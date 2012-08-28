@@ -233,6 +233,65 @@ void TriMesh::recalculateNormals()
 	std::for_each( mNormals.begin(), mNormals.end(), std::mem_fun_ref(&Vec3f::normalize) );
 }
 
+void TriMesh::spherize()
+{
+	std::for_each( mVertices.begin(), mVertices.end(), std::mem_fun_ref(&Vec3f::normalize) );
+}
+
+void TriMesh::subdivide()
+{
+	bool hasNormals = ( ! mNormals.empty() );
+	bool hasTexCoords = ( ! mTexCoords.empty() );
+
+	// create a copy of the index buffer
+	vector<uint32_t>	temp( mIndices );
+
+	// clear current index buffer and allocate enough memory
+	mIndices.clear();
+	mIndices.reserve( temp.size() * 4 );
+	mVertices.reserve( mVertices.size() * 2 );
+
+	if(hasNormals) mNormals.reserve( mNormals.size() * 2 );
+	if(hasTexCoords) mTexCoords.reserve( mTexCoords.size() * 2 );
+
+	// 
+	uint32_t i1, i2, i3;
+	uint32_t n1, n2, n3;
+
+	vector<uint32_t>::const_iterator itr;
+	for(itr=temp.begin();itr!=temp.end();)
+	{
+		// retrieve face
+		i1 = *itr;	++itr;
+		i2 = *itr;	++itr;
+		i3 = *itr;	++itr;
+
+		// create vertices
+		n1 = mVertices.size(); mVertices.push_back( mVertices[i1].lerp(0.5f, mVertices[i2]) );
+		n2 = mVertices.size(); mVertices.push_back( mVertices[i2].lerp(0.5f, mVertices[i3]) );
+		n3 = mVertices.size(); mVertices.push_back( mVertices[i3].lerp(0.5f, mVertices[i1]) );
+
+		// create normals and texture coordinates
+		if(hasNormals) {
+			mNormals.push_back( mNormals[i1].lerp(0.5f, mNormals[i2]) );
+			mNormals.push_back( mNormals[i2].lerp(0.5f, mNormals[i3]) );
+			mNormals.push_back( mNormals[i3].lerp(0.5f, mNormals[i1]) );
+		}
+
+		if(hasTexCoords) {
+			mTexCoords.push_back( mTexCoords[i1].lerp(0.5f, mTexCoords[i2]) );
+			mTexCoords.push_back( mTexCoords[i2].lerp(0.5f, mTexCoords[i3]) );
+			mTexCoords.push_back( mTexCoords[i3].lerp(0.5f, mTexCoords[i1]) );
+		}
+
+		// create new polygons
+		mIndices.push_back(i1); mIndices.push_back(n1); mIndices.push_back(n3);
+		mIndices.push_back(n1); mIndices.push_back(i2); mIndices.push_back(n2);
+		mIndices.push_back(n3); mIndices.push_back(n2); mIndices.push_back(i3);
+		mIndices.push_back(n1); mIndices.push_back(n2); mIndices.push_back(n3);
+	}
+}
+
 /////////////////////////////////////////////////////////////////////////////////////////////////
 // TriMesh2d
 void TriMesh2d::clear()

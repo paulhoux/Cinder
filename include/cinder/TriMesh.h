@@ -154,6 +154,12 @@ class TriMesh {
 
 	//! Adds or replaces normals by calculating them from the vertices and faces.
 	void		recalculateNormals();
+
+	//! Normalizes all vertices, effectively creating a sphere.
+	void		spherize();
+
+	//! Subdivides the mesh by dividing each polygon into four new ones.
+	void		subdivide();
 	
  private:
 	std::vector<Vec3f>		mVertices;
