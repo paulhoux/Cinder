@@ -45,6 +45,8 @@ AppImplMswBasic::AppImplMswBasic( AppBasic *aApp )
 {
 	mShouldQuit = false;
 	mIsDragging = false;
+
+	mSecondsPerFrame = 1.0 / mFrameRate;
 }
 
 void AppImplMswBasic::run()
@@ -67,6 +69,7 @@ void AppImplMswBasic::run()
 	mBorderless = mApp->getSettings().isBorderless();
 	mAlwaysOnTop = mApp->getSettings().isAlwaysOnTop();
 	mFrameRate = mApp->getSettings().getFrameRate();
+	mSecondsPerFrame = 1.0 / mFrameRate;
 
 	if( mApp->getSettings().isWindowPosSpecified() )
 		mWindowedPos = mApp->getSettings().getWindowPos();
@@ -102,18 +105,14 @@ void AppImplMswBasic::run()
 		// get current time in seconds
 		double currentSeconds = mApp->getElapsedSeconds();
 
-		// calculate time per frame in seconds
-		double secondsPerFrame = 1.0 / mFrameRate;
-
-		// determine if application was frozen for a while and adjust next frame time
+		// determine if application was delayed by more than 3 frames
+		// if so, skip frames and adjust next frame time
 		double elapsedSeconds = currentSeconds - mNextFrameTime;
-		if(elapsedSeconds > 1.0) {
-			int numSkipFrames = (int)(elapsedSeconds / secondsPerFrame);
-			mNextFrameTime += (numSkipFrames * secondsPerFrame);
-		}
+		if(elapsedSeconds > 3.0 * mSecondsPerFrame) 
+			mNextFrameTime = currentSeconds; 
 
 		// determine when next frame should be drawn
-		mNextFrameTime += secondsPerFrame;
+		mNextFrameTime += mSecondsPerFrame;
 
 		// sleep and process messages until next frame
 		if(mNextFrameTime > currentSeconds)
@@ -428,7 +427,12 @@ void AppImplMswBasic::setWindowSize( int aWindowWidth, int aWindowHeight )
 
 float AppImplMswBasic::setFrameRate( float aFrameRate )
 {
-	mFrameRate = aFrameRate;	// fix
+	// adjust next frame time
+	mNextFrameTime += ((aFrameRate - mFrameRate) / (aFrameRate * mFrameRate));
+
+	mFrameRate = aFrameRate;	
+	mSecondsPerFrame = 1.0 / mFrameRate;
+
 	return aFrameRate;
 }
 

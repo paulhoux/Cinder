@@ -76,6 +76,7 @@ class AppImplMswBasic : public AppImplMsw {
 	HINSTANCE				mInstance;
 	DWORD					mWindowStyle, mWindowExStyle;
 	Vec2i					mWindowedPos;
+	double					mSecondsPerFrame;
 	double					mNextFrameTime;
 	Display					*mDisplay;
 	std::map<DWORD,Vec2f>	mMultiTouchPrev;
