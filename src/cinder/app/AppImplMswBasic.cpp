@@ -93,37 +93,29 @@ void AppImplMswBasic::run()
 	::SetForegroundWindow( mWnd );
 	::SetFocus( mWnd );
 
-	// initialize our next frame time
-	mNextFrameTime = getElapsedSeconds();
-
 	// inner loop
 	while( ! mShouldQuit ) {
+		// keep track of the current time
+		double startFrameTime = mApp->getElapsedSeconds();
+		
 		// update and draw
 		mApp->privateUpdate__();
 		::RedrawWindow( mWnd, NULL, NULL, RDW_INVALIDATE | RDW_UPDATENOW );
-
-		// get current time in seconds
-		double currentSeconds = mApp->getElapsedSeconds();
-
-		// determine if application was delayed by more than 3 frames
-		// if so, skip frames and adjust next frame time
-		double elapsedSeconds = currentSeconds - mNextFrameTime;
-		if(elapsedSeconds > 3.0 * mSecondsPerFrame) 
-			mNextFrameTime = currentSeconds; 
-
-		// determine when next frame should be drawn
-		mNextFrameTime += mSecondsPerFrame;
-
-		// sleep and process messages until next frame
-		if(mNextFrameTime > currentSeconds)
-			sleep(mNextFrameTime - currentSeconds);
-		else {
-			MSG msg;
-			while( ::PeekMessage( &msg, NULL, 0, 0, PM_REMOVE ) ) {
-				::TranslateMessage( &msg );
-				::DispatchMessage( &msg );
-			}
+			
+		// process all system events
+		MSG msg;
+		while( ::PeekMessage( &msg, NULL, 0, 0, PM_REMOVE ) ) {
+			::TranslateMessage( &msg );
+			::DispatchMessage( &msg );
 		}
+
+		// calculate how much time updating and drawing took
+		double endFrameTime = mApp->getElapsedSeconds();
+		double frameTime = (endFrameTime - startFrameTime);
+
+		// work out if we need to force a sleep to hold back the frame rate
+		if( frameTime < mSecondsPerFrame )
+			sleep( mSecondsPerFrame - frameTime );
 	}
 
 	killWindow( mFullScreen );
@@ -427,9 +419,6 @@ void AppImplMswBasic::setWindowSize( int aWindowWidth, int aWindowHeight )
 
 float AppImplMswBasic::setFrameRate( float aFrameRate )
 {
-	// adjust next frame time
-	mNextFrameTime += ((aFrameRate - mFrameRate) / (aFrameRate * mFrameRate));
-
 	mFrameRate = aFrameRate;	
 	mSecondsPerFrame = 1.0 / mFrameRate;
 
