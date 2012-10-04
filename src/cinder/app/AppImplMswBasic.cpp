@@ -93,11 +93,11 @@ void AppImplMswBasic::run()
 	::SetForegroundWindow( mWnd );
 	::SetFocus( mWnd );
 
+	// keep track of the current time
+	double startFrameTime = mApp->getElapsedSeconds();
+	
 	// inner loop
-	while( ! mShouldQuit ) {
-		// keep track of the current time
-		double startFrameTime = mApp->getElapsedSeconds();
-		
+	while( ! mShouldQuit ) {		
 		// update and draw
 		mApp->privateUpdate__();
 		::RedrawWindow( mWnd, NULL, NULL, RDW_INVALIDATE | RDW_UPDATENOW );
@@ -114,8 +114,13 @@ void AppImplMswBasic::run()
 		double frameTime = (endFrameTime - startFrameTime);
 
 		// work out if we need to force a sleep to hold back the frame rate
-		if( frameTime < mSecondsPerFrame )
+		if( frameTime < mSecondsPerFrame ) {
 			sleep( mSecondsPerFrame - frameTime );
+			startFrameTime += mSecondsPerFrame;
+		}
+		else {
+			startFrameTime = mApp->getElapsedSeconds();
+		}
 	}
 
 	killWindow( mFullScreen );
