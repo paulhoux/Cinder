@@ -242,17 +242,21 @@ void TriMesh::subdivide()
 {
 	bool hasNormals = ( ! mNormals.empty() );
 	bool hasTexCoords = ( ! mTexCoords.empty() );
+	bool hasColorsRGB = ( ! mColorsRGB.empty() );
+	bool hasColorsRGBA = ( ! mColorsRGBA.empty() );
 
 	// create a copy of the index buffer
 	vector<uint32_t>	temp( mIndices );
 
-	// clear current index buffer and allocate enough memory
+	// clear current index buffer and allocate enough memory for all buffers
 	mIndices.clear();
 	mIndices.reserve( temp.size() * 4 );
 	mVertices.reserve( mVertices.size() * 2 );
 
 	if(hasNormals) mNormals.reserve( mNormals.size() * 2 );
 	if(hasTexCoords) mTexCoords.reserve( mTexCoords.size() * 2 );
+	if(hasColorsRGB) mColorsRGB.reserve( mColorsRGB.size() * 2 );
+	if(hasColorsRGBA) mColorsRGBA.reserve( mColorsRGBA.size() * 2 );
 
 	// 
 	uint32_t i1, i2, i3;
@@ -282,6 +286,19 @@ void TriMesh::subdivide()
 			mTexCoords.push_back( mTexCoords[i1].lerp(0.5f, mTexCoords[i2]) );
 			mTexCoords.push_back( mTexCoords[i2].lerp(0.5f, mTexCoords[i3]) );
 			mTexCoords.push_back( mTexCoords[i3].lerp(0.5f, mTexCoords[i1]) );
+		}
+
+		// calculate colors
+		if(hasColorsRGB) {
+			mColorsRGB.push_back( mColorsRGB[i1].lerp(0.5f, mColorsRGB[i2]) );
+			mColorsRGB.push_back( mColorsRGB[i2].lerp(0.5f, mColorsRGB[i3]) );
+			mColorsRGB.push_back( mColorsRGB[i3].lerp(0.5f, mColorsRGB[i1]) );
+		}
+
+		if(hasColorsRGBA) {
+			mColorsRGBA.push_back( mColorsRGBA[i1].lerp(0.5f, mColorsRGBA[i2]) );
+			mColorsRGBA.push_back( mColorsRGBA[i2].lerp(0.5f, mColorsRGBA[i3]) );
+			mColorsRGBA.push_back( mColorsRGBA[i3].lerp(0.5f, mColorsRGBA[i1]) );
 		}
 
 		// create new polygons
