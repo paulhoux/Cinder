@@ -1,5 +1,4 @@
 #version 120
-#extension GL_EXT_draw_instanced : enable
 
 attribute mat4	model_matrix;
 

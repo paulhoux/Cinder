@@ -54,24 +54,32 @@ public:
 	
 	void keyDown( KeyEvent event );
 private:
+	//! loads the hexagon mesh and create the vertex buffer object
 	void loadMesh();
+	//! creates a vertex array object containing the model matrix for each instance
 	void initializeBuffer();
+	//! renders the help window to a texture
 	void renderHelp();
 private:
 	bool			mDrawInstanced;
 
 	MayaCamUI		mCamera;
 
+	//! we use 2 shader versions: a standard and an instanced one
 	gl::GlslProg	mShader;
 	gl::GlslProg	mShaderInstanced;
 
+	//! the VBO containing the hexagon mesh
 	gl::VboMesh		mVboMesh;
+
+	//!
+	std::vector<Matrix44f>	mModelMatrices;
+	//! array buffer containing a model matrix for each instance
 	gl::Vbo			mBuffer;
+	//! vertex array object encapsulating all array buffers
 	GLuint			mVAO;
 
 	gl::Texture		mHelpTexture;
-
-	std::vector< Matrix44f >	mModelMatrices;
 };
 
 void InstancedVboRenderingApp::prepareSettings(Settings *settings)
@@ -96,8 +104,7 @@ void InstancedVboRenderingApp::setup()
 	mCamera.setCurrentCam( cam );
 
 	// initialize transforms for every instance
-	mModelMatrices.resize( NUM_INSTANCES );
-
+	mModelMatrices.reserve( NUM_INSTANCES );
 	for(size_t i=0;i<NUM_INSTANCES;++i)
 	{
 		float y = math<float>::floor( i / ROW_COUNT );
@@ -106,8 +113,8 @@ void InstancedVboRenderingApp::setup()
 
 		Matrix44f model;
 		model.translate( Vec3f(x, y, 0.0f) );
-		model.rotate( Rand::randFloat() * Vec3f::xAxis() );
-		mModelMatrices[i] = model;
+		model.rotate( Rand::randFloat(0.0f, 7.0f) * Vec3f::xAxis() );
+		mModelMatrices.push_back( model );
 	}
 
 	// load shader
