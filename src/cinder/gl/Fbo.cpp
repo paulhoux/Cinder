@@ -200,6 +200,7 @@ void Fbo::init()
 	// allocate the color buffers
 	for( int c = 0; c < mObj->mFormat.mNumColorBuffers; ++c ) {
 		mObj->mColorTextures.push_back( Texture( mObj->mWidth, mObj->mHeight, textureFormat ) );
+		mObj->mColorTextures.back().setFlipped(true); // work-around for the flipped texture issue
 	}
 	
 #if ! defined( CINDER_GLES )	
@@ -235,6 +236,7 @@ void Fbo::init()
 				glTexParameteri( getTarget(), GL_TEXTURE_WRAP_T, mObj->mFormat.mWrapT );
 				glTexParameteri( getTarget(), GL_DEPTH_TEXTURE_MODE, GL_LUMINANCE );
 				mObj->mDepthTexture = Texture( getTarget(), depthTextureId, mObj->mWidth, mObj->mHeight, true );
+				mObj->mDepthTexture.setFlipped(true); // work-around for the flipped texture issue
 
 				glFramebufferTexture2DEXT( GL_FRAMEBUFFER_EXT, GL_DEPTH_ATTACHMENT_EXT, getTarget(), mObj->mDepthTexture.getId(), 0 );
 //glFramebufferTexture2DEXT( GL_FRAMEBUFFER_EXT, GL_STENCIL_ATTACHMENT_EXT, getTarget(), mObj->mDepthTexture.getId(), 0 );
