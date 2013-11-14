@@ -71,6 +71,7 @@ class FrustumCullingReduxApp : public AppBasic
 	//! flags
 	bool			bPerformCulling;
 	bool			bMoveCamera;
+	bool			bSmallViewport;
 	bool			bDrawEstimatedBoundingBoxes;
 	bool			bDrawPreciseBoundingBoxes;
 	bool			bShowHelp;
@@ -118,6 +119,7 @@ void FrustumCullingReduxApp::setup()
 	//! intialize settings
 	bPerformCulling = true;
 	bMoveCamera = true;
+	bSmallViewport = true;
 	bDrawEstimatedBoundingBoxes = false;
 	bDrawPreciseBoundingBoxes = false;
 	bShowHelp = true;
@@ -155,7 +157,7 @@ void FrustumCullingReduxApp::setup()
 
 	//! setup cameras
 	mRenderCam = CameraPersp(getWindowWidth(), getWindowHeight(), 60.0f, 50.0f, 10000.0f);
-	mRenderCam.setEyePoint( Vec3f(200.0f, 200.0f, 200.0f) );
+	mRenderCam.setEyePoint( Vec3f(000.0f, 1000.0f, 1000.0f) );
 	mRenderCam.setCenterOfInterestPoint( Vec3f(0.0f, 0.0f, 0.0f) );
 	mMayaCam.setCurrentCam( mRenderCam );
 
@@ -172,8 +174,12 @@ void FrustumCullingReduxApp::update()
 	mCurrentSeconds += elapsed;
 
 	//! update culling camera (press SPACE to toggle bMoveCamera)
-	if(bMoveCamera) 
+	if(bMoveCamera) {
 		mCullingCam = mRenderCam;
+	
+		if(bSmallViewport)
+			mCullingCam.setFov( 0.5f * mRenderCam.getFov() );
+	}
 
 	//! perform frustum culling **********************************************************************************
 	Frustumf visibleWorld( mCullingCam );
@@ -277,6 +283,15 @@ void FrustumCullingReduxApp::draw()
 	// restore matrices
 	gl::popMatrices();
 
+	// render small viewport
+	if(bMoveCamera && bSmallViewport) {
+		Area viewport = gl::getViewport();
+		Area smallViewport = Area(0, 0, viewport.getWidth() / 2, viewport.getHeight() / 2);
+		smallViewport = Area::proportionalFit( smallViewport, viewport, true, false );
+		gl::color( Color(1, 1, 1) );
+		gl::drawStrokedRect( smallViewport );
+	}
+
 	// render help
 	if(bShowHelp && mHelp) {
 		gl::enableAlphaBlending();
@@ -324,6 +339,9 @@ void FrustumCullingReduxApp::keyDown( KeyEvent event )
 		break;
 	case KeyEvent::KEY_h:
 		bShowHelp = !bShowHelp;
+		break;
+	case KeyEvent::KEY_s:
+		bSmallViewport = !bSmallViewport;
 		break;
 	case KeyEvent::KEY_v:
 		toggleVerticalSync();
@@ -387,6 +405,9 @@ void FrustumCullingReduxApp::renderHelpToTexture()
 
 	if(bPerformCulling) layout.addLine("(C) Toggle culling (currently ON)");
 	else  layout.addLine("(C) Toggle culling (currently OFF)");
+
+	if(bSmallViewport) layout.addLine("(S) Toggle small viewport (currently ON)");
+	else  layout.addLine("(S) Toggle small viewport (currently OFF)");
 
 	if(bDrawEstimatedBoundingBoxes) layout.addLine("(B) Toggle estimated bounding boxes (currently ON)");
 	else  layout.addLine("(B) Toggle estimated bounding boxes (currently OFF)");
