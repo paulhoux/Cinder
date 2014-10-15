@@ -188,6 +188,7 @@
     </Lib>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\include\cinder\evr\EnhancedVideoRendererImpl.cpp" />
     <ClCompile Include="..\src\AntTweakBar\LoadOGLCore.cpp" />
     <ClCompile Include="..\src\AntTweakBar\TwDirect3D11.cpp" />
     <ClCompile Include="..\src\AntTweakBar\TwOpenGLCore.cpp" />
@@ -252,6 +253,7 @@
     <ClCompile Include="..\src\cinder\DataSource.cpp" />
     <ClCompile Include="..\src\cinder\DataTarget.cpp" />
     <ClCompile Include="..\src\cinder\Display.cpp" />
+    <ClCompile Include="..\src\cinder\evr\EnhancedVideoRendererGlImpl.cpp" />
     <ClCompile Include="..\src\cinder\Exception.cpp" />
     <ClCompile Include="..\src\cinder\Font.cpp" />
     <ClCompile Include="..\src\cinder\Frustum.cpp" />
@@ -467,6 +469,8 @@
     <ClInclude Include="..\include\cinder\dx\gldx.h" />
     <ClInclude Include="..\include\cinder\dx\HlslProg.h" />
     <ClInclude Include="..\include\cinder\dx\PlatformHelpers.h" />
+    <ClInclude Include="..\include\cinder\evr\EnhancedVideoRendererGlImpl.h" />
+    <ClInclude Include="..\include\cinder\evr\EnhancedVideoRendererImpl.h" />
     <ClInclude Include="..\include\cinder\Filesystem.h" />
     <ClInclude Include="..\include\cinder\Frustum.h" />
     <ClInclude Include="..\include\cinder\GeomIo.h" />
@@ -499,6 +503,7 @@
     <ClInclude Include="..\include\cinder\Matrix33.h" />
     <ClInclude Include="..\include\cinder\Matrix44.h" />
     <ClInclude Include="..\include\cinder\MatrixStack.h" />
+    <ClInclude Include="..\include\cinder\msw\CinderMswComPtr.h" />
     <ClInclude Include="..\include\cinder\Plane.h" />
     <ClInclude Include="..\include\cinder\Function.h" />
     <ClInclude Include="..\include\cinder\qtime\MovieWriter.h" />

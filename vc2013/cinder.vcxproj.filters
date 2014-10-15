@@ -139,6 +139,12 @@
     <Filter Include="Source Files\glload">
       <UniqueIdentifier>{989dc751-89fb-4b63-adb6-f745dd03ccb9}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\evr">
+      <UniqueIdentifier>{f2d3fa94-d4be-4123-8c85-9419b551cddc}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\evr">
+      <UniqueIdentifier>{dccbcfd9-492c-40f6-80d4-c5aa1fbea7bb}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\src\cinder\Area.cpp">
@@ -743,6 +749,12 @@
     </ClCompile>
     <ClCompile Include="..\src\cinder\ImageSourceFileRadiance.cpp">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\cinder\evr\EnhancedVideoRendererGlImpl.cpp">
+      <Filter>Source Files\evr</Filter>
+    </ClCompile>
+    <ClCompile Include="..\include\cinder\evr\EnhancedVideoRendererImpl.cpp">
+      <Filter>Source Files\evr</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -1582,6 +1594,15 @@
     </ClInclude>
     <ClInclude Include="..\include\cinder\ImageSourceFileRadiance.h">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\cinder\evr\EnhancedVideoRendererImpl.h">
+      <Filter>Header Files\evr</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\cinder\evr\EnhancedVideoRendererGlImpl.h">
+      <Filter>Header Files\evr</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\cinder\msw\CinderMswComPtr.h">
+      <Filter>Header Files\msw</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
