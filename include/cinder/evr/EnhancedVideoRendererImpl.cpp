@@ -36,15 +36,36 @@ POSSIBILITY OF SUCH DAMAGE.
 namespace cinder {
 namespace evr {
 
-MovieBase::MovieBase()
-	: mRefCount( 0 ), mState( CLOSED ), mWidth( 0 ), mHeight( 0 ), mCurrentVolume( 1 )
-	, mLoaded( false ), mPlayThroughOk( false ), mPlayable( false ), mProtected( false ), mPlaying( false )
-	, mPlayingForward( true ), mLoop( false ), mPalindrome( false ), mHasAudio( false ), mHasVideo( false )
+std::map<HWND, MovieBase*> MovieBase::sMovieWindows;
+
+//////////////////////////////////////////////////////////////////////////////////////////
+
+template <class Q>
+HRESULT GetEventObject( IMFMediaEvent *pEvent, Q **ppObject )
 {
-	init();
+	*ppObject = nullptr;
+
+	PROPVARIANT var;
+	HRESULT hr = pEvent->GetValue( &var );
+	if( SUCCEEDED( hr ) ) {
+		if( var.vt == VT_UNKNOWN ) {
+			hr = var.punkVal->QueryInterface( ppObject );
+		}
+		else {
+			hr = MF_E_INVALIDTYPE;
+		}
+		PropVariantClear( &var );
+	}
+
+	return hr;
 }
 
-void MovieBase::init()
+//////////////////////////////////////////////////////////////////////////////////////////
+
+MovieBase::MovieBase()
+	: mRefCount( 0 ), mHwnd( nullptr ), mState( CLOSED ), mWidth( 0 ), mHeight( 0 ), mCurrentVolume( 1 )
+	, mLoaded( false ), mPlayThroughOk( false ), mPlayable( false ), mProtected( false ), mPlaying( false )
+	, mPlayingForward( true ), mLoop( false ), mPalindrome( false ), mHasAudio( false ), mHasVideo( false )
 {
 	static bool isInitialized = false;
 
@@ -59,13 +80,16 @@ void MovieBase::init()
 	}
 }
 
-void MovieBase::initFromUrl( const Url& url )
+void MovieBase::init()
 {
-
+	mHwnd = createWindow( this );
+	// TODO: error checking.
 }
 
-void MovieBase::initFromPath( const fs::path& filePath )
+void MovieBase::initFromUrl( const Url& url )
 {
+	init();
+
 	// Create the media session.
 	HRESULT hr = createSession();
 	if( FAILED( hr ) ) {
@@ -74,8 +98,8 @@ void MovieBase::initFromPath( const fs::path& filePath )
 	}
 
 	// Create the media source.
-	std::wstring url = msw::toWideString( filePath.generic_string() );
-	hr = createMediaSource( url.c_str(), &mMediaSourcePtr );
+	std::wstring wstr = msw::toWideString( url.str() );
+	hr = createMediaSource( wstr.c_str(), &mMediaSourcePtr );
 	if( FAILED( hr ) ) {
 		CI_LOG_E( "Failed to create media source." );
 		closeSession();
@@ -83,42 +107,61 @@ void MovieBase::initFromPath( const fs::path& filePath )
 	}
 
 	// Create the presentation descriptor for the media source.
-	msw::ComPtr<IMFPresentationDescriptor> pSourcePD;
-	hr = mMediaSourcePtr->CreatePresentationDescriptor( &pSourcePD );
+	msw::ScopedComPtr<IMFPresentationDescriptor> pPD;
+	hr = mMediaSourcePtr->CreatePresentationDescriptor( &pPD );
 	if( FAILED( hr ) ) {
 		CI_LOG_E( "Failed to create presentation descriptor." );
 		closeSession();
 		return;
 	}
 
-	// Create a partial topology.
-	msw::ComPtr<IMFTopology> pTopology;
-	//hr = createPlaybackTopology( mMediaSourcePtr, pSourcePD, m_hwndVideo, &pTopology, m_pEVRPresenter );
+	hr = createPartialTopology( pPD );
 	if( FAILED( hr ) ) {
-		CI_LOG_E( "Failed to create playback topology." );
-		closeSession();
-		return;
-	}
-
-	hr = setMediaInfo( pSourcePD );
-	if( FAILED( hr ) ) {
-		CI_LOG_E( "Failed to set media info." );
-		closeSession();
-		return;
-	}
-
-	// Set the topology on the media session.
-	hr = mMediaSessionPtr->SetTopology( 0, pTopology );
-	if( FAILED( hr ) ) {
-		CI_LOG_E( "Failed to set topology." );
+		CI_LOG_E( "Failed to create partial topology." );
 		closeSession();
 		return;
 	}
 
 	mState = OPEN_PENDING;
+}
 
-	// If SetTopology succeeds, the media session will queue an 
-	// MESessionTopologySet event.
+void MovieBase::initFromPath( const fs::path& filePath )
+{
+	init();
+
+	// Create the media session.
+	HRESULT hr = createSession();
+	if( FAILED( hr ) ) {
+		CI_LOG_E( "Failed to create session." );
+		return;
+	}
+
+	// Create the media source.
+	std::wstring wstr = msw::toWideString( filePath.generic_string() );
+	hr = createMediaSource( wstr.c_str(), &mMediaSourcePtr );
+	if( FAILED( hr ) ) {
+		CI_LOG_E( "Failed to create media source." );
+		closeSession();
+		return;
+	}
+
+	// Create the presentation descriptor for the media source.
+	msw::ScopedComPtr<IMFPresentationDescriptor> pPD;
+	hr = mMediaSourcePtr->CreatePresentationDescriptor( &pPD );
+	if( FAILED( hr ) ) {
+		CI_LOG_E( "Failed to create presentation descriptor." );
+		closeSession();
+		return;
+	}
+
+	hr = createPartialTopology( pPD );
+	if( FAILED( hr ) ) {
+		CI_LOG_E( "Failed to create partial topology." );
+		closeSession();
+		return;
+	}
+
+	mState = OPEN_PENDING;
 }
 
 //  Create a new instance of the media session.
@@ -194,8 +237,10 @@ HRESULT MovieBase::closeSession()
 			mMediaSourcePtr->Shutdown();
 
 		// Shut down the media session. (Synchronous operation, no events.)
-		if( mMediaSessionPtr )
+		if( mMediaSessionPtr ) {
 			mMediaSessionPtr->Shutdown();
+			CI_LOG_V( "Media session closed." );
+		}
 	}
 
 	mMediaSourcePtr = nullptr;
@@ -203,7 +248,34 @@ HRESULT MovieBase::closeSession()
 
 	mState = CLOSED;
 
-	CI_LOG_V( "Media session closed." );
+	return hr;
+}
+
+HRESULT MovieBase::createPartialTopology( IMFPresentationDescriptor *pPD )
+{
+	HRESULT hr = S_OK;
+
+	msw::ScopedComPtr<IMFTopology> pTopology;
+	//hr = createPlaybackTopology( mMediaSourcePtr, pPD, m_hwndVideo, &pTopology, m_pEVRPresenter );
+	if( FAILED( hr ) ) {
+		CI_LOG_E( "Failed to create playback topology." );
+		return hr;
+	}
+
+	hr = setMediaInfo( pPD );
+	if( FAILED( hr ) ) {
+		CI_LOG_E( "Failed to set media info." );
+		return hr;
+	}
+
+	// Set the topology on the media session.
+	hr = mMediaSessionPtr->SetTopology( 0, pTopology );
+	if( FAILED( hr ) ) {
+		CI_LOG_E( "Failed to set topology." );
+		return hr;
+	}
+
+	// If SetTopology succeeds, the media session will queue an MESessionTopologySet event.
 
 	return hr;
 }
@@ -223,7 +295,7 @@ HRESULT MovieBase::setMediaInfo( IMFPresentationDescriptor *pPD )
 	for( DWORD i = 0; i < count; i++ ) {
 		BOOL selected;
 
-		msw::ComPtr<IMFStreamDescriptor> spStreamDesc;
+		msw::ScopedComPtr<IMFStreamDescriptor> spStreamDesc;
 		hr = pPD->GetStreamDescriptorByIndex( i, &selected, &spStreamDesc );
 		if( FAILED( hr ) ) {
 			CI_LOG_E( "Failed to get stream descriptor by index." );
@@ -231,7 +303,7 @@ HRESULT MovieBase::setMediaInfo( IMFPresentationDescriptor *pPD )
 		}
 
 		if( selected ) {
-			msw::ComPtr<IMFMediaTypeHandler> pHandler;
+			msw::ScopedComPtr<IMFMediaTypeHandler> pHandler;
 			hr = spStreamDesc->GetMediaTypeHandler( &pHandler );
 			if( FAILED( hr ) ) {
 				CI_LOG_E( "Failed to get media type handler." );
@@ -247,7 +319,7 @@ HRESULT MovieBase::setMediaInfo( IMFPresentationDescriptor *pPD )
 
 			if( MFMediaType_Video == guidMajorType ) {
 				// first get the source video size and allocate a new texture
-				msw::ComPtr<IMFMediaType> pMediaType;
+				msw::ScopedComPtr<IMFMediaType> pMediaType;
 				hr = pHandler->GetCurrentMediaType( &pMediaType );
 				if( FAILED( hr ) ) {
 					CI_LOG_E( "Failed to get current media type." );
@@ -269,6 +341,165 @@ HRESULT MovieBase::setMediaInfo( IMFPresentationDescriptor *pPD )
 	}
 
 	return hr;
+}
+
+LRESULT MovieBase::WndProc( HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam )
+{
+	switch( message ) {
+	case WM_DESTROY:
+		PostQuitMessage( 0 );
+		break;
+	case WM_APP_MOVIE_EVENT:
+		handleEvent( wParam );
+	default:
+		return DefWindowProc( hWnd, message, wParam, lParam );
+	}
+
+	return 0L;
+}
+
+HRESULT MovieBase::handleEvent( UINT_PTR pEventPtr )
+{
+	HRESULT hr = S_OK;
+
+	msw::ScopedComPtr<IMFMediaEvent> pEvent( (IMFMediaEvent*) pEventPtr );
+	if( pEvent == nullptr )
+		return E_POINTER;
+
+	// Get the event type.
+	MediaEventType eventType = MEUnknown;
+	hr = pEvent->GetType( &eventType );
+	if( FAILED( hr ) ) {
+		CI_LOG_E( "Failed to get event type." );
+		return hr;
+	}
+
+	// Get the event status. If the operation that triggered the event 
+	// did not succeed, the status is a failure code.
+	HRESULT hrStatus = S_OK;
+	hr = pEvent->GetStatus( &hrStatus );
+	if( FAILED( hr ) ) {
+		CI_LOG_E( "Failed to get status for event." );
+		return hr;
+	}
+
+	// Check if the async operation succeeded.
+	if( SUCCEEDED( hr ) && FAILED( hrStatus ) ) {
+		CI_LOG_E( "GetStatus() returned a failed status: " << hrStatus );
+		hr = hrStatus;
+	}
+
+	if( FAILED( hr ) )
+		return hr;
+
+	switch( eventType ) {
+	case MESessionTopologySet:
+		hr = handleSessionTopologySetEvent( pEvent );
+		break;
+	case MESessionTopologyStatus:
+		hr = handleSessionTopologyStatusEvent( pEvent );
+		break;
+	case MEEndOfPresentation:
+		hr = handleEndOfPresentationEvent( pEvent );
+		break;
+	case MENewPresentation:
+		hr = handleNewPresentationEvent( pEvent );
+		break;
+	case MESessionStarted:
+		// Do nothing.
+		break;
+	default:
+		hr = handleSessionEvent( pEvent, eventType );
+		break;
+	}
+
+	return hr;
+}
+
+HRESULT MovieBase::handleSessionTopologySetEvent( IMFMediaEvent *pEvent )
+{
+#if _DEBUG
+	msw::ScopedComPtr<IMFTopology> pTopology;
+	GetEventObject<IMFTopology>( pEvent, &pTopology );
+
+	if( !pTopology )
+		return E_POINTER;
+
+	WORD nodeCount;
+	pTopology->GetNodeCount( &nodeCount );
+
+	CI_LOG_V( "Topo set and we have " << nodeCount << " nodes" );
+#endif
+
+	return S_OK;
+}
+
+HRESULT MovieBase::handleSessionTopologyStatusEvent( IMFMediaEvent *pEvent )
+{
+	UINT32 status;
+
+	HRESULT hr = pEvent->GetUINT32( MF_EVENT_TOPOLOGY_STATUS, &status );
+	if( SUCCEEDED( hr ) && ( status == MF_TOPOSTATUS_READY ) ) {
+		mVideoDisplayControlPtr.Release();
+
+		//hr = StartPlayback();
+		//hr = Pause();
+	}
+
+	return hr;
+}
+
+HRESULT MovieBase::handleEndOfPresentationEvent( IMFMediaEvent *pEvent )
+{
+	mMediaSessionPtr->Pause();
+	mState = PAUSED;
+
+	// Seek to the beginning.
+	PROPVARIANT varStart;
+	PropVariantInit( &varStart );
+	varStart.vt = VT_I8;
+	varStart.hVal.QuadPart = 0;
+
+	HRESULT hr = S_OK;
+	hr = mMediaSessionPtr->Start( &GUID_NULL, &varStart );
+
+	if( !mLoop )
+		mMediaSessionPtr->Pause();
+	else
+		mState = STARTED;
+
+	PropVariantClear( &varStart );
+
+	// The session puts itself into the stopped state automatically.
+
+	return S_OK;
+}
+
+HRESULT MovieBase::handleNewPresentationEvent( IMFMediaEvent *pEvent )
+{
+	// Get the presentation descriptor from the event.
+	msw::ScopedComPtr<IMFPresentationDescriptor> pPD;
+	HRESULT hr = GetEventObject( pEvent, &pPD );
+	if( FAILED( hr ) ) {
+		CI_LOG_E( "Failed to get event object." );
+		return hr;
+	}
+
+	// Create a partial topology.
+	hr = createPartialTopology( pPD );
+	if( FAILED( hr ) ) {
+		CI_LOG_E( "Failed to set topology." );
+		return hr;
+	}
+
+	mState = OPEN_PENDING;
+
+	return S_OK;
+}
+
+HRESULT MovieBase::handleSessionEvent( IMFMediaEvent *pEvent, MediaEventType eventType )
+{
+	return S_OK;
 }
 
 // IUnknown methods
@@ -304,7 +535,7 @@ HRESULT MovieBase::Invoke( IMFAsyncResult *pResult )
 		return E_POINTER;
 
 	// Get the event from the event queue.
-	msw::ComPtr<IMFMediaEvent> pEvent;
+	msw::ScopedComPtr<IMFMediaEvent> pEvent;
 	HRESULT hr = mMediaSessionPtr->EndGetEvent( pResult, &pEvent );
 	if( FAILED( hr ) ) {
 		CI_LOG_E( "Failed to end get event." );
@@ -315,7 +546,7 @@ HRESULT MovieBase::Invoke( IMFAsyncResult *pResult )
 	MediaEventType eventType = MEUnknown;
 	hr = pEvent->GetType( &eventType );
 	if( FAILED( hr ) ) {
-		CI_LOG_E( "Failed to get type." );
+		CI_LOG_E( "Failed to get event type." );
 		return hr;
 	}
 
@@ -343,11 +574,95 @@ HRESULT MovieBase::Invoke( IMFAsyncResult *pResult )
 
 	if( mState != CLOSING ) {
 		// Leave a reference count on the event.
-		pEvent.p->AddRef();
+		pEvent.get()->AddRef();
 
-		PostMessage( m_hwndEvent, WM_APP_MOVIE_EVENT, (WPARAM) pEvent.p, (LPARAM) eventType );
+		PostMessage( mHwnd, WM_APP_MOVIE_EVENT, (WPARAM) pEvent.get(), (LPARAM) eventType );
 	}
 	return S_OK;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////
+
+LRESULT CALLBACK MovieBase::WndProcDummy( HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam )
+{
+	MovieBase* movie = nullptr;
+
+	switch( message ) {
+	case WM_CREATE:
+		// Let DefWindowProc handle it.
+		break;
+	default:
+		movie = findMovie( hWnd );
+		if( movie )
+			return movie->WndProc( hWnd, message, wParam, lParam );
+		break;
+	}
+
+	return DefWindowProc( hWnd, message, wParam, lParam );
+}
+
+HWND MovieBase::createWindow( MovieBase* movie )
+{
+	static const PCWSTR szWindowClass = L"MFPLAYBACK";
+
+	// Register the window class.
+	WNDCLASSEX wcex;
+	ZeroMemory( &wcex, sizeof( WNDCLASSEX ) );
+	wcex.cbSize = sizeof( WNDCLASSEX );
+	wcex.style = CS_HREDRAW | CS_VREDRAW;
+
+	wcex.lpfnWndProc = WndProcDummy;
+	wcex.hbrBackground = (HBRUSH) ( BLACK_BRUSH );
+	wcex.lpszClassName = szWindowClass;
+
+	if( RegisterClassEx( &wcex ) == 0 )
+		throw std::runtime_error( "Failed to register window class." );
+
+	// Create the window.
+	HWND hWnd;
+	hWnd = CreateWindow( szWindowClass, L"", WS_OVERLAPPEDWINDOW,
+						 CW_USEDEFAULT, 0, CW_USEDEFAULT, 0, NULL, NULL, NULL, NULL );
+
+	if( hWnd != nullptr ) {
+		// Keep track of window.
+		sMovieWindows[hWnd] = movie;
+
+		// Set window attributes.
+		LONG style2 = ::GetWindowLong( hWnd, GWL_STYLE );
+		style2 &= ~WS_DLGFRAME;
+		style2 &= ~WS_CAPTION;
+		style2 &= ~WS_BORDER;
+		style2 &= WS_POPUP;
+
+		LONG exstyle2 = ::GetWindowLong( hWnd, GWL_EXSTYLE );
+		exstyle2 &= ~WS_EX_DLGMODALFRAME;
+		::SetWindowLong( hWnd, GWL_STYLE, style2 );
+		::SetWindowLong( hWnd, GWL_EXSTYLE, exstyle2 );
+
+		UpdateWindow( hWnd );
+	}
+
+	return hWnd;
+}
+
+void MovieBase::destroyWindow( HWND hWnd )
+{
+	auto itr = sMovieWindows.find( hWnd );
+	if( itr != sMovieWindows.end() )
+		sMovieWindows.erase( itr );
+
+	if( !DestroyWindow( hWnd ) ) {
+		// Something went wrong. Use GetLastError() to find out what.
+	}
+}
+
+MovieBase* MovieBase::findMovie( HWND hWnd )
+{
+	auto itr = sMovieWindows.find( hWnd );
+	if( itr != sMovieWindows.end() )
+		return itr->second;
+
+	return nullptr;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////
@@ -356,7 +671,7 @@ HRESULT MovieBase::Invoke( IMFAsyncResult *pResult )
 HRESULT MovieBase::createMediaSource( LPCWSTR pUrl, IMFMediaSource **ppSource )
 {
 	// Create the source resolver.
-	msw::ComPtr<IMFSourceResolver> pSourceResolver;
+	msw::ScopedComPtr<IMFSourceResolver> pSourceResolver;
 	HRESULT hr = MFCreateSourceResolver( &pSourceResolver );
 	if( FAILED( hr ) ) {
 		CI_LOG_E( "Failed to create source resolver." );
@@ -372,7 +687,7 @@ HRESULT MovieBase::createMediaSource( LPCWSTR pUrl, IMFMediaSource **ppSource )
 
 	DWORD dwFlags = MF_RESOLUTION_MEDIASOURCE | MF_RESOLUTION_CONTENT_DOES_NOT_HAVE_TO_MATCH_EXTENSION_OR_MIME_TYPE;
 	MF_OBJECT_TYPE objectType = MF_OBJECT_INVALID;
-	msw::ComPtr<IUnknown> pSource;
+	msw::ScopedComPtr<IUnknown> pSource;
 	hr = pSourceResolver->CreateObjectFromURL( pUrl, dwFlags, NULL, &objectType, &pSource );
 	if( FAILED( hr ) ) {
 		CI_LOG_E( "Failed to create object from URL: " << pUrl );
@@ -380,14 +695,14 @@ HRESULT MovieBase::createMediaSource( LPCWSTR pUrl, IMFMediaSource **ppSource )
 	}
 
 	// Get the IMFMediaSource interface from the media source.
-	return pSource->QueryInterface( IID_PPV_ARGS( ppSource ) );
+	return pSource.QueryInterface( __uuidof( **ppSource ), (void**) ppSource );
 }
 
 //  Create a playback topology from a media source.
 HRESULT MovieBase::createPlaybackTopology( IMFMediaSource *pSource, IMFPresentationDescriptor *pPD, HWND hVideoWnd, IMFTopology **ppTopology, IMFVideoPresenter *pVideoPresenter )
 {
 	// Create a new topology.
-	msw::ComPtr<IMFTopology> pTopology;
+	msw::ScopedComPtr<IMFTopology> pTopology;
 	HRESULT hr = MFCreateTopology( &pTopology );
 	if( FAILED( hr ) ) {
 		CI_LOG_E( "Failed to create topology." );
@@ -422,7 +737,7 @@ HRESULT MovieBase::createPlaybackTopology( IMFMediaSource *pSource, IMFPresentat
 HRESULT MovieBase::createMediaSinkActivate( IMFStreamDescriptor *pSourceSD, HWND hVideoWindow, IMFActivate **ppActivate, IMFVideoPresenter *pVideoPresenter, IMFMediaSink **ppMediaSink )
 {
 	// Get the media type handler for the stream.
-	msw::ComPtr<IMFMediaTypeHandler> pHandler;
+	msw::ScopedComPtr<IMFMediaTypeHandler> pHandler;
 	HRESULT hr = pSourceSD->GetMediaTypeHandler( &pHandler );
 	if( FAILED( hr ) ) {
 		CI_LOG_E( "Failed to get media type handler." );
@@ -440,7 +755,7 @@ HRESULT MovieBase::createMediaSinkActivate( IMFStreamDescriptor *pSourceSD, HWND
 	// Create an IMFActivate object for the renderer, based on the media type.
 	if( MFMediaType_Audio == guidMajorType ) {
 		// Create the audio renderer.
-		msw::ComPtr<IMFActivate> pActivate;
+		msw::ScopedComPtr<IMFActivate> pActivate;
 		hr = MFCreateAudioRendererActivate( &pActivate );
 		if( FAILED( hr ) ) {
 			CI_LOG_E( "Failed to create audio renderer / activate it." );
@@ -453,15 +768,15 @@ HRESULT MovieBase::createMediaSinkActivate( IMFStreamDescriptor *pSourceSD, HWND
 	}
 	else if( MFMediaType_Video == guidMajorType ) {
 		// Create the video renderer.
-		msw::ComPtr<IMFMediaSink> pSink;
+		msw::ScopedComPtr<IMFMediaSink> pSink;
 		hr = MFCreateVideoRenderer( __uuidof( IMFMediaSink ), (void**) &pSink );
 		if( FAILED( hr ) ) {
 			CI_LOG_E( "Failed to create video renderer." );
 			return hr;
 		}
 
-		msw::ComPtr<IMFVideoRenderer> pVideoRenderer;
-		hr = pSink->QueryInterface( __uuidof( IMFVideoRenderer ), (void**) &pVideoRenderer );
+		msw::ScopedComPtr<IMFVideoRenderer> pVideoRenderer;
+		hr = pSink.QueryInterface( __uuidof( IMFVideoRenderer ), (void**) &pVideoRenderer );
 		if( FAILED( hr ) ) {
 			CI_LOG_E( "Failed to query IMFVideoRenderer interface." );
 			return hr;
@@ -496,7 +811,7 @@ HRESULT MovieBase::createMediaSinkActivate( IMFStreamDescriptor *pSourceSD, HWND
 HRESULT MovieBase::addSourceNode( IMFTopology *pTopology, IMFMediaSource *pSource, IMFPresentationDescriptor *pPD, IMFStreamDescriptor *pSD, IMFTopologyNode **ppNode )
 {
 	// Create the node.
-	msw::ComPtr<IMFTopologyNode> pNode;
+	msw::ScopedComPtr<IMFTopologyNode> pNode;
 	HRESULT hr = MFCreateTopologyNode( MF_TOPOLOGY_SOURCESTREAM_NODE, &pNode );
 	if( FAILED( hr ) ) {
 		CI_LOG_E( "Failed to create topology node." );
@@ -541,7 +856,7 @@ HRESULT MovieBase::addOutputNode( IMFTopology *pTopology, IMFStreamSink *pStream
 	HRESULT hr = S_OK;
 
 	// Create the node.
-	msw::ComPtr<IMFTopologyNode> pNode;
+	msw::ScopedComPtr<IMFTopologyNode> pNode;
 	hr = MFCreateTopologyNode( MF_TOPOLOGY_OUTPUT_NODE, &pNode );
 
 	// Set the object pointer.
@@ -570,7 +885,7 @@ HRESULT MovieBase::addOutputNode( IMFTopology *pTopology, IMFStreamSink *pStream
 // Add an output node to a topology.
 HRESULT MovieBase::addOutputNode( IMFTopology *pTopology, IMFActivate *pActivate, DWORD dwId, IMFTopologyNode **ppNode )
 {
-	msw::ComPtr<IMFTopologyNode> pNode;
+	msw::ScopedComPtr<IMFTopologyNode> pNode;
 
 	// Create the node.
 	HRESULT hr = MFCreateTopologyNode( MF_TOPOLOGY_OUTPUT_NODE, &pNode );
@@ -625,11 +940,11 @@ HRESULT MovieBase::addOutputNode( IMFTopology *pTopology, IMFActivate *pActivate
 
 HRESULT MovieBase::addBranchToPartialTopology( IMFTopology *pTopology, IMFMediaSource *pSource, IMFPresentationDescriptor *pPD, DWORD iStream, HWND hVideoWnd, IMFVideoPresenter *pVideoPresenter )
 {
-	msw::ComPtr<IMFStreamDescriptor> pSD;
-	msw::ComPtr<IMFActivate> pSinkActivate;
-	msw::ComPtr<IMFTopologyNode> pSourceNode;
-	msw::ComPtr<IMFTopologyNode> pOutputNode;
-	msw::ComPtr<IMFMediaSink> pMediaSink;
+	msw::ScopedComPtr<IMFStreamDescriptor> pSD;
+	msw::ScopedComPtr<IMFActivate> pSinkActivate;
+	msw::ScopedComPtr<IMFTopologyNode> pSourceNode;
+	msw::ScopedComPtr<IMFTopologyNode> pOutputNode;
+	msw::ScopedComPtr<IMFMediaSink> pMediaSink;
 
 	assert( pPD != nullptr );
 

@@ -64,7 +64,7 @@ public:
 		CLOSING
 	};
 public:
-	virtual		~MovieBase() {}
+	virtual		~MovieBase() { if( mHwnd ) destroyWindow( mHwnd ); }
 
 	//! Returns whether the movie has loaded and buffered enough to playback without interruption
 	bool		checkPlayable() { /*TODO*/ return false; }
@@ -185,9 +185,26 @@ protected:
 	STDMETHODIMP  GetParameters( DWORD*, DWORD* ) { return E_NOTIMPL; } // Implementation of this method is optional.
 	STDMETHODIMP  Invoke( IMFAsyncResult* pAsyncResult );
 
-	HRESULT createSession();
-	HRESULT closeSession();
-	HRESULT setMediaInfo( IMFPresentationDescriptor *pPD );
+	virtual HRESULT createSession();
+	virtual HRESULT closeSession();
+	virtual HRESULT createPartialTopology( IMFPresentationDescriptor *pPD );
+	virtual HRESULT setMediaInfo( IMFPresentationDescriptor *pPD );
+
+	//! Default window message handler.
+	virtual LRESULT WndProc( HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam );
+
+	virtual HRESULT handleEvent( UINT_PTR pEventPtr );
+	virtual HRESULT handleSessionTopologySetEvent( IMFMediaEvent *pEvent );
+	virtual HRESULT handleSessionTopologyStatusEvent( IMFMediaEvent *pEvent );
+	virtual HRESULT handleEndOfPresentationEvent( IMFMediaEvent *pEvent );
+	virtual HRESULT handleNewPresentationEvent( IMFMediaEvent *pEvent );
+	virtual HRESULT handleSessionEvent( IMFMediaEvent *pEvent, MediaEventType eventType );
+
+	static HWND createWindow( MovieBase* movie );
+	static void destroyWindow( HWND hWnd );
+	static MovieBase* findMovie( HWND hWnd );
+
+	static LRESULT CALLBACK MovieBase::WndProcDummy( HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam );
 
 	static HRESULT createMediaSource( LPCWSTR pUrl, IMFMediaSource **ppSource );
 	static HRESULT createPlaybackTopology( IMFMediaSource *pSource, IMFPresentationDescriptor *pPD, HWND hVideoWnd, IMFTopology **ppTopology, IMFVideoPresenter *pVideoPresenter );
@@ -217,19 +234,21 @@ protected:
 
 	//EVRCustomPresenter*      mEVRPresenter; // Custom EVR for texture sharing
 
-	msw::ComPtr<IMFMediaSession>         mMediaSessionPtr;
-	msw::ComPtr<IMFSequencerSource>      mSequencerSourcePtr;
-	msw::ComPtr<IMFMediaSource>          mMediaSourcePtr;
-	msw::ComPtr<IMFVideoDisplayControl>  mVideoDisplayControlPtr;
-	msw::ComPtr<IMFAudioStreamVolume>    mAudioStreamVolumePtr;
+	msw::ScopedComPtr<IMFMediaSession>         mMediaSessionPtr;
+	msw::ScopedComPtr<IMFSequencerSource>      mSequencerSourcePtr;
+	msw::ScopedComPtr<IMFMediaSource>          mMediaSourcePtr;
+	msw::ScopedComPtr<IMFVideoDisplayControl>  mVideoDisplayControlPtr;
+	msw::ScopedComPtr<IMFAudioStreamVolume>    mAudioStreamVolumePtr;
 
 	MFSequencerElementId     m_previousTopoID;
-	HWND                     m_hwndVideo;        // Video window.
-	HWND                     m_hwndEvent;        // App window to receive events.
-	PlayerState              mState;            // Current state of the media session.
-	HANDLE                   mCloseEventHandle;      // Event to wait on while closing.
 
+	HWND                     mHwnd;
+	PlayerState              mState;
+	HANDLE                   mCloseEventHandle;
 	long                     mRefCount;
+
+	//! Keeps track of each player's window.
+	static std::map<HWND, MovieBase*> sMovieWindows;
 };
 
 }

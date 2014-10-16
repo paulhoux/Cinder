@@ -33,11 +33,8 @@ namespace evr {
 MovieGl::MovieGl()
 	: MovieBase()
 {
-	if( wglext_NV_DX_interop ) {
-		CI_LOG_V( "WGL_NV_DX_interop supported" );
-	}
-	else {
-		CI_LOG_E( "WGL_NV_DX_interop not supported. Upgrade your graphic drivers and try again." );
+	if( !wglext_NV_DX_interop ) {
+		throw std::runtime_error( "WGL_NV_DX_interop extension not supported. Upgrade your graphics drivers and try again." );
 	}
 }
 
@@ -46,10 +43,15 @@ MovieGl::~MovieGl()
 	HRESULT hr = closeSession();
 }
 
+MovieGl::MovieGl( const Url& url )
+	: MovieGl()
+{
+	MovieBase::initFromUrl( url );
+}
+
 MovieGl::MovieGl( const fs::path& filePath )
 	: MovieGl()
 {
-	this->AddRef();
 	MovieBase::initFromPath( filePath );
 }
 

@@ -44,9 +44,9 @@ class MovieGl : public MovieBase {
 public:
 	virtual ~MovieGl();
 
-	static MovieGlRef create( const Url& url ) { return MovieGlRef( new MovieGl( url ) ); }
-	static MovieGlRef create( const fs::path& path ) { return MovieGlRef( new MovieGl( path ) ); }
-	//static MovieGlRef create( const MovieLoaderRef &loader ) { return MovieGlRef( new MovieGl( *loader ) ); }
+	static MovieGlRef create( const Url& url ) { return msw::makeComShared<MovieGl>( new MovieGl( url ) ); }
+	static MovieGlRef create( const fs::path& path ) { return msw::makeComShared<MovieGl>( new MovieGl( path ) ); }
+	//static MovieGlRef create( const MovieLoaderRef &loader ) { return msw::makeComShared<MovieGl>( new MovieGl( *loader ) ); }
 
 	//! \inherit
 	virtual bool hasAlpha() const { /*TODO*/ return false; }
@@ -56,7 +56,7 @@ public:
 
 protected:
 	MovieGl();
-	MovieGl( const Url& url ) : MovieGl() {}
+	MovieGl( const Url& url );
 	MovieGl( const fs::path& path );
 	//MovieGl( const MovieLoader& loader );
 
