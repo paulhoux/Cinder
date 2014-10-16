@@ -89,6 +89,9 @@ void WindowsEnhancedVideoApp::keyDown( KeyEvent event )
 	case KeyEvent::KEY_ESCAPE:
 		quit();
 		break;
+	case KeyEvent::KEY_DELETE:
+		mMovieRef.reset();
+		break;
 	/*case KeyEvent::KEY_l:
 		if( mMovieRef ) {
 			mMovieRef->setLoop( !mMovieRef->isLooping() );
