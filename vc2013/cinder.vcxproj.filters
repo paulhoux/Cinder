@@ -750,10 +750,13 @@
     <ClCompile Include="..\src\cinder\ImageSourceFileRadiance.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\cinder\evr\EnhancedVideoRendererGlImpl.cpp">
+    <ClCompile Include="..\src\cinder\evr\RendererGlImpl.cpp">
       <Filter>Source Files\evr</Filter>
     </ClCompile>
-    <ClCompile Include="..\include\cinder\evr\EnhancedVideoRendererImpl.cpp">
+    <ClCompile Include="..\include\cinder\evr\RendererImpl.cpp">
+      <Filter>Source Files\evr</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\cinder\evr\Presenter.cpp">
       <Filter>Source Files\evr</Filter>
     </ClCompile>
   </ItemGroup>
@@ -1595,13 +1598,19 @@
     <ClInclude Include="..\include\cinder\ImageSourceFileRadiance.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\cinder\evr\EnhancedVideoRendererImpl.h">
+    <ClInclude Include="..\include\cinder\evr\Framework.h">
       <Filter>Header Files\evr</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\cinder\evr\EnhancedVideoRendererGlImpl.h">
+    <ClInclude Include="..\include\cinder\evr\Presenter.h">
       <Filter>Header Files\evr</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\cinder\msw\CinderMswComPtr.h">
+    <ClInclude Include="..\include\cinder\evr\RendererImpl.h">
+      <Filter>Header Files\evr</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\cinder\evr\RendererGlImpl.h">
+      <Filter>Header Files\evr</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\cinder\msw\CinderMswCom.h">
       <Filter>Header Files\msw</Filter>
     </ClInclude>
   </ItemGroup>

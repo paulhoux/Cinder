@@ -35,17 +35,7 @@ POSSIBILITY OF SUCH DAMAGE.
 #include "cinder/CinderAssert.h"
 #include "cinder/Log.h"
 
-#include "cinder/msw/CinderMsw.h"
-#include "cinder/msw/CinderMswComPtr.h"
-
-#include <shobjidl.h> 
-#include <shlwapi.h>
-
-// Media Foundation headers.
-#include <mfapi.h>
-#include <mfidl.h>
-#include <mferror.h>
-#include <evr.h>
+#include "cinder/evr/Presenter.h"
 
 namespace cinder {
 namespace evr {
@@ -187,7 +177,7 @@ protected:
 
 	virtual HRESULT createSession();
 	virtual HRESULT closeSession();
-	virtual HRESULT createPartialTopology( IMFPresentationDescriptor *pPD );
+	virtual HRESULT createPartialTopology( IMFPresentationDescriptor *pPD ) { return E_NOTIMPL; }
 	virtual HRESULT setMediaInfo( IMFPresentationDescriptor *pPD );
 
 	//! Default window message handler.
@@ -231,8 +221,6 @@ protected:
 
 protected:
 	float                    mCurrentVolume;
-
-	//EVRCustomPresenter*      mEVRPresenter; // Custom EVR for texture sharing
 
 	msw::ScopedComPtr<IMFMediaSession>         mMediaSessionPtr;
 	msw::ScopedComPtr<IMFSequencerSource>      mSequencerSourcePtr;

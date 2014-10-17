@@ -27,7 +27,7 @@
 #include "cinder/audio/Target.h"
 #include "cinder/audio/SampleType.h"
 #include "cinder/audio/msw/MswUtil.h"
-#include "cinder/msw/CinderMsw.h"
+#include "cinder/msw/CinderMswCom.h"
 
 #include <vector>
 

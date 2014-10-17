@@ -24,7 +24,7 @@ POSSIBILITY OF SUCH DAMAGE.
 
 #if defined( CINDER_MSW )
 
-#include "cinder/evr/EnhancedVideoRendererImpl.h"
+#include "cinder/evr/RendererImpl.h"
 
 #pragma comment(lib, "mf.lib")
 #pragma comment(lib, "mfplat.lib")
@@ -43,7 +43,7 @@ std::map<HWND, MovieBase*> MovieBase::sMovieWindows;
 template <class Q>
 HRESULT GetEventObject( IMFMediaEvent *pEvent, Q **ppObject )
 {
-	*ppObject = nullptr;
+	*ppObject = NULL;
 
 	PROPVARIANT var;
 	HRESULT hr = pEvent->GetValue( &var );
@@ -63,7 +63,7 @@ HRESULT GetEventObject( IMFMediaEvent *pEvent, Q **ppObject )
 //////////////////////////////////////////////////////////////////////////////////////////
 
 MovieBase::MovieBase()
-	: mRefCount( 0 ), mHwnd( nullptr ), mState( CLOSED ), mWidth( 0 ), mHeight( 0 ), mCurrentVolume( 1 )
+	: mRefCount( 0 ), mHwnd( NULL ), mState( CLOSED ), mWidth( 0 ), mHeight( 0 ), mCurrentVolume( 1 )
 	, mLoaded( false ), mPlayThroughOk( false ), mPlayable( false ), mProtected( false ), mPlaying( false )
 	, mPlayingForward( true ), mLoop( false ), mPalindrome( false ), mHasAudio( false ), mHasVideo( false )
 {
@@ -210,8 +210,8 @@ HRESULT MovieBase::closeSession()
 
 	HRESULT hr = S_OK;
 
-	mVideoDisplayControlPtr = nullptr;
-	mAudioStreamVolumePtr = nullptr;
+	mVideoDisplayControlPtr = NULL;
+	mAudioStreamVolumePtr = NULL;
 
 	// First close the media session.
 	if( mMediaSessionPtr ) {
@@ -243,39 +243,10 @@ HRESULT MovieBase::closeSession()
 		}
 	}
 
-	mMediaSourcePtr = nullptr;
-	mMediaSessionPtr = nullptr;
+	mMediaSourcePtr = NULL;
+	mMediaSessionPtr = NULL;
 
 	mState = CLOSED;
-
-	return hr;
-}
-
-HRESULT MovieBase::createPartialTopology( IMFPresentationDescriptor *pPD )
-{
-	HRESULT hr = S_OK;
-
-	msw::ScopedComPtr<IMFTopology> pTopology;
-	//hr = createPlaybackTopology( mMediaSourcePtr, pPD, m_hwndVideo, &pTopology, m_pEVRPresenter );
-	if( FAILED( hr ) ) {
-		CI_LOG_E( "Failed to create playback topology." );
-		return hr;
-	}
-
-	hr = setMediaInfo( pPD );
-	if( FAILED( hr ) ) {
-		CI_LOG_E( "Failed to set media info." );
-		return hr;
-	}
-
-	// Set the topology on the media session.
-	hr = mMediaSessionPtr->SetTopology( 0, pTopology );
-	if( FAILED( hr ) ) {
-		CI_LOG_E( "Failed to set topology." );
-		return hr;
-	}
-
-	// If SetTopology succeeds, the media session will queue an MESessionTopologySet event.
 
 	return hr;
 }
@@ -285,7 +256,7 @@ HRESULT MovieBase::setMediaInfo( IMFPresentationDescriptor *pPD )
 	mWidth = 0;
 	mHeight = 0;
 
-	assert( pPD != nullptr );
+	assert( pPD != NULL );
 
 	HRESULT hr = S_OK;
 
@@ -363,7 +334,7 @@ HRESULT MovieBase::handleEvent( UINT_PTR pEventPtr )
 	HRESULT hr = S_OK;
 
 	msw::ScopedComPtr<IMFMediaEvent> pEvent( (IMFMediaEvent*) pEventPtr );
-	if( pEvent == nullptr )
+	if( pEvent == NULL )
 		return E_POINTER;
 
 	// Get the event type.
@@ -585,7 +556,7 @@ HRESULT MovieBase::Invoke( IMFAsyncResult *pResult )
 
 LRESULT CALLBACK MovieBase::WndProcDummy( HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam )
 {
-	MovieBase* movie = nullptr;
+	MovieBase* movie = NULL;
 
 	switch( message ) {
 	case WM_CREATE:
@@ -611,21 +582,21 @@ HWND MovieBase::createWindow( MovieBase* movie )
 	wcex.cbSize = sizeof( WNDCLASSEX );
 	wcex.style = CS_HREDRAW | CS_VREDRAW;
 
-	wcex.lpfnWndProc = WndProcDummy;
+	wcex.lpfnWndProc = MovieBase::WndProcDummy;
 	wcex.hbrBackground = (HBRUSH) ( BLACK_BRUSH );
 	wcex.lpszClassName = szWindowClass;
 
-	if( RegisterClassEx( &wcex ) == 0 )
-		throw std::runtime_error( "Failed to register window class." );
+	RegisterClassEx( &wcex );
 
 	// Create the window.
 	HWND hWnd;
 	hWnd = CreateWindow( szWindowClass, L"", WS_OVERLAPPEDWINDOW,
 						 CW_USEDEFAULT, 0, CW_USEDEFAULT, 0, NULL, NULL, NULL, NULL );
 
-	if( hWnd != nullptr ) {
+	if( hWnd != NULL ) {
 		// Keep track of window.
 		sMovieWindows[hWnd] = movie;
+		CI_LOG_V( "Created a hidden window. Total number of hidden windows is now: " << sMovieWindows.size() );
 
 		// Set window attributes.
 		LONG style2 = ::GetWindowLong( hWnd, GWL_STYLE );
@@ -653,7 +624,10 @@ void MovieBase::destroyWindow( HWND hWnd )
 
 	if( !DestroyWindow( hWnd ) ) {
 		// Something went wrong. Use GetLastError() to find out what.
+		CI_LOG_E( "Failed to destroy hidden window." );
 	}
+	else
+		CI_LOG_V( "Destroyed a hidden window. Total number of hidden windows is now: " << sMovieWindows.size() );
 }
 
 MovieBase* MovieBase::findMovie( HWND hWnd )
@@ -662,7 +636,7 @@ MovieBase* MovieBase::findMovie( HWND hWnd )
 	if( itr != sMovieWindows.end() )
 		return itr->second;
 
-	return nullptr;
+	return NULL;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////
@@ -946,7 +920,7 @@ HRESULT MovieBase::addBranchToPartialTopology( IMFTopology *pTopology, IMFMediaS
 	msw::ScopedComPtr<IMFTopologyNode> pOutputNode;
 	msw::ScopedComPtr<IMFMediaSink> pMediaSink;
 
-	assert( pPD != nullptr );
+	assert( pPD != NULL );
 
 	BOOL fSelected = FALSE;
 	HRESULT hr = pPD->GetStreamDescriptorByIndex( iStream, &fSelected, &pSD );

@@ -4,7 +4,7 @@
 #include "cinder/Log.h"
 #include "cinder/Utilities.h"
 
-#include "cinder/evr/EnhancedVideoRendererGlImpl.h"
+#include "cinder/evr/RendererGlImpl.h"
 
 using namespace ci;
 using namespace ci::app;

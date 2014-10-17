@@ -24,7 +24,7 @@
 
 #include "cinder/ImageSourceFileWic.h"
 #include "cinder/Utilities.h"
-#include "cinder/msw/CinderMsw.h"
+#include "cinder/msw/CinderMswCom.h"
 
 #if (_WIN32_WINNT >= _WIN32_WINNT_WIN8) || defined(_WIN7_PLATFORM_UPDATE)
 	#include <D2D1.h>

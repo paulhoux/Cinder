@@ -25,13 +25,15 @@
 #include "cinder/Cinder.h"
 #include "cinder/Vector.h"
 #include "cinder/Surface.h"
-#include "cinder/Stream.h"
 
-#include <string>
 #include <windows.h>
-#include <Objidl.h>
 #undef min
 #undef max
+
+#define LOWORD(_dw)     ((WORD)(((DWORD_PTR)(_dw)) & 0xffff))
+#define HIWORD(_dw)     ((WORD)((((DWORD_PTR)(_dw)) >> 16) & 0xffff))
+#define LODWORD(_qw)    ((DWORD)(_qw))
+#define HIDWORD(_qw)    ((DWORD)(((_qw) >> 32) & 0xffffffff))
 
 namespace cinder { namespace msw {
 
@@ -50,86 +52,48 @@ inline vec2 toVec2( const ::POINTFX &p )
 { return vec2( ( (p.x.value << 16) | p.x.fract ) / 65535.0f, ( (p.y.value << 16) | p.y.fract ) / 65535.0f ); }
 #endif
 
-//! A free function designed to interact with makeComShared, calls Release() on a com-managed object
-void ComDelete( void *p );
-
-//! Functor version that calls Release() on a com-managed object
-struct ComDeleter {
-	template <typename T>
-	void operator()( T* ptr )	{ if( ptr ) ptr->Release(); }
-};
-
-//! Creates a shared_ptr whose deleter will properly decrement the reference count of a COM object
-template<typename T>
-inline std::shared_ptr<T> makeComShared( T *p )		{ return std::shared_ptr<T>( p, &ComDelete ); }
-
-//! Creates a unique_ptr whose deleter will properly decrement the reference count of a COM object
-template<typename T>
-inline std::unique_ptr<T, ComDeleter> makeComUnique( T *p )	{ return std::unique_ptr<T, ComDeleter>( p ); }
-
-//! Wraps a cinder::OStream with a COM ::IStream
-class ComOStream : public ::IStream
-{
-  public:
-	ComOStream( cinder::OStreamRef aOStream ) : mOStream( aOStream ), _refcount( 1 ) {}
-
-    virtual HRESULT STDMETHODCALLTYPE QueryInterface( REFIID iid, void ** ppvObject );
-    virtual ULONG STDMETHODCALLTYPE AddRef();
-    virtual ULONG STDMETHODCALLTYPE Release(); 
-
-  // ISequentialStream Interface
-  public:
-	virtual HRESULT STDMETHODCALLTYPE Read( void* pv, ULONG cb, ULONG* pcbRead ) { return E_NOTIMPL; }
-	virtual HRESULT STDMETHODCALLTYPE Write( void const* pv, ULONG cb, ULONG* pcbWritten );
-  // IStream Interface
-  public:
-	virtual HRESULT STDMETHODCALLTYPE SetSize( ULARGE_INTEGER ) { return E_NOTIMPL; }
-	virtual HRESULT STDMETHODCALLTYPE CopyTo( ::IStream*, ULARGE_INTEGER, ULARGE_INTEGER*, ULARGE_INTEGER* ) { return E_NOTIMPL; }
-	virtual HRESULT STDMETHODCALLTYPE Commit( DWORD ) { return E_NOTIMPL; }
-	virtual HRESULT STDMETHODCALLTYPE Revert() { return E_NOTIMPL; }
-	virtual HRESULT STDMETHODCALLTYPE LockRegion( ULARGE_INTEGER, ULARGE_INTEGER, DWORD ) { return E_NOTIMPL; }
-	virtual HRESULT STDMETHODCALLTYPE UnlockRegion( ULARGE_INTEGER, ULARGE_INTEGER, DWORD ) { return E_NOTIMPL; }
-	virtual HRESULT STDMETHODCALLTYPE Clone(IStream **) { return E_NOTIMPL; }
-	virtual HRESULT STDMETHODCALLTYPE Seek( LARGE_INTEGER liDistanceToMove, DWORD dwOrigin, ULARGE_INTEGER* lpNewFilePointer );
-	virtual HRESULT STDMETHODCALLTYPE Stat( STATSTG* pStatstg, DWORD grfStatFlag) { return E_NOTIMPL; }
-
-  private:
-	cinder::OStreamRef	mOStream;
-	LONG			_refcount;
-};
-
-//! Wraps a cinder::IStream with a COM ::IStream
-class ComIStream : public ::IStream
-{
-public:
-	ComIStream( cinder::IStreamRef aIStream ) : mIStream( aIStream ), _refcount( 1 ) {}
-
-	virtual HRESULT STDMETHODCALLTYPE QueryInterface( REFIID iid, void ** ppvObject );
-	virtual ULONG STDMETHODCALLTYPE AddRef();
-	virtual ULONG STDMETHODCALLTYPE Release(); 
-
-	// ISequentialStream Interface
-public:
-	virtual HRESULT STDMETHODCALLTYPE Read( void* pv, ULONG cb, ULONG* pcbRead );
-	virtual HRESULT STDMETHODCALLTYPE Write( void const* pv, ULONG cb, ULONG* pcbWritten ) { return E_NOTIMPL; }
-	// IStream Interface
-public:
-	virtual HRESULT STDMETHODCALLTYPE SetSize( ULARGE_INTEGER ) { return E_NOTIMPL; }
-	virtual HRESULT STDMETHODCALLTYPE CopyTo( ::IStream*, ULARGE_INTEGER, ULARGE_INTEGER*, ULARGE_INTEGER* ) { return E_NOTIMPL; }
-	virtual HRESULT STDMETHODCALLTYPE Commit( DWORD ) { return E_NOTIMPL; }
-	virtual HRESULT STDMETHODCALLTYPE Revert() { return E_NOTIMPL; }
-	virtual HRESULT STDMETHODCALLTYPE LockRegion( ULARGE_INTEGER, ULARGE_INTEGER, DWORD ) { return E_NOTIMPL; }
-	virtual HRESULT STDMETHODCALLTYPE UnlockRegion( ULARGE_INTEGER, ULARGE_INTEGER, DWORD ) { return E_NOTIMPL; }
-	virtual HRESULT STDMETHODCALLTYPE Clone(IStream **) { return E_NOTIMPL; }
-	virtual HRESULT STDMETHODCALLTYPE Seek( LARGE_INTEGER liDistanceToMove, DWORD dwOrigin, ULARGE_INTEGER* lpNewFilePointer );
-	virtual HRESULT STDMETHODCALLTYPE Stat( STATSTG* pStatstg, DWORD grfStatFlag);
-
+//! Warps a critical section.
+class CriticalSection {
 private:
-	cinder::IStreamRef	mIStream;
-	LONG			_refcount;
+	CRITICAL_SECTION mCriticalSection;
+public:
+	CriticalSection()
+	{
+		InitializeCriticalSection( &mCriticalSection );
+	}
+
+	~CriticalSection()
+	{
+		assert( mCriticalSection.LockCount == 0 );
+		DeleteCriticalSection( &mCriticalSection );
+	}
+
+	void Lock()
+	{
+		EnterCriticalSection( &mCriticalSection );
+	}
+
+	void Unlock()
+	{
+		LeaveCriticalSection( &mCriticalSection );
+	}
 };
 
-//! Initializes COM on this thread. Uses Boost's thread local storage to prevent multiple initializations per thread
-void initializeCom( DWORD params = COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE );
+//! Provides automatic locking and unlocking of a critical section.
+class ScopedCriticalSection {
+private:
+	CriticalSection *mCriticalSectionPtr;
+public:
+	ScopedCriticalSection( CriticalSection& section )
+	{
+		mCriticalSectionPtr = &section;
+		mCriticalSectionPtr->Lock();
+	}
+	~ScopedCriticalSection()
+	{
+		assert( mCriticalSectionPtr != nullptr );
+		mCriticalSectionPtr->Unlock();
+	}
+};
 
 } } // namespace cinder::msw

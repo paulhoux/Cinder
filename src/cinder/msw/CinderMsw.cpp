@@ -22,7 +22,7 @@
  POSSIBILITY OF SUCH DAMAGE.
 */
 
-#include "cinder/msw/CinderMsw.h"
+#include "cinder/msw/CinderMswCom.h"
 #include "cinder/ip/Fill.h"
 
 #include <vector>

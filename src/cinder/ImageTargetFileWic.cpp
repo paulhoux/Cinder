@@ -22,7 +22,7 @@
 
 #include "cinder/ImageTargetFileWic.h"
 #include "cinder/Utilities.h"
-#include "cinder/msw/CinderMsw.h"
+#include "cinder/msw/CinderMswCom.h"
 
 #include <map>
 

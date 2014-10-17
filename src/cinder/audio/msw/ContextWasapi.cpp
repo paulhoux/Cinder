@@ -32,6 +32,7 @@
 #include "cinder/audio/dsp/Converter.h"
 #include "cinder/audio/Exception.h"
 #include "cinder/msw/CinderMsw.h"
+#include "cinder/msw/CinderMswCom.h"
 #include "cinder/CinderAssert.h"
 #include "cinder/Log.h"
 

@@ -28,6 +28,7 @@
 #include "cinder/CinderAssert.h"
 #include "cinder/Log.h"
 #include "cinder/msw/CinderMsw.h"
+#include "cinder/msw/CinderMswCom.h"
 
 #include <setupapi.h>
 #pragma comment(lib, "setupapi.lib")

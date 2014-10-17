@@ -28,7 +28,7 @@ POSSIBILITY OF SUCH DAMAGE.
 
 #if defined( CINDER_MSW )
 
-#include "cinder/evr/EnhancedVideoRendererImpl.h"
+#include "cinder/evr/RendererImpl.h"
 
 #include "cinder/gl/gl.h"
 #include "cinder/gl/Texture.h"
@@ -48,8 +48,8 @@ public:
 	static MovieGlRef create( const fs::path& path ) { return msw::makeComShared<MovieGl>( new MovieGl( path ) ); }
 	//static MovieGlRef create( const MovieLoaderRef &loader ) { return msw::makeComShared<MovieGl>( new MovieGl( *loader ) ); }
 
-	//! \inherit
-	virtual bool hasAlpha() const { /*TODO*/ return false; }
+	//!
+	virtual bool hasAlpha() const override { /*TODO*/ return false; }
 
 	//! Returns the gl::Texture representing the Movie's current frame, bound to the \c GL_TEXTURE_RECTANGLE_ARB target
 	gl::TextureRef	getTexture();
@@ -60,8 +60,12 @@ protected:
 	MovieGl( const fs::path& path );
 	//MovieGl( const MovieLoader& loader );
 
+	virtual HRESULT createPartialTopology( IMFPresentationDescriptor *pPD ) override;
+
 protected:
 	gl::TextureRef           mTexture;
+
+	EVRCustomPresenter*      mEVRPresenter; // Custom EVR for texture sharing
 };
 
 }

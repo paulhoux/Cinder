@@ -8,7 +8,7 @@
 #include  <iostream>
 
 #include "videoInput/videoInput.h"
-#include "cinder/msw/CinderMsw.h"
+#include "cinder/msw/CinderMswCom.h"
 #include <tchar.h>
 
 //Include Directshow stuff here so we don't worry about needing all the h files.

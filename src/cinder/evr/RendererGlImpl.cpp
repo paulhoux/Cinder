@@ -24,14 +24,13 @@ POSSIBILITY OF SUCH DAMAGE.
 
 #if defined( CINDER_MSW )
 
-#include "cinder/evr/EnhancedVideoRendererGlImpl.h"
-#include "glload/wgl_all.h"
+#include "cinder/evr/RendererGlImpl.h"
 
 namespace cinder {
 namespace evr {
 
 MovieGl::MovieGl()
-	: MovieBase()
+	: MovieBase(), mEVRPresenter( NULL )
 {
 	if( !wglext_NV_DX_interop ) {
 		throw std::runtime_error( "WGL_NV_DX_interop extension not supported. Upgrade your graphics drivers and try again." );
@@ -47,12 +46,63 @@ MovieGl::MovieGl( const Url& url )
 	: MovieGl()
 {
 	MovieBase::initFromUrl( url );
+
+
+
+	HRESULT hr = S_OK;
+
+	if( !mEVRPresenter ) {
+		mEVRPresenter = new EVRCustomPresenter( hr );
+		hr = mEVRPresenter->SetVideoWindow( mHwnd );
+	}
+
+	//hr = EVRCustomPresenter::CreateInstance( nullptr, __uuidof( EVRCustomPresenter ), (void**) mEVRPresenter );
 }
 
 MovieGl::MovieGl( const fs::path& filePath )
 	: MovieGl()
 {
 	MovieBase::initFromPath( filePath );
+
+
+
+	HRESULT hr = S_OK;
+
+	if( !mEVRPresenter ) {
+		mEVRPresenter = new EVRCustomPresenter( hr );
+		hr = mEVRPresenter->SetVideoWindow( mHwnd );
+	}
+
+	//hr = EVRCustomPresenter::CreateInstance( nullptr, __uuidof( EVRCustomPresenter ), (void**) mEVRPresenter );
+}
+
+HRESULT MovieGl::createPartialTopology( IMFPresentationDescriptor *pPD )
+{
+	HRESULT hr = S_OK;
+
+	msw::ScopedComPtr<IMFTopology> pTopology;
+	hr = createPlaybackTopology( mMediaSourcePtr, pPD, mHwnd, &pTopology, mEVRPresenter );
+	if( FAILED( hr ) ) {
+		CI_LOG_E( "Failed to create playback topology." );
+		return hr;
+	}
+
+	hr = setMediaInfo( pPD );
+	if( FAILED( hr ) ) {
+		CI_LOG_E( "Failed to set media info." );
+		return hr;
+	}
+
+	// Set the topology on the media session.
+	hr = mMediaSessionPtr->SetTopology( 0, pTopology );
+	if( FAILED( hr ) ) {
+		CI_LOG_E( "Failed to set topology." );
+		return hr;
+	}
+
+	// If SetTopology succeeds, the media session will queue an MESessionTopologySet event.
+
+	return hr;
 }
 
 }
