@@ -74,7 +74,8 @@ void WindowsEnhancedVideoApp::draw()
 	gl::setModelMatrix( mTransform );
 
 	gl::color( 1, 1, 1 );
-	//mMovieRef->draw( 0, 0 );
+	if(mMovieRef)
+		mMovieRef->draw( 0, 0 );
 
 	gl::popModelMatrix();
 }

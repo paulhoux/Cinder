@@ -209,7 +209,7 @@ HRESULT FindAdapter( IDirect3D9 *pD3D9, HMONITOR hMonitor, UINT *puAdapterID )
 
 D3DPresentEngine::D3DPresentEngine( HRESULT& hr )
 	: m_hwnd( NULL ), m_DeviceResetToken( 0 ), m_pD3D9( NULL ), m_pDevice( NULL ), m_pDeviceManager( NULL )
-	, m_pSurfaceRepaint( NULL ), gl_handleD3D( NULL ), d3d_shared_texture( NULL ), d3d_shared_surface( NULL )
+	, m_pSurfaceRepaint( NULL ), m_pD3DDeviceHandle( NULL ), m_pD3dSharedTexture( NULL ), m_pD3DSharedSurface( NULL )
 {
 	SetRectEmpty( &m_rcDestRect );
 
@@ -224,11 +224,11 @@ D3DPresentEngine::D3DPresentEngine( HRESULT& hr )
 
 D3DPresentEngine::~D3DPresentEngine()
 {
-	if( gl_handleD3D ) {
+	if( m_pD3DDeviceHandle ) {
 		releaseSharedTexture();
 
 		CI_LOG_V( "WMFVideoPlayer : Killing present engine....." );
-		if( wglDXCloseDeviceNV( gl_handleD3D ) ) {
+		if( wglDXCloseDeviceNV( m_pD3DDeviceHandle ) ) {
 			CI_LOG_V( "SUCCESS" );
 		}
 		else CI_LOG_E( "FAILED closing handle" );
@@ -245,53 +245,50 @@ bool D3DPresentEngine::createSharedTexture( int w, int h, int textureID )
 	_w = w;
 	_h = h;
 
-	if( gl_handleD3D == NULL )
-		gl_handleD3D = wglDXOpenDeviceNV( m_pDevice );
+	if( m_pD3DDeviceHandle == NULL )
+		m_pD3DDeviceHandle = wglDXOpenDeviceNV( m_pDevice );
 
-	if( !gl_handleD3D ) {
-		CI_LOG_E( "ofxWMFVideoplayer : openning the shared device failed\nCreate SharedTexture Failed" );
+	if( !m_pD3DDeviceHandle ) {
+		CI_LOG_E( "Failed to open shared device." );
 		return false;
 	}
 
-	gl_name = textureID;
+	mGlName = textureID;
 
-	HANDLE sharedHandle = NULL; //We need to create a shared handle for the ressource, otherwise the extension fails on ATI/Intel cards
-
-	HRESULT hr = m_pDevice->CreateTexture( w, h, 1, D3DUSAGE_RENDERTARGET, D3DFMT_A8R8G8B8, D3DPOOL_DEFAULT, &d3d_shared_texture, &sharedHandle );
+	//We need to create a shared handle for the ressource, otherwise the extension fails on ATI/Intel cards.
+	HANDLE pSharedHandle = NULL;
+	HRESULT hr = m_pDevice->CreateTexture( w, h, 1, D3DUSAGE_RENDERTARGET, D3DFMT_A8R8G8B8, D3DPOOL_DEFAULT, &m_pD3dSharedTexture, &pSharedHandle );
 
 	if( FAILED( hr ) ) {
-		CI_LOG_E( "ofxWMFVideoplayer : Error creating D3DTexture" );
+		CI_LOG_E( "Failed to create D3D texture." );
 		return false;
 	}
 
-	if( !sharedHandle ) {
-		CI_LOG_E( "ofxWMFVideoplayer : Error creating D3D sahred handle" );
+	if( !pSharedHandle ) {
+		CI_LOG_E( "Failed to create shared handle." );
 		return false;
 	}
 
-	wglDXSetResourceShareHandleNV( d3d_shared_texture, sharedHandle );
+	bool success = wglDXSetResourceShareHandleNV( m_pD3dSharedTexture, pSharedHandle );
 
-	d3d_shared_texture->GetSurfaceLevel( 0, &d3d_shared_surface );
+	m_pD3dSharedTexture->GetSurfaceLevel( 0, &m_pD3DSharedSurface );
 
-	gl_handle = wglDXRegisterObjectNV( gl_handleD3D, d3d_shared_texture,
-									   gl_name,
-									   GL_TEXTURE_RECTANGLE,
-									   WGL_ACCESS_READ_ONLY_NV );
-
-	if( !gl_handle ) {
-		CI_LOG_E( "ofxWMFVideoplayer : opening the shared texture failed. Create SharedTexture Failed" );
+	mGlHandle = wglDXRegisterObjectNV( m_pD3DDeviceHandle, m_pD3dSharedTexture, mGlName, GL_TEXTURE_RECTANGLE, WGL_ACCESS_READ_ONLY_NV );
+	if( !mGlHandle ) {
+		CI_LOG_E( "Failed to register shared texture." );
 		return false;
 	}
+
 	return true;
 }
 
 void D3DPresentEngine::releaseSharedTexture()
 {
-	if( !gl_handleD3D ) return;
+	if( !m_pD3DDeviceHandle ) return;
 
 	bool success = true;
 
-	success = wglDXUnlockObjectsNV( gl_handleD3D, 1, &gl_handle );
+	success = wglDXUnlockObjectsNV( m_pD3DDeviceHandle, 1, &mGlHandle );
 	if( !success ) {
 		switch( GetLastError() ) {
 		case ERROR_NOT_LOCKED:
@@ -309,29 +306,29 @@ void D3DPresentEngine::releaseSharedTexture()
 		}
 	}
 	else {
-		success = wglDXUnregisterObjectNV( gl_handleD3D, gl_handle );
+		success = wglDXUnregisterObjectNV( m_pD3DDeviceHandle, mGlHandle );
 		if( !success ) {
 			CI_LOG_E( "Failed to unregister object: " << GetLastError() );
 		}
 	}
 
-	//glDeleteTextures(1, &gl_name);
-	SafeRelease( d3d_shared_surface );
-	SafeRelease( d3d_shared_texture );
+	//glDeleteTextures(1, &mGlName);
+	SafeRelease( m_pD3DSharedSurface );
+	SafeRelease( m_pD3dSharedTexture );
 
 }
 bool D3DPresentEngine::lockSharedTexture()
 {
-	if( !gl_handleD3D ) return false;
-	if( !gl_handle ) return false;
-	return wglDXLockObjectsNV( gl_handleD3D, 1, &gl_handle );
+	if( !m_pD3DDeviceHandle ) return false;
+	if( !mGlHandle ) return false;
+	return wglDXLockObjectsNV( m_pD3DDeviceHandle, 1, &mGlHandle );
 }
 
 bool D3DPresentEngine::unlockSharedTexture()
 {
-	if( !gl_handleD3D ) return false;
-	if( !gl_handle ) return false;
-	return wglDXUnlockObjectsNV( gl_handleD3D, 1, &gl_handle );
+	if( !m_pD3DDeviceHandle ) return false;
+	if( !mGlHandle ) return false;
+	return wglDXUnlockObjectsNV( m_pD3DDeviceHandle, 1, &mGlHandle );
 }
 
 HRESULT D3DPresentEngine::GetService( REFGUID guidService, REFIID riid, void** ppv )
@@ -721,7 +718,7 @@ HRESULT D3DPresentEngine::PresentSwapChain( IDirect3DSwapChain9* pSwapChain, IDi
 	if( FAILED( hr ) )
 		return hr;
 
-	if( m_pDevice->StretchRect( surface, NULL, d3d_shared_surface, NULL, D3DTEXF_NONE ) != D3D_OK ) {
+	if( m_pDevice->StretchRect( surface, NULL, m_pD3DSharedSurface, NULL, D3DTEXF_NONE ) != D3D_OK ) {
 		CI_LOG_E( "ofxWMFVideoPlayer: Error while copying texture to gl context " );
 	}
 
@@ -815,25 +812,25 @@ const MFRatio EVRCustomPresenter::sDefaultFrameRate = { 30, 1 };
 
 /*HRESULT EVRCustomPresenter::CreateInstance( IUnknown *pUnkOuter, REFIID iid, void **ppv )
 {
-	if( ppv == NULL )
-		return E_POINTER;
+if( ppv == NULL )
+return E_POINTER;
 
-	// This object does not support aggregation.
-	if( pUnkOuter != NULL )
-		return CLASS_E_NOAGGREGATION;
+// This object does not support aggregation.
+if( pUnkOuter != NULL )
+return CLASS_E_NOAGGREGATION;
 
-	HRESULT hr = S_OK;
+HRESULT hr = S_OK;
 
-	ScopedComPtr<EVRCustomPresenter> pObject( new EVRCustomPresenter( hr ) );
+ScopedComPtr<EVRCustomPresenter> pObject( new EVRCustomPresenter( hr ) );
 
-	if( pObject == NULL )
-		hr = E_OUTOFMEMORY;
+if( pObject == NULL )
+hr = E_OUTOFMEMORY;
 
-	if( FAILED( hr ) )
-		return hr;
+if( FAILED( hr ) )
+return hr;
 
-	hr = pObject.QueryInterface( iid, ppv );
-	return hr;
+hr = pObject.QueryInterface( iid, ppv );
+return hr;
 }*/
 
 HRESULT EVRCustomPresenter::QueryInterface( REFIID riid, void ** ppv )

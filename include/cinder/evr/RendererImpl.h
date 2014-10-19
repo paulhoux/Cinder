@@ -45,13 +45,13 @@ const UINT WM_APP_MOVIE_EVENT = WM_APP + 1;
 class MovieBase : public IMFAsyncCallback {
 public:
 	typedef enum PlayerState {
-		CLOSED = 0,
-		READY,
-		OPEN_PENDING,
-		STARTED,
-		PAUSED,
-		STOPPED,
-		CLOSING
+		Closed = 0,
+		Ready,
+		OpenPending,
+		Started,
+		Paused,
+		Stopped,
+		Closing
 	};
 public:
 	virtual		~MovieBase() { if( mHwnd ) destroyWindow( mHwnd ); }
@@ -135,9 +135,9 @@ public:
 	//! Returns whether the movie has completely finished playing
 	bool		isDone() const { /*TODO*/ return false; }
 	//! Begins movie playback.
-	void		play() { /*TODO*/ }
+	virtual void play() {}
 	//! Stops movie playback.
-	void		stop() { /*TODO*/ }
+	virtual void stop() {}
 
 	//! TODO: implement getPlayerHandle();
 
@@ -175,6 +175,11 @@ protected:
 	STDMETHODIMP  GetParameters( DWORD*, DWORD* ) { return E_NOTIMPL; } // Implementation of this method is optional.
 	STDMETHODIMP  Invoke( IMFAsyncResult* pAsyncResult );
 
+	//
+	virtual HRESULT StartPlayback();
+	virtual HRESULT Pause();
+
+	//
 	virtual HRESULT createSession();
 	virtual HRESULT closeSession();
 	virtual HRESULT createPartialTopology( IMFPresentationDescriptor *pPD ) { return E_NOTIMPL; }

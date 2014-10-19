@@ -105,21 +105,21 @@ protected:
 	IDirect3DSurface9           *m_pSurfaceRepaint;       // Surface for repaint requests.
 
 protected:
-	HANDLE gl_handleD3D;
-	HANDLE d3d_shared_handle;
+	HANDLE m_pD3DDeviceHandle;
+	HANDLE m_pD3DSharedHandle;
 
-	GLuint gl_name;
-	HANDLE gl_handle;
+	GLuint mGlName;
+	HANDLE mGlHandle;
 
-	DWORD _shared_handle_val;
-	IDirect3DSurface9 *d3d_shared_surface;
-	IDirect3DTexture9 *d3d_shared_texture;
+	DWORD mSharedHandleValue;
+	IDirect3DSurface9 *m_pD3DSharedSurface;
+	IDirect3DTexture9 *m_pD3dSharedTexture;
 
 	int _w, _h;
 
 public:
 
-	HANDLE getSharedDeviceHandle() { return gl_handleD3D; }
+	HANDLE getSharedDeviceHandle() { return m_pD3DDeviceHandle; }
 
 	virtual void OnReleaseResources()
 	{

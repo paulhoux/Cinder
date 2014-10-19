@@ -45,35 +45,79 @@ MovieGl::~MovieGl()
 MovieGl::MovieGl( const Url& url )
 	: MovieGl()
 {
-	MovieBase::initFromUrl( url );
-
-
-
 	HRESULT hr = S_OK;
+
+	MovieBase::init();
 
 	if( !mEVRPresenter ) {
 		mEVRPresenter = new EVRCustomPresenter( hr );
 		hr = mEVRPresenter->SetVideoWindow( mHwnd );
 	}
 
-	//hr = EVRCustomPresenter::CreateInstance( nullptr, __uuidof( EVRCustomPresenter ), (void**) mEVRPresenter );
+	MovieBase::initFromUrl( url );
+
+	// TODO: move to method of its own
+	if( mTexture && ( mWidth != mTexture->getWidth() || mHeight != mTexture->getHeight() ) ) {
+		mEVRPresenter->releaseSharedTexture();
+		mTexture.reset();
+	}
+
+	if( !mTexture ) {
+		gl::Texture2d::Format fmt;
+		fmt.setTarget( GL_TEXTURE_RECTANGLE );
+		fmt.loadTopDown( true );
+
+		mTexture = gl::Texture2d::create( mWidth, mHeight, fmt );
+		mEVRPresenter->createSharedTexture( mWidth, mHeight, mTexture->getId() );
+	}
 }
 
 MovieGl::MovieGl( const fs::path& filePath )
 	: MovieGl()
 {
-	MovieBase::initFromPath( filePath );
-
-
-
 	HRESULT hr = S_OK;
+
+	MovieBase::init();
 
 	if( !mEVRPresenter ) {
 		mEVRPresenter = new EVRCustomPresenter( hr );
 		hr = mEVRPresenter->SetVideoWindow( mHwnd );
 	}
 
-	//hr = EVRCustomPresenter::CreateInstance( nullptr, __uuidof( EVRCustomPresenter ), (void**) mEVRPresenter );
+	MovieBase::initFromPath( filePath );
+
+	// TODO: move to method of its own
+	if( mTexture && ( mWidth != mTexture->getWidth() || mHeight != mTexture->getHeight() ) ) {
+		mEVRPresenter->releaseSharedTexture();
+		mTexture.reset();
+	}
+
+	if( !mTexture ) {
+		gl::Texture2d::Format fmt;
+		fmt.setTarget( GL_TEXTURE_RECTANGLE );
+		fmt.loadTopDown( true );
+
+		mTexture = gl::Texture2d::create( mWidth, mHeight, fmt );
+		mEVRPresenter->createSharedTexture( mWidth, mHeight, mTexture->getId() );
+	}
+}
+
+void MovieGl::play()
+{
+	if( mMediaSessionPtr == NULL || mMediaSourcePtr == NULL )
+		return;
+
+	if( mState != Paused && mState != Stopped ) {
+		mPlaying = true;
+		return;
+	}
+
+	StartPlayback();
+}
+
+void MovieGl::stop()
+{
+
 }
 
 HRESULT MovieGl::createPartialTopology( IMFPresentationDescriptor *pPD )

@@ -51,8 +51,29 @@ public:
 	//!
 	virtual bool hasAlpha() const override { /*TODO*/ return false; }
 
+	//!
+	virtual void play() override;
+	//!
+	virtual void stop() override;
+
 	//! Returns the gl::Texture representing the Movie's current frame, bound to the \c GL_TEXTURE_RECTANGLE_ARB target
-	gl::TextureRef	getTexture();
+	//gl::TextureRef	getTexture();
+
+	void draw( int x = 0, int y = 0 )
+	{
+		draw( x, y, mWidth, mHeight );
+	}
+
+	void draw( int x, int y, int w, int h )
+	{
+		if( !mTexture || !mEVRPresenter )
+			return;
+
+		if( mEVRPresenter->lockSharedTexture() ) {
+			gl::draw( mTexture, Rectf( x, y, w, h ) );
+			mEVRPresenter->unlockSharedTexture();
+		}
+	}
 
 protected:
 	MovieGl();
