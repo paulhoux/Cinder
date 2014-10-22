@@ -531,27 +531,28 @@ HRESULT D3DPresentEngine::PresentSample( IMFSample* pSample, LONGLONG llTarget )
 	}
 	else if( m_pSurfaceRepaint ) {
 		// Redraw from the last surface.
-		pSurface = m_pSurfaceRepaint;
-		pSurface.Attach( m_pSurfaceRepaint ); // pSurface - AddRef();
+		m_pSurfaceRepaint->AddRef();
+		pSurface.Attach( m_pSurfaceRepaint );
 	}
 
 	if( SUCCEEDED( hr ) ) {
-		// Get the swap chain from the surface.
-		ScopedComPtr<IDirect3DSwapChain9> pSwapChain;
-		if( SUCCEEDED( hr = pSurface->GetContainer( __uuidof( IDirect3DSwapChain9 ), (LPVOID*) &pSwapChain ) ) ) {
+		if( pSurface ) {
+			// Get the swap chain from the surface.
+			ScopedComPtr<IDirect3DSwapChain9> pSwapChain;
+			if( SUCCEEDED( hr = pSurface->GetContainer( __uuidof( IDirect3DSwapChain9 ), (LPVOID*) &pSwapChain ) ) ) {
 
-			// Present the swap chain.
-			if( SUCCEEDED( hr = PresentSwapChain( pSwapChain, pSurface ) ) ) {
-				// Store this pointer in case we need to repaint the surface.
-				CopyComPtr( m_pSurfaceRepaint, pSurface.get() );
+				// Present the swap chain.
+				if( SUCCEEDED( hr = PresentSwapChain( pSwapChain, pSurface ) ) ) {
+					// Store this pointer in case we need to repaint the surface.
+					CopyComPtr( m_pSurfaceRepaint, pSurface.get() );
+				}
 			}
 		}
+		else {
+			// No surface. All we can do is paint a black rectangle.
+			PaintFrameWithGDI();
+		}
 	}
-	else {
-		// No surface. All we can do is paint a black rectangle.
-		PaintFrameWithGDI();
-	}
-
 
 	if( FAILED( hr ) ) {
 		if( hr == D3DERR_DEVICELOST || hr == D3DERR_DEVICENOTRESET || hr == D3DERR_DEVICEHUNG ) {
