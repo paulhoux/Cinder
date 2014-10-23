@@ -1911,6 +1911,13 @@ ScopedColor::ScopedColor( const ColorAf &color )
 	mCtx->setCurrentColor( color );
 }
 
+ScopedColor::ScopedColor( float r, float g, float b, float a )
+	: mCtx( gl::context() )
+{
+	mColor = mCtx->getCurrentColor();
+	mCtx->setCurrentColor( ColorA( r, g, b, a ) );
+}
+
 ScopedColor::~ScopedColor()
 {
 	mCtx->setCurrentColor( mColor );
