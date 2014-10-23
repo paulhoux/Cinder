@@ -37,7 +37,7 @@ void SketchApp::prepareSettings( Settings *settings )
 
 void SketchApp::setup()
 {
-	mCamera.setFov( 50 );
+	mCamera.setPerspective( 50, 1, 1, 1000 );
 	mCamera.setEyePoint( vec3( 10, 10, 10 ) );
 	mCamera.setCenterOfInterestPoint( vec3( 0 ) );
 
@@ -49,6 +49,9 @@ void SketchApp::setup()
 void SketchApp::update()
 {
 	float time = (float) getElapsedSeconds();
+
+	// Save the current matrices, so we can restore them.
+	gl::ScopedMatrices matrices;
 
 	// Clear the sketch buffer.
 	mSketch.clear();
@@ -91,16 +94,16 @@ void SketchApp::update()
 		gl::translate( 0, 0, -6 );
 		gl::rotate( time, 0, 1, 0 );
 
-		vec3 base = vec3( 0, math<float>::max( 0, -math<float>::cos( 3 * time + 1.5f ) ), 0 );
-		vec3 top = vec3( 0, 5 + math<float>::sin( 3 * time ), 0 );
-		float radius = math<float>::sqrt( 5 / ( top.y - base.y ) );
+		vec3 base = vec3( 0, math<float>::max( 0, -3 * math<float>::cos( 3 * time + 1.5f ) ), 0 );
+		vec3 top = vec3( 0, 5 + 2 * math<float>::sin( 3 * time ), 0 );
+		float radius = math<float>::sqrt( 5 / glm::distance( base, top ) );
 
 		gl::color( 0.75, 1.00, 0.50f );
 		mSketch.cylinder( base, top, radius );
 	}
 
 	// It's easy to draw a camera frustum, too.
-	gl::color( 1, 1, 1 );
+	gl::color( 0.5f, 0.5f, 0.5f );
 	mSketch.frustum( mCameraGhost );
 
 	// We can also draw in 2D. Simply change to window coordinates:
@@ -112,11 +115,11 @@ void SketchApp::update()
 	// And with a bit of work, we can draw polygons.
 	{
 		Font font = Font( "Georgia", 144 );
-		Shape2d shape = font.getGlyphShape( font.getGlyphChar( '$' ) );
+		Shape2d shape = font.getGlyphShape( font.getGlyphChar( '*' ) );
 
 		gl::ScopedModelMatrix model;
 
-		gl::translate( 100, 100, 0 );
+		gl::translate( 40, 100, 0 );
 		gl::color( 1, 1, 0 );
 
 		auto contours = shape.getContours();
@@ -148,7 +151,7 @@ void SketchApp::mouseDown( MouseEvent event )
 
 void SketchApp::mouseDrag( MouseEvent event )
 {
-	mMayaCam.mouseDrag( event.getPos(), true, false, false );
+	mMayaCam.mouseDrag( event.getPos(), event.isLeftDown(), false, event.isRightDown() );
 	mCamera = mMayaCam.getCamera();
 }
 

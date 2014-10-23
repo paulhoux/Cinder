@@ -34,21 +34,37 @@
 namespace cinder {
 namespace gl {
 
+typedef std::shared_ptr<class Sketch> SketchRef;
+
 class Sketch {
 public:
-	Sketch() : mBatch( VertBatch::create( GL_LINES ) ) {};
+	//! By default, Sketch will respect the current transform matrices, allowing you to mix 2D and 3D rendering and it 'just works'.
+	//  All transformations are done on the CPU, which can be slow for large numbers of objects.
+	Sketch()
+		: mAutoTransform( true ), mBatch( VertBatch::create( GL_LINES ) ) {};
+	//! By setting \a autoTransform to FALSE, Sketch will not perform any transformations on the CPU. It's faster, but you yourself
+	//  are responsible for properly setting up the model, view and projection matrices before you draw the sketch.
+	Sketch( bool autoTransform )
+		: mAutoTransform( autoTransform ), mBatch( VertBatch::create( GL_LINES ) ) {};
 	~Sketch() {};
 
-	void clear() { mBatch->clear(); }
+	static SketchRef create( bool autoTransform = true ) { return std::make_shared<Sketch>( autoTransform ); }
+
+	void clear()
+	{
+		mBatch->clear();
+	}
+
 	void draw()
 	{
-		gl::ScopedState depthWrite( GL_DEPTH_WRITEMASK, GL_FALSE );
-
 		gl::pushMatrices();
 
-		gl::setModelMatrix( mat4() );
-		gl::setViewMatrix( mat4() );
-		gl::setProjectionMatrix( mat4() );
+		if( mAutoTransform ) {
+			gl::setModelMatrix( mat4() );
+			gl::setViewMatrix( mat4() );
+			gl::setProjectionMatrix( mat4() );
+		}
+
 		mBatch->draw();
 
 		gl::popMatrices();
@@ -179,9 +195,16 @@ private:
 	void implDrawLine( const vec3& a, const vec3& b )
 	{
 		const ColorA& clr = gl::context()->getCurrentColor();
-		const mat4& transform = gl::getModelViewProjection();
-		mBatch->vertex( transform * vec4( a, 1 ), clr );
-		mBatch->vertex( transform * vec4( b, 1 ), clr );
+
+		if( mAutoTransform ) {
+			const mat4& transform = gl::getModelViewProjection();
+			mBatch->vertex( transform * vec4( a, 1 ), clr );
+			mBatch->vertex( transform * vec4( b, 1 ), clr );
+		}
+		else {
+			mBatch->vertex( vec4( a, 1 ), clr );
+			mBatch->vertex( vec4( b, 1 ), clr );
+		}
 	}
 
 	void implDrawQuad( const vec3& a, const vec3& b, const vec3& c, const vec3& d )
@@ -211,7 +234,7 @@ private:
 
 	void implDrawCircle( const vec3& center, float radius, const vec3& axis )
 	{
-		static const int kCurves = 36;
+		static const int kCurves = 60;
 
 		const float angle = toRadians( 360.0f / kCurves );
 		const quat orientation( vec3( 0, 0, 1 ), normalize( axis ) );
@@ -330,6 +353,7 @@ private:
 	}
 
 private:
+	bool         mAutoTransform;
 	VertBatchRef mBatch;
 };
 
