@@ -33,7 +33,7 @@ private:
 
 void WindowsEnhancedVideoApp::prepareSettings( Settings* settings )
 {
-	settings->disableFrameRate();
+	settings->setFrameRate(60);
 	settings->setWindowSize( 1920, 1080 );
 }
 

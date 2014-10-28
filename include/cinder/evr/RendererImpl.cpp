@@ -625,7 +625,7 @@ HWND MovieBase::createWindow( MovieBase* movie )
 	wcex.style = CS_HREDRAW | CS_VREDRAW;
 
 	wcex.lpfnWndProc = MovieBase::WndProcDummy;
-	wcex.hbrBackground = (HBRUSH) ( BLACK_BRUSH );
+	wcex.hbrBackground = (HBRUSH) NULL; // no bkg brush, the view and the bars should always fill the whole client area
 	wcex.lpszClassName = szWindowClass;
 
 	RegisterClassEx( &wcex );

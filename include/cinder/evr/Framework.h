@@ -699,6 +699,7 @@ public:
 		if( handle == NULL ) {
 			return HRESULT_FROM_WIN32( GetLastError() );
 		}
+		SetThreadPriority( handle, THREAD_PRIORITY_TIME_CRITICAL );
 		m_hSchedulerThread.reset( handle );
 
 		HANDLE hObjects[] = { m_hThreadReadyEvent.get(), m_hSchedulerThread.get() };
