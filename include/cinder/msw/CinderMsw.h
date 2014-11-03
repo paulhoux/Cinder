@@ -35,6 +35,10 @@
 #define LODWORD(_qw)    ((DWORD)(_qw))
 #define HIDWORD(_qw)    ((DWORD)(((_qw) >> 32) & 0xffffffff))
 
+#define BREAK_ON_FAIL(value)          if( FAILED( value ) ) break;
+#define BREAK_ON_NULL(value, result)  if( value == NULL ) { hr = result; break; }
+#define BREAK_IF_FALSE(test, result)  if( !(test) ) { hr = result; break; }
+
 namespace cinder { namespace msw {
 
 /** Converts a Win32 HBITMAP to a cinder::Surface8u

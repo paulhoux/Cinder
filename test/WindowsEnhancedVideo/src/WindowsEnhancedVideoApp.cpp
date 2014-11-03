@@ -8,6 +8,7 @@
 
 using namespace ci;
 using namespace ci::app;
+using namespace ci::msw;
 using namespace std;
 
 class WindowsEnhancedVideoApp : public AppNative {
@@ -25,15 +26,15 @@ public:
 	void resize() override;
 	void fileDrop( FileDropEvent event ) override;
 private:
-	evr::MovieGlRef  mMovieRef;
+	video::MovieGlRef  mMovieRef;
 
-	glm::mat4        mTransform;
-	double           mTime;
+	glm::mat4          mTransform;
+	double             mTime;
 };
 
 void WindowsEnhancedVideoApp::prepareSettings( Settings* settings )
 {
-	settings->setFrameRate(60);
+	settings->setFrameRate(30);
 	settings->setWindowSize( 1920, 1080 );
 }
 
@@ -42,13 +43,13 @@ void WindowsEnhancedVideoApp::setup()
 	fs::path path = getOpenFilePath();
 
 	if( !path.empty() && fs::exists( path ) ) {
-		mMovieRef = evr::MovieGl::create( path );
+		mMovieRef = video::MovieGl::create( path );
 		mMovieRef->play();
 	}
 
 	mTime = getElapsedSeconds();
 
-	gl::enableVerticalSync( false );
+	gl::enableVerticalSync( true );
 }
 
 void WindowsEnhancedVideoApp::shutdown()
@@ -115,7 +116,7 @@ void WindowsEnhancedVideoApp::fileDrop( FileDropEvent event )
 {
 	const fs::path& path = event.getFile( 0 );
 	if( !path.empty() && fs::exists( path ) ) {
-		mMovieRef = evr::MovieGl::create( path );
+		mMovieRef = video::MovieGl::create( path );
 		mMovieRef->play();
 
 		resize();

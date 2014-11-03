@@ -27,7 +27,8 @@ POSSIBILITY OF SUCH DAMAGE.
 #include "cinder/evr/RendererGlImpl.h"
 
 namespace cinder {
-namespace evr {
+namespace msw {
+namespace video {
 
 MovieGl::MovieGl()
 	: MovieBase(), mEVRPresenter( NULL )
@@ -39,117 +40,98 @@ MovieGl::MovieGl()
 
 MovieGl::~MovieGl()
 {
-	HRESULT hr = closeSession();
 }
 
 MovieGl::MovieGl( const Url& url )
 	: MovieGl()
 {
 	HRESULT hr = S_OK;
-
-	MovieBase::init();
-
+	/*
 	if( !mEVRPresenter ) {
-		mEVRPresenter = new EVRCustomPresenter( hr );
-		hr = mEVRPresenter->SetVideoWindow( mHwnd );
+	mEVRPresenter = new EVRCustomPresenter( hr );
+	hr = mEVRPresenter->SetVideoWindow( mHwnd );
 	}
-
+	*/
 	MovieBase::initFromUrl( url );
-
-	// TODO: move to method of its own
-	if( mTexture && ( mWidth != mTexture->getWidth() || mHeight != mTexture->getHeight() ) ) {
+	/*
+		// TODO: move to method of its own
+		if( mTexture && ( mWidth != mTexture->getWidth() || mHeight != mTexture->getHeight() ) ) {
 		mEVRPresenter->releaseSharedTexture();
 		mTexture.reset();
-	}
+		}
 
-	if( !mTexture ) {
+		if( !mTexture ) {
 		gl::Texture2d::Format fmt;
 		fmt.setTarget( GL_TEXTURE_RECTANGLE );
 		fmt.loadTopDown( true );
 
 		mTexture = gl::Texture2d::create( mWidth, mHeight, fmt );
 		mEVRPresenter->createSharedTexture( mWidth, mHeight, mTexture->getId() );
-	}
+		}
+		*/
 }
 
 MovieGl::MovieGl( const fs::path& filePath )
 	: MovieGl()
 {
 	HRESULT hr = S_OK;
-
-	MovieBase::init();
-
+	/*
 	if( !mEVRPresenter ) {
-		mEVRPresenter = new EVRCustomPresenter( hr );
-		hr = mEVRPresenter->SetVideoWindow( mHwnd );
+	mEVRPresenter = new EVRCustomPresenter( hr );
+	hr = mEVRPresenter->SetVideoWindow( mHwnd );
 	}
-
+	*/
 	MovieBase::initFromPath( filePath );
-
-	// TODO: move to method of its own
-	if( mTexture && ( mWidth != mTexture->getWidth() || mHeight != mTexture->getHeight() ) ) {
+	/*
+		// TODO: move to method of its own
+		if( mTexture && ( mWidth != mTexture->getWidth() || mHeight != mTexture->getHeight() ) ) {
 		mEVRPresenter->releaseSharedTexture();
 		mTexture.reset();
-	}
+		}
 
-	if( !mTexture ) {
+		if( !mTexture ) {
 		gl::Texture2d::Format fmt;
 		fmt.setTarget( GL_TEXTURE_RECTANGLE );
 		fmt.loadTopDown( true );
 
 		mTexture = gl::Texture2d::create( mWidth, mHeight, fmt );
 		mEVRPresenter->createSharedTexture( mWidth, mHeight, mTexture->getId() );
-	}
+		}
+		*/
 }
 
-void MovieGl::play()
-{
-	if( mMediaSessionPtr == NULL || mMediaSourcePtr == NULL )
-		return;
-
-	if( mState != Paused && mState != Stopped ) {
-		mPlaying = true;
-		return;
-	}
-
-	StartPlayback();
-}
-
-void MovieGl::stop()
-{
-
-}
-
+/*
 HRESULT MovieGl::createPartialTopology( IMFPresentationDescriptor *pPD )
 {
-	HRESULT hr = S_OK;
+HRESULT hr = S_OK;
 
-	msw::ScopedComPtr<IMFTopology> pTopology;
-	hr = createPlaybackTopology( mMediaSourcePtr, pPD, mHwnd, &pTopology, mEVRPresenter );
-	if( FAILED( hr ) ) {
-		CI_LOG_E( "Failed to create playback topology." );
-		return hr;
-	}
-
-	hr = setMediaInfo( pPD );
-	if( FAILED( hr ) ) {
-		CI_LOG_E( "Failed to set media info." );
-		return hr;
-	}
-
-	// Set the topology on the media session.
-	hr = mMediaSessionPtr->SetTopology( 0, pTopology );
-	if( FAILED( hr ) ) {
-		CI_LOG_E( "Failed to set topology." );
-		return hr;
-	}
-
-	// If SetTopology succeeds, the media session will queue an MESessionTopologySet event.
-
-	return hr;
+msw::ScopedComPtr<IMFTopology> pTopology;
+hr = createPlaybackTopology( mMediaSourcePtr, pPD, mHwnd, &pTopology, mEVRPresenter );
+if( FAILED( hr ) ) {
+CI_LOG_E( "Failed to create playback topology." );
+return hr;
 }
 
+hr = setMediaInfo( pPD );
+if( FAILED( hr ) ) {
+CI_LOG_E( "Failed to set media info." );
+return hr;
 }
+
+// Set the topology on the media session.
+hr = mMediaSessionPtr->SetTopology( 0, pTopology );
+if( FAILED( hr ) ) {
+CI_LOG_E( "Failed to set topology." );
+return hr;
 }
+
+// If SetTopology succeeds, the media session will queue an MESessionTopologySet event.
+
+return hr;
+}
+*/
+} // namespace video
+} // namespace msw
+} // namespace cinder
 
 #endif // CINDER_MSW

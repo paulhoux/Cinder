@@ -35,29 +35,21 @@ POSSIBILITY OF SUCH DAMAGE.
 #include "cinder/CinderAssert.h"
 #include "cinder/Log.h"
 
+#include "cinder/evr/IPlayer.h"
 #include "cinder/evr/Presenter.h"
 
 namespace cinder {
-namespace evr {
+namespace msw {
+namespace video {
 
-const UINT WM_APP_MOVIE_EVENT = WM_APP + 1;
-
-class MovieBase : public IMFAsyncCallback {
+class MovieBase {
 public:
-	typedef enum PlayerState {
-		Closed = 0,
-		Ready,
-		OpenPending,
-		Started,
-		Paused,
-		Stopped,
-		Closing
-	};
-public:
-	virtual		~MovieBase() { if( mHwnd ) destroyWindow( mHwnd ); }
+	virtual		~MovieBase();
 
 	//! Returns whether the movie has loaded and buffered enough to playback without interruption
 	bool		checkPlayable() { /*TODO*/ return false; }
+	//! Returns whether the movie has loaded and buffered enough to playback without interruption
+	bool		checkPlaythroughOk() { /*TODO*/ return false; }
 
 	//! Returns the width of the movie in pixels
 	uint32_t	getWidth() const { return mWidth; }
@@ -71,16 +63,14 @@ public:
 	Area		getBounds() const { return Area( 0, 0, getWidth(), getHeight() ); }
 
 	//! Returns the movie's pixel aspect ratio. Returns 1.0 if the movie does not contain an explicit pixel aspect ratio.
-	float		getPixelAspectRatio() const { return 1.0f; }
+	float		getPixelAspectRatio() const { /*TODO*/ return 1.0f; }
 
-	//! Returns whether the movie has loaded and buffered enough to playback without interruption
-	bool		checkPlaythroughOk() { /*TODO*/ return false; }
 	//! Returns whether the movie is in a loaded state, implying its structures are ready for reading but it may not be ready for playback
-	bool		isLoaded() const { return mLoaded; }
+	bool		isLoaded() const { return mIsLoaded; }
 	//! Returns whether the movie is playable, implying the movie is fully formed and can be played but media data is still downloading
-	bool		isPlayable() const { return mPlayable; }
+	bool		isPlayable() const { return mIsPlayable; }
 	//! Returns true if the content represented by the movie is protected by DRM
-	bool		isProtected() const { return mProtected; }
+	bool		isProtected() const { return mIsProtected; }
 	//! Returns the movie's length measured in seconds
 	float		getDuration() const { return mDuration; }
 	//! Returns the movie's framerate measured as frames per second
@@ -135,9 +125,9 @@ public:
 	//! Returns whether the movie has completely finished playing
 	bool		isDone() const { /*TODO*/ return false; }
 	//! Begins movie playback.
-	virtual void play() {}
+	void		play() { if( mPlayer ) mPlayer->Play(); }
 	//! Stops movie playback.
-	virtual void stop() {}
+	void		stop() { if( mPlayer ) mPlayer->Stop(); }
 
 	//! TODO: implement getPlayerHandle();
 
@@ -150,103 +140,55 @@ public:
 
 protected:
 	MovieBase();
-	void init();
-	void initFromUrl( const Url& url );
-	void initFromPath( const fs::path& filePath );
-	//void initFromLoader( const MovieLoader& loader );
 
-	void loadAsset();
-	void updateFrame();
-	uint32_t countFrames() const;
+	void      initFromUrl( const Url& url );
+	void      initFromPath( const fs::path& filePath );
+	//void     initFromLoader( const MovieLoader& loader );
 
-	void lock() { mMutex.lock(); }
-	void unlock() { mMutex.unlock(); }
+	void      loadAsset();
+	void      updateFrame();
+	uint32_t  countFrames() const;
 
-	void removeObservers();
-	void addObservers();
+	void      lock() { mMutex.lock(); }
+	void      unlock() { mMutex.unlock(); }
 
-protected:
-	// IUnknown methods
-	STDMETHODIMP QueryInterface( REFIID iid, void** ppv );
-	STDMETHODIMP_( ULONG ) AddRef();
-	STDMETHODIMP_( ULONG ) Release();
-
-	// IMFAsyncCallback methods
-	STDMETHODIMP  GetParameters( DWORD*, DWORD* ) { return E_NOTIMPL; } // Implementation of this method is optional.
-	STDMETHODIMP  Invoke( IMFAsyncResult* pAsyncResult );
-
-	//
-	virtual HRESULT StartPlayback();
-	virtual HRESULT Pause();
-
-	//
-	virtual HRESULT createSession();
-	virtual HRESULT closeSession();
-	virtual HRESULT createPartialTopology( IMFPresentationDescriptor *pPD ) { return E_NOTIMPL; }
-	virtual HRESULT setMediaInfo( IMFPresentationDescriptor *pPD );
+	void      removeObservers();
+	void      addObservers();
 
 	//! Default window message handler.
-	virtual LRESULT WndProc( HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam );
+	LRESULT WndProc( HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam );
 
-	virtual HRESULT handleEvent( UINT_PTR pEventPtr );
-	virtual HRESULT handleSessionTopologySetEvent( IMFMediaEvent *pEvent );
-	virtual HRESULT handleSessionTopologyStatusEvent( IMFMediaEvent *pEvent );
-	virtual HRESULT handleEndOfPresentationEvent( IMFMediaEvent *pEvent );
-	virtual HRESULT handleNewPresentationEvent( IMFMediaEvent *pEvent );
-	virtual HRESULT handleSessionEvent( IMFMediaEvent *pEvent, MediaEventType eventType );
+	//! Static functions
+	static HWND        createWindow( MovieBase* movie );
+	static void        destroyWindow( HWND hWnd );
+	static MovieBase*  findMovie( HWND hWnd );
 
-	static HWND createWindow( MovieBase* movie );
-	static void destroyWindow( HWND hWnd );
-	static MovieBase* findMovie( HWND hWnd );
-
-	static LRESULT CALLBACK MovieBase::WndProcDummy( HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam );
-
-	static HRESULT createMediaSource( LPCWSTR pUrl, IMFMediaSource **ppSource );
-	static HRESULT createPlaybackTopology( IMFMediaSource *pSource, IMFPresentationDescriptor *pPD, HWND hVideoWnd, IMFTopology **ppTopology, IMFVideoPresenter *pVideoPresenter );
-	static HRESULT createMediaSinkActivate( IMFStreamDescriptor *pSourceSD, HWND hVideoWindow, IMFActivate **ppActivate, IMFVideoPresenter *pVideoPresenter, IMFMediaSink **ppMediaSink );
-	static HRESULT addSourceNode( IMFTopology *pTopology, IMFMediaSource *pSource, IMFPresentationDescriptor *pPD, IMFStreamDescriptor *pSD, IMFTopologyNode **ppNode );
-	static HRESULT addOutputNode( IMFTopology *pTopology, IMFStreamSink *pStreamSink, IMFTopologyNode **ppNode );
-	static HRESULT addOutputNode( IMFTopology *pTopology, IMFActivate *pActivate, DWORD dwId, IMFTopologyNode **ppNode );
-	static HRESULT addBranchToPartialTopology( IMFTopology *pTopology, IMFMediaSource *pSource, IMFPresentationDescriptor *pPD, DWORD iStream, HWND hVideoWnd, IMFVideoPresenter *pVideoPresenter );
+	static LRESULT CALLBACK WndProcDummy( HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam );
 
 protected:
+	IPlayer*					mPlayer;
+
 	uint32_t					mWidth, mHeight;
 	uint32_t					mFrameCount;
 	float						mFrameRate;
 	float						mDuration;
 	std::atomic<bool>			mAssetLoaded;
-	bool						mLoaded, mPlayThroughOk, mPlayable, mProtected;
+	bool						mIsLoaded, mPlayThroughOk, mIsPlayable, mIsProtected;
 	bool						mPlayingForward, mLoop, mPalindrome;
 	bool						mHasAudio, mHasVideo;
-	bool						mPlaying;	// required to auto-start the movie
+	bool						mIsPlaying;	// required to auto-start the movie
+	bool						mIsInitialized;
 
 	std::mutex					mMutex;
 
 	signals::signal<void()>		mSignalNewFrame, mSignalReady, mSignalCancelled, mSignalEnded, mSignalJumped, mSignalOutputWasFlushed;
 
-protected:
-	float                    mCurrentVolume;
-
-	msw::ScopedComPtr<IMFMediaSession>         mMediaSessionPtr;
-	msw::ScopedComPtr<IMFSequencerSource>      mSequencerSourcePtr;
-	msw::ScopedComPtr<IMFMediaSource>          mMediaSourcePtr;
-	msw::ScopedComPtr<IMFVideoDisplayControl>  mVideoDisplayControlPtr;
-	msw::ScopedComPtr<IMFAudioStreamVolume>    mAudioStreamVolumePtr;
-
-	MFSequencerElementId     m_previousTopoID;
-
-	HWND                     mHwnd;
-	PlayerState              mState;
-	HANDLE                   mCloseEventHandle;
-	long                     mRefCount;
-
 	//! Keeps track of each player's window.
 	static std::map<HWND, MovieBase*> sMovieWindows;
 };
 
-}
-}
+} // namespace video
+} // namespace msw
+} // namespace cinder
 
-#else
-#error "Enhanced Video Renderer is not supported on this platform."
 #endif // CINDER_MSW

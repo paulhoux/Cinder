@@ -253,6 +253,9 @@
     <ClCompile Include="..\src\cinder\DataSource.cpp" />
     <ClCompile Include="..\src\cinder\DataTarget.cpp" />
     <ClCompile Include="..\src\cinder\Display.cpp" />
+    <ClCompile Include="..\src\cinder\evr\DirectShowPlayer.cpp" />
+    <ClCompile Include="..\src\cinder\evr\DirectShowVideo.cpp" />
+    <ClCompile Include="..\src\cinder\evr\MediaFoundationPlayer.cpp" />
     <ClCompile Include="..\src\cinder\evr\Presenter.cpp" />
     <ClCompile Include="..\src\cinder\evr\RendererGlImpl.cpp" />
     <ClCompile Include="..\src\cinder\Exception.cpp" />
@@ -470,10 +473,14 @@
     <ClInclude Include="..\include\cinder\dx\gldx.h" />
     <ClInclude Include="..\include\cinder\dx\HlslProg.h" />
     <ClInclude Include="..\include\cinder\dx\PlatformHelpers.h" />
+    <ClInclude Include="..\include\cinder\evr\DirectShowPlayer.h" />
+    <ClInclude Include="..\include\cinder\evr\DirectShowVideo.h" />
+    <ClInclude Include="..\include\cinder\evr\MediaFoundationPlayer.h" />
+    <ClInclude Include="..\include\cinder\evr\IPlayer.h" />
     <ClInclude Include="..\include\cinder\evr\RendererGlImpl.h" />
     <ClInclude Include="..\include\cinder\evr\RendererImpl.h" />
     <ClInclude Include="..\include\cinder\evr\Presenter.h" />
-    <ClInclude Include="..\include\cinder\evr\Framework.h" />
+    <ClInclude Include="..\include\cinder\evr\MediaFoundationFramework.h" />
     <ClInclude Include="..\include\cinder\Filesystem.h" />
     <ClInclude Include="..\include\cinder\Frustum.h" />
     <ClInclude Include="..\include\cinder\GeomIo.h" />

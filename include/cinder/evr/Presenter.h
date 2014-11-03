@@ -30,10 +30,11 @@ POSSIBILITY OF SUCH DAMAGE.
 #include "cinder/gl/gl.h" // included to avoid error C2120 when including "wgl_all.h"
 #include "glload/wgl_all.h"
 
-#include "cinder/evr/Framework.h"
+#include "MediaFoundationFramework.h"
 
 namespace cinder {
-namespace evr {
+namespace msw {
+namespace video {
 
 inline float MFOffsetToFloat( const MFOffset& offset ) { return offset.value + ( float( offset.fract ) / 65536 ); }
 
@@ -355,8 +356,9 @@ public:
 	void releaseSharedTexture() { return m_pD3DPresentEngine->releaseSharedTexture(); };
 };
 
-}
-} // namespace cinder::evr
+} // namespace video
+} // namespace msw
+} // namespace cinder
 
 #endif // CINDER_MSW
 

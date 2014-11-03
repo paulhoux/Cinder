@@ -25,16 +25,19 @@ POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
 #include "cinder/Cinder.h"
+#include "cinder/Timer.h"
 
 #if defined( CINDER_MSW )
 
 #include "cinder/evr/RendererImpl.h"
 
 #include "cinder/gl/gl.h"
+#include "cinder/gl/GlslProg.h"
 #include "cinder/gl/Texture.h"
 
 namespace cinder {
-namespace evr {
+namespace msw {
+namespace video {
 
 typedef std::shared_ptr<class MovieGl>	MovieGlRef;
 /** \brief Movie playback as OpenGL textures through the WGL_NV_DX_interop extension.
@@ -51,11 +54,6 @@ public:
 	//!
 	virtual bool hasAlpha() const override { /*TODO*/ return false; }
 
-	//!
-	virtual void play() override;
-	//!
-	virtual void stop() override;
-
 	//! Returns the gl::Texture representing the Movie's current frame, bound to the \c GL_TEXTURE_RECTANGLE_ARB target
 	//gl::TextureRef	getTexture();
 
@@ -69,8 +67,56 @@ public:
 		if( !mTexture || !mEVRPresenter )
 			return;
 
+		static ci::Timer timer( true );
+
+		// TEMP
+		if( !mShader ) {
+			gl::GlslProg::Format fmt;
+			fmt.vertex(
+				"#version 150\n"
+				""
+				"uniform mat4 ciModelViewProjection;\n"
+				"in vec4 ciPosition;\n"
+				"in vec2 ciTexCoord0;\n"
+				"out vec2 vTexCoord0;\n"
+				""
+				"void main(void) {\n"
+				"	gl_Position = ciModelViewProjection * ciPosition;\n"
+				"	vTexCoord0 = ciTexCoord0;\n"
+				"}"
+				);
+			fmt.fragment(
+				"#version 150\n"
+				""
+				"uniform sampler2DRect uTex0;\n"
+				"uniform float uTime;\n"
+				"in vec2 vTexCoord0;\n"
+				"out vec4 oColor;\n"
+				""
+				"void main(void) {\n"
+				"	vec2 uv = vTexCoord0;\n"
+				"	uv.x += 10 * sin(uTime * 10.0 + 0.1 * uv.y);\n"
+				"	oColor = texture( uTex0, uv );\n"
+				"}"
+				);
+
+			try {
+				mShader = gl::GlslProg::create( fmt );
+			}
+			catch( const std::exception &e ) {
+				CI_LOG_V( e.what() );
+			}
+		}
+
 		if( mEVRPresenter->lockSharedTexture() ) {
-			gl::draw( mTexture, Rectf( x, y, w, h ) );
+			//gl::draw( mTexture, Rectf( x, y, x+w, y+h ) );
+
+			gl::ScopedTextureBind tex0( mTexture );
+			gl::ScopedGlslProg shader( mShader );
+			mShader->uniform( "uTex0", 0 );
+			mShader->uniform( "uTime", float( timer.getSeconds() ) );
+			gl::drawSolidRect( Rectf( x, y, x + w, y + h ), vec2( 0, 0 ), vec2( mTexture->getWidth(), mTexture->getHeight() ) );
+
 			mEVRPresenter->unlockSharedTexture();
 		}
 	}
@@ -81,15 +127,17 @@ protected:
 	MovieGl( const fs::path& path );
 	//MovieGl( const MovieLoader& loader );
 
-	virtual HRESULT createPartialTopology( IMFPresentationDescriptor *pPD ) override;
+	//virtual HRESULT createPartialTopology( IMFPresentationDescriptor *pPD ) override;
 
 protected:
 	gl::TextureRef           mTexture;
+	gl::GlslProgRef          mShader;
 
 	EVRCustomPresenter*      mEVRPresenter; // Custom EVR for texture sharing
 };
 
-}
-} // namespace cinder::evr
+} // namespace video
+} // namespace msw
+} // namespace cinder
 
 #endif // CINDER_MSW

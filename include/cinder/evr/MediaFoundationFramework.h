@@ -27,11 +27,11 @@
 #pragma comment(lib,"d3d9.lib")
 #pragma comment(lib,"dxva2.lib")
 #pragma comment (lib,"evr.lib")
-
-using namespace cinder::msw;
+//#pragma comment(lib, "strmiids") // required?
 
 namespace cinder {
-namespace evr {
+namespace msw {
+namespace video {
 
 inline LONG MFTimeToMsec( const LONGLONG& time )
 {
@@ -1383,7 +1383,7 @@ public:
 	// This returns the default or attempts to compute it, in its absence.
 	HRESULT GetDefaultStride( LONG *plStride )
 	{
-		return cinder::evr::GetDefaultStride( GetMediaType(), plStride );
+		return video::GetDefaultStride( GetMediaType(), plStride );
 	}
 
 	// Sets the default stride. Only appropriate for uncompressed data formats.
@@ -1724,7 +1724,7 @@ public:
 	{
 		if( pArea == NULL ) return E_POINTER;
 
-		return cinder::evr::GetVideoDisplayArea( GetMediaType(), pArea );
+		return video::GetVideoDisplayArea( GetMediaType(), pArea );
 	}
 };
 
@@ -2062,7 +2062,8 @@ public:
 	InvokeFn m_pInvokeFn;
 };
 
-}
-} // namespace cinder::evr
+} // namespace video
+} // namespace msw
+} // namespace cinder
 
 #endif // CINDER_MSW

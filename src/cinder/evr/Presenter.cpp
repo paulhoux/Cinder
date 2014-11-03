@@ -2,12 +2,13 @@
 #include "cinder/evr/Presenter.h"
 #include "cinder/Log.h"
 
+#if defined(CINDER_MSW)
+
 #include <dshow.h> // for EC_DISPLAY_CHANGED event
 
-using namespace cinder::msw;
-
 namespace cinder {
-namespace evr {
+namespace msw {
+namespace video {
 
 RECT CorrectAspectRatio( const RECT& src, const MFRatio& srcPAR, const MFRatio& destPAR )
 {
@@ -2423,5 +2424,8 @@ float EVRCustomPresenter::GetMaxRate( BOOL bThin )
 	return fMaxRate;
 }
 
-}
-} // namespace cinder::evr
+} // namespace video
+} // namespace msw
+} // namespace cinder
+
+#endif // CINDER_MSW
