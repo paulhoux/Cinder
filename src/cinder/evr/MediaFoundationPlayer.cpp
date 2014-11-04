@@ -1,4 +1,5 @@
 #include "cinder/evr/MediaFoundationPlayer.h"
+#include "cinder/evr/MediaFoundationVideo.h"
 
 #include "cinder/CinderAssert.h"
 #include "cinder/Log.h"
@@ -38,20 +39,47 @@ HRESULT GetEventObject( IMFMediaEvent *pEvent, Q **ppObject )
 
 //////////////////////////////////////////////////////////////////////////////////////////
 
-MediaFoundationPlayer::MediaFoundationPlayer( HRESULT *hr, HWND hwnd )
+MediaFoundationPlayer::MediaFoundationPlayer( HRESULT &hr, HWND hwnd )
 	: mRefCount( 0 ), mHwnd( hwnd ), mState( Closed ), mIsInitialized( false ), mCurrentVolume( 1 ), mWidth( 0 ), mHeight( 0 )
+	, mMediaSessionPtr( NULL ), mSequencerSourcePtr( NULL ), mMediaSourcePtr( NULL ), mVideoDisplayControlPtr( NULL ), mAudioStreamVolumePtr( NULL ), mPresenterPtr( NULL )
+	, mOpenEventHandle( NULL ), mCloseEventHandle( NULL )
 {
-	*hr = MFStartup( MF_VERSION );
-	if( SUCCEEDED( *hr ) )
+	hr = S_OK;
+
+	mOpenEventHandle = CreateEvent( NULL, FALSE, FALSE, NULL );
+	mCloseEventHandle = CreateEvent( NULL, FALSE, FALSE, NULL );
+
+	do {
+		hr = MFStartup( MF_VERSION );
+		BREAK_ON_FAIL( hr );
+
 		mIsInitialized = true;
+
+		// Create custom EVR presenter.
+		mPresenterPtr = new EVRCustomPresenter( hr );
+		BREAK_ON_FAIL( hr );
+
+		hr = mPresenterPtr->SetVideoWindow( mHwnd );
+		BREAK_ON_FAIL( hr );
+
+	} while( false );
+
+	CI_LOG_V( "Created MediaFoundationPlayer." );
 }
 
 MediaFoundationPlayer::~MediaFoundationPlayer()
 {
+	SafeRelease( mPresenterPtr );
+
 	if( mIsInitialized )
 		MFShutdown();
 
 	mIsInitialized = false;
+
+	CloseHandle( mCloseEventHandle );
+	CloseHandle( mOpenEventHandle );
+
+	CI_LOG_V( "Destroyed MediaFoundationPlayer." );
 }
 
 HRESULT MediaFoundationPlayer::OpenFile( LPCWSTR pszFileName )
@@ -125,8 +153,8 @@ HRESULT MediaFoundationPlayer::CloseSession()
 
 	HRESULT hr = S_OK;
 
-	mVideoDisplayControlPtr = NULL;
-	mAudioStreamVolumePtr = NULL;
+	SafeRelease( mVideoDisplayControlPtr );
+	SafeRelease( mAudioStreamVolumePtr );
 
 	// First close the media session.
 	if( mMediaSessionPtr ) {
@@ -138,7 +166,10 @@ HRESULT MediaFoundationPlayer::CloseSession()
 		// Wait for the close operation to complete
 		if( SUCCEEDED( hr ) ) {
 			DWORD dwWaitResult = WaitForSingleObject( mCloseEventHandle, 5000 );
-			if( dwWaitResult == WAIT_TIMEOUT ) {
+			if( dwWaitResult == WAIT_FAILED ) {
+				assert( FALSE );
+			}
+			else if( dwWaitResult == WAIT_TIMEOUT ) {
 				assert( FALSE );
 			}
 			// Now there will be no more events from this session.
@@ -158,10 +189,33 @@ HRESULT MediaFoundationPlayer::CloseSession()
 		}
 	}
 
-	mMediaSourcePtr = NULL;
-	mMediaSessionPtr = NULL;
+	SafeRelease( mMediaSourcePtr );
+	SafeRelease( mMediaSessionPtr );
 
 	mState = Closed;
+
+	return hr;
+}
+
+HRESULT MediaFoundationPlayer::CreatePartialTopology( IMFPresentationDescriptor *pPD )
+{
+	HRESULT hr = S_OK;
+
+	do {
+		ScopedComPtr<IMFTopology> pTopology;
+		hr = CreatePlaybackTopology( mMediaSourcePtr, pPD, mHwnd, &pTopology, mPresenterPtr );
+		BREAK_ON_FAIL( hr );
+
+		hr = SetMediaInfo( pPD );
+		BREAK_ON_FAIL( hr );
+
+		// Set the topology on the media session.
+		hr = mMediaSessionPtr->SetTopology( 0, pTopology );
+		BREAK_ON_FAIL( hr );
+
+		// If SetTopology succeeds, the media session will queue an MESessionTopologySet event.
+
+	} while( false );
 
 	return hr;
 }
@@ -229,6 +283,15 @@ HRESULT MediaFoundationPlayer::Play()
 		// fails later, we'll get an MESessionStarted event with
 		// an error code, and we will update our state then.
 		mState = Started;
+
+/*
+		DWORD dwWaitResult = WaitForSingleObject( mOpenEventHandle, 5000 );
+		if( dwWaitResult == WAIT_FAILED ) {
+			assert( FALSE );
+		}
+		else if( dwWaitResult == WAIT_TIMEOUT ) {
+			assert( FALSE );
+*/
 	}
 
 	PropVariantClear( &varStart );
@@ -272,28 +335,47 @@ HRESULT MediaFoundationPlayer::HandleEvent( UINT_PTR pEventPtr )
 
 		// Check if the async operation succeeded.
 		if( SUCCEEDED( hr ) && FAILED( hrStatus ) ) {
+			CI_LOG_V( "Async operation failed: " << hrStatus );
 			hr = hrStatus;
 		}
-		BREAK_ON_FAIL( hr );
+		//BREAK_ON_FAIL( hr );
 
 		switch( eventType ) {
 		case MESessionTopologySet:
-			hr = HandleSessionTopologySetEvent( pEvent );
+			if( FAILED( hr ) )
+				CI_LOG_V( "MESessionTopologySet" );
+			else
+				hr = HandleSessionTopologySetEvent( pEvent );
 			break;
 		case MESessionTopologyStatus:
-			hr = HandleSessionTopologyStatusEvent( pEvent );
+			if( FAILED( hr ) )
+				CI_LOG_V( "MESessionTopologyStatus" );
+			else
+				hr = HandleSessionTopologyStatusEvent( pEvent );
 			break;
 		case MEEndOfPresentation:
-			hr = HandleEndOfPresentationEvent( pEvent );
+			if( FAILED( hr ) )
+				CI_LOG_V( "MEEndOfPresentation" );
+			else
+				hr = HandleEndOfPresentationEvent( pEvent );
 			break;
 		case MENewPresentation:
-			hr = HandleNewPresentationEvent( pEvent );
+			if( FAILED( hr ) )
+				CI_LOG_V( "MENewPresentation" );
+			else
+				hr = HandleNewPresentationEvent( pEvent );
 			break;
 		case MESessionStarted:
-			// Do nothing.
+			if( FAILED( hr ) )
+				CI_LOG_V( "MESessionStarted" );
+			else
+				mState = Started;
 			break;
 		default:
-			hr = HandleSessionEvent( pEvent, eventType );
+			if( FAILED( hr ) )
+				CI_LOG_V( "default" );
+			else
+				hr = HandleSessionEvent( pEvent, eventType );
 			break;
 		}
 	} while( false );
@@ -325,7 +407,7 @@ HRESULT MediaFoundationPlayer::HandleSessionTopologyStatusEvent( IMFMediaEvent *
 
 	HRESULT hr = pEvent->GetUINT32( MF_EVENT_TOPOLOGY_STATUS, &status );
 	if( SUCCEEDED( hr ) && ( status == MF_TOPOSTATUS_READY ) ) {
-		mVideoDisplayControlPtr.Release();
+		SafeRelease( mVideoDisplayControlPtr );
 
 		hr = Play();
 
@@ -713,7 +795,7 @@ HRESULT MediaFoundationPlayer::AddBranchToPartialTopology( IMFTopology *pTopolog
 				hr = AddOutputNode( pTopology, pSinkActivate, 0, &pOutputNode );
 			}
 			else if( pMediaSink ) {
-				IMFStreamSink  * pStreamSink = NULL;
+				IMFStreamSink* pStreamSink = NULL;
 				DWORD streamCount;
 
 				pMediaSink->GetStreamSinkCount( &streamCount );

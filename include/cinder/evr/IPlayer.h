@@ -4,6 +4,8 @@
 
 #if defined(CINDER_MSW)
 
+#include "cinder/msw/CinderMswCom.h"
+
 namespace cinder {
 namespace msw {
 namespace video {
@@ -11,7 +13,7 @@ namespace video {
 //! Definitions
 const UINT WM_PLAYER_EVENT = WM_APP + 1;
 
-class IPlayer {
+class IPlayer : public IUnknown {
 public:
 	IPlayer() {}
 	virtual ~IPlayer() {}

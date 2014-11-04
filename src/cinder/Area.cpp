@@ -156,7 +156,11 @@ bool Area::operator<( const Area &aArea ) const
 Area Area::proportionalFit( const Area &srcArea, const Area &dstArea, bool center, bool expand )
 {
 	int32_t resultWidth, resultHeight;
-	if( srcArea.getWidth() >= srcArea.getHeight() ) { // wider than tall
+	if( srcArea.getWidth() == 0 || srcArea.getHeight() == 0 ) { // invalid source area
+		resultWidth = 0;
+		resultHeight = 0;
+	}
+	else if( srcArea.getWidth() >= srcArea.getHeight() ) { // wider than tall
 		resultWidth = ( expand ) ? dstArea.getWidth() : std::min( dstArea.getWidth(), srcArea.getWidth() );
 		resultHeight = resultWidth * srcArea.getHeight() / srcArea.getWidth();
 		if( resultHeight > dstArea.getHeight() ) { // maximized proportional would be too tall

@@ -66,73 +66,63 @@ HRESULT GetEventObject( IMFMediaEvent *pEvent, Q **ppObject )
 //////////////////////////////////////////////////////////////////////////////////////////
 
 MovieBase::MovieBase()
-	: mPlayer( NULL ), mWidth( 0 ), mHeight( 0 )
+	: mPlayer( NULL ), mHwnd( NULL ), mWidth( 0 ), mHeight( 0 )
 	, mIsLoaded( false ), mPlayThroughOk( false ), mIsPlayable( false ), mIsProtected( false ), mIsPlaying( false ), mIsInitialized( false )
 	, mPlayingForward( true ), mLoop( false ), mPalindrome( false ), mHasAudio( false ), mHasVideo( false )
 {
+	mHwnd = createWindow( this );
 }
 
 MovieBase::~MovieBase()
 {
-	SafeDelete( mPlayer );
+	SafeRelease( mPlayer );
+
+	destroyWindow( mHwnd );
+	mHwnd = NULL;
 }
 
-void MovieBase::initFromUrl( const Url& url )
+void MovieBase::init( const std::wstring &url )
 {
 	HRESULT hr = S_OK;
 
-	assert( mPlayer == NULL );
+	assert( mHwnd != NULL );
 
-	// Create window
-	HWND hwnd = createWindow( this );
+	for( int i = 0; i < BE_COUNT; ++i ) {
+		SafeRelease( mPlayer );
 
-	// First, try to play the movie using Media Foundation.
-	//mPlayer = new MediaFoundationPlayer( &hr, hwnd );
-
-	// If that did not work, try DirectShow.
-	//if( FAILED( hr ) ) {
-		mPlayer = new DirectShowPlayer( &hr, hwnd );
-	//}
-
-	// 
-	if( SUCCEEDED( hr ) ) {
-		std::wstring wstr = toWideString( url.c_str() );
-		hr = mPlayer->OpenFile( wstr.c_str() );
+		if( i == BE_DIRECTSHOW ) {
+			// Try to play the movie using DirectShow.
+			mPlayer = new DirectShowPlayer( hr, mHwnd );
+			mPlayer->AddRef();
+			if( SUCCEEDED( hr ) ) {
+				hr = mPlayer->OpenFile( url.c_str() );
+				if( SUCCEEDED( hr ) )
+					break;
+			}
+		}
+		else if( i == BE_MEDIA_FOUNDATION ) {
+			// Try to play the movie using Media Foundation.
+			mPlayer = new MediaFoundationPlayer( hr, mHwnd );
+			//mPlayer->AddRef();
+			if( SUCCEEDED( hr ) ) {
+				hr = mPlayer->OpenFile( url.c_str() );
+				if( SUCCEEDED( hr ) )
+					break;
+			}
+		}
 	}
 
-	mWidth = mPlayer->GetWidth();
-	mHeight = mPlayer->GetHeight();
+	if( FAILED( hr ) ) {
+		CI_LOG_V( "Failed to play movie using DirectShow." );
+		SafeRelease( mPlayer );
 
-	// TODO: log error
-}
-
-void MovieBase::initFromPath( const fs::path& filePath )
-{
-	HRESULT hr = S_OK;
-
-	assert( mPlayer == NULL );
-
-	// Create window
-	HWND hwnd = createWindow( this );
-
-	// First, try to play the movie using Media Foundation.
-	//mPlayer = new MediaFoundationPlayer( &hr, hwnd );
-
-	// If that did not work, try DirectShow.
-	//if( FAILED( hr ) ) {
-		mPlayer = new DirectShowPlayer( &hr, hwnd );
-	//}
-
-	// 
-	if( SUCCEEDED( hr ) ) {
-		std::wstring wstr = toWideString( filePath.string() );
-		hr = mPlayer->OpenFile( wstr.c_str() );
+		// log error
+		CI_LOG_E( "Failed to play movie: " << url.c_str() );
 	}
-
-	mWidth = mPlayer->GetWidth();
-	mHeight = mPlayer->GetHeight();
-
-	// TODO: log error
+	else {
+		mWidth = mPlayer->GetWidth();
+		mHeight = mPlayer->GetHeight();
+	}
 }
 
 LRESULT MovieBase::WndProc( HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam )

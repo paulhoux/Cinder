@@ -1,5 +1,5 @@
 
-#include "cinder/evr/Presenter.h"
+#include "cinder/evr/MediaFoundationVideo.h"
 #include "cinder/Log.h"
 
 #if defined(CINDER_MSW)
@@ -212,15 +212,22 @@ D3DPresentEngine::D3DPresentEngine( HRESULT& hr )
 	: m_hwnd( NULL ), m_DeviceResetToken( 0 ), m_pD3D9( NULL ), m_pDevice( NULL ), m_pDeviceManager( NULL )
 	, m_pSurfaceRepaint( NULL ), m_pD3DDeviceHandle( NULL ), m_pD3dSharedTexture( NULL ), m_pD3DSharedSurface( NULL )
 {
-	SetRectEmpty( &m_rcDestRect );
+	hr = S_OK;
 
-	ZeroMemory( &m_DisplayMode, sizeof( m_DisplayMode ) );
+	CI_LOG_V( "Created D3DPresentEngine." );
 
-	hr = InitializeD3D();
+	do {
+		SetRectEmpty( &m_rcDestRect );
 
-	if( SUCCEEDED( hr ) ) {
+		ZeroMemory( &m_DisplayMode, sizeof( m_DisplayMode ) );
+
+		hr = InitializeD3D();
+		BREAK_ON_FAIL( hr );
+
 		hr = CreateD3DDevice();
-	}
+		BREAK_ON_FAIL( hr );
+
+	} while( false );
 }
 
 D3DPresentEngine::~D3DPresentEngine()
@@ -228,17 +235,19 @@ D3DPresentEngine::~D3DPresentEngine()
 	if( m_pD3DDeviceHandle ) {
 		releaseSharedTexture();
 
-		CI_LOG_V( "WMFVideoPlayer : Killing present engine....." );
+		CI_LOG_V( "Killing present engine..." );
 		if( wglDXCloseDeviceNV( m_pD3DDeviceHandle ) ) {
-			CI_LOG_V( "SUCCESS" );
+			CI_LOG_V( "SUCCEEDED" );
 		}
-		else CI_LOG_E( "FAILED closing handle" );
+		else CI_LOG_E( "FAILED" );
 	}
 
 	SafeRelease( m_pDevice );
 	SafeRelease( m_pSurfaceRepaint );
 	SafeRelease( m_pDeviceManager );
 	SafeRelease( m_pD3D9 );
+
+	CI_LOG_V( "Destroyed D3DPresentEngine." );
 }
 
 bool D3DPresentEngine::createSharedTexture( int w, int h, int textureID )
@@ -256,7 +265,7 @@ bool D3DPresentEngine::createSharedTexture( int w, int h, int textureID )
 
 	mGlName = textureID;
 
-	//We need to create a shared handle for the ressource, otherwise the extension fails on ATI/Intel cards.
+	//We need to create a shared handle for the resource, otherwise the extension fails on ATI/Intel cards.
 	HANDLE pSharedHandle = NULL;
 	HRESULT hr = m_pDevice->CreateTexture( w, h, 1, D3DUSAGE_RENDERTARGET, D3DFMT_A8R8G8B8, D3DPOOL_DEFAULT, &m_pD3dSharedTexture, &pSharedHandle );
 
@@ -270,7 +279,7 @@ bool D3DPresentEngine::createSharedTexture( int w, int h, int textureID )
 		return false;
 	}
 
-	bool success = wglDXSetResourceShareHandleNV( m_pD3dSharedTexture, pSharedHandle );
+	BOOL success = wglDXSetResourceShareHandleNV( m_pD3dSharedTexture, pSharedHandle );
 
 	m_pD3dSharedTexture->GetSurfaceLevel( 0, &m_pD3DSharedSurface );
 
@@ -287,9 +296,7 @@ void D3DPresentEngine::releaseSharedTexture()
 {
 	if( !m_pD3DDeviceHandle ) return;
 
-	bool success = true;
-
-	success = wglDXUnlockObjectsNV( m_pD3DDeviceHandle, 1, &mGlHandle );
+	BOOL success = wglDXUnlockObjectsNV( m_pD3DDeviceHandle, 1, &mGlHandle );
 	if( !success ) {
 		switch( GetLastError() ) {
 		case ERROR_NOT_LOCKED:
@@ -322,14 +329,14 @@ bool D3DPresentEngine::lockSharedTexture()
 {
 	if( !m_pD3DDeviceHandle ) return false;
 	if( !mGlHandle ) return false;
-	return wglDXLockObjectsNV( m_pD3DDeviceHandle, 1, &mGlHandle );
+	return ( wglDXLockObjectsNV( m_pD3DDeviceHandle, 1, &mGlHandle ) == GL_TRUE );
 }
 
 bool D3DPresentEngine::unlockSharedTexture()
 {
 	if( !m_pD3DDeviceHandle ) return false;
 	if( !mGlHandle ) return false;
-	return wglDXUnlockObjectsNV( m_pD3DDeviceHandle, 1, &mGlHandle );
+	return ( wglDXUnlockObjectsNV( m_pD3DDeviceHandle, 1, &mGlHandle ) == GL_TRUE );
 }
 
 HRESULT D3DPresentEngine::GetService( REFGUID guidService, REFIID riid, void** ppv )
@@ -355,29 +362,26 @@ HRESULT D3DPresentEngine::CheckFormat( D3DFORMAT format )
 {
 	HRESULT hr = S_OK;
 
-	UINT uAdapter = D3DADAPTER_DEFAULT;
-	D3DDEVTYPE type = D3DDEVTYPE_HAL;
+	do {
+		UINT uAdapter = D3DADAPTER_DEFAULT;
+		D3DDEVTYPE type = D3DDEVTYPE_HAL;
 
-	D3DDISPLAYMODE mode;
-	D3DDEVICE_CREATION_PARAMETERS params;
+		if( m_pDevice ) {
+			D3DDEVICE_CREATION_PARAMETERS params;
+			hr = m_pDevice->GetCreationParameters( &params );
+			BREAK_ON_FAIL( hr );
 
-	if( m_pDevice ) {
-		hr = m_pDevice->GetCreationParameters( &params );
-		if( FAILED( hr ) )
-			return hr;
+			uAdapter = params.AdapterOrdinal;
+			type = params.DeviceType;
+		}
 
-		uAdapter = params.AdapterOrdinal;
-		type = params.DeviceType;
+		D3DDISPLAYMODE mode;
+		hr = m_pD3D9->GetAdapterDisplayMode( uAdapter, &mode );
+		BREAK_ON_FAIL( hr );
 
-	}
-
-	hr = m_pD3D9->GetAdapterDisplayMode( uAdapter, &mode );
-	if( FAILED( hr ) )
-		return hr;
-
-	hr = m_pD3D9->CheckDeviceType( uAdapter, type, mode.Format, format, TRUE );
-	if( FAILED( hr ) )
-		return hr;
+		hr = m_pD3D9->CheckDeviceType( uAdapter, type, mode.Format, format, TRUE );
+		BREAK_ON_FAIL( hr );
+	} while( false );
 
 	return hr;
 }
@@ -421,60 +425,54 @@ HRESULT D3DPresentEngine::SetDestinationRect( const RECT& rcDest )
 
 HRESULT D3DPresentEngine::CreateVideoSamples( IMFMediaType *pFormat, VideoSampleList& videoSampleQueue )
 {
-	if( m_hwnd == NULL ) {
-		return MF_E_INVALIDREQUEST;
-	}
-
-	if( pFormat == NULL ) {
-		return MF_E_UNEXPECTED;
-	}
-
 	HRESULT hr = S_OK;
 
 	ScopedCriticalSection lock( m_ObjectLock );
 
-	ReleaseResources();
+	do {
+		BREAK_ON_NULL( m_hwnd, MF_E_INVALIDREQUEST );
+		BREAK_ON_NULL( pFormat, MF_E_UNEXPECTED );
 
-	// Get the swap chain parameters from the media type.
-	D3DPRESENT_PARAMETERS pp;
-	hr = GetSwapChainPresentParameters( pFormat, &pp );
+		ReleaseResources();
+
+		// Get the swap chain parameters from the media type.
+		D3DPRESENT_PARAMETERS pPresentParams;
+		hr = GetSwapChainPresentParameters( pFormat, &pPresentParams );
+		BREAK_ON_FAIL( hr );
+
+		UpdateDestRect();
+
+		// Create the video samples.
+		for( int i = 0; i < PRESENTER_BUFFER_COUNT; i++ ) {
+			ScopedComPtr<IDirect3DSwapChain9> pSwapChain;
+			ScopedComPtr<IMFSample> pVideoSample;
+
+			// Create a new swap chain.
+			hr = m_pDevice->CreateAdditionalSwapChain( &pPresentParams, &pSwapChain );
+			BREAK_ON_FAIL( hr );
+
+			// Create the video sample from the swap chain.
+			hr = CreateD3DSample( pSwapChain, &pVideoSample );
+			BREAK_ON_FAIL( hr );
+
+			// Add it to the list.
+			hr = videoSampleQueue.InsertBack( pVideoSample );
+			BREAK_ON_FAIL( hr );
+
+			// Set the swap chain pointer as a custom attribute on the sample. This keeps
+			// a reference count on the swap chain, so that the swap chain is kept alive
+			// for the duration of the sample's lifetime.
+			hr = pVideoSample->SetUnknown( MFSamplePresenter_SampleSwapChain, pSwapChain );
+			BREAK_ON_FAIL( hr );
+		}
+		BREAK_ON_FAIL( hr );
+
+		// Let the derived class create any additional D3D resources that it needs.
+		hr = OnCreateVideoSamples( pPresentParams );
+		BREAK_ON_FAIL( hr );
+	} while( false );
+
 	if( FAILED( hr ) )
-		return hr;
-
-	UpdateDestRect();
-
-	// Create the video samples.
-	for( int i = 0; i < PRESENTER_BUFFER_COUNT; i++ ) {
-		ScopedComPtr<IDirect3DSwapChain9> pSwapChain;
-		ScopedComPtr<IMFSample> pVideoSample;
-
-		// Create a new swap chain.
-		hr = m_pDevice->CreateAdditionalSwapChain( &pp, &pSwapChain );
-		if( FAILED( hr ) )
-			break;
-
-		// Create the video sample from the swap chain.
-		hr = CreateD3DSample( pSwapChain, &pVideoSample );
-		if( FAILED( hr ) )
-			break;
-
-		// Add it to the list.
-		hr = videoSampleQueue.InsertBack( pVideoSample );
-		if( FAILED( hr ) )
-			break;
-
-		// Set the swap chain pointer as a custom attribute on the sample. This keeps
-		// a reference count on the swap chain, so that the swap chain is kept alive
-		// for the duration of the sample's lifetime.
-		hr = pVideoSample->SetUnknown( MFSamplePresenter_SampleSwapChain, pSwapChain );
-		if( FAILED( hr ) )
-			break;
-	}
-
-	// Let the derived class create any additional D3D resources that it needs.
-	if( SUCCEEDED( hr ) )
-		hr = OnCreateVideoSamples( pp );
-	else
 		ReleaseResources();
 
 	return hr;
@@ -520,40 +518,43 @@ HRESULT D3DPresentEngine::PresentSample( IMFSample* pSample, LONGLONG llTarget )
 {
 	HRESULT hr = S_OK;
 
-	ScopedComPtr<IDirect3DSurface9> pSurface;
+	do {
+		ScopedComPtr<IDirect3DSurface9> pSurface;
 
-	if( pSample ) {
-		// Get the buffer from the sample.
-		ScopedComPtr<IMFMediaBuffer> pBuffer;
-		if( SUCCEEDED( hr = pSample->GetBufferByIndex( 0, &pBuffer ) ) ) {
+		if( pSample ) {
+			// Get the buffer from the sample.
+			ScopedComPtr<IMFMediaBuffer> pBuffer;
+			hr = pSample->GetBufferByIndex( 0, &pBuffer );
+			BREAK_ON_FAIL( hr );
+
 			// Get the surface from the buffer.
 			hr = MFGetService( pBuffer, MR_BUFFER_SERVICE, __uuidof( IDirect3DSurface9 ), (void**) &pSurface );
+			BREAK_ON_FAIL( hr );
 		}
-	}
-	else if( m_pSurfaceRepaint ) {
-		// Redraw from the last surface.
-		m_pSurfaceRepaint->AddRef();
-		pSurface.Attach( m_pSurfaceRepaint );
-	}
+		else if( m_pSurfaceRepaint ) {
+			// Redraw from the last surface.
+			m_pSurfaceRepaint->AddRef();
+			pSurface.Attach( m_pSurfaceRepaint );
+		}
 
-	if( SUCCEEDED( hr ) ) {
 		if( pSurface ) {
 			// Get the swap chain from the surface.
 			ScopedComPtr<IDirect3DSwapChain9> pSwapChain;
-			if( SUCCEEDED( hr = pSurface->GetContainer( __uuidof( IDirect3DSwapChain9 ), (LPVOID*) &pSwapChain ) ) ) {
+			hr = pSurface->GetContainer( __uuidof( IDirect3DSwapChain9 ), (LPVOID*) &pSwapChain );
+			BREAK_ON_FAIL( hr );
 
-				// Present the swap chain.
-				if( SUCCEEDED( hr = PresentSwapChain( pSwapChain, pSurface ) ) ) {
-					// Store this pointer in case we need to repaint the surface.
-					CopyComPtr( m_pSurfaceRepaint, pSurface.get() );
-				}
-			}
+			// Present the swap chain.
+			hr = PresentSwapChain( pSwapChain, pSurface );
+			BREAK_ON_FAIL( hr );
+
+			// Store this pointer in case we need to repaint the surface.
+			CopyComPtr( m_pSurfaceRepaint, pSurface.get() );
 		}
 		else {
 			// No surface. All we can do is paint a black rectangle.
 			PaintFrameWithGDI();
 		}
-	}
+	} while( false );
 
 	if( FAILED( hr ) ) {
 		if( hr == D3DERR_DEVICELOST || hr == D3DERR_DEVICENOTRESET || hr == D3DERR_DEVICEHUNG ) {
@@ -581,95 +582,87 @@ HRESULT D3DPresentEngine::InitializeD3D()
 	assert( m_pD3D9 == NULL );
 	assert( m_pDeviceManager == NULL );
 
-	// Create Direct3D
-	hr = Direct3DCreate9Ex( D3D_SDK_VERSION, &m_pD3D9 );
-	if( FAILED( hr ) )
-		return hr;
+	do {
+		// Create Direct3D
+		hr = Direct3DCreate9Ex( D3D_SDK_VERSION, &m_pD3D9 );
+		BREAK_ON_FAIL( hr );
 
-	// Create the device manager
-	hr = DXVA2CreateDirect3DDeviceManager9( &m_DeviceResetToken, &m_pDeviceManager );
+		// Create the device manager
+		hr = DXVA2CreateDirect3DDeviceManager9( &m_DeviceResetToken, &m_pDeviceManager );
+		BREAK_ON_FAIL( hr );
+	} while( false );
 
 	return hr;
 }
 
 HRESULT D3DPresentEngine::CreateD3DDevice()
 {
-	HRESULT     hr = S_OK;
-	HWND        hwnd = NULL;
-	HMONITOR    hMonitor = NULL;
-	UINT        uAdapterID = D3DADAPTER_DEFAULT;
-	DWORD       vp = 0;
+	HRESULT hr = S_OK;
 
-	D3DCAPS9    ddCaps;
-	ZeroMemory( &ddCaps, sizeof( ddCaps ) );
+	do {
+		// Hold the lock because we might be discarding an exisiting device.
+		ScopedCriticalSection lock( m_ObjectLock );
 
+		BREAK_ON_NULL( m_pD3D9, MF_E_NOT_INITIALIZED );
+		BREAK_ON_NULL( m_pDeviceManager, MF_E_NOT_INITIALIZED );
 
-	// Hold the lock because we might be discarding an exisiting device.
-	ScopedCriticalSection lock( m_ObjectLock );
+		// Find the monitor for this window.
+		UINT uAdapterID = D3DADAPTER_DEFAULT;
+		if( m_hwnd ) {
+			HMONITOR hMonitor = MonitorFromWindow( m_hwnd, MONITOR_DEFAULTTONEAREST );
 
-	if( !m_pD3D9 || !m_pDeviceManager ) {
-		return MF_E_NOT_INITIALIZED;
-	}
+			// Find the corresponding adapter.
+			hr = FindAdapter( m_pD3D9, hMonitor, &uAdapterID );
+			BREAK_ON_FAIL( hr );
+		}
 
-	hwnd = GetDesktopWindow();
+		// Get the device caps for this adapter.
+		D3DCAPS9 ddCaps;
+		ZeroMemory( &ddCaps, sizeof( ddCaps ) );
 
-	// Note: The presenter creates additional swap chains to present the
-	// video frames. Therefore, it does not use the device's implicit 
-	// swap chain, so the size of the back buffer here is 1 x 1.
+		hr = m_pD3D9->GetDeviceCaps( uAdapterID, D3DDEVTYPE_HAL, &ddCaps );
+		BREAK_ON_FAIL( hr );
 
-	D3DPRESENT_PARAMETERS pp;
-	ZeroMemory( &pp, sizeof( pp ) );
+		DWORD vp = D3DCREATE_SOFTWARE_VERTEXPROCESSING;
+		if( ddCaps.DevCaps & D3DDEVCAPS_HWTRANSFORMANDLIGHT ) {
+			vp = D3DCREATE_HARDWARE_VERTEXPROCESSING;
+		}
+		else {
+			CI_LOG_W( "Failed to enable hardware rendering. Using software rendering instead." );
+		}
 
-	pp.BackBufferWidth = 1;
-	pp.BackBufferHeight = 1;
-	pp.Windowed = TRUE;
-	pp.SwapEffect = D3DSWAPEFFECT_COPY;
-	pp.BackBufferFormat = D3DFMT_UNKNOWN;
-	pp.hDeviceWindow = hwnd;
-	pp.Flags = D3DPRESENTFLAG_VIDEO;
-	pp.PresentationInterval = D3DPRESENT_INTERVAL_DEFAULT;
+		// Note: The presenter creates additional swap chains to present the
+		// video frames. Therefore, it does not use the device's implicit 
+		// swap chain, so the size of the back buffer here is 1 x 1.
 
-	// Find the monitor for this window.
-	if( m_hwnd ) {
-		hMonitor = MonitorFromWindow( m_hwnd, MONITOR_DEFAULTTONEAREST );
+		D3DPRESENT_PARAMETERS pPresentParams;
+		ZeroMemory( &pPresentParams, sizeof( pPresentParams ) );
 
-		// Find the corresponding adapter.
-		hr = FindAdapter( m_pD3D9, hMonitor, &uAdapterID );
-		if( FAILED( hr ) )
-			return hr;
-	}
+		pPresentParams.BackBufferWidth = 1;
+		pPresentParams.BackBufferHeight = 1;
+		pPresentParams.Windowed = TRUE;
+		pPresentParams.SwapEffect = D3DSWAPEFFECT_COPY;
+		pPresentParams.BackBufferFormat = D3DFMT_UNKNOWN;
+		pPresentParams.hDeviceWindow = GetDesktopWindow();
+		pPresentParams.Flags = D3DPRESENTFLAG_VIDEO;
+		pPresentParams.PresentationInterval = D3DPRESENT_INTERVAL_DEFAULT;
 
-	// Get the device caps for this adapter.
-	hr = m_pD3D9->GetDeviceCaps( uAdapterID, D3DDEVTYPE_HAL, &ddCaps );
-	if( FAILED( hr ) )
-		return hr;
+		// Create the device.
+		ScopedComPtr<IDirect3DDevice9Ex> pDevice;
+		hr = m_pD3D9->CreateDeviceEx( uAdapterID, D3DDEVTYPE_HAL, pPresentParams.hDeviceWindow,
+									  vp | D3DCREATE_NOWINDOWCHANGES | D3DCREATE_MULTITHREADED | D3DCREATE_FPU_PRESERVE, &pPresentParams, NULL, &pDevice );
+		BREAK_ON_FAIL( hr );
 
-	if( ddCaps.DevCaps & D3DDEVCAPS_HWTRANSFORMANDLIGHT ) {
-		vp = D3DCREATE_HARDWARE_VERTEXPROCESSING;
-	}
-	else {
-		CI_LOG_W( "Software cap, no bueno" );
-		vp = D3DCREATE_SOFTWARE_VERTEXPROCESSING;
-	}
+		// Get the adapter display mode.
+		hr = m_pD3D9->GetAdapterDisplayMode( uAdapterID, &m_DisplayMode );
+		BREAK_ON_FAIL( hr );
 
-	// Create the device.
-	ScopedComPtr<IDirect3DDevice9Ex> pDevice;
-	hr = m_pD3D9->CreateDeviceEx( uAdapterID, D3DDEVTYPE_HAL, pp.hDeviceWindow,
-								  vp | D3DCREATE_NOWINDOWCHANGES | D3DCREATE_MULTITHREADED | D3DCREATE_FPU_PRESERVE, &pp, NULL, &pDevice );
-	if( FAILED( hr ) )
-		return hr;
+		// Reset the D3DDeviceManager with the new device 
+		hr = m_pDeviceManager->ResetDevice( pDevice, m_DeviceResetToken );
+		BREAK_ON_FAIL( hr );
 
-	// Get the adapter display mode.
-	hr = m_pD3D9->GetAdapterDisplayMode( uAdapterID, &m_DisplayMode );
-	if( FAILED( hr ) )
-		return hr;
-
-	// Reset the D3DDeviceManager with the new device 
-	hr = m_pDeviceManager->ResetDevice( pDevice, m_DeviceResetToken );
-	if( FAILED( hr ) )
-		return hr;
-
-	CopyComPtr( m_pDevice, pDevice.get() );
+		CopyComPtr( m_pDevice, pDevice.get() );
+	} while( false );
 
 	return hr;
 }
@@ -680,28 +673,27 @@ HRESULT D3DPresentEngine::CreateD3DSample( IDirect3DSwapChain9 *pSwapChain, IMFS
 	// Caller holds the object lock.
 
 	HRESULT hr = S_OK;
-	D3DCOLOR clrBlack = D3DCOLOR_ARGB( 0xFF, 0x00, 0x00, 0x00 );
 
-	// Get the back buffer surface.
-	ScopedComPtr<IDirect3DSurface9> pSurface;
-	hr = pSwapChain->GetBackBuffer( 0, D3DBACKBUFFER_TYPE_MONO, &pSurface );
-	if( FAILED( hr ) )
-		return hr;
+	do {
+		// Get the back buffer surface.
+		ScopedComPtr<IDirect3DSurface9> pSurface;
+		hr = pSwapChain->GetBackBuffer( 0, D3DBACKBUFFER_TYPE_MONO, &pSurface );
+		BREAK_ON_FAIL( hr );
 
-	// Fill it with black.
-	hr = m_pDevice->ColorFill( pSurface, NULL, clrBlack );
-	if( FAILED( hr ) )
-		return hr;
+		// Fill it with black.
+		const D3DCOLOR clrBlack = D3DCOLOR_ARGB( 0xFF, 0x00, 0x00, 0x00 );
+		hr = m_pDevice->ColorFill( pSurface, NULL, clrBlack );
+		BREAK_ON_FAIL( hr );
 
-	// Create the sample.
-	ScopedComPtr<IMFSample> pSample;
-	hr = MFCreateVideoSampleFromSurface( pSurface, &pSample );
-	if( FAILED( hr ) )
-		return hr;
+		// Create the sample.
+		ScopedComPtr<IMFSample> pSample;
+		hr = MFCreateVideoSampleFromSurface( pSurface, &pSample );
+		BREAK_ON_FAIL( hr );
 
-	// Return the pointer to the caller.
-	*ppVideoSample = pSample;
-	( *ppVideoSample )->AddRef();
+		// Return the pointer to the caller.
+		*ppVideoSample = pSample;
+		( *ppVideoSample )->AddRef();
+	} while( false );
 
 	return hr;
 }
@@ -711,20 +703,19 @@ HRESULT D3DPresentEngine::PresentSwapChain( IDirect3DSwapChain9* pSwapChain, IDi
 {
 	HRESULT hr = S_OK;
 
-	if( m_hwnd == NULL ) {
-		return MF_E_INVALIDREQUEST;
-	}
+	do {
+		BREAK_ON_NULL( m_hwnd, MF_E_INVALIDREQUEST );
 
-	ScopedComPtr<IDirect3DSurface9> surface;
-	hr = pSwapChain->GetBackBuffer( 0, D3DBACKBUFFER_TYPE_MONO, &surface );
-	if( FAILED( hr ) )
-		return hr;
+		ScopedComPtr<IDirect3DSurface9> pSurface;
+		hr = pSwapChain->GetBackBuffer( 0, D3DBACKBUFFER_TYPE_MONO, &pSurface );
+		BREAK_ON_FAIL( hr );
 
-	if( m_pDevice->StretchRect( surface, NULL, m_pD3DSharedSurface, NULL, D3DTEXF_NONE ) != D3D_OK ) {
-		CI_LOG_E( "ofxWMFVideoPlayer: Error while copying texture to gl context " );
-	}
+		hr = m_pDevice->StretchRect( pSurface, NULL, m_pD3DSharedSurface, NULL, D3DTEXF_NONE );
+		BREAK_ON_FAIL( hr );
 
-	hr = pSwapChain->Present( NULL, &m_rcDestRect, m_hwnd, NULL, 0 );
+		hr = pSwapChain->Present( NULL, &m_rcDestRect, m_hwnd, NULL, 0 );
+		BREAK_ON_FAIL( hr );
+	} while( false );
 
 	return hr;
 }
@@ -876,12 +867,18 @@ HRESULT EVRCustomPresenter::QueryInterface( REFIID riid, void ** ppv )
 
 ULONG EVRCustomPresenter::AddRef()
 {
-	return RefCountedObject::AddRef();
+	return InterlockedIncrement( &mRefCount );
 }
 
 ULONG EVRCustomPresenter::Release()
 {
-	return RefCountedObject::Release();
+	assert( mRefCount > 0 );
+
+	ULONG uCount = InterlockedDecrement( &mRefCount );
+	if( uCount == 0 )
+		delete this;
+
+	return uCount;
 }
 
 HRESULT EVRCustomPresenter::GetService( REFGUID guidService, REFIID riid, LPVOID *ppvObject )
@@ -1429,12 +1426,14 @@ HRESULT EVRCustomPresenter::RepaintVideo()
 //-----------------------------------------------------------------------------
 
 EVRCustomPresenter::EVRCustomPresenter( HRESULT& hr )
-	: m_RenderState( Shutdown ), m_pD3DPresentEngine( NULL ), m_pClock( NULL ), m_pMixer( NULL )
+	: mRefCount( 0 ), m_RenderState( Shutdown ), m_pD3DPresentEngine( NULL ), m_pClock( NULL ), m_pMixer( NULL )
 	, m_pMediaEventSink( NULL ), m_pMediaType( NULL ), m_bSampleNotify( FALSE ), m_bRepaint( FALSE )
 	, m_bEndStreaming( FALSE ), m_bPrerolled( FALSE ), m_fRate( 1.0f ), m_TokenCounter( 0 )
 	, m_SampleFreeCB( this, &EVRCustomPresenter::OnSampleFree )
 {
 	hr = S_OK;
+
+	CI_LOG_V( "Created EVRCustomPresenter." );
 
 	// Initial source rectangle = (0,0,1,1)
 	m_nrcSource.top = 0;
@@ -1460,6 +1459,8 @@ EVRCustomPresenter::~EVRCustomPresenter()
 
 	// Deletable objects
 	SafeDelete( m_pD3DPresentEngine );
+
+	CI_LOG_V( "Destroyed EVRCustomPresenter." );
 }
 
 HRESULT EVRCustomPresenter::ConfigureMixer( IMFTransform *pMixer )
@@ -2376,7 +2377,8 @@ HRESULT EVRCustomPresenter::OnSampleFree( IMFAsyncResult *pResult )
 			}
 
 			if( SUCCEEDED( hr ) ) {
-				m_ObjectLock.Lock();
+				//m_ObjectLock.Lock();
+				ScopedCriticalSection lock( m_ObjectLock );
 
 				if( MFGetAttributeUINT32( pSample, MFSamplePresenter_SampleCounter, (UINT32) -1 ) == m_TokenCounter ) {
 					// Return the sample to the sample pool.
@@ -2386,8 +2388,8 @@ HRESULT EVRCustomPresenter::OnSampleFree( IMFAsyncResult *pResult )
 					if( SUCCEEDED( hr ) )
 						(void) ProcessOutputLoop();
 				}
-				if( SUCCEEDED( hr ) )
-					m_ObjectLock.Unlock();
+				//if( SUCCEEDED( hr ) )
+				//	m_ObjectLock.Unlock();
 			}
 		}
 	}

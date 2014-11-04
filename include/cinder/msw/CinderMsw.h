@@ -68,7 +68,7 @@ public:
 
 	~CriticalSection()
 	{
-		assert( mCriticalSection.LockCount == 0 );
+		assert( mCriticalSection.LockCount == -1 );
 		DeleteCriticalSection( &mCriticalSection );
 	}
 
@@ -79,6 +79,7 @@ public:
 
 	void Unlock()
 	{
+		assert( mCriticalSection.LockCount < -1 );
 		LeaveCriticalSection( &mCriticalSection );
 	}
 };

@@ -22,6 +22,9 @@ POSSIBILITY OF SUCH DAMAGE.
 
 #include "cinder/Cinder.h"
 
+#include "cinder/gl/gl.h" // included to avoid error C2120 when including "wgl_all.h"
+#include "glload/wgl_all.h"
+
 #if defined( CINDER_MSW )
 
 #include "cinder/evr/RendererGlImpl.h"
@@ -31,9 +34,9 @@ namespace msw {
 namespace video {
 
 MovieGl::MovieGl()
-	: MovieBase(), mEVRPresenter( NULL )
+	: MovieBase()//, mEVRPresenter( NULL )
 {
-	if( !wglext_NV_DX_interop ) {
+	if( ! wglext_NV_DX_interop ) {
 		throw std::runtime_error( "WGL_NV_DX_interop extension not supported. Upgrade your graphics drivers and try again." );
 	}
 }
@@ -98,6 +101,72 @@ MovieGl::MovieGl( const fs::path& filePath )
 		mEVRPresenter->createSharedTexture( mWidth, mHeight, mTexture->getId() );
 		}
 		*/
+}
+
+void MovieGl::initFromUrl( const Url& url )
+{
+	MovieBase::initFromUrl( url );
+	/*
+	HRESULT hr = S_OK;
+
+	assert( mPlayer == NULL );
+
+	// Create window
+	HWND hwnd = createWindow( this );
+
+	// First, try to play the movie using Media Foundation.
+	mPlayer = new MediaFoundationPlayer( &hr, hwnd );
+
+	// If that did not work, try DirectShow.
+	if( FAILED( hr ) ) {
+		mPlayer = new DirectShowPlayer( &hr, hwnd );
+	}
+
+	// 
+	if( SUCCEEDED( hr ) ) {
+		std::wstring wstr = toWideString( url.c_str() );
+		hr = mPlayer->OpenFile( wstr.c_str() );
+	}
+
+	if( SUCCEEDED( hr ) ) {
+		mWidth = mPlayer->GetWidth();
+		mHeight = mPlayer->GetHeight();
+	}
+	*/
+	// TODO: log error
+}
+
+void MovieGl::initFromPath( const fs::path& filePath )
+{
+	MovieBase::initFromPath( filePath );
+	/*
+	HRESULT hr = S_OK;
+
+	assert( mPlayer == NULL );
+
+	// Create window
+	HWND hwnd = createWindow( this );
+
+	// First, try to play the movie using Media Foundation.
+	mPlayer = new MediaFoundationPlayer( &hr, hwnd );
+
+	// If that did not work, try DirectShow.
+	if( FAILED( hr ) ) {
+		mPlayer = new DirectShowPlayer( &hr, hwnd );
+	}
+
+	// 
+	if( SUCCEEDED( hr ) ) {
+		std::wstring wstr = toWideString( filePath.string() );
+		hr = mPlayer->OpenFile( wstr.c_str() );
+	}
+
+	if( SUCCEEDED( hr ) ) {
+		mWidth = mPlayer->GetWidth();
+		mHeight = mPlayer->GetHeight();
+	}
+	*/
+	// TODO: log error
 }
 
 /*

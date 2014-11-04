@@ -34,15 +34,17 @@ POSSIBILITY OF SUCH DAMAGE.
 #include "cinder/Thread.h"
 #include "cinder/CinderAssert.h"
 #include "cinder/Log.h"
-
+#include "cinder/msw/CinderMsw.h"
 #include "cinder/evr/IPlayer.h"
-#include "cinder/evr/Presenter.h"
 
 namespace cinder {
 namespace msw {
 namespace video {
 
 class MovieBase {
+public:
+	typedef enum PlayerBackends { BE_DIRECTSHOW, BE_MEDIA_FOUNDATION, BE_COUNT };
+
 public:
 	virtual		~MovieBase();
 
@@ -141,9 +143,10 @@ public:
 protected:
 	MovieBase();
 
-	void      initFromUrl( const Url& url );
-	void      initFromPath( const fs::path& filePath );
-	//void     initFromLoader( const MovieLoader& loader );
+	virtual void  init( const std::wstring &url );
+	virtual void  initFromUrl( const Url& url ) { init( toWideString( url.str() ) ); }
+	virtual void  initFromPath( const fs::path& filePath ) { init( toWideString( filePath.string() ) ); }
+	//virtual void  initFromLoader( const MovieLoader& loader );
 
 	void      loadAsset();
 	void      updateFrame();
@@ -167,6 +170,7 @@ protected:
 
 protected:
 	IPlayer*					mPlayer;
+	HWND						mHwnd;
 
 	uint32_t					mWidth, mHeight;
 	uint32_t					mFrameCount;

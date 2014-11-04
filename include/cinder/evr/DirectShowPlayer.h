@@ -15,7 +15,7 @@ namespace msw {
 namespace video {
 
 //! Forward declarations
-class CVideoRenderer;
+class VideoRenderer;
 
 //! Definitions
 typedef void ( CALLBACK *GraphEventFN )( HWND hwnd, long eventCode, LONG_PTR param1, LONG_PTR param2 );
@@ -30,8 +30,13 @@ class DirectShowPlayer : public IPlayer {
 	};
 
 public:
-	DirectShowPlayer( HRESULT *hr, HWND hwnd );
+	DirectShowPlayer( HRESULT &hr, HWND hwnd );
 	~DirectShowPlayer();
+
+	// IUnknown methods
+	STDMETHODIMP QueryInterface( REFIID iid, void** ppv ) override;
+	STDMETHODIMP_( ULONG ) AddRef() override;
+	STDMETHODIMP_( ULONG ) Release() override;
 
 	// IPlayer methods
 	HRESULT OpenFile( PCWSTR pszFileName ) override;
@@ -61,14 +66,16 @@ private:
 	HRESULT CreateVideoRenderer();
 	HRESULT RenderStreams( IBaseFilter *pSource );
 
-	PlayerState   m_state;
+	PlayerState      m_state;
 
-	HWND m_hwnd; // Video window. This window also receives graph events.
+	HWND             m_hwnd; // Video window. This window also receives graph events.
 
 	IGraphBuilder   *m_pGraph;
 	IMediaControl   *m_pControl;
 	IMediaEventEx   *m_pEvent;
-	CVideoRenderer  *m_pVideo;
+	VideoRenderer  *m_pVideo;
+
+	volatile long    mRefCount;
 };
 
 } // namespace video

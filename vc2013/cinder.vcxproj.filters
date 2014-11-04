@@ -756,9 +756,6 @@
     <ClCompile Include="..\include\cinder\evr\RendererImpl.cpp">
       <Filter>Source Files\evr</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\cinder\evr\Presenter.cpp">
-      <Filter>Source Files\evr</Filter>
-    </ClCompile>
     <ClCompile Include="..\src\cinder\evr\DirectShowVideo.cpp">
       <Filter>Source Files\evr</Filter>
     </ClCompile>
@@ -766,6 +763,9 @@
       <Filter>Source Files\evr</Filter>
     </ClCompile>
     <ClCompile Include="..\src\cinder\evr\MediaFoundationPlayer.cpp">
+      <Filter>Source Files\evr</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\cinder\evr\MediaFoundationVideo.cpp">
       <Filter>Source Files\evr</Filter>
     </ClCompile>
   </ItemGroup>
@@ -1607,9 +1607,6 @@
     <ClInclude Include="..\include\cinder\ImageSourceFileRadiance.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\cinder\evr\Presenter.h">
-      <Filter>Header Files\evr</Filter>
-    </ClInclude>
     <ClInclude Include="..\include\cinder\evr\RendererImpl.h">
       <Filter>Header Files\evr</Filter>
     </ClInclude>
@@ -1632,6 +1629,9 @@
       <Filter>Header Files\evr</Filter>
     </ClInclude>
     <ClInclude Include="..\include\cinder\evr\IPlayer.h">
+      <Filter>Header Files\evr</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\cinder\evr\MediaFoundationVideo.h">
       <Filter>Header Files\evr</Filter>
     </ClInclude>
   </ItemGroup>

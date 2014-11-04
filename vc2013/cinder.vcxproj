@@ -256,7 +256,7 @@
     <ClCompile Include="..\src\cinder\evr\DirectShowPlayer.cpp" />
     <ClCompile Include="..\src\cinder\evr\DirectShowVideo.cpp" />
     <ClCompile Include="..\src\cinder\evr\MediaFoundationPlayer.cpp" />
-    <ClCompile Include="..\src\cinder\evr\Presenter.cpp" />
+    <ClCompile Include="..\src\cinder\evr\MediaFoundationVideo.cpp" />
     <ClCompile Include="..\src\cinder\evr\RendererGlImpl.cpp" />
     <ClCompile Include="..\src\cinder\Exception.cpp" />
     <ClCompile Include="..\src\cinder\Font.cpp" />
@@ -479,7 +479,7 @@
     <ClInclude Include="..\include\cinder\evr\IPlayer.h" />
     <ClInclude Include="..\include\cinder\evr\RendererGlImpl.h" />
     <ClInclude Include="..\include\cinder\evr\RendererImpl.h" />
-    <ClInclude Include="..\include\cinder\evr\Presenter.h" />
+    <ClInclude Include="..\include\cinder\evr\MediaFoundationVideo.h" />
     <ClInclude Include="..\include\cinder\evr\MediaFoundationFramework.h" />
     <ClInclude Include="..\include\cinder\Filesystem.h" />
     <ClInclude Include="..\include\cinder\Frustum.h" />

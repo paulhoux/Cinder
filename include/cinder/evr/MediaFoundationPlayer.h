@@ -13,6 +13,9 @@ namespace cinder {
 namespace msw {
 namespace video {
 
+//! Forward declarations.
+class __declspec( uuid( "9A6E430D-27EE-4DBB-9A7F-7782EA4036A0" ) ) EVRCustomPresenter;
+
 class MediaFoundationPlayer : public IMFAsyncCallback, public IPlayer {
 public:
 	typedef enum PlayerState {
@@ -26,7 +29,7 @@ public:
 	};
 
 public:
-	MediaFoundationPlayer( HRESULT *hr, HWND hwnd );
+	MediaFoundationPlayer( HRESULT &hr, HWND hwnd );
 	~MediaFoundationPlayer();
 
 protected:
@@ -54,7 +57,7 @@ protected:
 	//
 	HRESULT CreateSession();
 	HRESULT CloseSession();
-	HRESULT CreatePartialTopology( IMFPresentationDescriptor *pPD ) { return E_NOTIMPL; }
+	HRESULT CreatePartialTopology( IMFPresentationDescriptor *pPD );// { return E_NOTIMPL; }
 	HRESULT SetMediaInfo( IMFPresentationDescriptor *pPD );
 	
 	HRESULT HandleSessionTopologySetEvent( IMFMediaEvent *pEvent );
@@ -72,24 +75,27 @@ protected:
 	static HRESULT AddBranchToPartialTopology( IMFTopology *pTopology, IMFMediaSource *pSource, IMFPresentationDescriptor *pPD, DWORD iStream, HWND hVideoWnd, IMFVideoPresenter *pVideoPresenter );
 
 protected:
-	bool                                  mIsInitialized;
+	bool                     mIsInitialized;
 
-	uint32_t                              mWidth, mHeight;
-	float                                 mCurrentVolume;
+	uint32_t                 mWidth, mHeight;
+	float                    mCurrentVolume;
 
-	ScopedComPtr<IMFMediaSession>         mMediaSessionPtr;
-	ScopedComPtr<IMFSequencerSource>      mSequencerSourcePtr;
-	ScopedComPtr<IMFMediaSource>          mMediaSourcePtr;
-	ScopedComPtr<IMFVideoDisplayControl>  mVideoDisplayControlPtr;
-	ScopedComPtr<IMFAudioStreamVolume>    mAudioStreamVolumePtr;
+	IMFMediaSession*         mMediaSessionPtr;
+	IMFSequencerSource*      mSequencerSourcePtr;
+	IMFMediaSource*          mMediaSourcePtr;
+	IMFVideoDisplayControl*  mVideoDisplayControlPtr;
+	IMFAudioStreamVolume*    mAudioStreamVolumePtr;
 
-	//MFSequencerElementId                  mPreviousTopologyId;
+	EVRCustomPresenter*      mPresenterPtr;
+
+	//MFSequencerElementId     mPreviousTopologyId;
 	
-	HWND                                  mHwnd;
-	PlayerState                           mState;
-	HANDLE                                mCloseEventHandle;
+	HWND                     mHwnd;
+	PlayerState              mState;
+	HANDLE                   mOpenEventHandle;
+	HANDLE                   mCloseEventHandle;
 
-	volatile long                         mRefCount;
+	volatile long            mRefCount;
 };
 
 } // namespace video

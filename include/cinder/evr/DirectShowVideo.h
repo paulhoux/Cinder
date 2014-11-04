@@ -22,9 +22,9 @@ HRESULT AddFilterByCLSID( IGraphBuilder *pGraph, REFGUID clsid, IBaseFilter **pp
 
 // Abstract class to manage the video renderer filter.
 // Specific implementations handle the VMR-7, VMR-9, or EVR filter.
-class CVideoRenderer {
+class VideoRenderer {
 public:
-	virtual ~CVideoRenderer() {};
+	virtual ~VideoRenderer() {};
 	virtual BOOL    HasVideo() const = 0;
 	virtual HRESULT AddToGraph( IGraphBuilder *pGraph, HWND hwnd ) = 0;
 	virtual HRESULT FinalizeGraph( IGraphBuilder *pGraph ) = 0;
@@ -34,12 +34,12 @@ public:
 };
 
 // Manages the VMR-7 video renderer filter.
-class CVMR7 : public CVideoRenderer {
+class RendererVMR7 : public VideoRenderer {
 	IVMRWindowlessControl   *m_pWindowless;
 
 public:
-	CVMR7();
-	~CVMR7();
+	RendererVMR7();
+	~RendererVMR7();
 	BOOL    HasVideo() const;
 	HRESULT AddToGraph( IGraphBuilder *pGraph, HWND hwnd );
 	HRESULT FinalizeGraph( IGraphBuilder *pGraph );
@@ -50,12 +50,12 @@ public:
 
 
 // Manages the VMR-9 video renderer filter.
-class CVMR9 : public CVideoRenderer {
+class RendererVMR9 : public VideoRenderer {
 	IVMRWindowlessControl9 *m_pWindowless;
 
 public:
-	CVMR9();
-	~CVMR9();
+	RendererVMR9();
+	~RendererVMR9();
 	BOOL    HasVideo() const;
 	HRESULT AddToGraph( IGraphBuilder *pGraph, HWND hwnd );
 	HRESULT FinalizeGraph( IGraphBuilder *pGraph );
@@ -66,13 +66,13 @@ public:
 
 
 // Manages the EVR video renderer filter.
-class CEVR : public CVideoRenderer {
+class RendererEVR : public VideoRenderer {
 	IBaseFilter            *m_pEVR;
 	IMFVideoDisplayControl *m_pVideoDisplay;
 
 public:
-	CEVR();
-	~CEVR();
+	RendererEVR();
+	~RendererEVR();
 	BOOL    HasVideo() const;
 	HRESULT AddToGraph( IGraphBuilder *pGraph, HWND hwnd );
 	HRESULT FinalizeGraph( IGraphBuilder *pGraph );

@@ -494,6 +494,7 @@ public:
 	}
 };
 
+/*
 //! You can use this when implementing IUnknown or any object that uses reference counting.
 class RefCountedObject {
 protected:
@@ -519,6 +520,7 @@ public:
 		return uCount;
 	}
 };
+*/
 
 template <class T>
 void CopyComPtr( T*& dest, T* src )

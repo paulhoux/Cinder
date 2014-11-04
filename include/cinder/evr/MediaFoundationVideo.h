@@ -25,10 +25,10 @@ POSSIBILITY OF SUCH DAMAGE.
 
 #include "cinder/Cinder.h"
 
-#if defined( CINDER_MSW )
-
 #include "cinder/gl/gl.h" // included to avoid error C2120 when including "wgl_all.h"
 #include "glload/wgl_all.h"
+
+#if defined( CINDER_MSW )
 
 #include "MediaFoundationFramework.h"
 
@@ -97,7 +97,7 @@ protected:
 	RECT                        m_rcDestRect;           // Destination rectangle.
 	D3DDISPLAYMODE              m_DisplayMode;          // Adapter's display mode.
 
-	msw::CriticalSection        m_ObjectLock;           // Thread lock for the D3D device.
+	CriticalSection             m_ObjectLock;           // Thread lock for the D3D device.
 
 	// COM interfaces
 	IDirect3D9Ex                *m_pD3D9;
@@ -152,7 +152,6 @@ static const GUID MFSamplePresenter_SampleSwapChain =
 { 0xad885bd1, 0x7def, 0x414a, { 0xb5, 0xb0, 0xd3, 0xd2, 0x63, 0xd6, 0xe9, 0x6d } };
 
 class __declspec( uuid( "9A6E430D-27EE-4DBB-9A7F-7782EA4036A0" ) ) EVRCustomPresenter :
-	public msw::RefCountedObject,
 	public IMFVideoDeviceID,
 	public IMFVideoPresenter, // Inherits IMFClockStateSink
 	public IMFRateSupport,
@@ -321,7 +320,7 @@ protected:
 	RenderState                 m_RenderState;          // Rendering state.
 	FrameStep                   m_FrameStep;            // Frame-stepping information.
 
-	msw::CriticalSection        m_ObjectLock;           // Serializes our public methods.  
+	CriticalSection             m_ObjectLock;           // Serializes our public methods.  
 
 	// Samples and scheduling
 	Scheduler                   m_scheduler;            // Manages scheduling of samples.
@@ -346,7 +345,7 @@ protected:
 	IMediaEventSink             *m_pMediaEventSink;      // The EVR's event-sink interface.
 	IMFMediaType                *m_pMediaType;           // Output media type
 
-
+	volatile long               mRefCount;
 public:
 	HANDLE getSharedDeviceHandle();
 

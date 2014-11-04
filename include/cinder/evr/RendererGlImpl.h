@@ -47,9 +47,9 @@ class MovieGl : public MovieBase {
 public:
 	virtual ~MovieGl();
 
-	static MovieGlRef create( const Url& url ) { return msw::makeComShared<MovieGl>( new MovieGl( url ) ); }
-	static MovieGlRef create( const fs::path& path ) { return msw::makeComShared<MovieGl>( new MovieGl( path ) ); }
-	//static MovieGlRef create( const MovieLoaderRef &loader ) { return msw::makeComShared<MovieGl>( new MovieGl( *loader ) ); }
+	static MovieGlRef create( const Url& url ) { return std::shared_ptr<MovieGl>( new MovieGl( url ) ); }
+	static MovieGlRef create( const fs::path& path ) { return std::shared_ptr<MovieGl>( new MovieGl( path ) ); }
+	//static MovieGlRef create( const MovieLoaderRef &loader ) { return std::shared_ptr<MovieGl>( new MovieGl( *loader ) ); }
 
 	//!
 	virtual bool hasAlpha() const override { /*TODO*/ return false; }
@@ -64,7 +64,7 @@ public:
 
 	void draw( int x, int y, int w, int h )
 	{
-		if( !mTexture || !mEVRPresenter )
+		if( !mTexture )
 			return;
 
 		static ci::Timer timer( true );
@@ -107,8 +107,8 @@ public:
 				CI_LOG_V( e.what() );
 			}
 		}
-
-		if( mEVRPresenter->lockSharedTexture() ) {
+		/*
+		if( mEVRPresenter && mEVRPresenter->lockSharedTexture() ) {
 			//gl::draw( mTexture, Rectf( x, y, x+w, y+h ) );
 
 			gl::ScopedTextureBind tex0( mTexture );
@@ -118,13 +118,16 @@ public:
 			gl::drawSolidRect( Rectf( x, y, x + w, y + h ), vec2( 0, 0 ), vec2( mTexture->getWidth(), mTexture->getHeight() ) );
 
 			mEVRPresenter->unlockSharedTexture();
-		}
+		}*/
 	}
 
 protected:
 	MovieGl();
 	MovieGl( const Url& url );
 	MovieGl( const fs::path& path );
+
+	void  initFromUrl( const Url& url ) override;
+	void  initFromPath( const fs::path& filePath ) override;
 	//MovieGl( const MovieLoader& loader );
 
 	//virtual HRESULT createPartialTopology( IMFPresentationDescriptor *pPD ) override;
@@ -132,8 +135,6 @@ protected:
 protected:
 	gl::TextureRef           mTexture;
 	gl::GlslProgRef          mShader;
-
-	EVRCustomPresenter*      mEVRPresenter; // Custom EVR for texture sharing
 };
 
 } // namespace video

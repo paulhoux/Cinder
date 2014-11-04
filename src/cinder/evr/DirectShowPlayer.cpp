@@ -4,20 +4,56 @@
 
 #if defined(CINDER_MSW)
 
+#include <shobjidl.h> 
+#include <shlwapi.h>
+
 namespace cinder {
-namespace msw { 
+namespace msw {
 namespace video {
 
 
-DirectShowPlayer::DirectShowPlayer( HRESULT *hr, HWND hwnd )
-	: m_state( STATE_NO_GRAPH ), m_hwnd( hwnd ), m_pGraph( NULL ), m_pControl( NULL ), m_pEvent( NULL ), m_pVideo( NULL )
+DirectShowPlayer::DirectShowPlayer( HRESULT &hr, HWND hwnd )
+	: mRefCount( 0 ), m_state( STATE_NO_GRAPH ), m_hwnd( hwnd ), m_pGraph( NULL ), m_pControl( NULL ), m_pEvent( NULL ), m_pVideo( NULL )
 {
-	*hr = S_OK;
+	hr = CoInitializeEx( NULL, COINIT_APARTMENTTHREADED );
+
+	CI_LOG_V( "Created DirectShowPlayer." );
 }
 
 DirectShowPlayer::~DirectShowPlayer()
 {
 	TearDownGraph();
+
+	CoUninitialize();
+
+	CI_LOG_V( "Destroyed DirectShowPlayer." );
+}
+
+HRESULT DirectShowPlayer::QueryInterface( REFIID riid, void** ppv )
+{
+	AddRef();
+
+	static const QITAB qit[] = {
+		QITABENT( DirectShowPlayer, IUnknown ),
+		{ 0 }
+	};
+	return QISearch( this, qit, riid, ppv );
+}
+
+ULONG DirectShowPlayer::AddRef()
+{
+	return InterlockedIncrement( &mRefCount );
+}
+
+ULONG DirectShowPlayer::Release()
+{
+	assert( mRefCount > 0 );
+
+	ULONG uCount = InterlockedDecrement( &mRefCount );
+	if( uCount == 0 ) {
+		delete this;
+	}
+	return uCount;
 }
 
 // Open a media file for playback.
@@ -27,7 +63,7 @@ HRESULT DirectShowPlayer::OpenFile( PCWSTR pszFileName )
 
 	do {
 		// Create a new filter graph. (This also closes the old one, if any.)
-		HRESULT hr = InitializeGraph();
+		hr = InitializeGraph();
 		BREAK_ON_FAIL( hr );
 
 		// Add the source filter to the graph.
@@ -174,8 +210,8 @@ HRESULT DirectShowPlayer::InitializeGraph()
 
 	do {
 		// Create the Filter Graph Manager.
-		HRESULT hr = CoCreateInstance( CLSID_FilterGraph, NULL,
-									   CLSCTX_INPROC_SERVER, IID_PPV_ARGS( &m_pGraph ) );
+		hr = CoCreateInstance( CLSID_FilterGraph, NULL,
+							   CLSCTX_INPROC_SERVER, IID_PPV_ARGS( &m_pGraph ) );
 		BREAK_ON_FAIL( hr );
 
 		hr = m_pGraph->QueryInterface( IID_PPV_ARGS( &m_pControl ) );
@@ -221,30 +257,26 @@ HRESULT DirectShowPlayer::CreateVideoRenderer()
 	for( DWORD i = Try_EVR; i <= Try_VMR7; i++ ) {
 		switch( i ) {
 		case Try_EVR:
-			m_pVideo = new ( std::nothrow ) CEVR();
+			m_pVideo = new ( std::nothrow ) RendererEVR();
 			break;
 
 		case Try_VMR9:
-			m_pVideo = new ( std::nothrow ) CVMR9();
+			m_pVideo = new ( std::nothrow ) RendererVMR9();
 			break;
 
 		case Try_VMR7:
-			m_pVideo = new ( std::nothrow ) CVMR7();
+			m_pVideo = new ( std::nothrow ) RendererVMR7();
 			break;
 		}
 
-		if( m_pVideo == NULL ) {
-			hr = E_OUTOFMEMORY;
-			break;
-		}
+		BREAK_ON_NULL( m_pVideo, E_OUTOFMEMORY );
 
 		hr = m_pVideo->AddToGraph( m_pGraph, m_hwnd );
 		if( SUCCEEDED( hr ) ) {
 			break;
 		}
 
-		delete m_pVideo;
-		m_pVideo = NULL;
+		SafeDelete( m_pVideo );
 	}
 	return hr;
 }
@@ -260,7 +292,7 @@ HRESULT DirectShowPlayer::RenderStreams( IBaseFilter *pSource )
 
 	do {
 		ScopedComPtr<IFilterGraph2> pGraph2;
-		HRESULT hr = m_pGraph->QueryInterface( IID_PPV_ARGS( &pGraph2 ) );
+		hr = m_pGraph->QueryInterface( IID_PPV_ARGS( &pGraph2 ) );
 		BREAK_ON_FAIL( hr );
 
 		// Add the video renderer to the graph

@@ -22,22 +22,22 @@ HRESULT FindConnectedPin( IBaseFilter *pFilter, PIN_DIRECTION PinDir, IPin **ppP
 
 /// VMR-7 Wrapper
 
-CVMR7::CVMR7() : m_pWindowless( NULL )
+RendererVMR7::RendererVMR7() : m_pWindowless( NULL )
 {
 
 }
 
-CVMR7::~CVMR7()
+RendererVMR7::~RendererVMR7()
 {
 	SafeRelease( m_pWindowless );
 }
 
-BOOL CVMR7::HasVideo() const
+BOOL RendererVMR7::HasVideo() const
 {
 	return ( m_pWindowless != NULL );
 }
 
-HRESULT CVMR7::AddToGraph( IGraphBuilder *pGraph, HWND hwnd )
+HRESULT RendererVMR7::AddToGraph( IGraphBuilder *pGraph, HWND hwnd )
 {
 	ScopedComPtr<IBaseFilter> pVMR;
 	HRESULT hr = AddFilterByCLSID( pGraph, CLSID_VideoMixingRenderer,
@@ -52,7 +52,7 @@ HRESULT CVMR7::AddToGraph( IGraphBuilder *pGraph, HWND hwnd )
 	return hr;
 }
 
-HRESULT CVMR7::FinalizeGraph( IGraphBuilder *pGraph )
+HRESULT RendererVMR7::FinalizeGraph( IGraphBuilder *pGraph )
 {
 	HRESULT hr = S_OK;
 
@@ -76,7 +76,7 @@ HRESULT CVMR7::FinalizeGraph( IGraphBuilder *pGraph )
 	return hr;
 }
 
-HRESULT CVMR7::UpdateVideoWindow( HWND hwnd, const LPRECT prc )
+HRESULT RendererVMR7::UpdateVideoWindow( HWND hwnd, const LPRECT prc )
 {
 	if( m_pWindowless == NULL ) {
 		return S_OK; // no-op
@@ -92,7 +92,7 @@ HRESULT CVMR7::UpdateVideoWindow( HWND hwnd, const LPRECT prc )
 	}
 }
 
-HRESULT CVMR7::Repaint( HWND hwnd, HDC hdc )
+HRESULT RendererVMR7::Repaint( HWND hwnd, HDC hdc )
 {
 	if( m_pWindowless ) {
 		return m_pWindowless->RepaintVideo( hwnd, hdc );
@@ -102,7 +102,7 @@ HRESULT CVMR7::Repaint( HWND hwnd, HDC hdc )
 	}
 }
 
-HRESULT CVMR7::DisplayModeChanged()
+HRESULT RendererVMR7::DisplayModeChanged()
 {
 	if( m_pWindowless ) {
 		return m_pWindowless->DisplayModeChanged();
@@ -156,22 +156,22 @@ HRESULT InitWindowlessVMR(
 
 /// VMR-9 Wrapper
 
-CVMR9::CVMR9() : m_pWindowless( NULL )
+RendererVMR9::RendererVMR9() : m_pWindowless( NULL )
 {
 
 }
 
-BOOL CVMR9::HasVideo() const
+BOOL RendererVMR9::HasVideo() const
 {
 	return ( m_pWindowless != NULL );
 }
 
-CVMR9::~CVMR9()
+RendererVMR9::~RendererVMR9()
 {
 	SafeRelease( m_pWindowless );
 }
 
-HRESULT CVMR9::AddToGraph( IGraphBuilder *pGraph, HWND hwnd )
+HRESULT RendererVMR9::AddToGraph( IGraphBuilder *pGraph, HWND hwnd )
 {
 	ScopedComPtr<IBaseFilter> pVMR;
 	HRESULT hr = AddFilterByCLSID( pGraph, CLSID_VideoMixingRenderer9,
@@ -185,7 +185,7 @@ HRESULT CVMR9::AddToGraph( IGraphBuilder *pGraph, HWND hwnd )
 	return hr;
 }
 
-HRESULT CVMR9::FinalizeGraph( IGraphBuilder *pGraph )
+HRESULT RendererVMR9::FinalizeGraph( IGraphBuilder *pGraph )
 {
 	if( m_pWindowless == NULL ) {
 		return S_OK;
@@ -212,7 +212,7 @@ HRESULT CVMR9::FinalizeGraph( IGraphBuilder *pGraph )
 }
 
 
-HRESULT CVMR9::UpdateVideoWindow( HWND hwnd, const LPRECT prc )
+HRESULT RendererVMR9::UpdateVideoWindow( HWND hwnd, const LPRECT prc )
 {
 	if( m_pWindowless == NULL ) {
 		return S_OK; // no-op
@@ -229,7 +229,7 @@ HRESULT CVMR9::UpdateVideoWindow( HWND hwnd, const LPRECT prc )
 	}
 }
 
-HRESULT CVMR9::Repaint( HWND hwnd, HDC hdc )
+HRESULT RendererVMR9::Repaint( HWND hwnd, HDC hdc )
 {
 	if( m_pWindowless ) {
 		return m_pWindowless->RepaintVideo( hwnd, hdc );
@@ -239,7 +239,7 @@ HRESULT CVMR9::Repaint( HWND hwnd, HDC hdc )
 	}
 }
 
-HRESULT CVMR9::DisplayModeChanged()
+HRESULT RendererVMR9::DisplayModeChanged()
 {
 	if( m_pWindowless ) {
 		return m_pWindowless->DisplayModeChanged();
@@ -293,23 +293,23 @@ HRESULT InitWindowlessVMR9(
 
 /// EVR Wrapper
 
-CEVR::CEVR() : m_pEVR( NULL ), m_pVideoDisplay( NULL )
+RendererEVR::RendererEVR() : m_pEVR( NULL ), m_pVideoDisplay( NULL )
 {
 
 }
 
-CEVR::~CEVR()
+RendererEVR::~RendererEVR()
 {
 	SafeRelease( m_pEVR );
 	SafeRelease( m_pVideoDisplay );
 }
 
-BOOL CEVR::HasVideo() const
+BOOL RendererEVR::HasVideo() const
 {
 	return ( m_pVideoDisplay != NULL );
 }
 
-HRESULT CEVR::AddToGraph( IGraphBuilder *pGraph, HWND hwnd )
+HRESULT RendererEVR::AddToGraph( IGraphBuilder *pGraph, HWND hwnd )
 {
 	HRESULT hr = S_OK;
 
@@ -333,7 +333,7 @@ HRESULT CEVR::AddToGraph( IGraphBuilder *pGraph, HWND hwnd )
 	return hr;
 }
 
-HRESULT CEVR::FinalizeGraph( IGraphBuilder *pGraph )
+HRESULT RendererEVR::FinalizeGraph( IGraphBuilder *pGraph )
 {
 	if( m_pEVR == NULL ) {
 		return S_OK;
@@ -348,7 +348,7 @@ HRESULT CEVR::FinalizeGraph( IGraphBuilder *pGraph )
 	return hr;
 }
 
-HRESULT CEVR::UpdateVideoWindow( HWND hwnd, const LPRECT prc )
+HRESULT RendererEVR::UpdateVideoWindow( HWND hwnd, const LPRECT prc )
 {
 	if( m_pVideoDisplay == NULL ) {
 		return S_OK; // no-op
@@ -365,7 +365,7 @@ HRESULT CEVR::UpdateVideoWindow( HWND hwnd, const LPRECT prc )
 	}
 }
 
-HRESULT CEVR::Repaint( HWND hwnd, HDC hdc )
+HRESULT RendererEVR::Repaint( HWND hwnd, HDC hdc )
 {
 	if( m_pVideoDisplay ) {
 		return m_pVideoDisplay->RepaintVideo();
@@ -375,7 +375,7 @@ HRESULT CEVR::Repaint( HWND hwnd, HDC hdc )
 	}
 }
 
-HRESULT CEVR::DisplayModeChanged()
+HRESULT RendererEVR::DisplayModeChanged()
 {
 	// The EVR does not require any action in response to WM_DISPLAYCHANGE.
 	return S_OK;
