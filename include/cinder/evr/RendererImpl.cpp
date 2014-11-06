@@ -106,22 +106,36 @@ void MovieBase::init( const std::wstring &url )
 			//mPlayer->AddRef();
 			if( SUCCEEDED( hr ) ) {
 				hr = mPlayer->OpenFile( url.c_str() );
-				if( SUCCEEDED( hr ) )
+				if( SUCCEEDED( hr ) ) {
+					mWidth = mPlayer->GetWidth();
+					mHeight = mPlayer->GetHeight();
+
+					MediaFoundationPlayer* player = dynamic_cast<MediaFoundationPlayer*>( mPlayer );
+					if( player ) {
+						// Create shared texture. TODO: move to method of its own
+						if( mTexture && ( mWidth != mTexture->getWidth() || mHeight != mTexture->getHeight() ) ) {
+							player->ReleaseSharedTexture();
+							mTexture.reset();
+						}
+
+						if( !mTexture ) {
+							gl::Texture2d::Format fmt;
+							fmt.setTarget( GL_TEXTURE_RECTANGLE );
+							fmt.loadTopDown( true );
+
+							mTexture = gl::Texture2d::create( mWidth, mHeight, fmt );
+							player->CreateSharedTexture( mWidth, mHeight, mTexture->getId() );
+						}
+					}
 					break;
+				}
 			}
 		}
 	}
 
 	if( FAILED( hr ) ) {
-		CI_LOG_V( "Failed to play movie using DirectShow." );
 		SafeRelease( mPlayer );
-
-		// log error
 		CI_LOG_E( "Failed to play movie: " << url.c_str() );
-	}
-	else {
-		mWidth = mPlayer->GetWidth();
-		mHeight = mPlayer->GetHeight();
 	}
 }
 
@@ -200,6 +214,10 @@ HWND MovieBase::createWindow( MovieBase* movie )
 		::SetWindowLong( hWnd, GWL_EXSTYLE, exstyle2 );
 
 		UpdateWindow( hWnd );
+
+#if _DEBUG
+		//ShowWindow( hWnd, SW_SHOWNORMAL ); // TEMP
+#endif
 	}
 
 	return hWnd;

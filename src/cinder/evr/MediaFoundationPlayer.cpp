@@ -61,7 +61,6 @@ MediaFoundationPlayer::MediaFoundationPlayer( HRESULT &hr, HWND hwnd )
 
 		hr = mPresenterPtr->SetVideoWindow( mHwnd );
 		BREAK_ON_FAIL( hr );
-
 	} while( false );
 
 	CI_LOG_V( "Created MediaFoundationPlayer." );
@@ -283,15 +282,6 @@ HRESULT MediaFoundationPlayer::Play()
 		// fails later, we'll get an MESessionStarted event with
 		// an error code, and we will update our state then.
 		mState = Started;
-
-/*
-		DWORD dwWaitResult = WaitForSingleObject( mOpenEventHandle, 5000 );
-		if( dwWaitResult == WAIT_FAILED ) {
-			assert( FALSE );
-		}
-		else if( dwWaitResult == WAIT_TIMEOUT ) {
-			assert( FALSE );
-*/
 	}
 
 	PropVariantClear( &varStart );
@@ -335,7 +325,6 @@ HRESULT MediaFoundationPlayer::HandleEvent( UINT_PTR pEventPtr )
 
 		// Check if the async operation succeeded.
 		if( SUCCEEDED( hr ) && FAILED( hrStatus ) ) {
-			CI_LOG_V( "Async operation failed: " << hrStatus );
 			hr = hrStatus;
 		}
 		//BREAK_ON_FAIL( hr );
@@ -343,38 +332,36 @@ HRESULT MediaFoundationPlayer::HandleEvent( UINT_PTR pEventPtr )
 		switch( eventType ) {
 		case MESessionTopologySet:
 			if( FAILED( hr ) )
-				CI_LOG_V( "MESessionTopologySet" );
+				CI_LOG_V( "MESessionTopologySet failed: " << hrStatus );
 			else
 				hr = HandleSessionTopologySetEvent( pEvent );
 			break;
 		case MESessionTopologyStatus:
 			if( FAILED( hr ) )
-				CI_LOG_V( "MESessionTopologyStatus" );
+				CI_LOG_V( "MESessionTopologyStatus failed: " << hrStatus );
 			else
 				hr = HandleSessionTopologyStatusEvent( pEvent );
 			break;
 		case MEEndOfPresentation:
 			if( FAILED( hr ) )
-				CI_LOG_V( "MEEndOfPresentation" );
+				CI_LOG_V( "MEEndOfPresentation failed: " << hrStatus );
 			else
 				hr = HandleEndOfPresentationEvent( pEvent );
 			break;
 		case MENewPresentation:
 			if( FAILED( hr ) )
-				CI_LOG_V( "MENewPresentation" );
+				CI_LOG_V( "MENewPresentation failed: " << hrStatus );
 			else
 				hr = HandleNewPresentationEvent( pEvent );
 			break;
 		case MESessionStarted:
 			if( FAILED( hr ) )
-				CI_LOG_V( "MESessionStarted" );
+				CI_LOG_V( "MESessionStarted failed: " << hrStatus );
 			else
 				mState = Started;
 			break;
 		default:
-			if( FAILED( hr ) )
-				CI_LOG_V( "default" );
-			else
+			if( SUCCEEDED( hr ) )
 				hr = HandleSessionEvent( pEvent, eventType );
 			break;
 		}

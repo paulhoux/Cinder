@@ -20,6 +20,8 @@ namespace video {
 HRESULT RemoveUnconnectedRenderer( IGraphBuilder *pGraph, IBaseFilter *pRenderer, BOOL *pbRemoved );
 HRESULT AddFilterByCLSID( IGraphBuilder *pGraph, REFGUID clsid, IBaseFilter **ppF, LPCWSTR wszName );
 
+class __declspec( uuid( "9A6E430D-27EE-4DBB-9A7F-7782EA4036A0" ) ) EVRCustomPresenter;
+
 // Abstract class to manage the video renderer filter.
 // Specific implementations handle the VMR-7, VMR-9, or EVR filter.
 class VideoRenderer {
@@ -69,6 +71,8 @@ public:
 class RendererEVR : public VideoRenderer {
 	IBaseFilter            *m_pEVR;
 	IMFVideoDisplayControl *m_pVideoDisplay;
+
+	EVRCustomPresenter     *m_pPresenter;
 
 public:
 	RendererEVR();

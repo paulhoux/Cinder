@@ -28,6 +28,7 @@ POSSIBILITY OF SUCH DAMAGE.
 #if defined( CINDER_MSW )
 
 #include "cinder/evr/RendererGlImpl.h"
+#include "cinder/evr/MediaFoundationPlayer.h"
 
 namespace cinder {
 namespace msw {
@@ -36,7 +37,7 @@ namespace video {
 MovieGl::MovieGl()
 	: MovieBase()//, mEVRPresenter( NULL )
 {
-	if( ! wglext_NV_DX_interop ) {
+	if( !wglext_NV_DX_interop ) {
 		throw std::runtime_error( "WGL_NV_DX_interop extension not supported. Upgrade your graphics drivers and try again." );
 	}
 }
@@ -119,18 +120,18 @@ void MovieGl::initFromUrl( const Url& url )
 
 	// If that did not work, try DirectShow.
 	if( FAILED( hr ) ) {
-		mPlayer = new DirectShowPlayer( &hr, hwnd );
+	mPlayer = new DirectShowPlayer( &hr, hwnd );
 	}
 
-	// 
+	//
 	if( SUCCEEDED( hr ) ) {
-		std::wstring wstr = toWideString( url.c_str() );
-		hr = mPlayer->OpenFile( wstr.c_str() );
+	std::wstring wstr = toWideString( url.c_str() );
+	hr = mPlayer->OpenFile( wstr.c_str() );
 	}
 
 	if( SUCCEEDED( hr ) ) {
-		mWidth = mPlayer->GetWidth();
-		mHeight = mPlayer->GetHeight();
+	mWidth = mPlayer->GetWidth();
+	mHeight = mPlayer->GetHeight();
 	}
 	*/
 	// TODO: log error
@@ -152,18 +153,18 @@ void MovieGl::initFromPath( const fs::path& filePath )
 
 	// If that did not work, try DirectShow.
 	if( FAILED( hr ) ) {
-		mPlayer = new DirectShowPlayer( &hr, hwnd );
+	mPlayer = new DirectShowPlayer( &hr, hwnd );
 	}
 
-	// 
+	//
 	if( SUCCEEDED( hr ) ) {
-		std::wstring wstr = toWideString( filePath.string() );
-		hr = mPlayer->OpenFile( wstr.c_str() );
+	std::wstring wstr = toWideString( filePath.string() );
+	hr = mPlayer->OpenFile( wstr.c_str() );
 	}
 
 	if( SUCCEEDED( hr ) ) {
-		mWidth = mPlayer->GetWidth();
-		mHeight = mPlayer->GetHeight();
+	mWidth = mPlayer->GetWidth();
+	mHeight = mPlayer->GetHeight();
 	}
 	*/
 	// TODO: log error
@@ -199,6 +200,67 @@ return hr;
 return hr;
 }
 */
+
+void MovieGl::draw( int x, int y, int w, int h )
+{
+	if( !mTexture )
+		return;
+
+	static ci::Timer timer( true );
+
+	// TEMP
+	if( !mShader ) {
+		gl::GlslProg::Format fmt;
+		fmt.vertex(
+			"#version 150\n"
+			""
+			"uniform mat4 ciModelViewProjection;\n"
+			"in vec4 ciPosition;\n"
+			"in vec2 ciTexCoord0;\n"
+			"out vec2 vTexCoord0;\n"
+			""
+			"void main(void) {\n"
+			"	gl_Position = ciModelViewProjection * ciPosition;\n"
+			"	vTexCoord0 = ciTexCoord0;\n"
+			"}"
+			);
+		fmt.fragment(
+			"#version 150\n"
+			""
+			"uniform sampler2DRect uTex0;\n"
+			"uniform float uTime;\n"
+			"in vec2 vTexCoord0;\n"
+			"out vec4 oColor;\n"
+			""
+			"void main(void) {\n"
+			"	vec2 uv = vTexCoord0;\n"
+			"	uv.x += 10 * sin(uTime * 10.0 + 0.1 * uv.y);\n"
+			"	oColor = texture( uTex0, uv );\n"
+			"}"
+			);
+
+		try {
+			mShader = gl::GlslProg::create( fmt );
+		}
+		catch( const std::exception &e ) {
+			CI_LOG_V( e.what() );
+		}
+	}
+
+	MediaFoundationPlayer* player = dynamic_cast<MediaFoundationPlayer*>( mPlayer );
+	if( player && player->LockSharedTexture() ) {
+		gl::draw( mTexture, Rectf( x, y, x+w, y+h ) );
+		/*
+		gl::ScopedTextureBind tex0( mTexture );
+		gl::ScopedGlslProg shader( mShader );
+		mShader->uniform( "uTex0", 0 );
+		mShader->uniform( "uTime", float( timer.getSeconds() ) );
+		gl::drawSolidRect( Rectf( x, y, x + w, y + h ), vec2( 0, 0 ), vec2( mTexture->getWidth(), mTexture->getHeight() ) );
+		*/
+		player->UnlockSharedTexture();
+	}
+}
+
 } // namespace video
 } // namespace msw
 } // namespace cinder

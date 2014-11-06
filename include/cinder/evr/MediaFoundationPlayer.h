@@ -7,14 +7,11 @@
 #include "cinder/msw/CinderMsw.h"
 #include "cinder/msw/CinderMswCom.h"
 #include "cinder/evr/IPlayer.h"
-#include "MediaFoundationFramework.h"
+#include "cinder/evr/MediaFoundationVideo.h"
 
 namespace cinder {
 namespace msw {
 namespace video {
-
-//! Forward declarations.
-class __declspec( uuid( "9A6E430D-27EE-4DBB-9A7F-7782EA4036A0" ) ) EVRCustomPresenter;
 
 class MediaFoundationPlayer : public IMFAsyncCallback, public IPlayer {
 public:
@@ -31,6 +28,11 @@ public:
 public:
 	MediaFoundationPlayer( HRESULT &hr, HWND hwnd );
 	~MediaFoundationPlayer();
+
+	bool CreateSharedTexture( int w, int h, int textureID ) { return mPresenterPtr->createSharedTexture( w, h, textureID ); }
+	bool LockSharedTexture() { return mPresenterPtr->lockSharedTexture(); }
+	bool UnlockSharedTexture() { return mPresenterPtr->unlockSharedTexture(); }
+	void ReleaseSharedTexture() { mPresenterPtr->releaseSharedTexture(); }
 
 protected:
 	// IUnknown methods
@@ -55,11 +57,12 @@ protected:
 	UINT32  GetHeight() override { return mHeight; }
 
 	//
+
 	HRESULT CreateSession();
 	HRESULT CloseSession();
 	HRESULT CreatePartialTopology( IMFPresentationDescriptor *pPD );// { return E_NOTIMPL; }
 	HRESULT SetMediaInfo( IMFPresentationDescriptor *pPD );
-	
+
 	HRESULT HandleSessionTopologySetEvent( IMFMediaEvent *pEvent );
 	HRESULT HandleSessionTopologyStatusEvent( IMFMediaEvent *pEvent );
 	HRESULT HandleEndOfPresentationEvent( IMFMediaEvent *pEvent );
@@ -88,8 +91,6 @@ protected:
 
 	EVRCustomPresenter*      mPresenterPtr;
 
-	//MFSequencerElementId     mPreviousTopologyId;
-	
 	HWND                     mHwnd;
 	PlayerState              mState;
 	HANDLE                   mOpenEventHandle;

@@ -37,13 +37,16 @@ POSSIBILITY OF SUCH DAMAGE.
 #include "cinder/msw/CinderMsw.h"
 #include "cinder/evr/IPlayer.h"
 
+// TEMP
+#include "cinder/gl/Texture.h"
+
 namespace cinder {
 namespace msw {
 namespace video {
 
 class MovieBase {
 public:
-	typedef enum PlayerBackends { BE_DIRECTSHOW, BE_MEDIA_FOUNDATION, BE_COUNT };
+	typedef enum PlayerBackends { BE_MEDIA_FOUNDATION, BE_DIRECTSHOW, BE_COUNT };
 
 public:
 	virtual		~MovieBase();
@@ -171,6 +174,8 @@ protected:
 protected:
 	IPlayer*					mPlayer;
 	HWND						mHwnd;
+
+	gl::Texture2dRef			mTexture; // TEMP
 
 	uint32_t					mWidth, mHeight;
 	uint32_t					mFrameCount;

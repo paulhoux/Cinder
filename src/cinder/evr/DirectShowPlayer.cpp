@@ -100,11 +100,78 @@ HRESULT DirectShowPlayer::HandleEvent( UINT_PTR pEventPtr )
 			case EC_USERABORT:
 				Stop();
 				break;
-
 			case EC_ERRORABORT:
 				CI_LOG_E( "Playback error." );
-				Stop();
+				//Stop();
 				break;
+#if _DEBUG
+			case EC_TIME:
+				CI_LOG_V( "EC_TIME" );
+				break;
+			case EC_REPAINT:
+				CI_LOG_V( "EC_REPAINT" );
+				break;
+			case EC_STREAM_ERROR_STOPPED:
+				CI_LOG_V( "EC_STREAM_ERROR_STOPPED" );
+				break;
+			case EC_STREAM_ERROR_STILLPLAYING:
+				CI_LOG_V( "EC_STREAM_ERROR_STILLPLAYING" );
+				break;
+			case EC_ERROR_STILLPLAYING:
+				CI_LOG_V( "EC_ERROR_STILLPLAYING" );
+				break;
+			case EC_PALETTE_CHANGED:
+				CI_LOG_V( "EC_PALETTE_CHANGED" );
+				break;
+			case EC_VIDEO_SIZE_CHANGED:
+				CI_LOG_V( "EC_VIDEO_SIZE_CHANGED" );
+				break;
+			case EC_QUALITY_CHANGE:
+				CI_LOG_V( "EC_QUALITY_CHANGE" );
+				break;
+			case EC_SHUTTING_DOWN:
+				CI_LOG_V( "EC_SHUTTING_DOWN" );
+				break;
+			case EC_CLOCK_CHANGED:
+				CI_LOG_V( "EC_CLOCK_CHANGED" );
+				break;
+			case EC_PAUSED:
+				CI_LOG_V( "EC_PAUSED" );
+				break;
+			case EC_OPENING_FILE:
+				CI_LOG_V( "EC_OPENING_FILE" );
+				break;
+			case EC_BUFFERING_DATA:
+				CI_LOG_V( "EC_BUFFERING_DATA" );
+				break;
+			case EC_FULLSCREEN_LOST:
+				CI_LOG_V( "EC_FULLSCREEN_LOST" );
+				break;
+			case EC_ACTIVATE:
+				CI_LOG_V( "EC_ACTIVATE" );
+				break;
+			case EC_WINDOW_DESTROYED:
+				CI_LOG_V( "EC_WINDOW_DESTROYED" );
+				break;
+			case EC_DISPLAY_CHANGED:
+				CI_LOG_V( "EC_DISPLAY_CHANGED" );
+				break;
+			case EC_STARVATION:
+				CI_LOG_V( "EC_STARVATION" );
+				break;
+			case EC_OLE_EVENT:
+				CI_LOG_V( "EC_OLE_EVENT" );
+				break;
+			case EC_NOTIFY_WINDOW:
+				CI_LOG_V( "EC_NOTIFY_WINDOW" );
+				break;
+			case EC_STREAM_CONTROL_STOPPED:
+				CI_LOG_V( "EC_STREAM_CONTROL_STOPPED" );
+				break;
+			case EC_STREAM_CONTROL_STARTED:
+				CI_LOG_V( "EC_STREAM_CONTROL_STARTED" );
+				break;
+#endif
 			}
 
 			// Free the event data.
@@ -166,6 +233,7 @@ BOOL DirectShowPlayer::HasVideo() const
 HRESULT DirectShowPlayer::UpdateVideoWindow( const LPRECT prc )
 {
 	if( m_pVideo ) {
+		CI_LOG_V( "UpdateVideoWindow" );
 		return m_pVideo->UpdateVideoWindow( m_hwnd, prc );
 	}
 	else {
@@ -177,6 +245,7 @@ HRESULT DirectShowPlayer::UpdateVideoWindow( const LPRECT prc )
 HRESULT DirectShowPlayer::Repaint( HDC hdc )
 {
 	if( m_pVideo ) {
+		CI_LOG_V( "Repaint" );
 		return m_pVideo->Repaint( m_hwnd, hdc );
 	}
 	else {
@@ -191,6 +260,7 @@ HRESULT DirectShowPlayer::Repaint( HDC hdc )
 HRESULT DirectShowPlayer::DisplayModeChanged()
 {
 	if( m_pVideo ) {
+		CI_LOG_V( "DisplayModeChanged" );
 		return m_pVideo->DisplayModeChanged();
 	}
 	else {
@@ -257,14 +327,17 @@ HRESULT DirectShowPlayer::CreateVideoRenderer()
 	for( DWORD i = Try_EVR; i <= Try_VMR7; i++ ) {
 		switch( i ) {
 		case Try_EVR:
+			CI_LOG_V( "Trying EVR..." );
 			m_pVideo = new ( std::nothrow ) RendererEVR();
 			break;
 
 		case Try_VMR9:
+			CI_LOG_V( "Trying VMR9..." );
 			m_pVideo = new ( std::nothrow ) RendererVMR9();
 			break;
 
 		case Try_VMR7:
+			CI_LOG_V( "Trying VMR7..." );
 			m_pVideo = new ( std::nothrow ) RendererVMR7();
 			break;
 		}
@@ -273,6 +346,7 @@ HRESULT DirectShowPlayer::CreateVideoRenderer()
 
 		hr = m_pVideo->AddToGraph( m_pGraph, m_hwnd );
 		if( SUCCEEDED( hr ) ) {
+			CI_LOG_V( "Success!" );
 			break;
 		}
 

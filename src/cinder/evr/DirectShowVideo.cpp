@@ -6,6 +6,8 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 
 #include "cinder/evr/DirectShowVideo.h"
+#include "cinder/evr/MediaFoundationVideo.h"
+#include "cinder/Log.h"
 
 #if defined(CINDER_MSW)
 
@@ -15,9 +17,9 @@ namespace cinder {
 namespace msw {
 namespace video {
 
-HRESULT InitializeEVR( IBaseFilter *pEVR, HWND hwnd, IMFVideoDisplayControl ** ppWc );
-HRESULT InitWindowlessVMR9( IBaseFilter *pVMR, HWND hwnd, IVMRWindowlessControl9 ** ppWc );
-HRESULT InitWindowlessVMR( IBaseFilter *pVMR, HWND hwnd, IVMRWindowlessControl** ppWc );
+HRESULT InitializeEVR( IBaseFilter *pEVR, HWND hwnd, IMFVideoPresenter *pPresenter, IMFVideoDisplayControl **ppWc );
+HRESULT InitWindowlessVMR9( IBaseFilter *pVMR, HWND hwnd, IVMRWindowlessControl9 **ppWc );
+HRESULT InitWindowlessVMR( IBaseFilter *pVMR, HWND hwnd, IVMRWindowlessControl **ppWc );
 HRESULT FindConnectedPin( IBaseFilter *pFilter, PIN_DIRECTION PinDir, IPin **ppPin );
 
 /// VMR-7 Wrapper
@@ -293,15 +295,16 @@ HRESULT InitWindowlessVMR9(
 
 /// EVR Wrapper
 
-RendererEVR::RendererEVR() : m_pEVR( NULL ), m_pVideoDisplay( NULL )
+RendererEVR::RendererEVR() 
+	: m_pEVR( NULL ), m_pVideoDisplay( NULL ), m_pPresenter( NULL )
 {
-
 }
 
 RendererEVR::~RendererEVR()
 {
 	SafeRelease( m_pEVR );
 	SafeRelease( m_pVideoDisplay );
+	SafeRelease( m_pPresenter );
 }
 
 BOOL RendererEVR::HasVideo() const
@@ -314,12 +317,20 @@ HRESULT RendererEVR::AddToGraph( IGraphBuilder *pGraph, HWND hwnd )
 	HRESULT hr = S_OK;
 
 	do {
+		// Create custom EVR presenter.
+		m_pPresenter = new EVRCustomPresenter( hr );
+		m_pPresenter->AddRef();
+		BREAK_ON_FAIL( hr );
+
+		hr = m_pPresenter->SetVideoWindow( hwnd );
+		BREAK_ON_FAIL( hr );
+
 		ScopedComPtr<IBaseFilter> pEVR;
 		hr = AddFilterByCLSID( pGraph, CLSID_EnhancedVideoRenderer,
 							   &pEVR, L"EVR" );
 		BREAK_ON_FAIL( hr );
 
-		hr = InitializeEVR( pEVR, hwnd, &m_pVideoDisplay );
+		hr = InitializeEVR( pEVR, hwnd, m_pPresenter, &m_pVideoDisplay );
 		BREAK_ON_FAIL( hr );
 
 		// Note: Because IMFVideoDisplayControl is a service interface,
@@ -329,6 +340,12 @@ HRESULT RendererEVR::AddToGraph( IGraphBuilder *pGraph, HWND hwnd )
 		m_pEVR = pEVR;
 		m_pEVR->AddRef();
 	} while( false );
+
+	if( FAILED( hr ) ) {
+		SafeRelease( m_pEVR );
+		SafeRelease( m_pVideoDisplay );
+		SafeRelease( m_pPresenter );
+	}
 
 	return hr;
 }
@@ -344,6 +361,7 @@ HRESULT RendererEVR::FinalizeGraph( IGraphBuilder *pGraph )
 	if( bRemoved ) {
 		SafeRelease( m_pEVR );
 		SafeRelease( m_pVideoDisplay );
+		SafeRelease( m_pPresenter );
 	}
 	return hr;
 }
@@ -387,6 +405,7 @@ HRESULT RendererEVR::DisplayModeChanged()
 HRESULT InitializeEVR(
 	IBaseFilter *pEVR,              // Pointer to the EVR
 	HWND hwnd,                      // Clipping window
+	IMFVideoPresenter* pRenderer,   // Custom presenter, or NULL for default
 	IMFVideoDisplayControl** ppDisplayControl
 	)
 {
@@ -408,6 +427,15 @@ HRESULT InitializeEVR(
 		// Preserve aspect ratio by letter-boxing
 		hr = pDisplay->SetAspectRatioMode( MFVideoARMode_PreservePicture );
 		BREAK_ON_FAIL( hr );
+
+		if( pRenderer != NULL ) {
+			ScopedComPtr<IMFVideoRenderer> pVideoRenderer;
+			hr = pEVR->QueryInterface( __uuidof( IMFVideoRenderer ), (void**) &pVideoRenderer );
+			BREAK_ON_FAIL( hr );
+
+			hr = pVideoRenderer->InitializeRenderer( NULL, pRenderer );
+			BREAK_ON_FAIL( hr );
+		}
 
 		// Return the IMFVideoDisplayControl pointer to the caller.
 		*ppDisplayControl = pDisplay;
@@ -526,6 +554,9 @@ HRESULT AddFilterByCLSID( IGraphBuilder *pGraph, REFGUID clsid,
 
 		hr = pGraph->AddFilter( pFilter, wszName );
 		BREAK_ON_FAIL( hr );
+
+		std::wstring wstr( wszName );
+		CI_LOG_V( "Added filter: " << wstr.c_str() );
 
 		*ppF = pFilter;
 		( *ppF )->AddRef();

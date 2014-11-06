@@ -647,7 +647,7 @@ HRESULT D3DPresentEngine::CreateD3DDevice()
 		pPresentParams.Flags = D3DPRESENTFLAG_VIDEO;
 		pPresentParams.PresentationInterval = D3DPRESENT_INTERVAL_DEFAULT;
 
-		// Create the device.
+		// Create the device. The interop definition states D3DCREATE_MULTITHREADED is required, but it may vary by vendor.
 		ScopedComPtr<IDirect3DDevice9Ex> pDevice;
 		hr = m_pD3D9->CreateDeviceEx( uAdapterID, D3DDEVTYPE_HAL, pPresentParams.hDeviceWindow,
 									  vp | D3DCREATE_NOWINDOWCHANGES | D3DCREATE_MULTITHREADED | D3DCREATE_FPU_PRESERVE, &pPresentParams, NULL, &pDevice );
@@ -996,26 +996,32 @@ HRESULT EVRCustomPresenter::ProcessMessage( MFVP_MESSAGE_TYPE eMessage, ULONG_PT
 
 	switch( eMessage ) {
 	case MFVP_MESSAGE_FLUSH:
+		CI_LOG_V("MFVP_MESSAGE_FLUSH");
 		// Flush all pending samples.
 		hr = Flush();
 		break;
 	case MFVP_MESSAGE_INVALIDATEMEDIATYPE:
+		CI_LOG_V( "MFVP_MESSAGE_INVALIDATEMEDIATYPE" );
 		// Renegotiate the media type with the mixer.
 		hr = RenegotiateMediaType();
 		break;
 	case MFVP_MESSAGE_PROCESSINPUTNOTIFY:
+		//CI_LOG_V( "MFVP_MESSAGE_PROCESSINPUTNOTIFY" );
 		// The mixer received a new input sample. 
 		hr = ProcessInputNotify();
 		break;
 	case MFVP_MESSAGE_BEGINSTREAMING:
+		CI_LOG_V( "MFVP_MESSAGE_BEGINSTREAMING" );
 		// Streaming is about to start.
 		hr = BeginStreaming();
 		break;
 	case MFVP_MESSAGE_ENDSTREAMING:
+		CI_LOG_V( "MFVP_MESSAGE_ENDSTREAMING" );
 		// Streaming has ended. (The EVR has stopped.)
 		hr = EndStreaming();
 		break;
 	case MFVP_MESSAGE_ENDOFSTREAM:
+		CI_LOG_V( "MFVP_MESSAGE_ENDOFSTREAM" );
 		// All input streams have ended.
 		// Set the EOS flag. 
 		m_bEndStreaming = TRUE;
@@ -1023,10 +1029,12 @@ HRESULT EVRCustomPresenter::ProcessMessage( MFVP_MESSAGE_TYPE eMessage, ULONG_PT
 		hr = CheckEndOfStream();
 		break;
 	case MFVP_MESSAGE_STEP:
+		CI_LOG_V( "MFVP_MESSAGE_STEP" );
 		// Frame-stepping is starting.
 		hr = PrepareFrameStep( LODWORD( ulParam ) );
 		break;
 	case MFVP_MESSAGE_CANCELSTEP:
+		CI_LOG_V( "MFVP_MESSAGE_CANCELSTEP" );
 		// Cancels frame-stepping.
 		hr = CancelFrameStep();
 		break;
@@ -2075,9 +2083,18 @@ void EVRCustomPresenter::ProcessOutputLoop()
 	}
 }
 
+//-----------------------------------------------------------------------------
+// ProcessOutput
+//
+// Attempts to get a new output sample from the mixer.
+//
+// Called in two situations:
+// (1) ProcessOutputLoop, if the mixer has a new input sample.
+// (2) Repainting the last frame.
+//-----------------------------------------------------------------------------
 HRESULT EVRCustomPresenter::ProcessOutput()
 {
-	assert( m_bSampleNotify || m_bRepaint );
+	assert( m_bSampleNotify || m_bRepaint ); // See note above.
 
 	HRESULT     hr = S_OK;
 	DWORD       dwStatus = 0;
@@ -2149,6 +2166,7 @@ HRESULT EVRCustomPresenter::ProcessOutput()
 				return hr;
 			}
 		}
+
 		// Handle some known error codes from ProcessOutput.
 		if( hr == MF_E_TRANSFORM_TYPE_NOT_SET ) {
 			// The mixer's format is not set. Negotiate a new format.
@@ -2349,7 +2367,6 @@ HRESULT EVRCustomPresenter::OnSampleFree( IMFAsyncResult *pResult )
 {
 	HRESULT hr = S_OK;
 
-
 	// Get the sample from the async result object.
 	ScopedComPtr<IUnknown> pObject;
 	hr = pResult->GetObject( &pObject );
@@ -2377,7 +2394,6 @@ HRESULT EVRCustomPresenter::OnSampleFree( IMFAsyncResult *pResult )
 			}
 
 			if( SUCCEEDED( hr ) ) {
-				//m_ObjectLock.Lock();
 				ScopedCriticalSection lock( m_ObjectLock );
 
 				if( MFGetAttributeUINT32( pSample, MFSamplePresenter_SampleCounter, (UINT32) -1 ) == m_TokenCounter ) {
@@ -2388,8 +2404,6 @@ HRESULT EVRCustomPresenter::OnSampleFree( IMFAsyncResult *pResult )
 					if( SUCCEEDED( hr ) )
 						(void) ProcessOutputLoop();
 				}
-				//if( SUCCEEDED( hr ) )
-				//	m_ObjectLock.Unlock();
 			}
 		}
 	}
