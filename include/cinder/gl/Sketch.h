@@ -39,20 +39,21 @@ typedef std::shared_ptr<class Sketch> SketchRef;
 class Sketch {
 public:
 	//! By default, Sketch will respect the current transform matrices, allowing you to mix 2D and 3D rendering and it 'just works'.
-	//  All transformations are done on the CPU, which can be slow for large numbers of objects.
-	Sketch()
-		: mAutoTransform( true ), mBatch( VertBatch::create( GL_LINES ) ) {};
-	//! By setting \a autoTransform to FALSE, Sketch will not perform any transformations on the CPU. It's faster, but you yourself
-	//  are responsible for properly setting up the model, view and projection matrices before you draw the sketch.
-	Sketch( bool autoTransform )
-		: mAutoTransform( autoTransform ), mBatch( VertBatch::create( GL_LINES ) ) {};
+	//  All transformations are done on the CPU, which can be slow for large numbers of objects. By setting \a autoTransform to FALSE, 
+	//  Sketch will not perform any transformations on the CPU. It's faster, but you yourself are responsible for properly setting up
+	//  the model, view and projection matrices before you draw the sketch.
+	Sketch( bool autoTransform = true )
+		: mAutoTransform( autoTransform ), mOwnsBuffers( true ) {};
 	~Sketch() {};
 
 	static SketchRef create( bool autoTransform = true ) { return std::make_shared<Sketch>( autoTransform ); }
 
 	void clear()
 	{
-		mBatch->clear();
+		mVertices.clear();
+		mColors.clear();
+		mVbo.reset();
+		mVao.reset();
 	}
 
 	void draw()
@@ -65,8 +66,18 @@ public:
 			gl::setProjectionMatrix( mat4() );
 		}
 
-		mBatch->draw();
+		// this pushes the VAO, which needs to be popped
+		setupBuffers();
+		ScopedVao vao( mVao );
 
+		auto ctx = context();
+		ctx->setDefaultShaderVars();
+		ctx->drawArrays( GL_LINES, 0, mVertices.size() );
+
+		// this was set by setupBuffers
+		ctx->popVao();
+
+		//
 		gl::popMatrices();
 	}
 
@@ -198,13 +209,16 @@ private:
 
 		if( mAutoTransform ) {
 			const mat4& transform = gl::getModelViewProjection();
-			mBatch->vertex( transform * vec4( a, 1 ), clr );
-			mBatch->vertex( transform * vec4( b, 1 ), clr );
+			mVertices.push_back( transform * vec4( a, 1 ) );
+			mVertices.push_back( transform * vec4( b, 1 ) );
 		}
 		else {
-			mBatch->vertex( vec4( a, 1 ), clr );
-			mBatch->vertex( vec4( b, 1 ), clr );
+			mVertices.push_back( vec4( a, 1 ) );
+			mVertices.push_back( vec4( b, 1 ) );
 		}
+
+		mColors.push_back( clr );
+		mColors.push_back( clr );
 	}
 
 	void implDrawQuad( const vec3& a, const vec3& b, const vec3& c, const vec3& d )
@@ -353,8 +367,16 @@ private:
 	}
 
 private:
-	bool         mAutoTransform;
-	VertBatchRef mBatch;
+	void					setupBuffers();
+
+	bool					mAutoTransform;
+
+	std::vector<vec4>		mVertices;
+	std::vector<ColorAf>	mColors;
+
+	bool					mOwnsBuffers;
+	VaoRef					mVao;
+	VboRef					mVbo;
 };
 
 }

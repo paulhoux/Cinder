@@ -57,5 +57,72 @@ void Sketch::frustum( const Camera& cam )
 	implDrawLine( eye, nearBottomLeft );
 }
 
+// Leaves mVAO bound
+void Sketch::setupBuffers()
+{
+	auto ctx = gl::context();
+
+	GlslProgRef glslProg = ctx->getGlslProg();
+	if( !glslProg )
+		return;
+
+	const size_t verticesSizeBytes = mVertices.size() * sizeof( vec4 );
+	const size_t colorsSizeBytes = mColors.size() * sizeof( ColorAf );
+	size_t totalSizeBytes = verticesSizeBytes + colorsSizeBytes;
+
+	// allocate the VBO if we don't have one yet (which implies we're not using the context defaults)
+	bool forceUpload = false;
+	if( !mVbo ) {
+		// allocate the VBO and upload the data
+		mVbo = gl::Vbo::create( GL_ARRAY_BUFFER, totalSizeBytes );
+		forceUpload = true;
+	}
+
+	ScopedBuffer ScopedBuffer( mVbo );
+	// if this VBO was freshly made, or we don't own the buffer because we use the context defaults
+	if( forceUpload || ( !mOwnsBuffers ) ) {
+		mVbo->ensureMinimumSize( totalSizeBytes );
+
+		// upload positions
+		GLintptr offset = 0;
+		mVbo->bufferSubData( offset, verticesSizeBytes, &mVertices[0] );
+		offset += verticesSizeBytes;
+
+		// upload colors
+		if( !mColors.empty() ) {
+			mVbo->bufferSubData( offset, colorsSizeBytes, &mColors[0] );
+			offset += colorsSizeBytes;
+		}
+	}
+
+	// Setup the VAO
+	ctx->pushVao();
+	if( !mOwnsBuffers )
+		mVao->replacementBindBegin();
+	else {
+		mVao = gl::Vao::create();
+		mVao->bind();
+	}
+
+	gl::ScopedBuffer vboScope( mVbo );
+	size_t offset = 0;
+	if( glslProg->hasAttribSemantic( geom::Attrib::POSITION ) ) {
+		int loc = glslProg->getAttribSemanticLocation( geom::Attrib::POSITION );
+		ctx->enableVertexAttribArray( loc );
+		ctx->vertexAttribPointer( loc, 4, GL_FLOAT, false, 0, (const GLvoid*) offset );
+		offset += verticesSizeBytes;
+	}
+
+	if( glslProg->hasAttribSemantic( geom::Attrib::COLOR ) && ( !mColors.empty() ) ) {
+		int loc = glslProg->getAttribSemanticLocation( geom::Attrib::COLOR );
+		ctx->enableVertexAttribArray( loc );
+		ctx->vertexAttribPointer( loc, 4, GL_FLOAT, false, 0, (const GLvoid*) offset );
+		offset += colorsSizeBytes;
+	}
+
+	if( !mOwnsBuffers )
+		mVao->replacementBindEnd();
+}
+
 }
 } // namespace cinder::gl

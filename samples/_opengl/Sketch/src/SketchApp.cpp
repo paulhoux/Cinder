@@ -22,11 +22,11 @@ public:
 
 	void resize() override;
 public:
-	gl::Sketch   mSketch;
+	gl::SketchRef   mSketchStatic;
+	gl::SketchRef   mSketchDynamic;
 
-	CameraPersp  mCamera;
-	CameraPersp  mCameraGhost;
-	MayaCamUI    mMayaCam;
+	CameraPersp     mCamera;
+	MayaCamUI       mMayaCam;
 };
 
 void SketchApp::prepareSettings( Settings *settings )
@@ -41,9 +41,36 @@ void SketchApp::setup()
 	mCamera.setEyePoint( vec3( 10, 10, 10 ) );
 	mCamera.setCenterOfInterestPoint( vec3( 0 ) );
 
-	mCameraGhost = mCamera;
-	mCameraGhost.setNearClip( 1 );
-	mCameraGhost.setFarClip( 10 );
+	// Let's create a static Sketch buffer that we can use over and over again.
+	// Make sure it records our primitives untransformed, so we can apply GPU transforms later.
+	// Just remember that we can draw either in 3D or 2D, but not both, because they will all
+	// share the same coordinate space.
+	mSketchStatic = gl::Sketch::create( false );
+
+	// Let's also create a dynamic Sketch buffer that we use to draw animated stuff with.
+	// This time, we'd like to mix 3D with 2D, so we enable auto transformations and do all
+	// transformations on the CPU. This is easier and more flexible, but less efficient.
+	mSketchDynamic = gl::Sketch::create( true );
+
+	// Clear the static Sketch buffer.
+	mSketchStatic->clear();
+
+	// Set the draw color and draw a grid.
+	gl::color( 0.25f, 0.25f, 0.25f );
+	mSketchStatic->grid( 10, 1 );
+
+	// Drawing a sphere is just as easy.
+	gl::color( 1.00f, 0.75f, 0.50f );
+	mSketchStatic->sphere( vec3( 0 ), 2 );
+
+	// A cube is no problem, either.
+	gl::color( 0.50f, 1.00f, 0.75f );
+	mSketchStatic->cube( vec3( 5, 0, 0 ), vec3( 2 ) );
+
+	// What about a nice cone?
+	gl::color( 0.75f, 0.50f, 1.00f );
+	mSketchStatic->cone( vec3( -5, 3, 0 ), vec3( -5, 0, 0 ), 0.5f );
+
 }
 
 void SketchApp::update()
@@ -53,30 +80,14 @@ void SketchApp::update()
 	// Save the current matrices, so we can restore them.
 	gl::ScopedMatrices matrices;
 
-	// Clear the sketch buffer.
-	mSketch.clear();
+	// Clear the dynamic Sketch buffer.
+	mSketchDynamic->clear();
 
-	// When sketching, the current coordinate space is respected,
+	// When sketching with auto transforms, the current coordinate space is respected,
 	// so let's draw in 3D using our camera.
 	gl::setMatrices( mCamera );
-
-	// Set the draw color and draw a grid.
-	gl::color( 0.25f, 0.25f, 0.25f );
-	mSketch.grid( 10, 1 );
-
-	// Drawing a sphere is just as easy.
-	gl::color( 1.00f, 0.75f, 0.50f );
-	mSketch.sphere( vec3( 0 ), 2 );
-
-	// A cube is no problem, either.
-	gl::color( 0.50f, 1.00f, 0.75f );
-	mSketch.cube( vec3( 5, 0, 0 ), vec3( 2 ) );
-
-	// What about a nice cone?
-	gl::color( 0.75f, 0.50f, 1.00f );
-	mSketch.cone( vec3( -5, 3, 0 ), vec3( -5, 0, 0 ), 0.5f );
-
-	// We can also animate stuff. Let's draw a rotating capsule.
+	
+	// Let's draw a rotating capsule.
 	{
 		gl::ScopedModelMatrix model;
 
@@ -84,7 +95,7 @@ void SketchApp::update()
 		gl::rotate( 2 * time, 0, 1, 0 );
 
 		gl::color( 1.00f, 0.50f, 0.75f );
-		mSketch.capsule( vec3( -2, 0, 0 ), vec3( 2, 0, 0 ), 1 );
+		mSketchDynamic->capsule( vec3( -2, 0, 0 ), vec3( 2, 0, 0 ), 1 );
 	}
 
 	// And a jumping cylinder.
@@ -96,21 +107,18 @@ void SketchApp::update()
 
 		vec3 base = vec3( 0, math<float>::max( 0, -3 * math<float>::cos( 3 * time + 1.5f ) ), 0 );
 		vec3 top = vec3( 0, 5 + 2 * math<float>::sin( 3 * time ), 0 );
-		float radius = math<float>::sqrt( 5 / glm::distance( base, top ) );
+		float radius = math<float>::sqrt( 3 / glm::distance( base, top ) );
 
 		gl::color( 0.75, 1.00, 0.50f );
-		mSketch.cylinder( base, top, radius );
+		mSketchDynamic->cylinder( base, top, radius );
 	}
 
-	// It's easy to draw a camera frustum, too.
-	gl::color( 0.5f, 0.5f, 0.5f );
-	mSketch.frustum( mCameraGhost );
-
-	// We can also draw in 2D. Simply change to window coordinates:
+	// We can also draw in 2D. Simply change to window coordinates.
 	gl::setMatricesWindow( getWindowSize() );
 
+	// Draw a circle.
 	gl::color( 0.50f, 0.75f, 1.00f );
-	mSketch.circle( getWindowSize() / 2, 100 );
+	mSketchDynamic->circle( getWindowSize() / 2, 100 );
 
 	// And with a bit of work, we can draw polygons.
 	{
@@ -124,7 +132,7 @@ void SketchApp::update()
 
 		auto contours = shape.getContours();
 		for( auto contour : contours ) {
-			mSketch.lineStrip( contour.getPoints() );
+			mSketchDynamic->lineStrip( contour.getPoints() );
 		}
 	}
 }
@@ -132,19 +140,24 @@ void SketchApp::update()
 void SketchApp::draw()
 {
 	gl::clear();
-	gl::enableDepthRead();
-	gl::enableDepthWrite();
 
-	// Now draw everything using a single draw call.
-	mSketch.draw();
+	// Save the current matrices, so we can restore them.
+	gl::ScopedMatrices matrices;
+
+	// For our static Sketch buffer, we need to setup the correct matrices,
+	// because it does not apply them automatically.
+	gl::setMatrices( mCamera );
+
+	// Now draw everything using a single draw call per Sketch buffer.
+	mSketchStatic->draw();
+
+	// The dynamic buffer will ignore the current matrices, using the 
+	// matrices that were active at the time of recording instead.
+	mSketchDynamic->draw();
 }
 
 void SketchApp::mouseDown( MouseEvent event )
 {
-	mCameraGhost = mCamera;
-	mCameraGhost.setNearClip( 5 );
-	mCameraGhost.setFarClip( 20 );
-
 	mMayaCam.setCurrentCam( mCamera );
 	mMayaCam.mouseDown( event.getPos() );
 }
@@ -158,7 +171,6 @@ void SketchApp::mouseDrag( MouseEvent event )
 void SketchApp::resize()
 {
 	mCamera.setAspectRatio( getWindowAspectRatio() );
-	mCameraGhost.setAspectRatio( getWindowAspectRatio() );
 }
 
 CINDER_APP_NATIVE( SketchApp, RendererGl )
