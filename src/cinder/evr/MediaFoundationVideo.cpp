@@ -473,6 +473,9 @@ HRESULT D3DPresentEngine::CreateVideoSamples( IMFMediaType *pFormat, VideoSample
 	} while( false );
 
 	if( FAILED( hr ) )
+		CI_LOG_E( "Failed to CreateVideoSamples: " << hr );
+
+	if( FAILED( hr ) )
 		ReleaseResources();
 
 	return hr;
@@ -556,6 +559,9 @@ HRESULT D3DPresentEngine::PresentSample( IMFSample* pSample, LONGLONG llTarget )
 		}
 	} while( false );
 
+	if( FAILED( hr ) )
+		CI_LOG_E( "Failed to PresentSample: " << hr );
+
 	if( FAILED( hr ) ) {
 		if( hr == D3DERR_DEVICELOST || hr == D3DERR_DEVICENOTRESET || hr == D3DERR_DEVICEHUNG ) {
 			// We failed because the device was lost. Fill the destination rectangle.
@@ -591,6 +597,9 @@ HRESULT D3DPresentEngine::InitializeD3D()
 		hr = DXVA2CreateDirect3DDeviceManager9( &m_DeviceResetToken, &m_pDeviceManager );
 		BREAK_ON_FAIL( hr );
 	} while( false );
+
+	if( FAILED( hr ) )
+		CI_LOG_E( "Failed to InitializeD3D: " << hr );
 
 	return hr;
 }
@@ -664,6 +673,9 @@ HRESULT D3DPresentEngine::CreateD3DDevice()
 		CopyComPtr( m_pDevice, pDevice.get() );
 	} while( false );
 
+	if( FAILED( hr ) )
+		CI_LOG_E( "Failed to CreateD3DDevice: " << hr );
+
 	return hr;
 }
 
@@ -695,6 +707,9 @@ HRESULT D3DPresentEngine::CreateD3DSample( IDirect3DSwapChain9 *pSwapChain, IMFS
 		( *ppVideoSample )->AddRef();
 	} while( false );
 
+	if( FAILED( hr ) )
+		CI_LOG_E( "Failed to CreateD3DSample: " << hr );
+
 	return hr;
 }
 
@@ -716,6 +731,9 @@ HRESULT D3DPresentEngine::PresentSwapChain( IDirect3DSwapChain9* pSwapChain, IDi
 		hr = pSwapChain->Present( NULL, &m_rcDestRect, m_hwnd, NULL, 0 );
 		BREAK_ON_FAIL( hr );
 	} while( false );
+
+	if( FAILED( hr ) )
+		CI_LOG_E( "Failed to PresentSwapChain: " << hr );
 
 	return hr;
 }
@@ -903,11 +921,12 @@ HRESULT EVRCustomPresenter::GetService( REFGUID guidService, REFIID riid, LPVOID
 	return hr;
 }
 
+/*! The standard mixer and presenter both use Direct3D 9, with the device GUID equal to IID_IDirect3DDevice9.
+	If you intend to use your custom presenter with the standard mixer, the presenter's device GUID must be IID_IDirect3DDevice9.
+	If you replace both components, you could define a new device GUID.
+	*/
 HRESULT EVRCustomPresenter::GetDeviceID( IID* pDeviceID )
 {
-	// This presenter is built on Direct3D9, so the device ID is 
-	// IID_IDirect3DDevice9. (Same as the standard presenter.)
-
 	if( pDeviceID == NULL )
 		return E_POINTER;
 
@@ -917,49 +936,57 @@ HRESULT EVRCustomPresenter::GetDeviceID( IID* pDeviceID )
 
 HRESULT EVRCustomPresenter::InitServicePointers( IMFTopologyServiceLookup *pLookup )
 {
-	if( pLookup == NULL )
-		return E_POINTER;
+	HRESULT hr = S_OK;
 
-	ScopedCriticalSection lock( m_ObjectLock );
+	do {
+		BREAK_ON_NULL( pLookup, E_POINTER );
 
-	// Do not allow initializing when playing or paused.
-	if( IsActive() )
-		return MF_E_INVALIDREQUEST;
+		ScopedCriticalSection lock( m_ObjectLock );
 
-	SafeRelease( m_pClock );
-	SafeRelease( m_pMixer );
-	SafeRelease( m_pMediaEventSink );
+		// Do not allow initializing when playing or paused.
+		if( IsActive() )
+			return MF_E_INVALIDREQUEST;
 
-	// Ask for the clock. Optional, because the EVR might not have a clock.
-	DWORD dwObjectCount = 1;
-	HRESULT hr = pLookup->LookupService( MF_SERVICE_LOOKUP_GLOBAL, 0, MR_VIDEO_RENDER_SERVICE,
-										 __uuidof( IMFClock ), (void**) &m_pClock, &dwObjectCount );
+		SafeRelease( m_pClock );
+		SafeRelease( m_pMixer );
+		SafeRelease( m_pMediaEventSink );
 
-	// Ask for the mixer. (Required.)
-	dwObjectCount = 1;
-	hr = pLookup->LookupService( MF_SERVICE_LOOKUP_GLOBAL, 0, MR_VIDEO_MIXER_SERVICE,
-								 __uuidof( IMFTransform ), (void**) &m_pMixer, &dwObjectCount );
-	if( FAILED( hr ) )
-		return hr;
+		// Ask for the clock. Optional, because the EVR might not have a clock.
+		DWORD dwObjectCount = 1;
+		HRESULT hr = pLookup->LookupService( MF_SERVICE_LOOKUP_GLOBAL, 0, MR_VIDEO_RENDER_SERVICE,
+											 __uuidof( IMFClock ), (void**) &m_pClock, &dwObjectCount );
 
-	// Make sure that we can work with this mixer.
-	hr = ConfigureMixer( m_pMixer );
-	if( FAILED( hr ) )
-		return hr;
+		// Ask for the mixer. (Required.)
+		dwObjectCount = 1;
+		hr = pLookup->LookupService( MF_SERVICE_LOOKUP_GLOBAL, 0, MR_VIDEO_MIXER_SERVICE,
+									 __uuidof( IMFTransform ), (void**) &m_pMixer, &dwObjectCount );
+		BREAK_ON_FAIL( hr );
 
-	// Ask for the EVR's event-sink interface. (Required.)
-	dwObjectCount = 1;
-	hr = pLookup->LookupService( MF_SERVICE_LOOKUP_GLOBAL, 0, MR_VIDEO_RENDER_SERVICE,
-								 __uuidof( IMediaEventSink ), (void**) &m_pMediaEventSink, &dwObjectCount );
-	if( FAILED( hr ) )
-		return hr;
+		// Make sure that we can work with this mixer.
+		hr = ConfigureMixer( m_pMixer );
+		BREAK_ON_FAIL( hr );
 
-	// Successfully initialized. Set the state to "stopped."
-	m_RenderState = Stopped;
+		// Ask for the EVR's event-sink interface. (Required.)
+		dwObjectCount = 1;
+		hr = pLookup->LookupService( MF_SERVICE_LOOKUP_GLOBAL, 0, MR_VIDEO_RENDER_SERVICE,
+									 __uuidof( IMediaEventSink ), (void**) &m_pMediaEventSink, &dwObjectCount );
+		BREAK_ON_FAIL( hr );
+
+		// Successfully initialized. Set the state to "stopped."
+		m_RenderState = Stopped;
+	} while( false );
 
 	return hr;
 }
 
+/*! The EVR calls ReleaseServicePointers for various reasons, including:
+	* Disconnecting or reconnecting pins (DirectShow), or adding or removing stream sinks (Media Foundation).
+	* Changing format.
+	* Setting a new clock.
+	* Final shutdown of the EVR.
+
+	During the lifetime of the presenter, the EVR might call InitServicePointers and ReleaseServicePointers several times.
+	*/
 HRESULT EVRCustomPresenter::ReleaseServicePointers()
 {
 	HRESULT hr = S_OK;
@@ -984,6 +1011,22 @@ HRESULT EVRCustomPresenter::ReleaseServicePointers()
 	return hr;
 }
 
+HRESULT EVRCustomPresenter::GetNativeVideoSize( SIZE* pszVideo, SIZE* pszARVideo )
+{
+	assert( pszVideo != nullptr );
+	assert( pszARVideo != nullptr );
+
+	pszVideo->cx = 0;
+	pszVideo->cy = 0;
+
+	return E_NOTIMPL;
+}
+
+HRESULT EVRCustomPresenter::GetIdealVideoSize( SIZE* pszMin, SIZE* pszMax )
+{
+	return E_NOTIMPL;
+}
+
 HRESULT EVRCustomPresenter::ProcessMessage( MFVP_MESSAGE_TYPE eMessage, ULONG_PTR ulParam )
 {
 	HRESULT hr = S_OK;
@@ -996,7 +1039,7 @@ HRESULT EVRCustomPresenter::ProcessMessage( MFVP_MESSAGE_TYPE eMessage, ULONG_PT
 
 	switch( eMessage ) {
 	case MFVP_MESSAGE_FLUSH:
-		CI_LOG_V("MFVP_MESSAGE_FLUSH");
+		CI_LOG_V( "MFVP_MESSAGE_FLUSH" );
 		// Flush all pending samples.
 		hr = Flush();
 		break;
@@ -1500,62 +1543,62 @@ HRESULT EVRCustomPresenter::RenegotiateMediaType()
 {
 	HRESULT hr = S_OK;
 
-	if( !m_pMixer )
-		return MF_E_INVALIDREQUEST;
+	do {
+		BREAK_ON_NULL( m_pMixer, MF_E_INVALIDREQUEST );
 
-	// Loop through all of the mixer's proposed output types.
-	DWORD iTypeIndex = 0;
-	BOOL bFoundMediaType = FALSE;
-	while( !bFoundMediaType && ( hr != MF_E_NO_MORE_TYPES ) ) {
-		ScopedComPtr<IMFMediaType> pMixerType;
-		ScopedComPtr<IMFMediaType> pOptimalType;
+		// Loop through all of the mixer's proposed output types.
+		DWORD iTypeIndex = 0;
+		BOOL bFoundMediaType = FALSE;
+		while( !bFoundMediaType && ( hr != MF_E_NO_MORE_TYPES ) ) {
+			ScopedComPtr<IMFMediaType> pMixerType;
+			ScopedComPtr<IMFMediaType> pOptimalType;
 
-		// Step 1. Get the next media type supported by mixer.
-		hr = m_pMixer->GetOutputAvailableType( 0, iTypeIndex++, &pMixerType );
-		if( FAILED( hr ) )
-			break;
+			// Step 1. Get the next media type supported by mixer.
+			hr = m_pMixer->GetOutputAvailableType( 0, iTypeIndex++, &pMixerType );
+			BREAK_ON_FAIL( hr );
 
-		// From now on, if anything in this loop fails, try the next type,
-		// until we succeed or the mixer runs out of types.
+			// From now on, if anything in this loop fails, try the next type,
+			// until we succeed or the mixer runs out of types.
 
-		// Step 2. Check if we support this media type. 
-		if( SUCCEEDED( hr ) ) {
-			// Note: None of the modifications that we make later in CreateOptimalVideoType
-			// will affect the suitability of the type, at least for us. (Possibly for the mixer.)
-			hr = IsMediaTypeSupported( pMixerType );
-		}
+			// Step 2. Check if we support this media type. 
+			if( SUCCEEDED( hr ) ) {
+				// Note: None of the modifications that we make later in CreateOptimalVideoType
+				// will affect the suitability of the type, at least for us. (Possibly for the mixer.)
+				hr = IsMediaTypeSupported( pMixerType );
+			}
 
-		// Step 3. Adjust the mixer's type to match our requirements.
-		if( SUCCEEDED( hr ) ) {
-			hr = CreateOptimalVideoType( pMixerType, &pOptimalType );
-		}
+			// Step 3. Adjust the mixer's type to match our requirements.
+			if( SUCCEEDED( hr ) ) {
+				hr = CreateOptimalVideoType( pMixerType, &pOptimalType );
+			}
 
-		// Step 4. Check if the mixer will accept this media type.
-		if( SUCCEEDED( hr ) ) {
-			hr = m_pMixer->SetOutputType( 0, pOptimalType, MFT_SET_TYPE_TEST_ONLY );
-		}
+			// Step 4. Check if the mixer will accept this media type.
+			if( SUCCEEDED( hr ) ) {
+				hr = m_pMixer->SetOutputType( 0, pOptimalType, MFT_SET_TYPE_TEST_ONLY );
+			}
 
-		// Step 5. Try to set the media type on ourselves.
-		if( SUCCEEDED( hr ) ) {
-			hr = SetMediaType( pOptimalType );
-		}
+			// Step 5. Try to set the media type on ourselves.
+			if( SUCCEEDED( hr ) ) {
+				hr = SetMediaType( pOptimalType );
+			}
 
-		// Step 6. Set output media type on mixer.
-		if( SUCCEEDED( hr ) ) {
-			hr = m_pMixer->SetOutputType( 0, pOptimalType, 0 );
+			// Step 6. Set output media type on mixer.
+			if( SUCCEEDED( hr ) ) {
+				hr = m_pMixer->SetOutputType( 0, pOptimalType, 0 );
 
-			assert( SUCCEEDED( hr ) ); // This should succeed unless the MFT lied in the previous call.
+				assert( SUCCEEDED( hr ) ); // This should succeed unless the MFT lied in the previous call.
 
-			// If something went wrong, clear the media type.
-			if( FAILED( hr ) ) {
-				SetMediaType( NULL );
+				// If something went wrong, clear the media type.
+				if( FAILED( hr ) ) {
+					SetMediaType( NULL );
+				}
+			}
+
+			if( SUCCEEDED( hr ) ) {
+				bFoundMediaType = TRUE;
 			}
 		}
-
-		if( SUCCEEDED( hr ) ) {
-			bFoundMediaType = TRUE;
-		}
-	}
+	} while( false );
 
 	return hr;
 }
@@ -1771,77 +1814,66 @@ HRESULT EVRCustomPresenter::CreateOptimalVideoType( IMFMediaType* pProposedType,
 	VideoType mtOptimal;
 	mtOptimal.CreateEmptyType();
 
-	// Clone the proposed type.
-	hr = mtOptimal.CopyFrom( pProposedType );
-	if( FAILED( hr ) )
-		return hr;
+	do {
+		// Clone the proposed type.
+		hr = mtOptimal.CopyFrom( pProposedType );
+		BREAK_ON_FAIL( hr );
 
-	// Modify the new type.
+		// Modify the new type.
 
-	// For purposes of this SDK sample, we assume 
-	// 1) The monitor's pixels are square.
-	// 2) The presenter always preserves the pixel aspect ratio.
+		// For purposes of this SDK sample, we assume 
+		// 1) The monitor's pixels are square.
+		// 2) The presenter always preserves the pixel aspect ratio.
 
-	// Set the pixel aspect ratio (PAR) to 1:1 (see assumption #1, above)
-	hr = mtOptimal.SetPixelAspectRatio( 1, 1 );
-	if( FAILED( hr ) )
-		return hr;
+		// Set the pixel aspect ratio (PAR) to 1:1 (see assumption #1, above)
+		hr = mtOptimal.SetPixelAspectRatio( 1, 1 );
+		BREAK_ON_FAIL( hr );
 
-	// Get the output rectangle.
-	rcOutput = m_pD3DPresentEngine->GetDestinationRect();
-	if( IsRectEmpty( &rcOutput ) ) {
-		// Calculate the output rectangle based on the media type.
-		hr = CalculateOutputRectangle( pProposedType, &rcOutput );
-		if( FAILED( hr ) )
-			return hr;
-	}
+		// Get the output rectangle.
+		rcOutput = m_pD3DPresentEngine->GetDestinationRect();
+		if( IsRectEmpty( &rcOutput ) ) {
+			// Calculate the output rectangle based on the media type.
+			hr = CalculateOutputRectangle( pProposedType, &rcOutput );
+			BREAK_ON_FAIL( hr );
+		}
 
-	// Set the extended color information: Use BT.709
-	hr = mtOptimal.SetYUVMatrix( MFVideoTransferMatrix_BT709 );
-	if( FAILED( hr ) )
-		return hr;
-	hr = mtOptimal.SetTransferFunction( MFVideoTransFunc_709 );
-	if( FAILED( hr ) )
-		return hr;
-	hr = mtOptimal.SetVideoPrimaries( MFVideoPrimaries_BT709 );
-	if( FAILED( hr ) )
-		return hr;
-	hr = mtOptimal.SetVideoNominalRange( MFNominalRange_16_235 );
-	if( FAILED( hr ) )
-		return hr;
-	hr = mtOptimal.SetVideoLighting( MFVideoLighting_dim );
-	if( FAILED( hr ) )
-		return hr;
+		// Set the extended color information: Use BT.709
+		hr = mtOptimal.SetYUVMatrix( MFVideoTransferMatrix_BT709 );
+		BREAK_ON_FAIL( hr );
+		hr = mtOptimal.SetTransferFunction( MFVideoTransFunc_709 );
+		BREAK_ON_FAIL( hr );
+		hr = mtOptimal.SetVideoPrimaries( MFVideoPrimaries_BT709 );
+		BREAK_ON_FAIL( hr );
+		hr = mtOptimal.SetVideoNominalRange( MFNominalRange_16_235 );
+		BREAK_ON_FAIL( hr );
+		hr = mtOptimal.SetVideoLighting( MFVideoLighting_dim );
+		BREAK_ON_FAIL( hr );
 
-	// Set the target rect dimensions. 
-	hr = mtOptimal.SetFrameDimensions( rcOutput.right, rcOutput.bottom );
-	if( FAILED( hr ) )
-		return hr;
+		// Set the target rect dimensions. 
+		hr = mtOptimal.SetFrameDimensions( rcOutput.right, rcOutput.bottom );
+		BREAK_ON_FAIL( hr );
 
-	// Set the geometric aperture, and disable pan/scan.
-	displayArea = MakeArea( 0, 0, rcOutput.right, rcOutput.bottom );
+		// Set the geometric aperture, and disable pan/scan.
+		displayArea = MakeArea( 0, 0, rcOutput.right, rcOutput.bottom );
 
-	hr = mtOptimal.SetPanScanEnabled( FALSE );
-	if( FAILED( hr ) )
-		return hr;
+		hr = mtOptimal.SetPanScanEnabled( FALSE );
+		BREAK_ON_FAIL( hr );
 
-	hr = mtOptimal.SetGeometricAperture( displayArea );
-	if( FAILED( hr ) )
-		return hr;
+		hr = mtOptimal.SetGeometricAperture( displayArea );
+		BREAK_ON_FAIL( hr );
 
-	// Set the pan/scan aperture and the minimum display aperture. We don't care
-	// about them per se, but the mixer will reject the type if these exceed the 
-	// frame dimentions.
-	hr = mtOptimal.SetPanScanAperture( displayArea );
-	if( FAILED( hr ) )
-		return hr;
+		// Set the pan/scan aperture and the minimum display aperture. We don't care
+		// about them per se, but the mixer will reject the type if these exceed the 
+		// frame dimentions.
+		hr = mtOptimal.SetPanScanAperture( displayArea );
+		BREAK_ON_FAIL( hr );
 
-	hr = mtOptimal.SetMinDisplayAperture( displayArea );
-	if( FAILED( hr ) )
-		return hr;
+		hr = mtOptimal.SetMinDisplayAperture( displayArea );
+		BREAK_ON_FAIL( hr );
 
-	// Return the pointer to the caller.
-	*ppOptimalType = mtOptimal.Detach();
+		// Return the pointer to the caller.
+		*ppOptimalType = mtOptimal.Detach();
+	} while( false );
 
 	return hr;
 }
@@ -1919,74 +1951,64 @@ HRESULT EVRCustomPresenter::SetMediaType( IMFMediaType *pMediaType )
 	}
 
 	HRESULT hr = S_OK;
-	MFRatio fps = { 0, 0 };
-	VideoSampleList sampleQueue;
 
-	// Cannot set the media type after shutdown.
-	hr = CheckShutdown();
-	if( FAILED( hr ) ) {
-		ReleaseResources();
-		return hr;
-	}
+	do {
+		// Cannot set the media type after shutdown.
+		hr = CheckShutdown();
+		BREAK_ON_FAIL( hr );
 
-	// Check if the new type is actually different.
-	// Note: This function safely handles NULL input parameters.
-	if( AreMediaTypesEqual( m_pMediaType, pMediaType ) ) {
-		return S_OK; // Nothing more to do.
-	}
-
-	// We're really changing the type. First get rid of the old type.
-	SafeRelease( m_pMediaType );
-	ReleaseResources();
-
-	// Initialize the presenter engine with the new media type.
-	// The presenter engine allocates the samples. 
-	hr = m_pD3DPresentEngine->CreateVideoSamples( pMediaType, sampleQueue );
-	if( FAILED( hr ) ) {
-		ReleaseResources();
-		return hr;
-	}
-
-	// Mark each sample with our token counter. If this batch of samples becomes
-	// invalid, we increment the counter, so that we know they should be discarded. 
-	for( auto pos = sampleQueue.FrontPosition(); pos != sampleQueue.EndPosition(); pos = sampleQueue.Next( pos ) ) {
-		ScopedComPtr<IMFSample> pSample;
-		hr = sampleQueue.GetItemPos( pos, &pSample );
-		if( FAILED( hr ) ) {
-			ReleaseResources();
-			return hr;
+		// Check if the new type is actually different.
+		// Note: This function safely handles NULL input parameters.
+		if( AreMediaTypesEqual( m_pMediaType, pMediaType ) ) {
+			return S_OK; // Nothing more to do.
 		}
 
-		hr = pSample->SetUINT32( MFSamplePresenter_SampleCounter, m_TokenCounter );
-		if( FAILED( hr ) ) {
-			ReleaseResources();
-			return hr;
-		}
-	}
-
-	// Add the samples to the sample pool.
-	hr = m_SamplePool.Initialize( sampleQueue );
-	if( FAILED( hr ) ) {
+		// We're really changing the type. First get rid of the old type.
+		SafeRelease( m_pMediaType );
 		ReleaseResources();
-		return hr;
-	}
 
-	// Set the frame rate on the scheduler. 
-	if( SUCCEEDED( GetFrameRate( pMediaType, &fps ) ) && ( fps.Numerator != 0 ) && ( fps.Denominator != 0 ) ) {
-		m_scheduler.SetFrameRate( fps );
-	}
-	else {
-		// NOTE: The mixer's proposed type might not have a frame rate, in which case 
-		// we'll use an arbitary default. (Although it's unlikely the video source
-		// does not have a frame rate.)
-		m_scheduler.SetFrameRate( sDefaultFrameRate );
-	}
+		// Initialize the presenter engine with the new media type.
+		// The presenter engine allocates the samples. 
+		VideoSampleList sampleQueue;
+		hr = m_pD3DPresentEngine->CreateVideoSamples( pMediaType, sampleQueue );
+		BREAK_ON_FAIL( hr );
 
-	// Store the media type.
-	assert( pMediaType != NULL );
+		// Mark each sample with our token counter. If this batch of samples becomes
+		// invalid, we increment the counter, so that we know they should be discarded. 
+		for( auto pos = sampleQueue.FrontPosition(); pos != sampleQueue.EndPosition(); pos = sampleQueue.Next( pos ) ) {
+			ScopedComPtr<IMFSample> pSample;
+			hr = sampleQueue.GetItemPos( pos, &pSample );
+			BREAK_ON_FAIL( hr );
 
-	m_pMediaType = pMediaType;
-	m_pMediaType->AddRef();
+			hr = pSample->SetUINT32( MFSamplePresenter_SampleCounter, m_TokenCounter );
+			BREAK_ON_FAIL( hr );
+		}
+
+		// Add the samples to the sample pool.
+		hr = m_SamplePool.Initialize( sampleQueue );
+		BREAK_ON_FAIL( hr );
+
+		// Set the frame rate on the scheduler. 
+		MFRatio fps = { 0, 0 };
+		if( SUCCEEDED( GetFrameRate( pMediaType, &fps ) ) && ( fps.Numerator != 0 ) && ( fps.Denominator != 0 ) ) {
+			m_scheduler.SetFrameRate( fps );
+		}
+		else {
+			// NOTE: The mixer's proposed type might not have a frame rate, in which case 
+			// we'll use an arbitary default. (Although it's unlikely the video source
+			// does not have a frame rate.)
+			m_scheduler.SetFrameRate( sDefaultFrameRate );
+		}
+
+		// Store the media type.
+		assert( pMediaType != NULL );
+
+		m_pMediaType = pMediaType;
+		m_pMediaType->AddRef();
+	} while( false );
+
+	if( FAILED( hr ) )
+		ReleaseResources();
 
 	return hr;
 }
@@ -2367,46 +2389,45 @@ HRESULT EVRCustomPresenter::OnSampleFree( IMFAsyncResult *pResult )
 {
 	HRESULT hr = S_OK;
 
-	// Get the sample from the async result object.
-	ScopedComPtr<IUnknown> pObject;
-	hr = pResult->GetObject( &pObject );
+	do {
+		// Get the sample from the async result object.
+		ScopedComPtr<IUnknown> pObject;
+		hr = pResult->GetObject( &pObject );
+		BREAK_ON_FAIL( hr );
 
-	if( SUCCEEDED( hr ) ) {
 		ScopedComPtr<IMFSample> pSample;
 		hr = pObject.QueryInterface( __uuidof( IMFSample ), (void**) &pSample );
+		BREAK_ON_FAIL( hr );
 
-		if( SUCCEEDED( hr ) ) {
-			// If this sample was submitted for a frame-step, then the frame step is complete.
-			if( m_FrameStep.state == Scheduled ) {
-				// QI the sample for IUnknown and compare it to our cached value.
-				ScopedComPtr<IUnknown> pUnk;
-				hr = pSample.QueryInterface( __uuidof( IMFSample ), (void**) &pUnk );
+		// If this sample was submitted for a frame-step, then the frame step is complete.
+		if( m_FrameStep.state == Scheduled ) {
+			// QI the sample for IUnknown and compare it to our cached value.
+			ScopedComPtr<IUnknown> pUnk;
+			hr = pSample.QueryInterface( __uuidof( IMFSample ), (void**) &pUnk );
+			BREAK_ON_FAIL( hr );
 
-				if( SUCCEEDED( hr ) ) {
-					if( m_FrameStep.pSampleNoRef == (DWORD_PTR) pUnk.get() ) {
-						// Notify the EVR. 
-						hr = CompleteFrameStep( pSample );
-					}
-				}
-				// Note: Although pObject is also an IUnknown pointer, it's not guaranteed
-				// to be the exact pointer value returned via QueryInterface, hence the 
-				// need for the second QI.
+			if( m_FrameStep.pSampleNoRef == (DWORD_PTR) pUnk.get() ) {
+				// Notify the EVR. 
+				hr = CompleteFrameStep( pSample );
+				BREAK_ON_FAIL( hr );
 			}
 
-			if( SUCCEEDED( hr ) ) {
-				ScopedCriticalSection lock( m_ObjectLock );
-
-				if( MFGetAttributeUINT32( pSample, MFSamplePresenter_SampleCounter, (UINT32) -1 ) == m_TokenCounter ) {
-					// Return the sample to the sample pool.
-					hr = m_SamplePool.ReturnSample( pSample );
-
-					// Now that a free sample is available, process more data if possible.
-					if( SUCCEEDED( hr ) )
-						(void) ProcessOutputLoop();
-				}
-			}
+			// Note: Although pObject is also an IUnknown pointer, it's not guaranteed
+			// to be the exact pointer value returned via QueryInterface, hence the 
+			// need for the second QI.
 		}
-	}
+
+		ScopedCriticalSection lock( m_ObjectLock );
+
+		if( MFGetAttributeUINT32( pSample, MFSamplePresenter_SampleCounter, (UINT32) -1 ) == m_TokenCounter ) {
+			// Return the sample to the sample pool.
+			hr = m_SamplePool.ReturnSample( pSample );
+			BREAK_ON_FAIL( hr );
+
+			// Now that a free sample is available, process more data if possible.
+			(void) ProcessOutputLoop();
+		}
+	} while( false );
 
 	if( FAILED( hr ) ) {
 		NotifyEvent( EC_ERRORABORT, hr, 0 );

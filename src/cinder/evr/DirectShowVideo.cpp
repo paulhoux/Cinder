@@ -17,11 +17,6 @@ namespace cinder {
 namespace msw {
 namespace video {
 
-HRESULT InitializeEVR( IBaseFilter *pEVR, HWND hwnd, IMFVideoPresenter *pPresenter, IMFVideoDisplayControl **ppWc );
-HRESULT InitWindowlessVMR9( IBaseFilter *pVMR, HWND hwnd, IVMRWindowlessControl9 **ppWc );
-HRESULT InitWindowlessVMR( IBaseFilter *pVMR, HWND hwnd, IVMRWindowlessControl **ppWc );
-HRESULT FindConnectedPin( IBaseFilter *pFilter, PIN_DIRECTION PinDir, IPin **ppPin );
-
 /// VMR-7 Wrapper
 
 RendererVMR7::RendererVMR7() : m_pWindowless( NULL )
@@ -111,6 +106,20 @@ HRESULT RendererVMR7::DisplayModeChanged()
 	}
 	else {
 		return S_OK;
+	}
+}
+
+HRESULT RendererVMR7::GetNativeVideoSize( LONG *lpWidth, LONG *lpHeight )
+{
+	assert( lpWidth != nullptr );
+	assert( lpHeight != nullptr );
+
+	if( m_pWindowless ) {
+		LONG ARWidth, ARHeight;
+		return m_pWindowless->GetNativeVideoSize( lpWidth, lpHeight, &ARWidth, &ARHeight );
+	}
+	else {
+		return E_POINTER;
 	}
 }
 
@@ -251,6 +260,20 @@ HRESULT RendererVMR9::DisplayModeChanged()
 	}
 }
 
+HRESULT RendererVMR9::GetNativeVideoSize( LONG *lpWidth, LONG *lpHeight )
+{
+	assert( lpWidth != nullptr );
+	assert( lpHeight != nullptr );
+
+	if( m_pWindowless ) {
+		LONG ARWidth, ARHeight;
+		return m_pWindowless->GetNativeVideoSize( lpWidth, lpHeight, &ARWidth, &ARHeight );
+	}
+	else {
+		return E_POINTER;
+	}
+}
+
 
 // Initialize the VMR-9 for windowless mode. 
 
@@ -295,7 +318,7 @@ HRESULT InitWindowlessVMR9(
 
 /// EVR Wrapper
 
-RendererEVR::RendererEVR() 
+RendererEVR::RendererEVR()
 	: m_pEVR( NULL ), m_pVideoDisplay( NULL ), m_pPresenter( NULL )
 {
 }
@@ -325,6 +348,10 @@ HRESULT RendererEVR::AddToGraph( IGraphBuilder *pGraph, HWND hwnd )
 		hr = m_pPresenter->SetVideoWindow( hwnd );
 		BREAK_ON_FAIL( hr );
 
+		// Note: Because IMFVideoDisplayControl is a service interface,
+		// you cannot QI the pointer to get back the IBaseFilter pointer.
+		// Therefore, we need to cache the IBaseFilter pointer.
+
 		ScopedComPtr<IBaseFilter> pEVR;
 		hr = AddFilterByCLSID( pGraph, CLSID_EnhancedVideoRenderer,
 							   &pEVR, L"EVR" );
@@ -332,10 +359,6 @@ HRESULT RendererEVR::AddToGraph( IGraphBuilder *pGraph, HWND hwnd )
 
 		hr = InitializeEVR( pEVR, hwnd, m_pPresenter, &m_pVideoDisplay );
 		BREAK_ON_FAIL( hr );
-
-		// Note: Because IMFVideoDisplayControl is a service interface,
-		// you cannot QI the pointer to get back the IBaseFilter pointer.
-		// Therefore, we need to cache the IBaseFilter pointer.
 
 		m_pEVR = pEVR;
 		m_pEVR->AddRef();
@@ -399,6 +422,26 @@ HRESULT RendererEVR::DisplayModeChanged()
 	return S_OK;
 }
 
+HRESULT RendererEVR::GetNativeVideoSize( LONG *lpWidth, LONG *lpHeight )
+{
+	assert( lpWidth != nullptr );
+	assert( lpHeight != nullptr );
+
+	HRESULT hr = S_OK;
+
+	if( m_pVideoDisplay ) {
+		SIZE szVideo, szARVideo;
+		if( SUCCEEDED( hr = m_pVideoDisplay->GetNativeVideoSize( &szVideo, &szARVideo ) ) ) {
+			*lpWidth = szVideo.cx;
+			*lpHeight = szVideo.cy;
+		}
+
+		return hr;
+	}
+	else {
+		return E_POINTER;
+	}
+}
 
 // Initialize the EVR filter. 
 

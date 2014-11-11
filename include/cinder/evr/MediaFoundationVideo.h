@@ -211,8 +211,8 @@ public:
 	STDMETHOD( ReleaseServicePointers )( ) override;
 
 	// IMFVideoDisplayControl methods
-	STDMETHOD( GetNativeVideoSize )( SIZE* pszVideo, SIZE* pszARVideo ) override { return E_NOTIMPL; }
-	STDMETHOD( GetIdealVideoSize )( SIZE* pszMin, SIZE* pszMax ) override { return E_NOTIMPL; }
+	STDMETHOD( GetNativeVideoSize )( SIZE* pszVideo, SIZE* pszARVideo ) override;
+	STDMETHOD( GetIdealVideoSize )( SIZE* pszMin, SIZE* pszMax ) override;
 	STDMETHOD( SetVideoPosition )( const MFVideoNormalizedRect* pnrcSource, const LPRECT prcDest ) override;
 	STDMETHOD( GetVideoPosition )( MFVideoNormalizedRect* pnrcSource, LPRECT prcDest ) override;
 	STDMETHOD( SetAspectRatioMode )( DWORD dwAspectRatioMode ) override { return E_NOTIMPL; }

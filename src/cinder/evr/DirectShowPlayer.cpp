@@ -4,6 +4,7 @@
 
 #if defined(CINDER_MSW)
 
+#include <dvdmedia.h> // for VIDEOINFOHEADER2
 #include <shobjidl.h> 
 #include <shlwapi.h>
 
@@ -13,9 +14,12 @@ namespace video {
 
 
 DirectShowPlayer::DirectShowPlayer( HRESULT &hr, HWND hwnd )
-	: mRefCount( 0 ), m_state( STATE_NO_GRAPH ), m_hwnd( hwnd ), m_pGraph( NULL ), m_pControl( NULL ), m_pEvent( NULL ), m_pVideo( NULL )
+	: mRefCount( 0 ), m_state( STATE_NO_GRAPH ), m_hwnd( hwnd ), m_Width( 4096 ), m_Height( 1716 )
+	, m_pGraph( NULL ), m_pControl( NULL ), m_pEvent( NULL ), m_pVideo( NULL )
 {
-	hr = CoInitializeEx( NULL, COINIT_APARTMENTTHREADED );
+	hr = S_OK;
+
+	cinder::msw::initializeCom( COINIT_APARTMENTTHREADED );
 
 	CI_LOG_V( "Created DirectShowPlayer." );
 }
@@ -23,8 +27,6 @@ DirectShowPlayer::DirectShowPlayer( HRESULT &hr, HWND hwnd )
 DirectShowPlayer::~DirectShowPlayer()
 {
 	TearDownGraph();
-
-	CoUninitialize();
 
 	CI_LOG_V( "Destroyed DirectShowPlayer." );
 }
@@ -73,6 +75,7 @@ HRESULT DirectShowPlayer::OpenFile( PCWSTR pszFileName )
 
 		// Try to render the streams.
 		hr = RenderStreams( pSource );
+		BREAK_ON_FAIL( hr );
 	} while( false );
 
 	if( FAILED( hr ) )
@@ -403,6 +406,7 @@ HRESULT DirectShowPlayer::RenderStreams( IBaseFilter *pSource )
 		// Remove the audio renderer, if not used.
 		BOOL bRemoved;
 		hr = RemoveUnconnectedRenderer( m_pGraph, pAudioRenderer, &bRemoved );
+		BREAK_ON_FAIL( hr );
 	} while( false );
 
 	// If we succeeded to this point, make sure we rendered at least one 

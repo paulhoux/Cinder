@@ -29,10 +29,11 @@ public:
 	MediaFoundationPlayer( HRESULT &hr, HWND hwnd );
 	~MediaFoundationPlayer();
 
-	bool CreateSharedTexture( int w, int h, int textureID ) { return mPresenterPtr->createSharedTexture( w, h, textureID ); }
-	bool LockSharedTexture() { return mPresenterPtr->lockSharedTexture(); }
-	bool UnlockSharedTexture() { return mPresenterPtr->unlockSharedTexture(); }
-	void ReleaseSharedTexture() { mPresenterPtr->releaseSharedTexture(); }
+	// IPlayer methods
+	bool CreateSharedTexture( int w, int h, int textureID ) override { return mPresenterPtr->createSharedTexture( w, h, textureID ); }
+	bool LockSharedTexture() override { return mPresenterPtr->lockSharedTexture(); }
+	bool UnlockSharedTexture() override { return mPresenterPtr->unlockSharedTexture(); }
+	void ReleaseSharedTexture() override { mPresenterPtr->releaseSharedTexture(); }
 
 protected:
 	// IUnknown methods

@@ -7,15 +7,13 @@
 #include "cinder/msw/CinderMsw.h"
 #include "cinder/msw/CinderMswCom.h"
 #include "cinder/evr/IPlayer.h"
+#include "cinder/evr/DirectShowVideo.h"
 
 #include <dshow.h>
 
 namespace cinder {
 namespace msw {
 namespace video {
-
-//! Forward declarations
-class VideoRenderer;
 
 //! Definitions
 typedef void ( CALLBACK *GraphEventFN )( HWND hwnd, long eventCode, LONG_PTR param1, LONG_PTR param2 );
@@ -47,8 +45,13 @@ public:
 
 	HRESULT HandleEvent( UINT_PTR pEventPtr ) override;
 
-	UINT32  GetWidth() override { return 1; }
-	UINT32  GetHeight() override { return 1; }
+	UINT32  GetWidth() override { return (UINT32) m_Width; }
+	UINT32  GetHeight() override { return (UINT32) m_Height; }
+
+	bool CreateSharedTexture( int w, int h, int textureID ) override { return m_pVideo->CreateSharedTexture( w, h, textureID ); }
+	bool LockSharedTexture() override { return m_pVideo->LockSharedTexture(); }
+	bool UnlockSharedTexture() override { return m_pVideo->UnlockSharedTexture(); }
+	void ReleaseSharedTexture() override { m_pVideo->ReleaseSharedTexture(); }
 
 	//
 	PlayerState State() const { return m_state; }
@@ -68,12 +71,15 @@ private:
 
 	PlayerState      m_state;
 
+	long             m_Width;
+	long             m_Height;
+
 	HWND             m_hwnd; // Video window. This window also receives graph events.
 
 	IGraphBuilder   *m_pGraph;
 	IMediaControl   *m_pControl;
 	IMediaEventEx   *m_pEvent;
-	VideoRenderer  *m_pVideo;
+	VideoRenderer   *m_pVideo;
 
 	volatile long    mRefCount;
 };

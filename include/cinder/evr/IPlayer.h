@@ -28,6 +28,11 @@ public:
 
 	virtual UINT32  GetWidth() = 0;
 	virtual UINT32  GetHeight() = 0;
+
+	virtual bool CreateSharedTexture( int w, int h, int textureID ) = 0;
+	virtual bool LockSharedTexture() = 0;
+	virtual bool UnlockSharedTexture() = 0;
+	virtual void ReleaseSharedTexture() = 0;
 };
 
 } // namespace video
