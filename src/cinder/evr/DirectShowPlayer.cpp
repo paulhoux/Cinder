@@ -140,6 +140,7 @@ HRESULT DirectShowPlayer::HandleEvent( UINT_PTR pEventPtr )
 				break;
 			case EC_PAUSED:
 				CI_LOG_V( "EC_PAUSED" );
+				hr = this->m_pVideo->GetNativeVideoSize( &m_Width, &m_Height );
 				break;
 			case EC_OPENING_FILE:
 				CI_LOG_V( "EC_OPENING_FILE" );
@@ -173,6 +174,9 @@ HRESULT DirectShowPlayer::HandleEvent( UINT_PTR pEventPtr )
 				break;
 			case EC_STREAM_CONTROL_STARTED:
 				CI_LOG_V( "EC_STREAM_CONTROL_STARTED" );
+				break;
+			case EC_LOADSTATUS:
+				CI_LOG_V( "EC_LOADSTATUS" );
 				break;
 #endif
 			}

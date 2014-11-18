@@ -44,7 +44,7 @@ void WindowsEnhancedVideoApp::setup()
 
 	if( !path.empty() && fs::exists( path ) ) {
 		mMovieRef = video::MovieGl::create( path );
-		mMovieRef->play();
+		//mMovieRef->play();
 	}
 
 	mTime = getElapsedSeconds();
@@ -100,6 +100,11 @@ void WindowsEnhancedVideoApp::keyDown( KeyEvent event )
 			CI_LOG_I( "Looping set to: " << mPlayerRef->isLooping() );
 		}
 		break;*/
+	case KeyEvent::KEY_SPACE:
+		if( mMovieRef->isPlaying() )
+			mMovieRef->stop();
+		else mMovieRef->play();
+		break;
 	}
 }
 
@@ -117,7 +122,7 @@ void WindowsEnhancedVideoApp::fileDrop( FileDropEvent event )
 	const fs::path& path = event.getFile( 0 );
 	if( !path.empty() && fs::exists( path ) ) {
 		mMovieRef = video::MovieGl::create( path );
-		mMovieRef->play();
+		//mMovieRef->play();
 
 		resize();
 	}

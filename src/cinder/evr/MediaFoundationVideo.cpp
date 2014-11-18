@@ -1647,6 +1647,9 @@ HRESULT EVRCustomPresenter::BeginStreaming()
 {
 	HRESULT hr = S_OK;
 
+	SIZE size, aspect;
+	hr = GetNativeVideoSize( &size, &aspect );
+
 	// Start the scheduler thread.
 	hr = m_scheduler.StartScheduler( m_pClock );
 

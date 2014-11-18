@@ -396,10 +396,7 @@ HRESULT MediaFoundationPlayer::HandleSessionTopologyStatusEvent( IMFMediaEvent *
 	if( SUCCEEDED( hr ) && ( status == MF_TOPOSTATUS_READY ) ) {
 		SafeRelease( mVideoDisplayControlPtr );
 
-		hr = Play();
-
-		//if( !mIsPlaying )
-		//	hr = Pause();
+		hr = Pause();
 	}
 
 	return hr;
@@ -409,8 +406,7 @@ HRESULT MediaFoundationPlayer::HandleEndOfPresentationEvent( IMFMediaEvent *pEve
 {
 	HRESULT hr = S_OK;
 
-	mMediaSessionPtr->Pause();
-	mState = Paused;
+	hr = Pause();
 
 	// Seek to the beginning.
 	PROPVARIANT varStart;
