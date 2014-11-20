@@ -188,7 +188,6 @@
     </Lib>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\include\cinder\evr\RendererImpl.cpp" />
     <ClCompile Include="..\src\AntTweakBar\LoadOGLCore.cpp" />
     <ClCompile Include="..\src\AntTweakBar\TwDirect3D11.cpp" />
     <ClCompile Include="..\src\AntTweakBar\TwOpenGLCore.cpp" />
@@ -258,6 +257,7 @@
     <ClCompile Include="..\src\cinder\evr\MediaFoundationPlayer.cpp" />
     <ClCompile Include="..\src\cinder\evr\MediaFoundationVideo.cpp" />
     <ClCompile Include="..\src\cinder\evr\RendererGlImpl.cpp" />
+    <ClCompile Include="..\src\cinder\evr\RendererImpl.cpp" />
     <ClCompile Include="..\src\cinder\Exception.cpp" />
     <ClCompile Include="..\src\cinder\Font.cpp" />
     <ClCompile Include="..\src\cinder\Frustum.cpp" />

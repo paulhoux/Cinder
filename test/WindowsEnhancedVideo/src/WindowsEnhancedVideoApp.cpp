@@ -34,7 +34,7 @@ private:
 
 void WindowsEnhancedVideoApp::prepareSettings( Settings* settings )
 {
-	settings->setFrameRate(30);
+	settings->setFrameRate( 30 );
 	settings->setWindowSize( 1920, 1080 );
 }
 
@@ -44,7 +44,7 @@ void WindowsEnhancedVideoApp::setup()
 
 	if( !path.empty() && fs::exists( path ) ) {
 		mMovieRef = video::MovieGl::create( path );
-		//mMovieRef->play();
+		mMovieRef->play();
 	}
 
 	mTime = getElapsedSeconds();
@@ -75,7 +75,7 @@ void WindowsEnhancedVideoApp::draw()
 	gl::setModelMatrix( mTransform );
 
 	gl::color( 1, 1, 1 );
-	if(mMovieRef)
+	if( mMovieRef )
 		mMovieRef->draw( 0, 0 );
 
 	gl::popModelMatrix();
@@ -94,12 +94,12 @@ void WindowsEnhancedVideoApp::keyDown( KeyEvent event )
 	case KeyEvent::KEY_DELETE:
 		mMovieRef.reset();
 		break;
-	/*case KeyEvent::KEY_l:
-		if( mMovieRef ) {
+		/*case KeyEvent::KEY_l:
+			if( mMovieRef ) {
 			mMovieRef->setLoop( !mMovieRef->isLooping() );
 			CI_LOG_I( "Looping set to: " << mPlayerRef->isLooping() );
-		}
-		break;*/
+			}
+			break;*/
 	case KeyEvent::KEY_SPACE:
 		if( mMovieRef->isPlaying() )
 			mMovieRef->stop();
@@ -122,7 +122,7 @@ void WindowsEnhancedVideoApp::fileDrop( FileDropEvent event )
 	const fs::path& path = event.getFile( 0 );
 	if( !path.empty() && fs::exists( path ) ) {
 		mMovieRef = video::MovieGl::create( path );
-		//mMovieRef->play();
+		mMovieRef->play();
 
 		resize();
 	}

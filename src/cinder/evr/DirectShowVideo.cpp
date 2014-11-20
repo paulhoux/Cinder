@@ -429,9 +429,11 @@ HRESULT RendererEVR::GetNativeVideoSize( LONG *lpWidth, LONG *lpHeight )
 
 	HRESULT hr = S_OK;
 
-	if( m_pVideoDisplay ) {
+	if( m_pPresenter) {
 		SIZE szVideo, szARVideo;
-		if( SUCCEEDED( hr = m_pVideoDisplay->GetNativeVideoSize( &szVideo, &szARVideo ) ) ) {
+		hr = m_pPresenter->GetNativeVideoSize( &szVideo, &szARVideo );
+
+		if( SUCCEEDED( hr ) ) {
 			*lpWidth = szVideo.cx;
 			*lpHeight = szVideo.cy;
 		}

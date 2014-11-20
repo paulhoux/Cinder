@@ -336,6 +336,9 @@ protected:
 	MFVideoNormalizedRect       m_nrcSource;            // Source rectangle.
 	float                       m_fRate;                // Playback rate.
 
+	SIZE                        m_VideoSize;            // Size (width and height) of the video in pixels.
+	SIZE                        m_VideoARSize;          // Aspect ratio (nominator and denominator) of the video.
+
 	// Deletable objects.
 	D3DPresentEngine            *m_pD3DPresentEngine;    // Rendering engine. (Never null if the constructor succeeds.)
 

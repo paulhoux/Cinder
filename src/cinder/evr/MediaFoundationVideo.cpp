@@ -1016,10 +1016,10 @@ HRESULT EVRCustomPresenter::GetNativeVideoSize( SIZE* pszVideo, SIZE* pszARVideo
 	assert( pszVideo != nullptr );
 	assert( pszARVideo != nullptr );
 
-	pszVideo->cx = 0;
-	pszVideo->cy = 0;
+	*pszVideo = m_VideoSize;
+	*pszARVideo = m_VideoARSize;
 
-	return E_NOTIMPL;
+	return S_OK;
 }
 
 HRESULT EVRCustomPresenter::GetIdealVideoSize( SIZE* pszMin, SIZE* pszMax )
@@ -1044,7 +1044,7 @@ HRESULT EVRCustomPresenter::ProcessMessage( MFVP_MESSAGE_TYPE eMessage, ULONG_PT
 		hr = Flush();
 		break;
 	case MFVP_MESSAGE_INVALIDATEMEDIATYPE:
-		CI_LOG_V( "MFVP_MESSAGE_INVALIDATEMEDIATYPE" );
+		CI_LOG_V( "MFVP_MESSAGE_INVALIDATEMEDIATYPE. Renegotiating..." );
 		// Renegotiate the media type with the mixer.
 		hr = RenegotiateMediaType();
 		break;
@@ -1647,9 +1647,6 @@ HRESULT EVRCustomPresenter::BeginStreaming()
 {
 	HRESULT hr = S_OK;
 
-	SIZE size, aspect;
-	hr = GetNativeVideoSize( &size, &aspect );
-
 	// Start the scheduler thread.
 	hr = m_scheduler.StartScheduler( m_pClock );
 
@@ -1821,6 +1818,24 @@ HRESULT EVRCustomPresenter::CreateOptimalVideoType( IMFMediaType* pProposedType,
 		// Clone the proposed type.
 		hr = mtOptimal.CopyFrom( pProposedType );
 		BREAK_ON_FAIL( hr );
+
+
+		// Determine the size (width & height) of the video.
+		AM_MEDIA_TYPE* pAMMedia = nullptr;
+		LARGE_INTEGER  i64Size;
+		MFVIDEOFORMAT* VideoFormat;
+
+		hr = pProposedType->GetRepresentation( FORMAT_MFVideoFormat, (void**) &pAMMedia );
+		BREAK_ON_FAIL( hr );
+
+		VideoFormat = (MFVIDEOFORMAT*) pAMMedia->pbFormat;
+		m_VideoSize.cx = VideoFormat->videoInfo.dwWidth;
+		m_VideoSize.cy = VideoFormat->videoInfo.dwHeight;
+		m_VideoARSize.cx = VideoFormat->videoInfo.PixelAspectRatio.Numerator;
+		m_VideoARSize.cy = VideoFormat->videoInfo.PixelAspectRatio.Denominator;
+
+		pProposedType->FreeRepresentation( FORMAT_MFVideoFormat, (void*) pAMMedia );
+
 
 		// Modify the new type.
 

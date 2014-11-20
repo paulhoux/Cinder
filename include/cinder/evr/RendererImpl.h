@@ -130,7 +130,9 @@ public:
 	//! Returns whether the movie has completely finished playing
 	bool		isDone() const { /*TODO*/ return false; }
 	//! Begins movie playback.
-	void		play() { if( mPlayer ) mPlayer->Play(); }
+	void		play() {
+		if( mPlayer ) mPlayer->Play(); mIsPlaying = true; 
+	}
 	//! Stops movie playback.
 	void		stop() { if( mPlayer ) mPlayer->Stop(); }
 
@@ -151,15 +153,15 @@ protected:
 	virtual void  initFromPath( const fs::path& filePath ) { init( toWideString( filePath.string() ) ); }
 	//virtual void  initFromLoader( const MovieLoader& loader );
 
-	void      loadAsset();
-	void      updateFrame();
-	uint32_t  countFrames() const;
+	//void      loadAsset();
+	//void      updateFrame();
+	//uint32_t  countFrames() const;
 
 	void      lock() { mMutex.lock(); }
 	void      unlock() { mMutex.unlock(); }
 
-	void      removeObservers();
-	void      addObservers();
+	//void      removeObservers();
+	//void      addObservers();
 
 	//! Default window message handler.
 	LRESULT WndProc( HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam );

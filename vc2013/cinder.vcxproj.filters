@@ -753,9 +753,6 @@
     <ClCompile Include="..\src\cinder\evr\RendererGlImpl.cpp">
       <Filter>Source Files\evr</Filter>
     </ClCompile>
-    <ClCompile Include="..\include\cinder\evr\RendererImpl.cpp">
-      <Filter>Source Files\evr</Filter>
-    </ClCompile>
     <ClCompile Include="..\src\cinder\evr\DirectShowVideo.cpp">
       <Filter>Source Files\evr</Filter>
     </ClCompile>
@@ -766,6 +763,9 @@
       <Filter>Source Files\evr</Filter>
     </ClCompile>
     <ClCompile Include="..\src\cinder\evr\MediaFoundationVideo.cpp">
+      <Filter>Source Files\evr</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\cinder\evr\RendererImpl.cpp">
       <Filter>Source Files\evr</Filter>
     </ClCompile>
   </ItemGroup>

@@ -14,7 +14,7 @@ namespace video {
 
 
 DirectShowPlayer::DirectShowPlayer( HRESULT &hr, HWND hwnd )
-	: mRefCount( 0 ), m_state( STATE_NO_GRAPH ), m_hwnd( hwnd ), m_Width( 4096 ), m_Height( 1716 )
+	: mRefCount( 0 ), m_state( STATE_NO_GRAPH ), m_hwnd( hwnd ), m_Width( 0 ), m_Height( 0 )
 	, m_pGraph( NULL ), m_pControl( NULL ), m_pEvent( NULL ), m_pVideo( NULL )
 {
 	hr = S_OK;
@@ -75,6 +75,10 @@ HRESULT DirectShowPlayer::OpenFile( PCWSTR pszFileName )
 
 		// Try to render the streams.
 		hr = RenderStreams( pSource );
+		BREAK_ON_FAIL( hr );
+
+		// Obtain width and height of the video.
+		hr = m_pVideo->GetNativeVideoSize( &m_Width, &m_Height );
 		BREAK_ON_FAIL( hr );
 	} while( false );
 
@@ -140,7 +144,6 @@ HRESULT DirectShowPlayer::HandleEvent( UINT_PTR pEventPtr )
 				break;
 			case EC_PAUSED:
 				CI_LOG_V( "EC_PAUSED" );
-				hr = this->m_pVideo->GetNativeVideoSize( &m_Width, &m_Height );
 				break;
 			case EC_OPENING_FILE:
 				CI_LOG_V( "EC_OPENING_FILE" );
@@ -413,8 +416,7 @@ HRESULT DirectShowPlayer::RenderStreams( IBaseFilter *pSource )
 		BREAK_ON_FAIL( hr );
 	} while( false );
 
-	// If we succeeded to this point, make sure we rendered at least one 
-	// stream.
+	// If we succeeded to this point, make sure we rendered at least one stream.
 	if( SUCCEEDED( hr ) ) {
 		if( !bRenderedAnyPin ) {
 			hr = VFW_E_CANNOT_RENDER;
