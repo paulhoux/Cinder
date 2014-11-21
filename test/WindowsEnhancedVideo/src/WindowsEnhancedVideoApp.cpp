@@ -1,3 +1,5 @@
+#include "vld.h"
+
 #include "cinder/app/AppNative.h"
 #include "cinder/app/RendererGl.h"
 #include "cinder/gl/gl.h"
@@ -43,6 +45,7 @@ void WindowsEnhancedVideoApp::setup()
 	fs::path path = getOpenFilePath();
 
 	if( !path.empty() && fs::exists( path ) ) {
+		mMovieRef.reset();
 		mMovieRef = video::MovieGl::create( path );
 		mMovieRef->play();
 	}
@@ -121,6 +124,7 @@ void WindowsEnhancedVideoApp::fileDrop( FileDropEvent event )
 {
 	const fs::path& path = event.getFile( 0 );
 	if( !path.empty() && fs::exists( path ) ) {
+		mMovieRef.reset();
 		mMovieRef = video::MovieGl::create( path );
 		mMovieRef->play();
 

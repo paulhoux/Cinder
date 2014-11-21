@@ -885,12 +885,15 @@ HRESULT EVRCustomPresenter::QueryInterface( REFIID riid, void ** ppv )
 
 ULONG EVRCustomPresenter::AddRef()
 {
+	CI_LOG_V( "EVRCustomPresenter::AddRef():" << mRefCount + 1 );
+
 	return InterlockedIncrement( &mRefCount );
 }
 
 ULONG EVRCustomPresenter::Release()
 {
 	assert( mRefCount > 0 );
+	CI_LOG_V( "EVRCustomPresenter::Release():" << mRefCount - 1 );
 
 	ULONG uCount = InterlockedDecrement( &mRefCount );
 	if( uCount == 0 )

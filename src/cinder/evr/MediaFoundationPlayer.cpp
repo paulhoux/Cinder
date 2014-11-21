@@ -256,11 +256,11 @@ HRESULT MediaFoundationPlayer::SetMediaInfo( IMFPresentationDescriptor *pPD )
 				hr = MFGetAttributeSize( pMediaType, MF_MT_FRAME_SIZE, &mWidth, &mHeight );
 				BREAK_ON_FAIL( hr );
 
-				if( mWidth % 2 != 0 || mHeight % 2 != 0 ) {
-					CI_LOG_E( "Video resolution not divisible by 2." );
-					hr = E_UNEXPECTED;
-					break;
-				}
+				//if( mWidth % 2 != 0 || mHeight % 2 != 0 ) {
+					//CI_LOG_E( "Video resolution not divisible by 2." );
+					//hr = E_UNEXPECTED;
+					//break;
+				//}
 			}
 		}
 	}
@@ -300,6 +300,21 @@ HRESULT MediaFoundationPlayer::Pause()
 	HRESULT hr = mMediaSessionPtr->Pause();
 	if( SUCCEEDED( hr ) )
 		mState = Paused;
+
+	return hr;
+}
+
+HRESULT MediaFoundationPlayer::Stop()
+{
+	if( mState != Started && mState != Paused )
+		return MF_E_INVALIDREQUEST;
+
+	if( mMediaSessionPtr == NULL || mMediaSourcePtr == NULL )
+		return E_UNEXPECTED;
+
+	HRESULT hr = mMediaSessionPtr->Stop();
+	if( SUCCEEDED( hr ) )
+		mState = Stopped;
 
 	return hr;
 }

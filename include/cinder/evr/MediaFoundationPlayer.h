@@ -50,7 +50,7 @@ protected:
 
 	HRESULT Play() override;
 	HRESULT Pause() override;
-	HRESULT Stop() override { return S_OK; }
+	HRESULT Stop() override;
 
 	HRESULT HandleEvent( UINT_PTR pEventPtr ) override;
 
