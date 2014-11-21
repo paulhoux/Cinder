@@ -84,14 +84,14 @@ void App::Settings::disableFrameRate()
 	mFrameRateEnabled = false;
 }
 
-void App::Settings::setFrameRate( float aFrameRate )
+void App::Settings::setFrameRate( float frameRate )
 {
-	mFrameRate = aFrameRate;
+	mFrameRate = frameRate;
 }
 
-void App::Settings::enablePowerManagement( bool aPowerManagement )
+void App::Settings::enablePowerManagement( bool powerManagement )
 {
-	mPowerManagement = aPowerManagement;
+	mPowerManagement = powerManagement;
 }
 
 void App::Settings::prepareWindow( const Window::Format &format )
@@ -142,6 +142,12 @@ void App::privateUpdate__()
 	// service boost::asio::io_service
 	mIo->poll();
 #endif
+
+	if( getNumWindows() > 0 ) {
+		WindowRef mainWin = getWindowIndex( 0 );
+		if( mainWin )
+			mainWin->getRenderer()->makeCurrentContext();
+	}
 
 	mSignalUpdate();
 
@@ -363,8 +369,13 @@ fs::path App::getOpenFilePath( const fs::path &initialPath, vector<string> exten
 	restoreWindowContext();
 
 	if( resultCode == NSFileHandlingPanelOKButton ) {
-		NSString *result = [[[cinderOpen URLs] objectAtIndex:0] path];
-		return fs::path( [result UTF8String] );
+		NSString *result = [[[cinderOpen URLs] firstObject] path];
+		if( ! result ) {
+			CI_LOG_E( "empty path result" );
+			return fs::path();
+		}
+		else
+			return fs::path( [result UTF8String] );
 	}
 	else
 		return fs::path();
@@ -404,8 +415,13 @@ fs::path App::getFolderPath( const fs::path &initialPath )
 	restoreWindowContext();
 	
 	if( resultCode == NSFileHandlingPanelOKButton ) {
-		NSString *result = [[[cinderOpen URLs] objectAtIndex:0] path];
-		return fs::path([result UTF8String]);
+		NSString *result = [[[cinderOpen URLs] firstObject] path];
+		if( ! result ) {
+			CI_LOG_E( "empty path result" );
+			return fs::path();
+		}
+		else
+			return fs::path([result UTF8String]);
 	}
 	else
 		return fs::path();

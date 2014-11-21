@@ -38,7 +38,7 @@ GlslProg::AttribSemanticMap		GlslProg::sDefaultAttribNameToSemanticMap;
 //////////////////////////////////////////////////////////////////////////
 // GlslProg::Format
 GlslProg::Format::Format()
-#if ! defined( CINDER_GL_ES )
+#if ! defined( CINDER_GL_ES_2 )
 	: mTransformFormat( -1 )
 #endif
 {
@@ -297,7 +297,7 @@ GlslProg::GlslProg( const Format &format )
 	for( auto &attribLoc : attribLocations )
 		glBindAttribLocation( mHandle, attribLoc.second, attribLoc.first.c_str() );
 	
-#if ! defined( CINDER_GL_ES )
+#if ! defined( CINDER_GL_ES_2 )
 	if( ! format.getVaryings().empty() && format.getTransformFormat() > 0 ) {
 		// This is a mess due to an NVidia driver bug on MSW which expects the memory passed to glTransformFeedbackVaryings
 		// to still be around after the call. We allocate the storage and put it on the GlslProg itself to be freed at destruction
@@ -314,14 +314,16 @@ GlslProg::GlslProg( const Format &format )
 			memcpy( &(*mTransformFeedbackVaryingsChars)[curOffset], v.c_str(), v.length() + 1 );
 			curOffset += v.length() + 1;
 		}
-		glTransformFeedbackVaryings( mHandle, format.getVaryings().size(), mTransformFeedbackVaryingsCharStarts->data(), format.getTransformFormat() );
+		glTransformFeedbackVaryings( mHandle, (GLsizei)format.getVaryings().size(), mTransformFeedbackVaryingsCharStarts->data(), format.getTransformFormat() );
 	}
+#endif
 
+#if ! defined( CINDER_GL_ES )
 	// setup fragment data locations
 	for( const auto &fragDataLocation : format.getFragDataLocations() )
 		glBindFragDataLocation( mHandle, fragDataLocation.second, fragDataLocation.first.c_str() );
 #endif
-	
+
 	link();
 	
 	setLabel( format.getLabel() );
@@ -835,6 +837,50 @@ GLint GlslProg::getUniformLocation( const std::string &name ) const
 		return uniformIt->second;
 	}
 }
+
+#if ! defined( CINDER_GL_ES_2 )
+void GlslProg::uniformBlock( int loc, int binding )
+{
+	glUniformBlockBinding( mHandle, loc, binding );
+}
+
+void GlslProg::uniformBlock( const std::string &name, GLint binding )
+{
+	GLint loc = getUniformBlockLocation( name );
+	if( loc == -1 )
+		CI_LOG_E( "Unknown uniform block: \"" << name << "\"" );
+	else
+		glUniformBlockBinding( mHandle, loc, binding );
+}
+
+GLint GlslProg::getUniformBlockLocation( const std::string &name ) const
+{
+	auto existing = mUniformBlockLocs.find( name );
+	if( existing == mUniformBlockLocs.end() ) {
+		const GLuint loc = glGetUniformBlockIndex( mHandle, name.c_str() );
+		if( loc == GL_INVALID_INDEX )
+			return -1;
+		else
+			mUniformBlockLocs[name] = loc;
+		return loc;
+	}
+	else
+		return existing->second;
+}
+
+GLint GlslProg::getUniformBlockSize( GLint blockIndex ) const
+{
+	auto existing = mUniformBlockSizes.find( blockIndex );
+	if( existing == mUniformBlockSizes.end() ) {
+		GLint blockSize = 0;
+		glGetActiveUniformBlockiv( mHandle, blockIndex, GL_UNIFORM_BLOCK_DATA_SIZE, &blockSize );
+		mUniformBlockSizes[blockIndex] = blockSize;
+		return blockSize;
+	}
+	else
+		return existing->second;
+}
+#endif // ! defined( CINDER_GL_ES_2 )
 
 const std::map<std::string,GLenum>& GlslProg::getActiveUniformTypes() const
 {

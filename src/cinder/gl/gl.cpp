@@ -69,8 +69,10 @@ bool isExtensionAvailable( const std::string &extName )
 std::pair<GLint,GLint> getVersion()
 {
 	//hard-coded for now
-#if defined( CINDER_GL_ES )
+#if defined( CINDER_GL_ES_2 )
 	return std::make_pair( (GLint)2, (GLint)0 );
+#elif defined( CINDER_GL_ES_3 )
+	return std::make_pair( (GLint)3, (GLint)0 );
 #else
 	static bool	sInitialized = false;
 	static pair<GLint,GLint> sVersion;
@@ -561,6 +563,39 @@ void translate( const ci::vec3& v )
 	ctx->getModelMatrixStack().back() *= glm::translate( v );
 }
 
+vec3 windowToObjectCoord( const mat4 &modelMatrix, const ci::vec2 &coordinate, float z )
+{
+	// Build the viewport (x, y, width, height).
+	vec2 offset = gl::getViewport().first;
+	vec2 size = gl::getViewport().second;
+	vec4 viewport = vec4( offset.x, offset.y, size.x, size.y );
+
+	// Calculate the view-projection matrix.
+	mat4 viewProjectionMatrix = gl::getProjectionMatrix() * gl::getViewMatrix();
+
+	// Calculate the intersection of the mouse ray with the near (z=0) and far (z=1) planes.
+	vec3 nearPlane = glm::unProject( vec3( coordinate.x, size.y - coordinate.y, 0 ), modelMatrix, viewProjectionMatrix, viewport );
+	vec3 farPlane = glm::unProject( vec3( coordinate.x, size.y - coordinate.y, 1 ), modelMatrix, viewProjectionMatrix, viewport );
+
+	// Calculate world position.
+	return ci::lerp( nearPlane, farPlane, ( z - nearPlane.z ) / ( farPlane.z - nearPlane.z ) );
+}
+
+vec2 objectToWindowCoord( const mat4 &modelMatrix, const ci::vec3 &coordinate )
+{
+	// Build the viewport (x, y, width, height).
+	vec2 offset = gl::getViewport().first;
+	vec2 size = gl::getViewport().second;
+	vec4 viewport = vec4( offset.x, offset.y, size.x, size.y );
+
+	// Calculate the view-projection matrix.
+	mat4 viewProjectionMatrix = gl::getProjectionMatrix() * gl::getViewMatrix();
+
+	vec2 p = vec2( glm::project( coordinate, modelMatrix, viewProjectionMatrix, viewport ) );
+
+	return p;
+}
+
 void begin( GLenum mode )
 {
 	auto ctx = gl::context();
@@ -580,7 +615,7 @@ void end()
 	}
 }
 
-#if ! defined( CINDER_GL_ES )
+#if ! defined( CINDER_GL_ES_2 )
 void bindBufferBase( GLenum target, int index, BufferObjRef buffer )
 {
 	auto ctx = gl::context();
@@ -610,7 +645,9 @@ void endTransformFeedback()
 	auto ctx = gl::context();
 	ctx->endTransformFeedback();
 }
+#endif // ! defined( CINDER_GL_ES_2 )
 
+#if ! defined( CINDER_GL_ES )
 void patchParameteri( GLenum pname, GLint value )
 {
 	glPatchParameteri( pname, value );
@@ -620,8 +657,7 @@ void patchParameterfv( GLenum pname, GLfloat *value )
 {
 	glPatchParameterfv( pname, value );
 }
-
-#endif
+#endif // ! defined( CINDER_GL_ES )
 
 void color( float r, float g, float b )
 {
@@ -839,6 +875,18 @@ void readBuffer( GLenum src )
 {
 	glReadBuffer( src );
 }
+
+void drawBuffers( GLsizei num, const GLenum *bufs )
+{
+	glDrawBuffers( num, bufs );
+}
+#endif
+
+#if ! defined( CINDER_GL_ES )
+void drawBuffer( GLenum dst )
+{
+	glDrawBuffer( dst );
+}
 #endif
 
 void readPixels( GLint x, GLint y, GLsizei width, GLsizei height, GLenum format, GLenum type, GLvoid *data )
@@ -1010,6 +1058,8 @@ void drawCubeImpl( const vec3 &c, const vec3 &size, bool faceColors )
 	VboRef defaultArrayVbo = ctx->getDefaultArrayVbo( totalArrayBufferSize );
 	ScopedBuffer vboScp( defaultArrayVbo );
 	VboRef elementVbo = ctx->getDefaultElementVbo( 6*6 );
+	// we seem to need to orphan the existing element vbo on AMD on OS X
+	elementVbo->bufferData( 36, nullptr, GL_STREAM_DRAW );
 
 	elementVbo->bind();
 	size_t curBufferOffset = 0;
@@ -1643,7 +1693,8 @@ void drawSphere( const vec3 &center, float radius, int subdivisions )
 
 	ctx->pushVao();
 	ctx->getDefaultVao()->replacementBindBegin();
-	gl::VboMeshRef mesh = gl::VboMesh::create( geom::Sphere().center( center ).radius( radius ).subdivisions( subdivisions ).enable( geom::Attrib::NORMAL ).enable( geom::Attrib::TEX_COORD_0 ), ctx->getDefaultArrayVbo(), ctx->getDefaultElementVbo() );
+	gl::VboMeshRef mesh = gl::VboMesh::create( geom::Sphere().center( center ).radius( radius ).subdivisions( subdivisions ),
+			{ { VboMesh::Layout().attrib( geom::POSITION, 3 ).attrib( geom::NORMAL, 3 ).attrib( geom::TEX_COORD_0, 2 ), ctx->getDefaultArrayVbo() } }, ctx->getDefaultElementVbo() );
 	mesh->buildVao( curGlslProg );
 	ctx->getDefaultVao()->replacementBindEnd();
 	ctx->setDefaultShaderVars();
@@ -1760,7 +1811,7 @@ void drawFrustum( const Camera &cam )
 	
 void drawCoordinateFrame( float axisLength, float headLength, float headRadius )
 {
-	gl::color( 1.0f, 0.0f, 0.0f, 1.0f );
+	gl::ScopedColor color( ColorA( 1.0f, 0.0f, 0.0f, 1.0f ) );
 	drawVector( vec3( 0.0f ), vec3( 1.0f, 0.0f, 0.0f ) * axisLength, headLength, headRadius );
 	gl::color( 0.0f, 1.0f, 0.0f, 1.0f );
 	drawVector( vec3( 0.0f ), vec3( 0.0f, 1.0f, 0.0f ) * axisLength, headLength, headRadius );
@@ -2039,7 +2090,29 @@ ScopedTextureBind::ScopedTextureBind( const TextureBaseRef &texture, uint8_t tex
 {
 	mCtx->pushTextureBinding( mTarget, texture->getId(), mTextureUnit );
 }
-	
+
+// ----------------------------------------------------------------
+// These overloads are to alleviate a VS2013 bug where it cannot deduce
+// the correct constructor when a TextureBaseRef subclass is passed in
+ScopedTextureBind::ScopedTextureBind( const Texture2dRef &texture, uint8_t textureUnit )
+: mCtx( gl::context() ), mTarget( texture->getTarget() ), mTextureUnit( textureUnit )
+{
+	mCtx->pushTextureBinding( mTarget, texture->getId(), mTextureUnit );
+}
+
+ScopedTextureBind::ScopedTextureBind( const Texture3dRef &texture, uint8_t textureUnit )
+: mCtx( gl::context() ), mTarget( texture->getTarget() ), mTextureUnit( textureUnit )
+{
+	mCtx->pushTextureBinding( mTarget, texture->getId(), mTextureUnit );
+}
+
+ScopedTextureBind::ScopedTextureBind( const TextureCubeMapRef &texture, uint8_t textureUnit )
+: mCtx( gl::context() ), mTarget( texture->getTarget() ), mTextureUnit( textureUnit )
+{
+	mCtx->pushTextureBinding( mTarget, texture->getId(), mTextureUnit );
+}
+// ----------------------------------------------------------------
+
 ScopedTextureBind::~ScopedTextureBind()
 {
 	mCtx->popTextureBinding( mTarget, mTextureUnit );
@@ -2047,11 +2120,11 @@ ScopedTextureBind::~ScopedTextureBind()
 
 ///////////////////////////////////////////////////////////////////////////////////////////
 // ScopedScissor
-ScopedScissor::ScopedScissor( const ivec2 &lowerLeftPostion, const ivec2 &dimension )
+ScopedScissor::ScopedScissor( const ivec2 &lowerLeftPosition, const ivec2 &dimension )
 	: mCtx( gl::context() )
 {
 	mCtx->pushBoolState( GL_SCISSOR_TEST, GL_TRUE );
-	mCtx->pushScissor( std::pair<ivec2, ivec2>( lowerLeftPostion, dimension ) ); 
+	mCtx->pushScissor( std::pair<ivec2, ivec2>( lowerLeftPosition, dimension ) );
 }
 
 ScopedScissor::ScopedScissor( int lowerLeftX, int lowerLeftY, int width, int height )
@@ -2112,10 +2185,10 @@ ScopedRenderbuffer::~ScopedRenderbuffer()
 
 ///////////////////////////////////////////////////////////////////////////////////////////
 // ScopedViewport
-ScopedViewport::ScopedViewport( const ivec2 &lowerLeftPostion, const ivec2 &dimension )
+ScopedViewport::ScopedViewport( const ivec2 &lowerLeftPosition, const ivec2 &dimension )
 	: mCtx( gl::context() )
 {
-	mCtx->pushViewport( std::pair<ivec2, ivec2>( lowerLeftPostion, dimension ) ); 
+	mCtx->pushViewport( std::pair<ivec2, ivec2>( lowerLeftPosition, dimension ) );
 }
 
 ScopedViewport::ScopedViewport( int lowerLeftX, int lowerLeftY, int width, int height )
