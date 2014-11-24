@@ -194,10 +194,10 @@ private:
 		if( step <= 0 || step > size )
 			step = size;
 
-		const float fs = float( size );
-		const int   is = size / step;
-		for( int i = -is; i <= is; ++i ) {
-			float s = i * float( step );
+		const float fs = size * 0.5f;
+		const float fss = ( size / step ) * 0.5f;
+		for( size_t i = 0; i <= size / step; ++i ) {
+			float s = ( i - fss ) * float( step );
 			implDrawLine( center + orientation * vec3( s, 0.0f, -fs ), center + orientation * vec3( s, 0.0f, +fs ) );
 			implDrawLine( center + orientation * vec3( -fs, 0.0f, s ), center + orientation * vec3( +fs, 0.0f, s ) );
 		}
@@ -314,9 +314,8 @@ private:
 				implDrawLine( base + orientation * ( radiusBase * p ), top + orientation * ( radiusTop * p ) );
 			}
 
-			implDrawCircle( base, radiusBase, axis );
-			implDrawCircle( top, radiusTop, axis );
-			implDrawCircle( 0.5f * ( base + top ), 0.5f * ( radiusBase + radiusTop ), axis );
+			for( int i = 0; i <= 4; ++i )
+				implDrawCircle( lerp( base, top, i * 0.25f ), lerp( radiusBase, radiusTop, i*0.25f ), axis );
 		}
 	}
 

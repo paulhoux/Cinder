@@ -57,7 +57,7 @@ void SketchApp::setup()
 
 	// Set the draw color and draw a grid.
 	gl::color( 0.25f, 0.25f, 0.25f );
-	mSketchStatic->grid( 10, 1 );
+	mSketchStatic->grid( 20, 1 );
 
 	// Drawing a sphere is just as easy.
 	gl::color( 1.00f, 0.75f, 0.50f );
