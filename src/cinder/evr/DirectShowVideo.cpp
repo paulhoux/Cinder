@@ -109,7 +109,7 @@ HRESULT RendererVMR7::DisplayModeChanged()
 	}
 }
 
-HRESULT RendererVMR7::GetNativeVideoSize( LONG *lpWidth, LONG *lpHeight )
+HRESULT RendererVMR7::GetNativeVideoSize( LONG *lpWidth, LONG *lpHeight ) const
 {
 	assert( lpWidth != nullptr );
 	assert( lpHeight != nullptr );
@@ -260,7 +260,7 @@ HRESULT RendererVMR9::DisplayModeChanged()
 	}
 }
 
-HRESULT RendererVMR9::GetNativeVideoSize( LONG *lpWidth, LONG *lpHeight )
+HRESULT RendererVMR9::GetNativeVideoSize( LONG *lpWidth, LONG *lpHeight ) const
 {
 	assert( lpWidth != nullptr );
 	assert( lpHeight != nullptr );
@@ -337,6 +337,9 @@ BOOL RendererEVR::HasVideo() const
 
 HRESULT RendererEVR::AddToGraph( IGraphBuilder *pGraph, HWND hwnd )
 {
+	assert( m_pPresenter == NULL );
+	assert( m_pEVR == NULL );
+
 	HRESULT hr = S_OK;
 
 	do {
@@ -422,14 +425,14 @@ HRESULT RendererEVR::DisplayModeChanged()
 	return S_OK;
 }
 
-HRESULT RendererEVR::GetNativeVideoSize( LONG *lpWidth, LONG *lpHeight )
+HRESULT RendererEVR::GetNativeVideoSize( LONG *lpWidth, LONG *lpHeight ) const
 {
 	assert( lpWidth != nullptr );
 	assert( lpHeight != nullptr );
 
 	HRESULT hr = S_OK;
 
-	if( m_pPresenter) {
+	if( m_pPresenter ) {
 		SIZE szVideo, szARVideo;
 		hr = m_pPresenter->GetNativeVideoSize( &szVideo, &szARVideo );
 
@@ -498,9 +501,8 @@ HRESULT RemoveUnconnectedRenderer( IGraphBuilder *pGraph, IBaseFilter *pRenderer
 
 	// Look for a connected input pin on the renderer.
 
-	IPin *pPin = NULL;
+	ScopedComPtr<IPin> pPin;
 	HRESULT hr = FindConnectedPin( pRenderer, PINDIR_INPUT, &pPin );
-	SafeRelease( pPin );
 
 	// If this function succeeds, the renderer is connected, so we don't remove it.
 	// If it fails, it means the renderer is not connected to anything, so
@@ -516,7 +518,7 @@ HRESULT RemoveUnconnectedRenderer( IGraphBuilder *pGraph, IBaseFilter *pRenderer
 
 HRESULT IsPinConnected( IPin *pPin, BOOL *pResult )
 {
-	IPin *pTmp = NULL;
+	ScopedComPtr<IPin> pTmp;
 	HRESULT hr = pPin->ConnectedTo( &pTmp );
 	if( SUCCEEDED( hr ) ) {
 		*pResult = TRUE;
@@ -527,7 +529,6 @@ HRESULT IsPinConnected( IPin *pPin, BOOL *pResult )
 		hr = S_OK;
 	}
 
-	SafeRelease( pTmp );
 	return hr;
 }
 
@@ -546,8 +547,8 @@ HRESULT FindConnectedPin( IBaseFilter *pFilter, PIN_DIRECTION PinDir,
 {
 	*ppPin = NULL;
 
-	IEnumPins *pEnum = NULL;
-	IPin *pPin = NULL;
+	ScopedComPtr<IEnumPins> pEnum;
+	ScopedComPtr<IPin> pPin;
 
 	HRESULT hr = pFilter->EnumPins( &pEnum );
 	if( FAILED( hr ) ) {
@@ -565,17 +566,16 @@ HRESULT FindConnectedPin( IBaseFilter *pFilter, PIN_DIRECTION PinDir,
 		}
 
 		if( FAILED( hr ) ) {
-			pPin->Release();
 			break;
 		}
 		if( bFound ) {
 			*ppPin = pPin;
 			break;
 		}
-		pPin->Release();
-	}
 
-	pEnum->Release();
+		// Re-use pPin on next iteration.
+		pPin.Release();
+	}
 
 	if( !bFound ) {
 		hr = VFW_E_NOT_FOUND;
@@ -601,7 +601,7 @@ HRESULT AddFilterByCLSID( IGraphBuilder *pGraph, REFGUID clsid,
 		BREAK_ON_FAIL( hr );
 
 		std::wstring wstr( wszName );
-		CI_LOG_V( "Added filter: " << wstr.c_str() );
+		CI_LOG_V( "Added filter: " << toUtf8String( wstr ).c_str() );
 
 		*ppF = pFilter;
 		( *ppF )->AddRef();

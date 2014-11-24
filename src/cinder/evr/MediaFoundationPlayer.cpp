@@ -59,6 +59,7 @@ MediaFoundationPlayer::MediaFoundationPlayer( HRESULT &hr, HWND hwnd )
 		mPresenterPtr = new EVRCustomPresenter( hr );
 		BREAK_ON_FAIL( hr );
 
+		mPresenterPtr->AddRef();
 		hr = mPresenterPtr->SetVideoWindow( mHwnd );
 		BREAK_ON_FAIL( hr );
 	} while( false );
@@ -107,6 +108,18 @@ HRESULT MediaFoundationPlayer::OpenFile( LPCWSTR pszFileName )
 
 	if( FAILED( hr ) )
 		CloseSession();
+
+	return hr;
+}
+
+HRESULT MediaFoundationPlayer::Close()
+{
+	HRESULT hr = S_OK;
+
+	do {
+		hr = Stop();
+		hr = CloseSession();
+	} while( false );
 
 	return hr;
 }
@@ -257,9 +270,9 @@ HRESULT MediaFoundationPlayer::SetMediaInfo( IMFPresentationDescriptor *pPD )
 				BREAK_ON_FAIL( hr );
 
 				//if( mWidth % 2 != 0 || mHeight % 2 != 0 ) {
-					//CI_LOG_E( "Video resolution not divisible by 2." );
-					//hr = E_UNEXPECTED;
-					//break;
+				//CI_LOG_E( "Video resolution not divisible by 2." );
+				//hr = E_UNEXPECTED;
+				//break;
 				//}
 			}
 		}
@@ -474,6 +487,8 @@ HRESULT MediaFoundationPlayer::HandleSessionEvent( IMFMediaEvent *pEvent, MediaE
 
 HRESULT MediaFoundationPlayer::QueryInterface( REFIID riid, void** ppv )
 {
+	AddRef();
+
 	static const QITAB qit[] = {
 		QITABENT( MediaFoundationPlayer, IMFAsyncCallback ),
 		{ 0 }
@@ -483,11 +498,15 @@ HRESULT MediaFoundationPlayer::QueryInterface( REFIID riid, void** ppv )
 
 ULONG MediaFoundationPlayer::AddRef()
 {
+	//CI_LOG_V( "MediaFoundationPlayer::AddRef():" << mRefCount + 1 );
 	return InterlockedIncrement( &mRefCount );
 }
 
 ULONG MediaFoundationPlayer::Release()
 {
+	assert( mRefCount > 0 );
+	//CI_LOG_V( "MediaFoundationPlayer::Release():" << mRefCount - 1 );
+
 	ULONG uCount = InterlockedDecrement( &mRefCount );
 	if( uCount == 0 ) {
 		delete this;

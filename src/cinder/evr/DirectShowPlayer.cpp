@@ -44,12 +44,14 @@ HRESULT DirectShowPlayer::QueryInterface( REFIID riid, void** ppv )
 
 ULONG DirectShowPlayer::AddRef()
 {
+	//CI_LOG_V( "DirectShowPlayer::AddRef():" << mRefCount + 1 );
 	return InterlockedIncrement( &mRefCount );
 }
 
 ULONG DirectShowPlayer::Release()
 {
 	assert( mRefCount > 0 );
+	//CI_LOG_V( "DirectShowPlayer::Release():" << mRefCount - 1 );
 
 	ULONG uCount = InterlockedDecrement( &mRefCount );
 	if( uCount == 0 ) {
@@ -84,6 +86,16 @@ HRESULT DirectShowPlayer::OpenFile( PCWSTR pszFileName )
 
 	if( FAILED( hr ) )
 		TearDownGraph();
+
+	return hr;
+}
+
+HRESULT DirectShowPlayer::Close()
+{
+	HRESULT hr = S_OK;
+
+	Stop();
+	TearDownGraph();
 
 	return hr;
 }
@@ -321,8 +333,7 @@ void DirectShowPlayer::TearDownGraph()
 	SafeRelease( m_pControl );
 	SafeRelease( m_pEvent );
 
-	delete m_pVideo;
-	m_pVideo = NULL;
+	SafeDelete( m_pVideo );
 
 	m_state = STATE_NO_GRAPH;
 }

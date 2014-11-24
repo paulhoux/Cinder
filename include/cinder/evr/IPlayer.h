@@ -19,6 +19,7 @@ public:
 	virtual ~IPlayer() {}
 
 	virtual HRESULT OpenFile( PCWSTR pszFileName ) = 0;
+	virtual HRESULT Close() = 0;
 
 	virtual HRESULT Play() = 0;
 	virtual HRESULT Pause() = 0;
@@ -26,13 +27,15 @@ public:
 
 	virtual HRESULT HandleEvent( UINT_PTR pEventPtr ) = 0;
 
-	virtual UINT32  GetWidth() = 0;
-	virtual UINT32  GetHeight() = 0;
+	virtual UINT32  GetWidth() const = 0;
+	virtual UINT32  GetHeight() const = 0;
+
+	virtual BOOL    CheckNewFrame() const = 0;
 
 	virtual bool CreateSharedTexture( int w, int h, int textureID ) = 0;
-	virtual bool LockSharedTexture() = 0;
-	virtual bool UnlockSharedTexture() = 0;
-	virtual void ReleaseSharedTexture() = 0;
+	virtual void ReleaseSharedTexture( int textureID ) = 0;
+	virtual bool LockSharedTexture( int textureID ) = 0;
+	virtual bool UnlockSharedTexture( int textureID ) = 0;
 };
 
 } // namespace video

@@ -38,6 +38,7 @@ public:
 
 	// IPlayer methods
 	HRESULT OpenFile( PCWSTR pszFileName ) override;
+	HRESULT Close() override;
 
 	HRESULT Play() override;
 	HRESULT Pause() override;
@@ -45,13 +46,15 @@ public:
 
 	HRESULT HandleEvent( UINT_PTR pEventPtr ) override;
 
-	UINT32  GetWidth() override { return (UINT32) m_Width; }
-	UINT32  GetHeight() override { return (UINT32) m_Height; }
+	UINT32  GetWidth() const override { return (UINT32) m_Width; }
+	UINT32  GetHeight() const override { return (UINT32) m_Height; }
+
+	BOOL    CheckNewFrame() const override { return m_pVideo->CheckNewFrame(); }
 
 	bool CreateSharedTexture( int w, int h, int textureID ) override { return m_pVideo->CreateSharedTexture( w, h, textureID ); }
-	bool LockSharedTexture() override { return m_pVideo->LockSharedTexture(); }
-	bool UnlockSharedTexture() override { return m_pVideo->UnlockSharedTexture(); }
-	void ReleaseSharedTexture() override { m_pVideo->ReleaseSharedTexture(); }
+	void ReleaseSharedTexture( int textureID ) override { m_pVideo->ReleaseSharedTexture( textureID ); }
+	bool LockSharedTexture( int textureID ) override { return m_pVideo->LockSharedTexture( textureID ); }
+	bool UnlockSharedTexture( int textureID ) override { return m_pVideo->UnlockSharedTexture( textureID ); }
 
 	//
 	PlayerState State() const { return m_state; }

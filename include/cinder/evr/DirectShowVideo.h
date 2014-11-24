@@ -32,12 +32,13 @@ public:
 	virtual HRESULT UpdateVideoWindow( HWND hwnd, const LPRECT prc ) = 0;
 	virtual HRESULT Repaint( HWND hwnd, HDC hdc ) = 0;
 	virtual HRESULT DisplayModeChanged() = 0;
-	virtual HRESULT GetNativeVideoSize( LONG *lpWidth, LONG *lpHeight ) = 0;
+	virtual HRESULT GetNativeVideoSize( LONG *lpWidth, LONG *lpHeight ) const = 0;
+	virtual BOOL    CheckNewFrame() const = 0;
 
 	virtual bool CreateSharedTexture( int w, int h, int textureID ) = 0;
-	virtual bool LockSharedTexture() = 0;
-	virtual bool UnlockSharedTexture() = 0;
-	virtual void ReleaseSharedTexture() = 0;
+	virtual void ReleaseSharedTexture( int textureID ) = 0;
+	virtual bool LockSharedTexture( int textureID ) = 0;
+	virtual bool UnlockSharedTexture( int textureID ) = 0;
 };
 
 // Manages the VMR-7 video renderer filter.
@@ -53,12 +54,13 @@ public:
 	HRESULT UpdateVideoWindow( HWND hwnd, const LPRECT prc ) override;
 	HRESULT Repaint( HWND hwnd, HDC hdc ) override;
 	HRESULT DisplayModeChanged() override;
-	HRESULT GetNativeVideoSize( LONG *lpWidth, LONG *lpHeight ) override;
+	HRESULT GetNativeVideoSize( LONG *lpWidth, LONG *lpHeight ) const override;
+	BOOL    CheckNewFrame() const override { return TRUE; /* TODO */ }
 
 	bool CreateSharedTexture( int w, int h, int textureID ) override { throw std::runtime_error( "Not implemented" ); }
-	bool LockSharedTexture() override { throw std::runtime_error( "Not implemented" ); }
-	bool UnlockSharedTexture() override { throw std::runtime_error( "Not implemented" ); }
-	void ReleaseSharedTexture() override { throw std::runtime_error( "Not implemented" ); }
+	void ReleaseSharedTexture( int textureID ) override { throw std::runtime_error( "Not implemented" ); }
+	bool LockSharedTexture( int textureID ) override { throw std::runtime_error( "Not implemented" ); }
+	bool UnlockSharedTexture( int textureID ) override { throw std::runtime_error( "Not implemented" ); }
 };
 
 
@@ -75,21 +77,21 @@ public:
 	HRESULT UpdateVideoWindow( HWND hwnd, const LPRECT prc ) override;
 	HRESULT Repaint( HWND hwnd, HDC hdc ) override;
 	HRESULT DisplayModeChanged() override;
-	HRESULT GetNativeVideoSize( LONG *lpWidth, LONG *lpHeight ) override;
+	HRESULT GetNativeVideoSize( LONG *lpWidth, LONG *lpHeight ) const override;
+	BOOL    CheckNewFrame() const override { return TRUE; /* TODO */ }
 
 	bool CreateSharedTexture( int w, int h, int textureID ) override { throw std::runtime_error( "Not implemented" ); }
-	bool LockSharedTexture() override { throw std::runtime_error( "Not implemented" ); }
-	bool UnlockSharedTexture() override { throw std::runtime_error( "Not implemented" ); }
-	void ReleaseSharedTexture() override { throw std::runtime_error( "Not implemented" ); }
+	void ReleaseSharedTexture( int textureID ) override { throw std::runtime_error( "Not implemented" ); }
+	bool LockSharedTexture( int textureID ) override { throw std::runtime_error( "Not implemented" ); }
+	bool UnlockSharedTexture( int textureID ) override { throw std::runtime_error( "Not implemented" ); }
 };
 
 
 // Manages the EVR video renderer filter.
 class RendererEVR : public VideoRenderer {
-	IBaseFilter            *m_pEVR;
-	IMFVideoDisplayControl *m_pVideoDisplay;
-
-	EVRCustomPresenter     *m_pPresenter;
+	IBaseFilter*             m_pEVR;
+	IMFVideoDisplayControl*  m_pVideoDisplay;
+	EVRCustomPresenter*      m_pPresenter;
 
 public:
 	RendererEVR();
@@ -100,12 +102,13 @@ public:
 	HRESULT UpdateVideoWindow( HWND hwnd, const LPRECT prc ) override;
 	HRESULT Repaint( HWND hwnd, HDC hdc ) override;
 	HRESULT DisplayModeChanged() override;
-	HRESULT GetNativeVideoSize( LONG *lpWidth, LONG *lpHeight ) override;
+	HRESULT GetNativeVideoSize( LONG *lpWidth, LONG *lpHeight ) const override;
+	BOOL    CheckNewFrame() const override { assert( m_pPresenter != NULL ); return m_pPresenter->CheckNewFrame(); }
 
-	bool CreateSharedTexture( int w, int h, int textureID ) override { assert( m_pPresenter != NULL ); return m_pPresenter->createSharedTexture( w, h, textureID ); }
-	bool LockSharedTexture() override { assert( m_pPresenter != NULL ); return m_pPresenter->lockSharedTexture(); }
-	bool UnlockSharedTexture() override { assert( m_pPresenter != NULL ); return m_pPresenter->unlockSharedTexture(); }
-	void ReleaseSharedTexture() override { assert( m_pPresenter != NULL ); m_pPresenter->releaseSharedTexture(); }
+	bool CreateSharedTexture( int w, int h, int textureID ) override { assert( m_pPresenter != NULL ); return m_pPresenter->CreateSharedTexture( w, h, textureID ); }
+	void ReleaseSharedTexture( int textureID ) override { assert( m_pPresenter != NULL ); m_pPresenter->ReleaseSharedTexture( textureID ); }
+	bool LockSharedTexture( int textureID ) override { assert( m_pPresenter != NULL ); return m_pPresenter->LockSharedTexture( textureID ); }
+	bool UnlockSharedTexture( int textureID ) override { assert( m_pPresenter != NULL ); return m_pPresenter->UnlockSharedTexture( textureID ); }
 };
 
 

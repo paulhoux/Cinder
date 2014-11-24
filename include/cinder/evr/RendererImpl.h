@@ -91,7 +91,7 @@ public:
 	virtual bool hasAlpha() const { return false; }
 
 	//! Returns whether a movie has a new frame available
-	bool		checkNewFrame() { /*TODO*/ return false; }
+	bool		checkNewFrame() { return mPlayer->CheckNewFrame() == TRUE; }
 
 	//! Returns the current time of a movie in seconds
 	float		getCurrentTime() const;
@@ -177,7 +177,8 @@ protected:
 	IPlayer*					mPlayer;
 	HWND						mHwnd;
 
-	gl::Texture2dRef			mTexture; // TEMP
+	uint8_t						mTextureIndex;
+	gl::Texture2dRef			mTexture[2];
 
 	uint32_t					mWidth, mHeight;
 	uint32_t					mFrameCount;

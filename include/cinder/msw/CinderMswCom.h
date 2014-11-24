@@ -55,6 +55,9 @@ POSSIBILITY OF SUCH DAMAGE.
 namespace cinder {
 namespace msw {
 
+//! Initializes COM on this thread. Uses Boost's thread local storage to prevent multiple initializations per thread
+void initializeCom( DWORD params = COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE );
+
 //! Releases a COM pointer if the pointer is not NULL, and sets the pointer to NULL.
 template <class T> inline void SafeRelease( T*& p )
 {
@@ -498,27 +501,27 @@ public:
 //! You can use this when implementing IUnknown or any object that uses reference counting.
 class RefCountedObject {
 protected:
-	volatile long   mRefCount;
+volatile long   mRefCount;
 
 public:
-	RefCountedObject() : mRefCount( 1 ) {}
-	virtual ~RefCountedObject() { assert( mRefCount == 0 ); }
+RefCountedObject() : mRefCount( 1 ) {}
+virtual ~RefCountedObject() { assert( mRefCount == 0 ); }
 
-	ULONG AddRef()
-	{
-		return InterlockedIncrement( &mRefCount );
-	}
+ULONG AddRef()
+{
+return InterlockedIncrement( &mRefCount );
+}
 
-	ULONG Release()
-	{
-		assert( mRefCount > 0 );
+ULONG Release()
+{
+assert( mRefCount > 0 );
 
-		ULONG uCount = InterlockedDecrement( &mRefCount );
-		if( uCount == 0 )
-			delete this;
+ULONG uCount = InterlockedDecrement( &mRefCount );
+if( uCount == 0 )
+delete this;
 
-		return uCount;
-	}
+return uCount;
+}
 };
 */
 
@@ -558,8 +561,156 @@ bool AreComObjectsEqual( T1 *p1, T2 *p2 )
 	return false;
 }
 
-//! Initializes COM on this thread. Uses Boost's thread local storage to prevent multiple initializations per thread
-void initializeCom( DWORD params = COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE );
+//////////////////////////////////////////////////////////////////////////////////////
+
+template<class T, const IID* piid = NULL>
+class CComPtr {
+public:
+	CComPtr()
+	{
+		m_Ptr = NULL;
+	}
+
+	CComPtr( T* lPtr )
+	{
+		m_Ptr = NULL;
+
+		if( lPtr != NULL ) {
+			m_Ptr = lPtr;
+			m_Ptr->AddRef();
+		}
+	}
+
+	CComPtr( const CComPtr<T, piid>& RefComPtr )
+	{
+		m_Ptr = NULL;
+		m_Ptr = (T*) RefComPtr;
+
+		if( m_Ptr ) {
+			m_Ptr->AddRef();
+		}
+	}
+
+	CComPtr( IUnknown* pIUnknown, IID iid )
+	{
+		m_Ptr = NULL;
+
+		if( pIUnknown != NULL ) {
+			pIUnknown->QueryInterface( iid, (void**) &m_Ptr );
+		}
+	}
+
+	~CComPtr()
+	{
+		if( m_Ptr ) {
+			m_Ptr->Release();
+			m_Ptr = NULL;
+		}
+	}
+
+public:
+	operator T*() const
+	{
+		//assert( m_Ptr != NULL );
+		return m_Ptr;
+	}
+
+	T& operator*() const
+	{
+		//assert( m_Ptr != NULL );
+		return *m_Ptr;
+	}
+
+	T** operator&()
+	{
+		//assert( m_Ptr != NULL );
+		return &m_Ptr;
+	}
+
+	T* operator->() const
+	{
+		assert( m_Ptr != NULL );
+		return m_Ptr;
+	}
+
+	T* operator=( T* lPtr )
+	{
+		assert( lPtr != NULL );
+		//if( IsEqualObject( lPtr ) ) {
+		//	return m_Ptr;
+		//}
+
+		if( m_Ptr == lPtr ) {
+			return m_Ptr;
+		}
+
+		if( m_Ptr ) {
+			m_Ptr->Release();
+		}
+
+		lPtr->AddRef();
+		m_Ptr = lPtr;
+		return m_Ptr;
+	}
+
+	T* operator=( IUnknown* pIUnknown )
+	{
+		assert( pIUnknown != NULL );
+		assert( piid != NULL );
+		pIUnknown->QueryInterface( *piid, (void**) &m_Ptr );
+		assert( m_Ptr != NULL );
+		return m_Ptr;
+	}
+
+	T* operator=( const CComPtr<T, piid>& RefComPtr )
+	{
+		assert( &RefComPtr != NULL );
+		m_Ptr = (T*) RefComPtr;
+
+		if( m_Ptr ) {
+			m_Ptr->AddRef();
+		}
+		return m_Ptr;
+	}
+
+	void Attach( T* lPtr )
+	{
+		if( lPtr ) {
+			if( m_Ptr ) {
+				m_Ptr->Release();
+			}
+
+			m_Ptr = lPtr;
+		}
+	}
+
+	T* Detach()
+	{
+		T* lPtr = m_Ptr;
+		m_Ptr = NULL;
+		return lPtr;
+	}
+
+	void Release()
+	{
+		if( m_Ptr ) {
+			m_Ptr->Release();
+			m_Ptr = NULL;
+		}
+	}
+
+	BOOL IsEqualObject( IUnknown* pOther )
+	{
+		assert( pOther != NULL );
+		ScopedComPtr<IUnknown> pUnknown;
+		m_Ptr->QueryInterface( IID_IUnknown, (void**) &pUnknown );
+		return ( pOther == pUnknown );
+	}
+
+private:
+	T* m_Ptr;
+};
+
 
 } // namespace msw
 } // namespace cinder

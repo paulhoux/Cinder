@@ -23,6 +23,8 @@ POSSIBILITY OF SUCH DAMAGE.
 
 #pragma once
 
+#include <map>
+
 #include "cinder/Cinder.h"
 
 #include "cinder/gl/gl.h" // included to avoid error C2120 when including "wgl_all.h"
@@ -47,7 +49,20 @@ public:
 		DeviceRemoved,  // The device was removed.
 	};
 
+	typedef struct SharedTexture {
+		GLuint name;
+		HANDLE handle;
+		DWORD  value;
+		IDirect3DSurface9* pD3DSurface;
+		IDirect3DTexture9* pD3DTexture;
+
+		SharedTexture() : pD3DSurface( NULL ), pD3DTexture( NULL ), handle( NULL ) {}
+	};
+
+	typedef std::map<GLuint, SharedTexture> SharedTexturePool;
+
 	static const int PRESENTER_BUFFER_COUNT = 3;
+	static const int SHARED_TEXTURE_COUNT = 3;
 
 	D3DPresentEngine( HRESULT& hr );
 	virtual ~D3DPresentEngine();
@@ -73,6 +88,8 @@ public:
 
 	HRESULT CheckDeviceState( DeviceState *pState );
 	HRESULT PresentSample( IMFSample* pSample, LONGLONG llTarget );
+
+	BOOL    CheckNewFrame() const { return mHasNewFrame; }
 
 	UINT    RefreshRate() const { return m_DisplayMode.RefreshRate; }
 
@@ -107,32 +124,25 @@ protected:
 
 protected:
 	HANDLE m_pD3DDeviceHandle;
-	HANDLE m_pD3DSharedHandle;
+	//HANDLE m_pD3DSharedHandle;
 
-	GLuint mGlName;
-	HANDLE mGlHandle;
+	GLuint            mAvailableTextureID;                // Texture ID of a texture not in use by OpenGL.
+	SharedTexturePool mSharedTextures;
 
-	DWORD mSharedHandleValue;
-	IDirect3DSurface9 *m_pD3DSharedSurface;
-	IDirect3DTexture9 *m_pD3dSharedTexture;
+	BOOL              mHasNewFrame;
 
 	int _w, _h;
 
 public:
 
-	HANDLE getSharedDeviceHandle() { return m_pD3DDeviceHandle; }
+	HANDLE GetSharedDeviceHandle() { return m_pD3DDeviceHandle; }
 
-	virtual void OnReleaseResources()
-	{
+	virtual void OnReleaseResources() {}
 
-
-	}
-	bool createSharedTexture( int w, int h, int textureID );
-
-	void releaseSharedTexture();
-	bool lockSharedTexture();
-
-	bool unlockSharedTexture();
+	bool CreateSharedTexture( int w, int h, int textureID );
+	void ReleaseSharedTexture( int textureID );
+	bool LockSharedTexture( int textureID );
+	bool UnlockSharedTexture( int textureID );
 };
 
 // MFSamplePresenter_SampleCounter
@@ -350,12 +360,14 @@ protected:
 
 	volatile long               mRefCount;
 public:
-	HANDLE getSharedDeviceHandle();
+	HANDLE GetSharedDeviceHandle();
 
-	bool createSharedTexture( int w, int h, int textureID ) { return m_pD3DPresentEngine->createSharedTexture( w, h, textureID ); }
-	bool lockSharedTexture() { return m_pD3DPresentEngine->lockSharedTexture(); }
-	bool unlockSharedTexture() { return m_pD3DPresentEngine->unlockSharedTexture(); }
-	void releaseSharedTexture() { return m_pD3DPresentEngine->releaseSharedTexture(); };
+	BOOL   CheckNewFrame() const { return m_pD3DPresentEngine->CheckNewFrame(); }
+
+	bool CreateSharedTexture( int w, int h, int textureID ) { return m_pD3DPresentEngine->CreateSharedTexture( w, h, textureID ); }
+	void ReleaseSharedTexture( int textureID ) { return m_pD3DPresentEngine->ReleaseSharedTexture( textureID ); };
+	bool LockSharedTexture( int textureID ) { return m_pD3DPresentEngine->LockSharedTexture( textureID ); }
+	bool UnlockSharedTexture( int textureID ) { return m_pD3DPresentEngine->UnlockSharedTexture( textureID ); }
 };
 
 } // namespace video

@@ -7,6 +7,7 @@
 #include "cinder/Utilities.h"
 
 #include "cinder/evr/RendererGlImpl.h"
+#include "cinder/gl/Query.h"
 
 using namespace ci;
 using namespace ci::app;
@@ -28,15 +29,17 @@ public:
 	void resize() override;
 	void fileDrop( FileDropEvent event ) override;
 private:
-	video::MovieGlRef  mMovieRef;
+	video::MovieGlRef        mMovieRef;
+	gl::QueryTimeSwappedRef  mQuery;
+	glm::mat4                mTransform;
 
-	glm::mat4          mTransform;
-	double             mTime;
+	int    mFrames;
+	Timer  mTimer;
 };
 
 void WindowsEnhancedVideoApp::prepareSettings( Settings* settings )
 {
-	settings->setFrameRate( 30 );
+	settings->disableFrameRate();
 	settings->setWindowSize( 1920, 1080 );
 }
 
@@ -48,11 +51,18 @@ void WindowsEnhancedVideoApp::setup()
 		mMovieRef.reset();
 		mMovieRef = video::MovieGl::create( path );
 		mMovieRef->play();
+
+		getWindow()->setSize( mMovieRef->getSize() );
+
+		mFrames = 0;
+		mTimer.start();
 	}
 
-	mTime = getElapsedSeconds();
-
 	gl::enableVerticalSync( true );
+	gl::clear();
+	gl::color( 1, 1, 1 );
+
+	mQuery = gl::QueryTimeSwapped::create();
 }
 
 void WindowsEnhancedVideoApp::shutdown()
@@ -63,25 +73,24 @@ void WindowsEnhancedVideoApp::shutdown()
 
 void WindowsEnhancedVideoApp::update()
 {
-	double elapsed = getElapsedSeconds() - mTime;
-	getWindow()->setTitle( toString( 1.0 / math<double>::max( 0.001, elapsed ) ) );
-	mTime += elapsed;
+	double framerate = mFrames / mTimer.getSeconds() + 0.001;
+	getWindow()->setTitle( toString( framerate ) + " : " + toString( mQuery->getElapsedMilliseconds() ) );
 
 	//mMovieRef->update();
 }
 
 void WindowsEnhancedVideoApp::draw()
 {
-	gl::clear();
+	// No need to clear, we are going to draw the whole frame anyway.
+	// And we want to keep the current frame as long as there is no new one.
 
-	gl::pushModelMatrix();
-	gl::setModelMatrix( mTransform );
+	if( mMovieRef && mMovieRef->checkNewFrame() ) {
+		mFrames++;
 
-	gl::color( 1, 1, 1 );
-	if( mMovieRef )
+		mQuery->begin();
 		mMovieRef->draw( 0, 0 );
-
-	gl::popModelMatrix();
+		mQuery->end();
+	}
 }
 
 void WindowsEnhancedVideoApp::mouseDown( MouseEvent event )
@@ -117,6 +126,7 @@ void WindowsEnhancedVideoApp::resize()
 		Area bounds = mMovieRef->getBounds();
 		Area scaled = Area::proportionalFit( bounds, getWindowBounds(), true, true );
 		mTransform = glm::translate( vec3( scaled.getUL() - bounds.getUL(), 0 ) ) * glm::scale( vec3( vec2( scaled.getSize() ) / vec2( bounds.getSize() ), 1 ) );
+		gl::setModelMatrix( mTransform );
 	}
 }
 
@@ -128,7 +138,7 @@ void WindowsEnhancedVideoApp::fileDrop( FileDropEvent event )
 		mMovieRef = video::MovieGl::create( path );
 		mMovieRef->play();
 
-		resize();
+		getWindow()->setSize( mMovieRef->getSize() );
 	}
 }
 

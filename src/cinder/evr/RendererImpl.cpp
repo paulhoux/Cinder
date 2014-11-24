@@ -75,6 +75,9 @@ MovieBase::MovieBase()
 
 MovieBase::~MovieBase()
 {
+	if( mPlayer )
+		mPlayer->Close();
+
 	SafeRelease( mPlayer );
 
 	destroyWindow( mHwnd );
@@ -90,7 +93,18 @@ void MovieBase::init( const std::wstring &url )
 	for( int i = 0; i < BE_COUNT; ++i ) {
 		SafeRelease( mPlayer );
 
-		if( i == BE_DIRECTSHOW ) {
+		if( i == BE_MEDIA_FOUNDATION ) {
+			// Try to play the movie using Media Foundation.
+			mPlayer = new MediaFoundationPlayer( hr, mHwnd );
+			mPlayer->AddRef();
+			if( SUCCEEDED( hr ) ) {
+				hr = mPlayer->OpenFile( url.c_str() );
+				if( SUCCEEDED( hr ) ) {
+					break;
+				}
+			}
+		}
+		else if( i == BE_DIRECTSHOW ) {
 			// Try to play the movie using DirectShow.
 			mPlayer = new DirectShowPlayer( hr, mHwnd );
 			mPlayer->AddRef();
@@ -100,43 +114,40 @@ void MovieBase::init( const std::wstring &url )
 					break;
 			}
 		}
-		else if( i == BE_MEDIA_FOUNDATION ) {
-			// Try to play the movie using Media Foundation.
-			mPlayer = new MediaFoundationPlayer( hr, mHwnd );
-			//mPlayer->AddRef();
-			if( SUCCEEDED( hr ) ) {
-				hr = mPlayer->OpenFile( url.c_str() );
-				if( SUCCEEDED( hr ) ) {
-					break;
-				}
-			}
-		}
-	}
-
-	if( SUCCEEDED( hr ) ) {
-		mWidth = mPlayer->GetWidth();
-		mHeight = mPlayer->GetHeight();
-
-		// Create shared texture. TODO: move to method of its own
-		if( mTexture && ( mWidth != mTexture->getWidth() || mHeight != mTexture->getHeight() ) ) {
-			mPlayer->ReleaseSharedTexture();
-			mTexture.reset();
-		}
-
-		if( !mTexture ) {
-			gl::Texture2d::Format fmt;
-			fmt.setTarget( GL_TEXTURE_RECTANGLE );
-			fmt.loadTopDown( true );
-
-			mTexture = gl::Texture2d::create( mWidth, mHeight, fmt );
-			mPlayer->CreateSharedTexture( mWidth, mHeight, mTexture->getId() );
-		}
 	}
 
 	if( FAILED( hr ) ) {
 		SafeRelease( mPlayer );
 		CI_LOG_E( "Failed to play movie: " << url.c_str() );
+
+		return;
 	}
+
+	// Get width and height of the video.
+	mWidth = mPlayer->GetWidth();
+	mHeight = mPlayer->GetHeight();
+
+	// Delete existing shared textures if their size is different.
+	for( size_t i = 0; i < 1; ++i ) {
+		if( mTexture[i] && ( mWidth != mTexture[i]->getWidth() || mHeight != mTexture[i]->getHeight() ) ) {
+			mPlayer->ReleaseSharedTexture( mTexture[i]->getId() );
+			mTexture[i].reset();
+		}
+	}
+
+	// Create shared textures.
+	for( size_t i = 0; i < 1; ++i ) {
+		if( !mTexture[i] ) {
+			gl::Texture2d::Format fmt;
+			fmt.setTarget( GL_TEXTURE_RECTANGLE );
+			fmt.loadTopDown( true );
+
+			mTexture[i] = gl::Texture2d::create( mWidth, mHeight, fmt );
+			mPlayer->CreateSharedTexture( mWidth, mHeight, mTexture[i]->getId() );
+		}
+	}
+
+	mTextureIndex = 0;
 }
 
 LRESULT MovieBase::WndProc( HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam )

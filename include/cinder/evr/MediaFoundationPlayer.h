@@ -30,10 +30,10 @@ public:
 	~MediaFoundationPlayer();
 
 	// IPlayer methods
-	bool CreateSharedTexture( int w, int h, int textureID ) override { return mPresenterPtr->createSharedTexture( w, h, textureID ); }
-	bool LockSharedTexture() override { return mPresenterPtr->lockSharedTexture(); }
-	bool UnlockSharedTexture() override { return mPresenterPtr->unlockSharedTexture(); }
-	void ReleaseSharedTexture() override { mPresenterPtr->releaseSharedTexture(); }
+	bool CreateSharedTexture( int w, int h, int textureID ) override { return mPresenterPtr->CreateSharedTexture( w, h, textureID ); }
+	void ReleaseSharedTexture( int textureID ) override { mPresenterPtr->ReleaseSharedTexture( textureID ); }
+	bool LockSharedTexture( int textureID ) override { return mPresenterPtr->LockSharedTexture( textureID ); }
+	bool UnlockSharedTexture( int textureID ) override { return mPresenterPtr->UnlockSharedTexture( textureID ); }
 
 protected:
 	// IUnknown methods
@@ -47,6 +47,7 @@ protected:
 
 	// IPlayer methods
 	HRESULT OpenFile( PCWSTR pszFileName ) override;
+	HRESULT Close() override;
 
 	HRESULT Play() override;
 	HRESULT Pause() override;
@@ -54,8 +55,10 @@ protected:
 
 	HRESULT HandleEvent( UINT_PTR pEventPtr ) override;
 
-	UINT32  GetWidth() override { return mWidth; }
-	UINT32  GetHeight() override { return mHeight; }
+	UINT32  GetWidth() const override { return mWidth; }
+	UINT32  GetHeight() const override { return mHeight; }
+
+	BOOL    CheckNewFrame() const override { return mPresenterPtr->CheckNewFrame(); }
 
 	//
 

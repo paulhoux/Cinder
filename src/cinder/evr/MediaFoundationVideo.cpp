@@ -210,7 +210,7 @@ HRESULT FindAdapter( IDirect3D9 *pD3D9, HMONITOR hMonitor, UINT *puAdapterID )
 
 D3DPresentEngine::D3DPresentEngine( HRESULT& hr )
 	: m_hwnd( NULL ), m_DeviceResetToken( 0 ), m_pD3D9( NULL ), m_pDevice( NULL ), m_pDeviceManager( NULL )
-	, m_pSurfaceRepaint( NULL ), m_pD3DDeviceHandle( NULL ), m_pD3dSharedTexture( NULL ), m_pD3DSharedSurface( NULL )
+	, m_pSurfaceRepaint( NULL ), m_pD3DDeviceHandle( NULL ), mHasNewFrame( FALSE )
 {
 	hr = S_OK;
 
@@ -233,7 +233,11 @@ D3DPresentEngine::D3DPresentEngine( HRESULT& hr )
 D3DPresentEngine::~D3DPresentEngine()
 {
 	if( m_pD3DDeviceHandle ) {
-		releaseSharedTexture();
+		if( !mSharedTextures.empty() ) {
+			// Release all shared textures.
+			for( auto itr = mSharedTextures.rbegin(); itr != mSharedTextures.rend(); ++itr )
+				ReleaseSharedTexture( itr->first );
+		}
 
 		CI_LOG_V( "Killing present engine..." );
 		if( wglDXCloseDeviceNV( m_pD3DDeviceHandle ) ) {
@@ -250,11 +254,8 @@ D3DPresentEngine::~D3DPresentEngine()
 	CI_LOG_V( "Destroyed D3DPresentEngine." );
 }
 
-bool D3DPresentEngine::createSharedTexture( int w, int h, int textureID )
+bool D3DPresentEngine::CreateSharedTexture( int w, int h, int textureID )
 {
-	_w = w;
-	_h = h;
-
 	if( m_pD3DDeviceHandle == NULL )
 		m_pD3DDeviceHandle = wglDXOpenDeviceNV( m_pDevice );
 
@@ -263,11 +264,29 @@ bool D3DPresentEngine::createSharedTexture( int w, int h, int textureID )
 		return false;
 	}
 
-	mGlName = textureID;
+	// Sanity check.
+	if( !mSharedTextures.empty() ) {
+		// Texture size should match.
+		assert( _w == w );
+		assert( _h == h );
+		// Texture should not exist yet.
+		assert( mSharedTextures.find( textureID ) == mSharedTextures.end() );
+	}
+	else {
+		// Set first available texture to this one.
+		mAvailableTextureID = textureID;
+	}
 
-	//We need to create a shared handle for the resource, otherwise the extension fails on ATI/Intel cards.
+	// Set texture size.
+	_w = w;
+	_h = h;
+
+	// We need to create a shared handle for the resource, otherwise the extension fails on ATI/Intel cards.
+	SharedTexture shared;
+	shared.name = textureID;
+
 	HANDLE pSharedHandle = NULL;
-	HRESULT hr = m_pDevice->CreateTexture( w, h, 1, D3DUSAGE_RENDERTARGET, D3DFMT_A8R8G8B8, D3DPOOL_DEFAULT, &m_pD3dSharedTexture, &pSharedHandle );
+	HRESULT hr = m_pDevice->CreateTexture( w, h, 1, D3DUSAGE_RENDERTARGET, D3DFMT_A8R8G8B8, D3DPOOL_DEFAULT, &( shared.pD3DTexture ), &pSharedHandle );
 
 	if( FAILED( hr ) ) {
 		CI_LOG_E( "Failed to create D3D texture." );
@@ -279,24 +298,33 @@ bool D3DPresentEngine::createSharedTexture( int w, int h, int textureID )
 		return false;
 	}
 
-	BOOL success = wglDXSetResourceShareHandleNV( m_pD3dSharedTexture, pSharedHandle );
+	BOOL success = wglDXSetResourceShareHandleNV( shared.pD3DTexture, pSharedHandle );
 
-	m_pD3dSharedTexture->GetSurfaceLevel( 0, &m_pD3DSharedSurface );
+	shared.pD3DTexture->GetSurfaceLevel( 0, &( shared.pD3DSurface ) );
 
-	mGlHandle = wglDXRegisterObjectNV( m_pD3DDeviceHandle, m_pD3dSharedTexture, mGlName, GL_TEXTURE_RECTANGLE, WGL_ACCESS_READ_ONLY_NV );
-	if( !mGlHandle ) {
+	shared.handle = wglDXRegisterObjectNV( m_pD3DDeviceHandle, shared.pD3DTexture, shared.name, GL_TEXTURE_RECTANGLE, WGL_ACCESS_READ_ONLY_NV );
+	if( !shared.handle ) {
 		CI_LOG_E( "Failed to register shared texture." );
 		return false;
 	}
 
+	// Store texture in map.
+	mSharedTextures[textureID] = shared;
+
 	return true;
 }
 
-void D3DPresentEngine::releaseSharedTexture()
+void D3DPresentEngine::ReleaseSharedTexture( int textureID )
 {
 	if( !m_pD3DDeviceHandle ) return;
 
-	BOOL success = wglDXUnlockObjectsNV( m_pD3DDeviceHandle, 1, &mGlHandle );
+	auto itr = mSharedTextures.find( textureID );
+	if( itr == mSharedTextures.end() )
+		return;
+
+	SharedTexture &shared = itr->second;
+
+	BOOL success = wglDXUnlockObjectsNV( m_pD3DDeviceHandle, 1, &( shared.handle ) );
 	if( !success ) {
 		switch( GetLastError() ) {
 		case ERROR_NOT_LOCKED:
@@ -314,29 +342,59 @@ void D3DPresentEngine::releaseSharedTexture()
 		}
 	}
 	else {
-		success = wglDXUnregisterObjectNV( m_pD3DDeviceHandle, mGlHandle );
+		success = wglDXUnregisterObjectNV( m_pD3DDeviceHandle, shared.handle );
 		if( !success ) {
 			CI_LOG_E( "Failed to unregister object: " << GetLastError() );
 		}
 	}
 
-	//glDeleteTextures(1, &mGlName);
-	SafeRelease( m_pD3DSharedSurface );
-	SafeRelease( m_pD3dSharedTexture );
+	SafeRelease( shared.pD3DSurface );
+	SafeRelease( shared.pD3DTexture );
 
-}
-bool D3DPresentEngine::lockSharedTexture()
-{
-	if( !m_pD3DDeviceHandle ) return false;
-	if( !mGlHandle ) return false;
-	return ( wglDXLockObjectsNV( m_pD3DDeviceHandle, 1, &mGlHandle ) == GL_TRUE );
+	mSharedTextures.erase( itr );
 }
 
-bool D3DPresentEngine::unlockSharedTexture()
+bool D3DPresentEngine::LockSharedTexture( int textureID )
 {
 	if( !m_pD3DDeviceHandle ) return false;
-	if( !mGlHandle ) return false;
-	return ( wglDXUnlockObjectsNV( m_pD3DDeviceHandle, 1, &mGlHandle ) == GL_TRUE );
+
+	auto itr = mSharedTextures.find( textureID );
+	if( itr == mSharedTextures.end() )
+		return false;
+
+	SharedTexture &shared = itr->second;
+	if( !shared.handle )
+		return false;
+
+	if( wglDXLockObjectsNV( m_pD3DDeviceHandle, 1, &( shared.handle ) ) == GL_TRUE ) {
+		// Set the available texture to the one after this one.
+		++itr;
+		if( itr == mSharedTextures.end() )
+			itr = mSharedTextures.begin();
+		mAvailableTextureID = itr->first;
+
+		//
+		mHasNewFrame = FALSE;
+
+		return true;
+	}
+
+	return false;
+}
+
+bool D3DPresentEngine::UnlockSharedTexture( int textureID )
+{
+	if( !m_pD3DDeviceHandle ) return false;
+
+	auto itr = mSharedTextures.find( textureID );
+	if( itr == mSharedTextures.end() )
+		return false;
+
+	SharedTexture &shared = itr->second;
+	if( !shared.handle )
+		return false;
+
+	return ( wglDXUnlockObjectsNV( m_pD3DDeviceHandle, 1, &( shared.handle ) ) == GL_TRUE );
 }
 
 HRESULT D3DPresentEngine::GetService( REFGUID guidService, REFIID riid, void** ppv )
@@ -718,18 +776,27 @@ HRESULT D3DPresentEngine::PresentSwapChain( IDirect3DSwapChain9* pSwapChain, IDi
 {
 	HRESULT hr = S_OK;
 
+	if( mSharedTextures.empty() )
+		return MF_E_INVALIDREQUEST;
+
 	do {
 		BREAK_ON_NULL( m_hwnd, MF_E_INVALIDREQUEST );
+
+		// Assumes mAvailableTextureID is valid and set.
+		assert( mSharedTextures.find( mAvailableTextureID ) != mSharedTextures.end() );
+		SharedTexture &shared = mSharedTextures[mAvailableTextureID];
 
 		ScopedComPtr<IDirect3DSurface9> pSurface;
 		hr = pSwapChain->GetBackBuffer( 0, D3DBACKBUFFER_TYPE_MONO, &pSurface );
 		BREAK_ON_FAIL( hr );
 
-		hr = m_pDevice->StretchRect( pSurface, NULL, m_pD3DSharedSurface, NULL, D3DTEXF_NONE );
+		hr = m_pDevice->StretchRect( pSurface, NULL, shared.pD3DSurface, NULL, D3DTEXF_NONE );
 		BREAK_ON_FAIL( hr );
 
 		hr = pSwapChain->Present( NULL, &m_rcDestRect, m_hwnd, NULL, 0 );
 		BREAK_ON_FAIL( hr );
+
+		mHasNewFrame = TRUE;
 	} while( false );
 
 	if( FAILED( hr ) )
