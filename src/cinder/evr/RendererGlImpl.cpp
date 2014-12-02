@@ -70,13 +70,12 @@ void MovieGl::initFromPath( const fs::path& filePath )
 
 void MovieGl::draw( int x, int y, int w, int h )
 {
-	if( mTexture[mTextureIndex] ){
-		if( mPlayer && mPlayer->CheckNewFrame() ) {
-			if( mPlayer->LockSharedTexture( mTexture[mTextureIndex]->getId() ) ) {
-				gl::draw( mTexture[mTextureIndex], Rectf( x, y, x + w, y + h ) );
-				mPlayer->UnlockSharedTexture( mTexture[mTextureIndex]->getId() );
-				//mTextureIndex = ( mTextureIndex + 1) % 2;
-			}
+	int textureID;
+
+	if( mPlayer && mPlayer->CheckNewFrame() ) {
+		if( mPlayer->LockSharedTexture( &textureID ) ) {
+			gl::draw( mTextures[textureID], Rectf( x, y, x + w, y + h ) );
+			mPlayer->UnlockSharedTexture( textureID );
 		}
 	}
 }

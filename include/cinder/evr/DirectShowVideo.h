@@ -37,7 +37,7 @@ public:
 
 	virtual bool CreateSharedTexture( int w, int h, int textureID ) = 0;
 	virtual void ReleaseSharedTexture( int textureID ) = 0;
-	virtual bool LockSharedTexture( int textureID ) = 0;
+	virtual bool LockSharedTexture( int *pTextureID ) = 0;
 	virtual bool UnlockSharedTexture( int textureID ) = 0;
 };
 
@@ -59,7 +59,7 @@ public:
 
 	bool CreateSharedTexture( int w, int h, int textureID ) override { throw std::runtime_error( "Not implemented" ); }
 	void ReleaseSharedTexture( int textureID ) override { throw std::runtime_error( "Not implemented" ); }
-	bool LockSharedTexture( int textureID ) override { throw std::runtime_error( "Not implemented" ); }
+	bool LockSharedTexture( int *pTextureID ) override { throw std::runtime_error( "Not implemented" ); }
 	bool UnlockSharedTexture( int textureID ) override { throw std::runtime_error( "Not implemented" ); }
 };
 
@@ -82,7 +82,7 @@ public:
 
 	bool CreateSharedTexture( int w, int h, int textureID ) override { throw std::runtime_error( "Not implemented" ); }
 	void ReleaseSharedTexture( int textureID ) override { throw std::runtime_error( "Not implemented" ); }
-	bool LockSharedTexture( int textureID ) override { throw std::runtime_error( "Not implemented" ); }
+	bool LockSharedTexture( int *pTextureID ) override { throw std::runtime_error( "Not implemented" ); }
 	bool UnlockSharedTexture( int textureID ) override { throw std::runtime_error( "Not implemented" ); }
 };
 
@@ -107,7 +107,7 @@ public:
 
 	bool CreateSharedTexture( int w, int h, int textureID ) override { assert( m_pPresenter != NULL ); return m_pPresenter->CreateSharedTexture( w, h, textureID ); }
 	void ReleaseSharedTexture( int textureID ) override { assert( m_pPresenter != NULL ); m_pPresenter->ReleaseSharedTexture( textureID ); }
-	bool LockSharedTexture( int textureID ) override { assert( m_pPresenter != NULL ); return m_pPresenter->LockSharedTexture( textureID ); }
+	bool LockSharedTexture( int *pTextureID ) override { assert( m_pPresenter != NULL ); return m_pPresenter->LockSharedTexture( pTextureID ); }
 	bool UnlockSharedTexture( int textureID ) override { assert( m_pPresenter != NULL ); return m_pPresenter->UnlockSharedTexture( textureID ); }
 };
 

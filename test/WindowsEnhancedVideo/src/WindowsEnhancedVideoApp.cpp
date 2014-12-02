@@ -73,8 +73,8 @@ void WindowsEnhancedVideoApp::shutdown()
 
 void WindowsEnhancedVideoApp::update()
 {
-	double framerate = mFrames / mTimer.getSeconds() + 0.001;
-	getWindow()->setTitle( toString( framerate ) + " : " + toString( mQuery->getElapsedMilliseconds() ) );
+	//double framerate = mFrames / mTimer.getSeconds() + 0.001;
+	//getWindow()->setTitle( toString( framerate ) + " : " + toString( mQuery->getElapsedMilliseconds() ) );
 
 	//mMovieRef->update();
 }

@@ -32,7 +32,7 @@ public:
 	// IPlayer methods
 	bool CreateSharedTexture( int w, int h, int textureID ) override { return mPresenterPtr->CreateSharedTexture( w, h, textureID ); }
 	void ReleaseSharedTexture( int textureID ) override { mPresenterPtr->ReleaseSharedTexture( textureID ); }
-	bool LockSharedTexture( int textureID ) override { return mPresenterPtr->LockSharedTexture( textureID ); }
+	bool LockSharedTexture( int *pTextureID ) override { return mPresenterPtr->LockSharedTexture( pTextureID ); }
 	bool UnlockSharedTexture( int textureID ) override { return mPresenterPtr->UnlockSharedTexture( textureID ); }
 
 protected:

@@ -1,3 +1,4 @@
+#define  MFV_LOCK_ONCE 1
 
 #include "cinder/evr/MediaFoundationVideo.h"
 #include "cinder/Log.h"
@@ -233,11 +234,9 @@ D3DPresentEngine::D3DPresentEngine( HRESULT& hr )
 D3DPresentEngine::~D3DPresentEngine()
 {
 	if( m_pD3DDeviceHandle ) {
-		if( !mSharedTextures.empty() ) {
-			// Release all shared textures.
-			for( auto itr = mSharedTextures.rbegin(); itr != mSharedTextures.rend(); ++itr )
-				ReleaseSharedTexture( itr->first );
-		}
+		// Release all shared textures.
+		while( !mSharedTextures.empty() )
+			ReleaseSharedTexture( mSharedTextures.begin()->first );
 
 		CI_LOG_V( "Killing present engine..." );
 		if( wglDXCloseDeviceNV( m_pD3DDeviceHandle ) ) {
@@ -256,36 +255,35 @@ D3DPresentEngine::~D3DPresentEngine()
 
 bool D3DPresentEngine::CreateSharedTexture( int w, int h, int textureID )
 {
-	if( m_pD3DDeviceHandle == NULL )
+	// Make sure OpenGL interop is initialized.
+	if( !m_pD3DDeviceHandle ) {
 		m_pD3DDeviceHandle = wglDXOpenDeviceNV( m_pDevice );
 
-	if( !m_pD3DDeviceHandle ) {
-		CI_LOG_E( "Failed to open shared device." );
-		return false;
+		if( !m_pD3DDeviceHandle ) {
+			CI_LOG_E( "Failed to open shared device." );
+			return false;
+		}
 	}
+
+	ScopedCriticalSection lock( mSharedTexturesLock );
 
 	// Sanity check.
 	if( !mSharedTextures.empty() ) {
 		// Texture size should match.
-		assert( _w == w );
-		assert( _h == h );
+		assert( mWidth == w );
+		assert( mHeight == h );
 		// Texture should not exist yet.
 		assert( mSharedTextures.find( textureID ) == mSharedTextures.end() );
 	}
-	else {
-		// Set first available texture to this one.
-		mAvailableTextureID = textureID;
-	}
 
 	// Set texture size.
-	_w = w;
-	_h = h;
+	mWidth = w;
+	mHeight = h;
 
 	// We need to create a shared handle for the resource, otherwise the extension fails on ATI/Intel cards.
-	SharedTexture shared;
-	shared.name = textureID;
-
 	HANDLE pSharedHandle = NULL;
+
+	SharedTexture shared;
 	HRESULT hr = m_pDevice->CreateTexture( w, h, 1, D3DUSAGE_RENDERTARGET, D3DFMT_A8R8G8B8, D3DPOOL_DEFAULT, &( shared.pD3DTexture ), &pSharedHandle );
 
 	if( FAILED( hr ) ) {
@@ -298,18 +296,44 @@ bool D3DPresentEngine::CreateSharedTexture( int w, int h, int textureID )
 		return false;
 	}
 
-	BOOL success = wglDXSetResourceShareHandleNV( shared.pD3DTexture, pSharedHandle );
-
-	shared.pD3DTexture->GetSurfaceLevel( 0, &( shared.pD3DSurface ) );
-
-	shared.handle = wglDXRegisterObjectNV( m_pD3DDeviceHandle, shared.pD3DTexture, shared.name, GL_TEXTURE_RECTANGLE, WGL_ACCESS_READ_ONLY_NV );
-	if( !shared.handle ) {
-		CI_LOG_E( "Failed to register shared texture." );
+	if( !wglDXSetResourceShareHandleNV( shared.pD3DTexture, pSharedHandle ) ) {
+		CI_LOG_E( "Failed to shared resource." );
+		SafeRelease( shared.pD3DTexture );
 		return false;
 	}
 
+	shared.handle = wglDXRegisterObjectNV( m_pD3DDeviceHandle, shared.pD3DTexture, textureID, GL_TEXTURE_RECTANGLE, WGL_ACCESS_READ_ONLY_NV );
+	if( !shared.handle ) {
+		switch( GetLastError() ) {
+		case ERROR_INVALID_HANDLE:
+			CI_LOG_E( "No GL context is made current to the calling thread." );
+			break;
+		case ERROR_INVALID_DATA:
+			CI_LOG_E( "Incorrect <name> <type> or <access> parameters." );
+			break;
+		case ERROR_OPEN_FAILED:
+			CI_LOG_E( "Opening the Direct3D resource failed." );
+			break;
+		default:
+			CI_LOG_E( "Failed to register objects: " << GetLastError() );
+			break;
+		}
+		return false;
+	}
+
+	shared.name = textureID;
+	shared.pD3DTexture->GetSurfaceLevel( 0, &( shared.pD3DSurface ) );
+
+#if MFV_LOCK_ONCE
+	// Now lock it once, it's an expensive operation. We'll promise to make sure we're not writing to the texture while OpenGL is using it.
+	if( !wglDXLockObjectsNV( m_pD3DDeviceHandle, 1, &( shared.handle ) ) ) {
+		CI_LOG_E( "Failed to lock texture." );
+	}
+#endif
+
 	// Store texture in map.
 	mSharedTextures[textureID] = shared;
+	mSharedTextureFreeIDs.push_back( textureID );
 
 	return true;
 }
@@ -318,14 +342,15 @@ void D3DPresentEngine::ReleaseSharedTexture( int textureID )
 {
 	if( !m_pD3DDeviceHandle ) return;
 
+	ScopedCriticalSection lock( mSharedTexturesLock );
+
 	auto itr = mSharedTextures.find( textureID );
 	if( itr == mSharedTextures.end() )
 		return;
 
 	SharedTexture &shared = itr->second;
 
-	BOOL success = wglDXUnlockObjectsNV( m_pD3DDeviceHandle, 1, &( shared.handle ) );
-	if( !success ) {
+	if( !wglDXUnlockObjectsNV( m_pD3DDeviceHandle, 1, &( shared.handle ) ) ) {
 		switch( GetLastError() ) {
 		case ERROR_NOT_LOCKED:
 			CI_LOG_E( "One or more of the objects was not locked." );
@@ -341,24 +366,32 @@ void D3DPresentEngine::ReleaseSharedTexture( int textureID )
 			break;
 		}
 	}
-	else {
-		success = wglDXUnregisterObjectNV( m_pD3DDeviceHandle, shared.handle );
-		if( !success ) {
-			CI_LOG_E( "Failed to unregister object: " << GetLastError() );
-		}
-	}
+
+	// TODO: This always seems to crash :(
+	//if( !wglDXUnregisterObjectNV( m_pD3DDeviceHandle, shared.handle ) ) {
+	//	CI_LOG_E( "Failed to unregister object: " << GetLastError() );
+	//}
 
 	SafeRelease( shared.pD3DSurface );
 	SafeRelease( shared.pD3DTexture );
 
 	mSharedTextures.erase( itr );
+
+	auto itr2 = std::find( mSharedTextureFreeIDs.begin(), mSharedTextureFreeIDs.end(), textureID );
+	if( itr2 != mSharedTextureFreeIDs.end() )
+		mSharedTextureFreeIDs.erase( itr2 );
 }
 
-bool D3DPresentEngine::LockSharedTexture( int textureID )
+bool D3DPresentEngine::LockSharedTexture( int *pTextureID )
 {
 	if( !m_pD3DDeviceHandle ) return false;
 
-	auto itr = mSharedTextures.find( textureID );
+	ScopedCriticalSection lock( mSharedTexturesLock );
+
+	int id = mSharedTextureFreeIDs.front();
+	mSharedTextureFreeIDs.pop_front();
+
+	auto itr = mSharedTextures.find( id );
 	if( itr == mSharedTextures.end() )
 		return false;
 
@@ -366,16 +399,10 @@ bool D3DPresentEngine::LockSharedTexture( int textureID )
 	if( !shared.handle )
 		return false;
 
-	if( wglDXLockObjectsNV( m_pD3DDeviceHandle, 1, &( shared.handle ) ) == GL_TRUE ) {
-		// Set the available texture to the one after this one.
-		++itr;
-		if( itr == mSharedTextures.end() )
-			itr = mSharedTextures.begin();
-		mAvailableTextureID = itr->first;
-
-		//
+	if( MFV_LOCK_ONCE || wglDXLockObjectsNV( m_pD3DDeviceHandle, 1, &( shared.handle ) ) == GL_TRUE ) {
+		shared.locked = true;
+		*pTextureID = id;
 		mHasNewFrame = FALSE;
-
 		return true;
 	}
 
@@ -386,15 +413,23 @@ bool D3DPresentEngine::UnlockSharedTexture( int textureID )
 {
 	if( !m_pD3DDeviceHandle ) return false;
 
+	ScopedCriticalSection lock( mSharedTexturesLock );
+
 	auto itr = mSharedTextures.find( textureID );
 	if( itr == mSharedTextures.end() )
 		return false;
 
 	SharedTexture &shared = itr->second;
-	if( !shared.handle )
+	if( !shared.handle || !shared.locked )
 		return false;
 
-	return ( wglDXUnlockObjectsNV( m_pD3DDeviceHandle, 1, &( shared.handle ) ) == GL_TRUE );
+	if( MFV_LOCK_ONCE || wglDXUnlockObjectsNV( m_pD3DDeviceHandle, 1, &( shared.handle ) ) ) {
+		shared.locked = false;
+		mSharedTextureFreeIDs.push_back( textureID );
+		return true;
+	}
+
+	return false;
 }
 
 HRESULT D3DPresentEngine::GetService( REFGUID guidService, REFIID riid, void** ppv )
@@ -782,21 +817,26 @@ HRESULT D3DPresentEngine::PresentSwapChain( IDirect3DSwapChain9* pSwapChain, IDi
 	do {
 		BREAK_ON_NULL( m_hwnd, MF_E_INVALIDREQUEST );
 
-		// Assumes mAvailableTextureID is valid and set.
-		assert( mSharedTextures.find( mAvailableTextureID ) != mSharedTextures.end() );
-		SharedTexture &shared = mSharedTextures[mAvailableTextureID];
+		ScopedCriticalSection lock( mSharedTexturesLock );
 
-		ScopedComPtr<IDirect3DSurface9> pSurface;
-		hr = pSwapChain->GetBackBuffer( 0, D3DBACKBUFFER_TYPE_MONO, &pSurface );
+		// Find unlocked texture that we can use.
+		if( !mSharedTextureFreeIDs.empty() ) {
+			int textureID = mSharedTextureFreeIDs.front();
+			SharedTexture &shared = mSharedTextures[textureID];
+
+			// Blit texture.
+			ScopedComPtr<IDirect3DSurface9> pSurface;
+			hr = pSwapChain->GetBackBuffer( 0, D3DBACKBUFFER_TYPE_MONO, &pSurface );
+			BREAK_ON_FAIL( hr );
+
+			hr = m_pDevice->StretchRect( pSurface, NULL, shared.pD3DSurface, NULL, D3DTEXF_NONE );
+			BREAK_ON_FAIL( hr );
+
+			mHasNewFrame = TRUE;
+		}
+
+		hr = pSwapChain->Present( NULL, &m_rcDestRect, m_hwnd, NULL, 0 ); // <-- Is this required if we can't see the window anyway?
 		BREAK_ON_FAIL( hr );
-
-		hr = m_pDevice->StretchRect( pSurface, NULL, shared.pD3DSurface, NULL, D3DTEXF_NONE );
-		BREAK_ON_FAIL( hr );
-
-		hr = pSwapChain->Present( NULL, &m_rcDestRect, m_hwnd, NULL, 0 );
-		BREAK_ON_FAIL( hr );
-
-		mHasNewFrame = TRUE;
 	} while( false );
 
 	if( FAILED( hr ) )
@@ -952,15 +992,12 @@ HRESULT EVRCustomPresenter::QueryInterface( REFIID riid, void ** ppv )
 
 ULONG EVRCustomPresenter::AddRef()
 {
-	CI_LOG_V( "EVRCustomPresenter::AddRef():" << mRefCount + 1 );
-
 	return InterlockedIncrement( &mRefCount );
 }
 
 ULONG EVRCustomPresenter::Release()
 {
 	assert( mRefCount > 0 );
-	CI_LOG_V( "EVRCustomPresenter::Release():" << mRefCount - 1 );
 
 	ULONG uCount = InterlockedDecrement( &mRefCount );
 	if( uCount == 0 )

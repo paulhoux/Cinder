@@ -177,8 +177,8 @@ protected:
 	IPlayer*					mPlayer;
 	HWND						mHwnd;
 
-	uint8_t						mTextureIndex;
-	gl::Texture2dRef			mTexture[2];
+	// TODO: textures should be managed elsewhere, not in here!
+	std::map<int, gl::Texture2dRef>	mTextures;
 
 	uint32_t					mWidth, mHeight;
 	uint32_t					mFrameCount;

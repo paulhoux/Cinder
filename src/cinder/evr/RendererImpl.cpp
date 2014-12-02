@@ -128,26 +128,24 @@ void MovieBase::init( const std::wstring &url )
 	mHeight = mPlayer->GetHeight();
 
 	// Delete existing shared textures if their size is different.
-	for( size_t i = 0; i < 1; ++i ) {
-		if( mTexture[i] && ( mWidth != mTexture[i]->getWidth() || mHeight != mTexture[i]->getHeight() ) ) {
-			mPlayer->ReleaseSharedTexture( mTexture[i]->getId() );
-			mTexture[i].reset();
+	for( auto itr = mTextures.rbegin(); itr != mTextures.rend(); ++itr ) {
+		gl::Texture2dRef texture = itr->second;
+		if( texture && ( mWidth != texture->getWidth() || mHeight != texture->getHeight() ) ) {
+			mPlayer->ReleaseSharedTexture( texture->getId() );
+			mTextures.erase( texture->getId() );
 		}
 	}
 
 	// Create shared textures.
-	for( size_t i = 0; i < 1; ++i ) {
-		if( !mTexture[i] ) {
-			gl::Texture2d::Format fmt;
-			fmt.setTarget( GL_TEXTURE_RECTANGLE );
-			fmt.loadTopDown( true );
+	for( size_t i = 0; i < 3; ++i ) {
+		gl::Texture2d::Format fmt;
+		fmt.setTarget( GL_TEXTURE_RECTANGLE );
+		fmt.loadTopDown( true );
 
-			mTexture[i] = gl::Texture2d::create( mWidth, mHeight, fmt );
-			mPlayer->CreateSharedTexture( mWidth, mHeight, mTexture[i]->getId() );
-		}
+		gl::Texture2dRef texture = gl::Texture2d::create( mWidth, mHeight, fmt );
+		if( mPlayer->CreateSharedTexture( mWidth, mHeight, texture->getId() ) )
+			mTextures[texture->getId()] = texture;
 	}
-
-	mTextureIndex = 0;
 }
 
 LRESULT MovieBase::WndProc( HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam )

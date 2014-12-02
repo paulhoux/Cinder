@@ -40,6 +40,18 @@ namespace video {
 
 inline float MFOffsetToFloat( const MFOffset& offset ) { return offset.value + ( float( offset.fract ) / 65536 ); }
 
+struct SharedTexture {
+	GLuint name;
+	HANDLE handle;
+	DWORD  value;
+	BOOL   locked;
+
+	IDirect3DSurface9* pD3DSurface;
+	IDirect3DTexture9* pD3DTexture;
+
+	SharedTexture() : pD3DSurface( NULL ), pD3DTexture( NULL ), handle( NULL ), locked( FALSE ) {}
+};
+
 class D3DPresentEngine : public SchedulerCallback {
 public:
 	// State of the Direct3D device.
@@ -49,18 +61,7 @@ public:
 		DeviceRemoved,  // The device was removed.
 	};
 
-	typedef struct SharedTexture {
-		GLuint name;
-		HANDLE handle;
-		DWORD  value;
-		IDirect3DSurface9* pD3DSurface;
-		IDirect3DTexture9* pD3DTexture;
-
-		SharedTexture() : pD3DSurface( NULL ), pD3DTexture( NULL ), handle( NULL ) {}
-	};
-
-	typedef std::map<GLuint, SharedTexture> SharedTexturePool;
-
+public:
 	static const int PRESENTER_BUFFER_COUNT = 3;
 	static const int SHARED_TEXTURE_COUNT = 3;
 
@@ -119,19 +120,18 @@ protected:
 	// COM interfaces
 	IDirect3D9Ex                *m_pD3D9;
 	IDirect3DDevice9Ex          *m_pDevice;
-	IDirect3DDeviceManager9     *m_pDeviceManager;        // Direct3D device manager.
-	IDirect3DSurface9           *m_pSurfaceRepaint;       // Surface for repaint requests.
+	IDirect3DDeviceManager9     *m_pDeviceManager;      // Direct3D device manager.
+	IDirect3DSurface9           *m_pSurfaceRepaint;     // Surface for repaint requests.
 
 protected:
-	HANDLE m_pD3DDeviceHandle;
-	//HANDLE m_pD3DSharedHandle;
+	HANDLE                          m_pD3DDeviceHandle;     // Shared device handle for OpenGL interop.
+	BOOL                            mHasNewFrame;
+	int                             mWidth;                 // Width of all shared textures.
+	int                             mHeight;                // Height of all shared textures.
+	std::map<GLuint, SharedTexture> mSharedTextures;        // Shared textures used for buffering.
+	std::deque<GLuint>              mSharedTextureFreeIDs;  // List of unlocked (free) shared texture IDs.
 
-	GLuint            mAvailableTextureID;                // Texture ID of a texture not in use by OpenGL.
-	SharedTexturePool mSharedTextures;
-
-	BOOL              mHasNewFrame;
-
-	int _w, _h;
+	msw::CriticalSection            mSharedTexturesLock;
 
 public:
 
@@ -141,7 +141,7 @@ public:
 
 	bool CreateSharedTexture( int w, int h, int textureID );
 	void ReleaseSharedTexture( int textureID );
-	bool LockSharedTexture( int textureID );
+	bool LockSharedTexture( int *pTextureID );
 	bool UnlockSharedTexture( int textureID );
 };
 
@@ -366,7 +366,7 @@ public:
 
 	bool CreateSharedTexture( int w, int h, int textureID ) { return m_pD3DPresentEngine->CreateSharedTexture( w, h, textureID ); }
 	void ReleaseSharedTexture( int textureID ) { return m_pD3DPresentEngine->ReleaseSharedTexture( textureID ); };
-	bool LockSharedTexture( int textureID ) { return m_pD3DPresentEngine->LockSharedTexture( textureID ); }
+	bool LockSharedTexture( int *pTextureID ) { return m_pD3DPresentEngine->LockSharedTexture( pTextureID ); }
 	bool UnlockSharedTexture( int textureID ) { return m_pD3DPresentEngine->UnlockSharedTexture( textureID ); }
 };
 

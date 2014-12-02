@@ -34,7 +34,7 @@ public:
 
 	virtual bool CreateSharedTexture( int w, int h, int textureID ) = 0;
 	virtual void ReleaseSharedTexture( int textureID ) = 0;
-	virtual bool LockSharedTexture( int textureID ) = 0;
+	virtual bool LockSharedTexture( int *pTextureID ) = 0;
 	virtual bool UnlockSharedTexture( int textureID ) = 0;
 };
 

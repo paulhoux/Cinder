@@ -53,7 +53,7 @@ public:
 
 	bool CreateSharedTexture( int w, int h, int textureID ) override { return m_pVideo->CreateSharedTexture( w, h, textureID ); }
 	void ReleaseSharedTexture( int textureID ) override { m_pVideo->ReleaseSharedTexture( textureID ); }
-	bool LockSharedTexture( int textureID ) override { return m_pVideo->LockSharedTexture( textureID ); }
+	bool LockSharedTexture( int *pTextureID ) override { return m_pVideo->LockSharedTexture( pTextureID ); }
 	bool UnlockSharedTexture( int textureID ) override { return m_pVideo->UnlockSharedTexture( textureID ); }
 
 	//
