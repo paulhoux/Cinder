@@ -117,6 +117,25 @@ public:
 	void cone( const vec3& apex, const vec3& base, float ratio )
 	{ implDrawCylinder( base, apex, ratio * distance( apex, base ), 0.0f ); }
 
+	//! Draws a wedge (a stretched cone), where \a apex, \a base and \a ratio define the cone shape, \a axis is the line along which the cone is stretched.
+	void wedge( const vec3& apex, const vec3& base, const vec3& axis, float ratio )
+	{
+		vec3  axial = 0.5f * axis;
+		float radius = ratio * distance( apex, base );
+
+		implDrawHemicylinder( base - axial, apex - axial, -radius, 0.0f );
+		implDrawHemicylinder( base + axial, apex + axial, radius, 0.0f );
+
+		vec3 coaxial = radius * glm::cross( glm::normalize( axis ), glm::normalize( base - apex ) );
+		implDrawLine( base - coaxial, apex );
+		implDrawLine( base + coaxial, apex );
+
+		for( int i = 0; i <= 4; ++i ) {
+			implDrawLine( lerp( base - coaxial - axial, apex - axial, i * 0.25f ), lerp( base - coaxial + axial, apex + axial, i * 0.25f ) );
+			implDrawLine( lerp( base + coaxial - axial, apex - axial, i * 0.25f ), lerp( base + coaxial + axial, apex + axial, i * 0.25f ) );
+		}
+	}
+
 	//! Draws a capsule from \a base to \a top with the specified \a radius.
 	void capsule( const vec3& base, const vec3& top, float radius )
 	{ implDrawCapsule( base, top, radius ); }
@@ -258,7 +277,23 @@ private:
 			float s1 = radius * math<float>::sin( i * angle );
 			float c2 = radius * math<float>::cos( ( i + 1 ) * angle );
 			float s2 = radius * math<float>::sin( ( i + 1 ) * angle );
-			implDrawLine( center + orientation * vec3( c1, s1, 0 ), center + orientation * vec3( c2, s2, 0 ) );
+			implDrawLine( center + orientation * vec3( s1, c1, 0 ), center + orientation * vec3( s2, c2, 0 ) );
+		}
+	}
+
+	void implDrawHemicircle( const vec3& center, float radius, const vec3& axis )
+	{
+		static const int kCurves = 30;
+
+		const float angle = toRadians( 180.0f / kCurves );
+		const quat orientation( vec3( 0, 0, 1 ), normalize( axis ) );
+
+		for( int i = 0; i < kCurves; ++i ) {
+			float c1 = radius * math<float>::cos( i * angle );
+			float s1 = radius * math<float>::sin( i * angle );
+			float c2 = radius * math<float>::cos( ( i + 1 ) * angle );
+			float s2 = radius * math<float>::sin( ( i + 1 ) * angle );
+			implDrawLine( center + orientation * vec3( s1, c1, 0 ), center + orientation * vec3( s2, c2, 0 ) );
 		}
 	}
 
@@ -310,12 +345,34 @@ private:
 			for( int i = 0; i < kSides; ++i ) {
 				float c = math<float>::cos( i * angle );
 				float s = math<float>::sin( i * angle );
-				vec3 p = vec3( c, s, 0 );
+				vec3 p = vec3( s, c, 0 );
 				implDrawLine( base + orientation * ( radiusBase * p ), top + orientation * ( radiusTop * p ) );
 			}
 
 			for( int i = 0; i <= 4; ++i )
 				implDrawCircle( lerp( base, top, i * 0.25f ), lerp( radiusBase, radiusTop, i*0.25f ), axis );
+		}
+	}
+
+	void implDrawHemicylinder( const vec3& base, const vec3& top, float radiusBase, float radiusTop )
+	{
+		static const int kSides = 3;
+
+		const float angle = toRadians( 180.0f / kSides );
+		const float height = distance( base, top );
+		const vec3 axis = normalize( top - base );
+		const quat orientation( vec3( 0, 0, 1 ), normalize( axis ) );
+
+		if( height > 0.0f ) {
+			for( int i = 0; i <= kSides; ++i ) {
+				float c = math<float>::cos( i * angle );
+				float s = math<float>::sin( i * angle );
+				vec3 p = vec3( s, c, 0 );
+				implDrawLine( base + orientation * ( radiusBase * p ), top + orientation * ( radiusTop * p ) );
+			}
+
+			for( int i = 0; i <= 4; ++i )
+				implDrawHemicircle( lerp( base, top, i * 0.25f ), lerp( radiusBase, radiusTop, i*0.25f ), axis );
 		}
 	}
 
@@ -332,14 +389,14 @@ private:
 		for( int i = 0; i < kSides; ++i ) {
 			for( int j = 0; j < kCurves; ++j ) {
 				vec3 a;
-				a.x = math<float>::sin( j * phi ) * math<float>::cos( i * theta );
+				a.x = math<float>::sin( j * phi ) * math<float>::sin( i * theta );
 				a.z = math<float>::cos( j * phi );
-				a.y = math<float>::sin( j * phi ) * math<float>::sin( i * theta );
+				a.y = math<float>::sin( j * phi ) * math<float>::cos( i * theta );
 
 				vec3 b;
-				b.x = math<float>::sin( ( j + 1 ) * phi ) * math<float>::cos( i * theta );
+				b.x = math<float>::sin( ( j + 1 ) * phi ) * math<float>::sin( i * theta );
 				b.z = math<float>::cos( ( j + 1 ) * phi );
-				b.y = math<float>::sin( ( j + 1 ) * phi ) * math<float>::sin( i * theta );
+				b.y = math<float>::sin( ( j + 1 ) * phi ) * math<float>::cos( i * theta );
 				implDrawLine( center + orientation * ( radius * a ), center + orientation * ( radius * b ) );
 			}
 		}
