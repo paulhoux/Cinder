@@ -48,11 +48,13 @@ void WindowsEnhancedVideoApp::setup()
 	fs::path path = getOpenFilePath();
 
 	if( !path.empty() && fs::exists( path ) ) {
-		mMovieRef.reset();
+		//mMovieRef.reset();
 		mMovieRef = video::MovieGl::create( path );
 		mMovieRef->play();
 
-		getWindow()->setSize( mMovieRef->getSize() );
+		Area bounds = Area::proportionalFit( mMovieRef->getBounds(), getDisplay()->getBounds(), true, false );
+		getWindow()->setSize( bounds.getSize() );
+		getWindow()->setPos( bounds.getUL() );
 
 		mFrames = 0;
 		mTimer.start();
@@ -125,7 +127,7 @@ void WindowsEnhancedVideoApp::resize()
 	if( mMovieRef ) {
 		Area bounds = mMovieRef->getBounds();
 		Area scaled = Area::proportionalFit( bounds, getWindowBounds(), true, true );
-		mTransform = glm::translate( vec3( scaled.getUL() - bounds.getUL(), 0 ) ) * glm::scale( vec3( vec2( scaled.getSize() ) / vec2( bounds.getSize() ), 1 ) );
+		mTransform = glm::translate( vec3( vec2( scaled.getUL() - bounds.getUL() ) + vec2( 0.5 ), 0 ) ) * glm::scale( vec3( vec2( scaled.getSize() ) / vec2( bounds.getSize() ), 1 ) );
 		gl::setModelMatrix( mTransform );
 	}
 }
@@ -134,11 +136,13 @@ void WindowsEnhancedVideoApp::fileDrop( FileDropEvent event )
 {
 	const fs::path& path = event.getFile( 0 );
 	if( !path.empty() && fs::exists( path ) ) {
-		mMovieRef.reset();
+		//mMovieRef.reset();
 		mMovieRef = video::MovieGl::create( path );
 		mMovieRef->play();
 
-		getWindow()->setSize( mMovieRef->getSize() );
+		Area bounds = Area::proportionalFit( mMovieRef->getBounds(), getDisplay()->getBounds(), true, false );
+		getWindow()->setSize( bounds.getSize() );
+		getWindow()->setPos( bounds.getUL() );
 	}
 }
 

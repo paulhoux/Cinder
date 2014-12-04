@@ -76,6 +76,18 @@ template <class T> inline void SafeDelete( T*& p )
 	}
 }
 
+//! Returns the current reference count. Use for debugging purposes only.
+template <class T> inline ULONG GetRefCount( T*& p )
+{
+	if( !p )
+		return 0;
+
+	ULONG refCount = p->AddRef();
+	p->Release();
+
+	return refCount;
+}
+
 //! A free function designed to interact with makeComShared, calls Release() on a com-managed object
 void ComDelete( void *p );
 

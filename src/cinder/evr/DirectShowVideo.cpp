@@ -325,8 +325,8 @@ RendererEVR::RendererEVR()
 
 RendererEVR::~RendererEVR()
 {
-	SafeRelease( m_pEVR );
 	SafeRelease( m_pVideoDisplay );
+	SafeRelease( m_pEVR );
 	SafeRelease( m_pPresenter );
 }
 
@@ -368,8 +368,8 @@ HRESULT RendererEVR::AddToGraph( IGraphBuilder *pGraph, HWND hwnd )
 	} while( false );
 
 	if( FAILED( hr ) ) {
-		SafeRelease( m_pEVR );
 		SafeRelease( m_pVideoDisplay );
+		SafeRelease( m_pEVR );
 		SafeRelease( m_pPresenter );
 	}
 
@@ -385,8 +385,8 @@ HRESULT RendererEVR::FinalizeGraph( IGraphBuilder *pGraph )
 	BOOL bRemoved;
 	HRESULT hr = RemoveUnconnectedRenderer( pGraph, m_pEVR, &bRemoved );
 	if( bRemoved ) {
-		SafeRelease( m_pEVR );
 		SafeRelease( m_pVideoDisplay );
+		SafeRelease( m_pEVR );
 		SafeRelease( m_pPresenter );
 	}
 	return hr;
