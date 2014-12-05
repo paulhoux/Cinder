@@ -57,12 +57,15 @@ MediaFoundationPlayer::MediaFoundationPlayer( HRESULT &hr, HWND hwnd )
 
 		// Create custom EVR presenter.
 		mPresenterPtr = new EVRCustomPresenter( hr );
+		mPresenterPtr->AddRef();
 		BREAK_ON_FAIL( hr );
 
-		mPresenterPtr->AddRef();
 		hr = mPresenterPtr->SetVideoWindow( mHwnd );
 		BREAK_ON_FAIL( hr );
 	} while( false );
+
+	if( FAILED( hr ) )
+		SafeRelease( mPresenterPtr );
 
 	CI_LOG_V( "Created MediaFoundationPlayer." );
 }
@@ -509,6 +512,7 @@ ULONG MediaFoundationPlayer::Release()
 
 	ULONG uCount = InterlockedDecrement( &mRefCount );
 	if( uCount == 0 ) {
+		mRefCount = DESTRUCTOR_REF_COUNT;
 		delete this;
 	}
 	return uCount;

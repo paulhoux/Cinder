@@ -115,8 +115,10 @@ ULONG STDMETHODCALLTYPE ComOStream::AddRef()
 ULONG STDMETHODCALLTYPE ComOStream::Release() 
 {
     ULONG res = (ULONG) InterlockedDecrement(&_refcount);
-    if (res == 0) 
-        delete this;
+	if( res == 0 ) {
+		_refcount = DESTRUCTOR_REF_COUNT;
+		delete this;
+	}
     return res;
 }
 
@@ -211,8 +213,10 @@ ULONG STDMETHODCALLTYPE ComIStream::AddRef()
 ULONG STDMETHODCALLTYPE ComIStream::Release() 
 {
 	ULONG res = (ULONG) InterlockedDecrement(&_refcount);
-	if (res == 0) 
+	if( res == 0 ) {
+		_refcount = DESTRUCTOR_REF_COUNT;
 		delete this;
+	}
 	return res;
 }
 

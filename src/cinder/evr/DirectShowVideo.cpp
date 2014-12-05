@@ -364,6 +364,9 @@ HRESULT RendererEVR::AddToGraph( IGraphBuilder *pGraph, HWND hwnd )
 		BREAK_ON_FAIL( hr );
 
 		m_pEVR = pEVR;
+
+		// We have to add an extra reference to prevent the Graph from destroying our filter.
+		m_pEVR->AddRef();
 		m_pEVR->AddRef();
 	} while( false );
 

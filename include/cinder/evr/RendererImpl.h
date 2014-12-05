@@ -46,10 +46,13 @@ namespace video {
 
 class MovieBase {
 public:
-	typedef enum PlayerBackends { BE_MEDIA_FOUNDATION, BE_DIRECTSHOW, BE_COUNT };
+	typedef enum PlayerBackends { BE_MEDIA_FOUNDATION, BE_DIRECTSHOW, BE_COUNT, BE_UNKNOWN = -1 };
 
 public:
 	virtual		~MovieBase();
+
+	bool		isUsingDirectShow() { return mCurrentBackend == BE_DIRECTSHOW; }
+	bool		isUsingMediaFoundation() { return mCurrentBackend == BE_MEDIA_FOUNDATION; }
 
 	//! Returns whether the movie has loaded and buffered enough to playback without interruption
 	bool		checkPlayable() { /*TODO*/ return false; }
@@ -190,6 +193,8 @@ protected:
 	bool						mHasAudio, mHasVideo;
 	bool						mIsPlaying;	// required to auto-start the movie
 	bool						mIsInitialized;
+
+	PlayerBackends				mCurrentBackend;
 
 	std::mutex					mMutex;
 

@@ -34,6 +34,10 @@ POSSIBILITY OF SUCH DAMAGE.
 #undef min
 #undef max
 
+// The DESTRUCTOR_REF_COUNT prevents double destruction of reference counted objects.
+// See: http://blogs.msdn.com/b/oldnewthing/archive/2005/09/28/474855.aspx
+#define DESTRUCTOR_REF_COUNT 1337
+
 // The COMPILE_ASSERT macro can be used to verify that a compile time
 // expression is true. For example, you could use it to verify the
 // size of a static array:
@@ -74,18 +78,6 @@ template <class T> inline void SafeDelete( T*& p )
 		delete p;
 		p = NULL;
 	}
-}
-
-//! Returns the current reference count. Use for debugging purposes only.
-template <class T> inline ULONG GetRefCount( T*& p )
-{
-	if( !p )
-		return 0;
-
-	ULONG refCount = p->AddRef();
-	p->Release();
-
-	return refCount;
 }
 
 //! A free function designed to interact with makeComShared, calls Release() on a com-managed object
@@ -479,6 +471,18 @@ public:
 			static_cast<IUnknown*>( other_identity );
 	}
 
+	//! Returns the current reference count. Use for debugging purposes only.
+	ULONG GetRefCount()
+	{
+		if( !ptr_ )
+			return 0;
+
+		ULONG rc = ptr_->AddRef();
+		ptr_->Release();
+
+		return (rc - 1);
+	}
+
 	// Provides direct access to the interface.
 	// Here we use a well known trick to make sure we block access to
 	// IUnknown methods so that something bad like this doesn't happen:
@@ -529,8 +533,10 @@ ULONG Release()
 assert( mRefCount > 0 );
 
 ULONG uCount = InterlockedDecrement( &mRefCount );
-if( uCount == 0 )
+if( uCount == 0 ) {
+mRefCount = DESTRUCTOR_REF_COUNT;
 delete this;
+}
 
 return uCount;
 }
@@ -722,6 +728,24 @@ public:
 private:
 	T* m_Ptr;
 };
+
+//! Returns the current reference count. Use for debugging purposes only.
+template <class T> inline ULONG GetRefCount( T*& p )
+{
+	if( !p )
+		return 0;
+
+	ULONG refCount = p->AddRef();
+	p->Release();
+
+	return (ULONG) ( refCount - 1 );
+}
+
+//! Returns the current reference count. Use for debugging purposes only.
+template <class T> inline ULONG GetRefCount( ScopedComPtr<T>& p )
+{
+	return p.GetRefCount();
+}
 
 
 } // namespace msw

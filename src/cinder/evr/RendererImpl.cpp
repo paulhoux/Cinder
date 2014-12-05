@@ -68,7 +68,7 @@ HRESULT GetEventObject( IMFMediaEvent *pEvent, Q **ppObject )
 MovieBase::MovieBase()
 	: mPlayer( NULL ), mHwnd( NULL ), mWidth( 0 ), mHeight( 0 )
 	, mIsLoaded( false ), mPlayThroughOk( false ), mIsPlayable( false ), mIsProtected( false ), mIsPlaying( false ), mIsInitialized( false )
-	, mPlayingForward( true ), mLoop( false ), mPalindrome( false ), mHasAudio( false ), mHasVideo( false )
+	, mPlayingForward(true), mLoop(false), mPalindrome(false), mHasAudio(false), mHasVideo(false), mCurrentBackend(BE_UNKNOWN)
 {
 	mHwnd = createWindow( this );
 }
@@ -100,6 +100,7 @@ void MovieBase::init( const std::wstring &url )
 			if( SUCCEEDED( hr ) ) {
 				hr = mPlayer->OpenFile( url.c_str() );
 				if( SUCCEEDED( hr ) ) {
+					mCurrentBackend = (PlayerBackends) i;
 					break;
 				}
 			}
@@ -110,13 +111,17 @@ void MovieBase::init( const std::wstring &url )
 			mPlayer->AddRef();
 			if( SUCCEEDED( hr ) ) {
 				hr = mPlayer->OpenFile( url.c_str() );
-				if( SUCCEEDED( hr ) )
+				if( SUCCEEDED( hr ) ) {
+					mCurrentBackend = (PlayerBackends) i;
 					break;
+				}
 			}
 		}
 	}
 
 	if( FAILED( hr ) ) {
+		mCurrentBackend = BE_UNKNOWN;
+
 		SafeRelease( mPlayer );
 		CI_LOG_E( "Failed to play movie: " << url.c_str() );
 
@@ -137,7 +142,7 @@ void MovieBase::init( const std::wstring &url )
 	}
 
 	// Create shared textures.
-	for( size_t i = 0; i < 3; ++i ) {
+	for( size_t i = 0; i < 3 - mTextures.size(); ++i ) {
 		gl::Texture2d::Format fmt;
 		fmt.setTarget( GL_TEXTURE_RECTANGLE );
 		fmt.loadTopDown( true );

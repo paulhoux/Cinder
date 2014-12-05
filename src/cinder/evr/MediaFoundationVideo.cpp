@@ -245,6 +245,9 @@ D3DPresentEngine::~D3DPresentEngine()
 		else CI_LOG_E( "FAILED" );
 	}
 
+	mSharedTextures.clear();
+	mSharedTextureFreeIDs.clear();
+
 	SafeRelease( m_pDevice );
 	SafeRelease( m_pSurfaceRepaint );
 	SafeRelease( m_pDeviceManager );
@@ -1000,8 +1003,10 @@ ULONG EVRCustomPresenter::Release()
 	assert( mRefCount > 0 );
 
 	ULONG uCount = InterlockedDecrement( &mRefCount );
-	if( uCount == 0 )
+	if( uCount == 0 ) {
+		mRefCount = DESTRUCTOR_REF_COUNT;
 		delete this;
+	}
 
 	return uCount;
 }

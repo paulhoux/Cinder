@@ -28,13 +28,13 @@ public:
 
 	void resize() override;
 	void fileDrop( FileDropEvent event ) override;
+
+	bool playVideo( const fs::path &path );
 private:
 	video::MovieGlRef        mMovieRef;
-	gl::QueryTimeSwappedRef  mQuery;
 	glm::mat4                mTransform;
 
-	int    mFrames;
-	Timer  mTimer;
+	gl::QueryTimeSwappedRef  mQuery;
 };
 
 void WindowsEnhancedVideoApp::prepareSettings( Settings* settings )
@@ -46,19 +46,7 @@ void WindowsEnhancedVideoApp::prepareSettings( Settings* settings )
 void WindowsEnhancedVideoApp::setup()
 {
 	fs::path path = getOpenFilePath();
-
-	if( !path.empty() && fs::exists( path ) ) {
-		//mMovieRef.reset();
-		mMovieRef = video::MovieGl::create( path );
-		mMovieRef->play();
-
-		Area bounds = Area::proportionalFit( mMovieRef->getBounds(), getDisplay()->getBounds(), true, false );
-		getWindow()->setSize( bounds.getSize() );
-		getWindow()->setPos( bounds.getUL() );
-
-		mFrames = 0;
-		mTimer.start();
-	}
+	playVideo( path );
 
 	gl::enableVerticalSync( true );
 	gl::clear();
@@ -69,25 +57,17 @@ void WindowsEnhancedVideoApp::setup()
 
 void WindowsEnhancedVideoApp::shutdown()
 {
-	//mMovieRef->close();
 	mMovieRef.reset();
 }
 
 void WindowsEnhancedVideoApp::update()
 {
-	//double framerate = mFrames / mTimer.getSeconds() + 0.001;
-	//getWindow()->setTitle( toString( framerate ) + " : " + toString( mQuery->getElapsedMilliseconds() ) );
-
-	//mMovieRef->update();
 }
 
 void WindowsEnhancedVideoApp::draw()
 {
-	// No need to clear, we are going to draw the whole frame anyway.
-	// And we want to keep the current frame as long as there is no new one.
-
 	if( mMovieRef && mMovieRef->checkNewFrame() ) {
-		mFrames++;
+		gl::clear();
 
 		mQuery->begin();
 		mMovieRef->draw( 0, 0 );
@@ -135,15 +115,32 @@ void WindowsEnhancedVideoApp::resize()
 void WindowsEnhancedVideoApp::fileDrop( FileDropEvent event )
 {
 	const fs::path& path = event.getFile( 0 );
+	playVideo( path );
+}
+
+bool WindowsEnhancedVideoApp::playVideo( const fs::path &path )
+{
 	if( !path.empty() && fs::exists( path ) ) {
-		//mMovieRef.reset();
+		// TODO: make sure the movie can play
 		mMovieRef = video::MovieGl::create( path );
 		mMovieRef->play();
 
 		Area bounds = Area::proportionalFit( mMovieRef->getBounds(), getDisplay()->getBounds(), true, false );
 		getWindow()->setSize( bounds.getSize() );
 		getWindow()->setPos( bounds.getUL() );
+
+		std::string title = "WindowsEnhancedVideo";
+		if( mMovieRef->isUsingDirectShow() )
+			title += " (DirectShow)";
+		else if( mMovieRef->isUsingMediaFoundation() )
+			title += " (Media Foundation)";
+
+		getWindow()->setTitle( title );
+
+		return true;
 	}
+
+	return false;
 }
 
 CINDER_APP_NATIVE( WindowsEnhancedVideoApp, RendererGl )

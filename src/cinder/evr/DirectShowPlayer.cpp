@@ -55,6 +55,7 @@ ULONG DirectShowPlayer::Release()
 
 	ULONG uCount = InterlockedDecrement( &mRefCount );
 	if( uCount == 0 ) {
+		mRefCount = DESTRUCTOR_REF_COUNT;
 		delete this;
 	}
 	return uCount;

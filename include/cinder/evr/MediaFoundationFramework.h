@@ -675,6 +675,7 @@ public:
 		HRESULT hr = S_OK;
 
 		CopyComPtr( m_pClock, pClock );
+		m_pClock->AddRef();
 
 		// Set a high the timer resolution (ie, short timer period).
 		timeBeginPeriod( 1 );
