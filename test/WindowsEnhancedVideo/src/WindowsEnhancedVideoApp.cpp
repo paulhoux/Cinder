@@ -31,10 +31,12 @@ public:
 
 	bool playVideo( const fs::path &path );
 private:
-	video::MovieGlRef        mMovieRef;
-	glm::mat4                mTransform;
+	video::MovieGlRef              mMovieRef;
+	glm::mat4                      mTransform;
 
-	gl::QueryTimeSwappedRef  mQuery;
+	std::vector<gl::Texture2dRef>  mCapturedFrames;
+
+	gl::QueryTimeSwappedRef        mQuery;
 };
 
 void WindowsEnhancedVideoApp::prepareSettings( Settings* settings )
@@ -57,6 +59,7 @@ void WindowsEnhancedVideoApp::setup()
 
 void WindowsEnhancedVideoApp::shutdown()
 {
+	mCapturedFrames.clear();
 	mMovieRef.reset();
 }
 
@@ -69,9 +72,27 @@ void WindowsEnhancedVideoApp::draw()
 	if( mMovieRef && mMovieRef->checkNewFrame() ) {
 		gl::clear();
 
+		// Draw movie.
 		mQuery->begin();
-		mMovieRef->draw( 0, 0 );
+
+		gl::Texture2dRef tex = mMovieRef->getTexture();
+		gl::draw( tex );
+
 		mQuery->end();
+
+		// Draw captured frames.
+		int x = 0, y = 0;
+		for( auto &frame : mCapturedFrames ) {
+			int w = frame->getWidth() / 4;
+			int h = frame->getHeight() / 4;
+			gl::draw( frame, Rectf( x, y, x + w, y + h ) );
+
+			x += w;
+			if( ( x + w ) > getWindowWidth() ) {
+				x = 0;
+				y += h;
+			}
+		}
 	}
 }
 
@@ -85,19 +106,17 @@ void WindowsEnhancedVideoApp::keyDown( KeyEvent event )
 	case KeyEvent::KEY_ESCAPE:
 		quit();
 		break;
-	case KeyEvent::KEY_DELETE:
-		mMovieRef.reset();
-		break;
-		/*case KeyEvent::KEY_l:
-			if( mMovieRef ) {
-			mMovieRef->setLoop( !mMovieRef->isLooping() );
-			CI_LOG_I( "Looping set to: " << mPlayerRef->isLooping() );
-			}
-			break;*/
 	case KeyEvent::KEY_SPACE:
-		if( mMovieRef->isPlaying() )
-			mMovieRef->stop();
-		else mMovieRef->play();
+		if( mMovieRef ) {
+			mCapturedFrames.push_back( mMovieRef->getTexture() );
+		}
+		break;
+	case KeyEvent::KEY_DELETE:
+		if( !mCapturedFrames.empty() )
+			mCapturedFrames.pop_back();
+		break;
+	case KeyEvent::KEY_o:
+		playVideo( getOpenFilePath() );
 		break;
 	}
 }
@@ -121,6 +140,9 @@ void WindowsEnhancedVideoApp::fileDrop( FileDropEvent event )
 bool WindowsEnhancedVideoApp::playVideo( const fs::path &path )
 {
 	if( !path.empty() && fs::exists( path ) ) {
+		// 
+		mCapturedFrames.clear();
+
 		// TODO: make sure the movie can play
 		mMovieRef = video::MovieGl::create( path );
 		mMovieRef->play();

@@ -475,12 +475,14 @@
     <ClInclude Include="..\include\cinder\dx\PlatformHelpers.h" />
     <ClInclude Include="..\include\cinder\evr\DirectShowPlayer.h" />
     <ClInclude Include="..\include\cinder\evr\DirectShowVideo.h" />
+    <ClInclude Include="..\include\cinder\evr\IRenderer.h" />
     <ClInclude Include="..\include\cinder\evr\MediaFoundationPlayer.h" />
     <ClInclude Include="..\include\cinder\evr\IPlayer.h" />
     <ClInclude Include="..\include\cinder\evr\RendererGlImpl.h" />
     <ClInclude Include="..\include\cinder\evr\RendererImpl.h" />
     <ClInclude Include="..\include\cinder\evr\MediaFoundationVideo.h" />
     <ClInclude Include="..\include\cinder\evr\MediaFoundationFramework.h" />
+    <ClInclude Include="..\include\cinder\evr\SharedTexture.h" />
     <ClInclude Include="..\include\cinder\Filesystem.h" />
     <ClInclude Include="..\include\cinder\Frustum.h" />
     <ClInclude Include="..\include\cinder\GeomIo.h" />

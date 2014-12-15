@@ -37,7 +37,7 @@ public:
 
 	virtual bool CreateSharedTexture( int w, int h, int textureID ) = 0;
 	virtual void ReleaseSharedTexture( int textureID ) = 0;
-	virtual bool LockSharedTexture( int *pTextureID ) = 0;
+	virtual bool LockSharedTexture( int *pTextureID, int *pFreeTextures ) = 0;
 	virtual bool UnlockSharedTexture( int textureID ) = 0;
 };
 
@@ -59,7 +59,7 @@ public:
 
 	bool CreateSharedTexture( int w, int h, int textureID ) override { throw std::runtime_error( "Not implemented" ); }
 	void ReleaseSharedTexture( int textureID ) override { throw std::runtime_error( "Not implemented" ); }
-	bool LockSharedTexture( int *pTextureID ) override { throw std::runtime_error( "Not implemented" ); }
+	bool LockSharedTexture( int *pTextureID, int *pFreeTextures ) override { throw std::runtime_error( "Not implemented" ); }
 	bool UnlockSharedTexture( int textureID ) override { throw std::runtime_error( "Not implemented" ); }
 };
 
@@ -82,7 +82,7 @@ public:
 
 	bool CreateSharedTexture( int w, int h, int textureID ) override { throw std::runtime_error( "Not implemented" ); }
 	void ReleaseSharedTexture( int textureID ) override { throw std::runtime_error( "Not implemented" ); }
-	bool LockSharedTexture( int *pTextureID ) override { throw std::runtime_error( "Not implemented" ); }
+	bool LockSharedTexture( int *pTextureID, int *pFreeTextures ) override { throw std::runtime_error( "Not implemented" ); }
 	bool UnlockSharedTexture( int textureID ) override { throw std::runtime_error( "Not implemented" ); }
 };
 
@@ -107,7 +107,7 @@ public:
 
 	bool CreateSharedTexture( int w, int h, int textureID ) override { assert( m_pPresenter != NULL ); return m_pPresenter->CreateSharedTexture( w, h, textureID ); }
 	void ReleaseSharedTexture( int textureID ) override { assert( m_pPresenter != NULL ); m_pPresenter->ReleaseSharedTexture( textureID ); }
-	bool LockSharedTexture( int *pTextureID ) override { assert( m_pPresenter != NULL ); return m_pPresenter->LockSharedTexture( pTextureID ); }
+	bool LockSharedTexture( int *pTextureID, int *pFreeTextures ) override { assert( m_pPresenter != NULL ); return m_pPresenter->LockSharedTexture( pTextureID, pFreeTextures ); }
 	bool UnlockSharedTexture( int textureID ) override { assert( m_pPresenter != NULL ); return m_pPresenter->UnlockSharedTexture( textureID ); }
 };
 
@@ -122,5 +122,28 @@ HRESULT IsPinDirection( IPin *pPin, PIN_DIRECTION dir, BOOL *pResult );
 } // namespace video
 } // namespace msw
 } // namespace cinder
+
+
+//-----------------------------------------------------------------------------------
+// See: https://social.msdn.microsoft.com/Forums/windowsdesktop/en-US/ac877e2d-80a7-47b6-b315-5e3160b8b219/alternative-for-isamplegrabber?forum=windowsdirectshowdevelopment
+
+interface ISampleGrabberCB : public IUnknown {
+	virtual STDMETHODIMP SampleCB( double SampleTime, IMediaSample *pSample ) = 0;
+	virtual STDMETHODIMP BufferCB( double SampleTime, BYTE *pBuffer, long BufferLen ) = 0;
+};
+
+interface ISampleGrabber : public IUnknown {
+	virtual HRESULT STDMETHODCALLTYPE SetOneShot( BOOL OneShot ) = 0;
+	virtual HRESULT STDMETHODCALLTYPE SetMediaType( const AM_MEDIA_TYPE *pType ) = 0;
+	virtual HRESULT STDMETHODCALLTYPE GetConnectedMediaType( AM_MEDIA_TYPE *pType ) = 0;
+	virtual HRESULT STDMETHODCALLTYPE SetBufferSamples( BOOL BufferThem ) = 0;
+	virtual HRESULT STDMETHODCALLTYPE GetCurrentBuffer( long *pBufferSize, long *pBuffer ) = 0;
+	virtual HRESULT STDMETHODCALLTYPE GetCurrentSample( IMediaSample **ppSample ) = 0;
+	virtual HRESULT STDMETHODCALLTYPE SetCallback( ISampleGrabberCB *pCallback, long WhichMethodToCallback ) = 0;
+};
+
+static const IID IID_ISampleGrabber = { 0x6B652FFF, 0x11FE, 0x4fce, { 0x92, 0xAD, 0x02, 0x66, 0xB5, 0xD7, 0xC7, 0x8F } };
+static const IID IID_ISampleGrabberCB = { 0x0579154A, 0x2B53, 0x4994, { 0xB0, 0xD0, 0xE7, 0x73, 0x14, 0x8E, 0xFF, 0x85 } };
+static const CLSID CLSID_SampleGrabber = { 0xC1F400A0, 0x3F08, 0x11d3, { 0x9F, 0x0B, 0x00, 0x60, 0x08, 0x03, 0x9E, 0x37 } };
 
 #endif // CINDER_MSW

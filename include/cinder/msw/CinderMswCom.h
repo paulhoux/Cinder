@@ -66,6 +66,9 @@ void initializeCom( DWORD params = COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE
 template <class T> inline void SafeRelease( T*& p )
 {
 	if( p ) {
+#if _DEBUG
+		ULONG rc = GetRefCount( p );
+#endif
 		p->Release();
 		p = NULL;
 	}

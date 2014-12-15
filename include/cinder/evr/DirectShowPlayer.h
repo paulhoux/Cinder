@@ -29,7 +29,7 @@ class DirectShowPlayer : public IPlayer {
 
 public:
 	DirectShowPlayer( HRESULT &hr, HWND hwnd );
-	~DirectShowPlayer();
+	virtual ~DirectShowPlayer();
 
 	// IUnknown methods
 	STDMETHODIMP QueryInterface( REFIID iid, void** ppv ) override;
@@ -53,7 +53,7 @@ public:
 
 	bool CreateSharedTexture( int w, int h, int textureID ) override { return m_pVideo->CreateSharedTexture( w, h, textureID ); }
 	void ReleaseSharedTexture( int textureID ) override { m_pVideo->ReleaseSharedTexture( textureID ); }
-	bool LockSharedTexture( int *pTextureID ) override { return m_pVideo->LockSharedTexture( pTextureID ); }
+	bool LockSharedTexture( int *pTextureID, int *pFreeTextures ) override { return m_pVideo->LockSharedTexture( pTextureID, pFreeTextures ); }
 	bool UnlockSharedTexture( int textureID ) override { return m_pVideo->UnlockSharedTexture( textureID ); }
 
 	//
@@ -66,11 +66,11 @@ public:
 
 	HRESULT HandleGraphEvent( GraphEventFN pfnOnGraphEvent );
 
-private:
-	HRESULT InitializeGraph();
-	void    TearDownGraph();
-	HRESULT CreateVideoRenderer();
-	HRESULT RenderStreams( IBaseFilter *pSource );
+protected:
+	HRESULT         InitializeGraph();
+	void            TearDownGraph();
+	virtual HRESULT CreateVideoRenderer();
+	virtual HRESULT RenderStreams( IBaseFilter *pSource );
 
 	PlayerState      m_state;
 
@@ -84,6 +84,7 @@ private:
 	IMediaEventEx   *m_pEvent;
 	VideoRenderer   *m_pVideo;
 
+private:
 	volatile long    mRefCount;
 };
 

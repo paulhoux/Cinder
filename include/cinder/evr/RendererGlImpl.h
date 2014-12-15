@@ -54,8 +54,8 @@ public:
 	//!
 	virtual bool hasAlpha() const override { /*TODO*/ return false; }
 
-	//! Returns the gl::Texture representing the Movie's current frame, bound to the \c GL_TEXTURE_RECTANGLE_ARB target
-	//gl::TextureRef	getTexture();
+	//! Returns the gl::Texture representing the Movie's current frame, bound to the \c GL_TEXTURE_RECTANGLE_ARB target.
+	gl::Texture2dRef	getTexture();
 
 	//!
 	void draw( int x = 0, int y = 0 ) { draw( x, y, mWidth, mHeight ); }
@@ -66,15 +66,17 @@ protected:
 	MovieGl();
 	MovieGl( const Url& url );
 	MovieGl( const fs::path& path );
-
-	void  initFromUrl( const Url& url ) override;
-	void  initFromPath( const fs::path& filePath ) override;
 	//MovieGl( const MovieLoader& loader );
 
-	//virtual HRESULT createPartialTopology( IMFPresentationDescriptor *pPD ) override;
+	void  init( const std::wstring& url ) override;
+	void  initFromUrl( const Url& url ) override;
+	void  initFromPath( const fs::path& filePath ) override;
+
+	bool  initPlayer( Backend backend ) override;
 
 protected:
 	gl::GlslProgRef          mShader;
+	Backend                  mPreferredBackend;
 };
 
 } // namespace video

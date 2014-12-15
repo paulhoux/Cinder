@@ -10,14 +10,11 @@ namespace cinder {
 namespace msw {
 namespace video {
 
-//! Definitions
-const UINT WM_PLAYER_EVENT = WM_APP + 1;
-
-class IPlayer : public IUnknown {
+class IRenderer : public IUnknown {
 public:
-	IPlayer() {}
-	virtual ~IPlayer() {}
-
+	IRenderer() {}
+	virtual ~IRenderer() {}
+	/*
 	virtual HRESULT OpenFile( PCWSTR pszFileName ) = 0;
 	virtual HRESULT Close() = 0;
 
@@ -36,6 +33,7 @@ public:
 	virtual void ReleaseSharedTexture( int textureID ) = 0;
 	virtual bool LockSharedTexture( int *pTextureID, int *pFreeTextures ) = 0;
 	virtual bool UnlockSharedTexture( int textureID ) = 0;
+	*/
 };
 
 } // namespace video

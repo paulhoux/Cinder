@@ -346,7 +346,7 @@ HRESULT DirectShowPlayer::CreateVideoRenderer()
 
 	enum { Try_EVR, Try_VMR9, Try_VMR7 };
 
-	for( DWORD i = Try_EVR; i <= Try_VMR7; i++ ) {
+	for( DWORD i = Try_EVR; i <= Try_EVR; i++ ) {
 		switch( i ) {
 		case Try_EVR:
 			CI_LOG_V( "Trying EVR..." );

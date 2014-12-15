@@ -17,26 +17,6 @@ namespace cinder {
 namespace msw {
 namespace video {
 
-template <class Q>
-HRESULT GetEventObject( IMFMediaEvent *pEvent, Q **ppObject )
-{
-	*ppObject = NULL;
-
-	PROPVARIANT var;
-	HRESULT hr = pEvent->GetValue( &var );
-	if( SUCCEEDED( hr ) ) {
-		if( var.vt == VT_UNKNOWN ) {
-			hr = var.punkVal->QueryInterface( ppObject );
-		}
-		else {
-			hr = MF_E_INVALIDTYPE;
-		}
-		PropVariantClear( &var );
-	}
-
-	return hr;
-}
-
 //////////////////////////////////////////////////////////////////////////////////////////
 
 MediaFoundationPlayer::MediaFoundationPlayer( HRESULT &hr, HWND hwnd )
@@ -335,6 +315,42 @@ HRESULT MediaFoundationPlayer::Stop()
 	return hr;
 }
 
+HRESULT MediaFoundationPlayer::SkipToPosition( MFTIME seekTime )
+{
+	HRESULT hr = S_OK;
+
+	PROPVARIANT var;
+	PropVariantInit( &var );
+
+	// Get the rate control service.
+	ScopedComPtr<IMFRateControl> pRateControl;
+	hr = MFGetService( mMediaSessionPtr, MF_RATE_CONTROL_SERVICE, IID_PPV_ARGS( &pRateControl ) );
+
+	// Set the playback rate to zero without thinning.
+	if( SUCCEEDED( hr ) ) {
+		hr = pRateControl->SetRate( FALSE, 0.0F );
+	}
+
+	// Create the Media Session start position.
+	if( seekTime == PRESENTATION_CURRENT_POSITION ) {
+		var.vt = VT_EMPTY;
+	}
+	else {
+		var.vt = VT_I8;
+		var.hVal.QuadPart = seekTime;
+	}
+
+	// Start the Media Session.
+	if( SUCCEEDED( hr ) ) {
+		hr = mMediaSessionPtr->Start( NULL, &var );
+	}
+
+	// Clean up.
+	PropVariantClear( &var );
+
+	return hr;
+}
+
 HRESULT MediaFoundationPlayer::HandleEvent( UINT_PTR pEventPtr )
 {
 	HRESULT hr = S_OK;
@@ -362,14 +378,17 @@ HRESULT MediaFoundationPlayer::HandleEvent( UINT_PTR pEventPtr )
 
 		switch( eventType ) {
 		case MESessionTopologySet:
-			if( FAILED( hr ) )
+			if( FAILED( hr ) ) {
 				CI_LOG_V( "MESessionTopologySet failed: " << hrStatus );
+				hr = Close();
+			}
 			else
 				hr = HandleSessionTopologySetEvent( pEvent );
 			break;
 		case MESessionTopologyStatus:
-			if( FAILED( hr ) )
+			if( FAILED( hr ) ) {
 				CI_LOG_V( "MESessionTopologyStatus failed: " << hrStatus );
+			}
 			else
 				hr = HandleSessionTopologyStatusEvent( pEvent );
 			break;
@@ -390,6 +409,10 @@ HRESULT MediaFoundationPlayer::HandleEvent( UINT_PTR pEventPtr )
 				CI_LOG_V( "MESessionStarted failed: " << hrStatus );
 			else
 				mState = Started;
+			break;
+		case MESessionScrubSampleComplete:
+			if( SUCCEEDED( hr ) )
+				hr = HandleSessionEvent( pEvent, eventType );
 			break;
 		default:
 			if( SUCCEEDED( hr ) )

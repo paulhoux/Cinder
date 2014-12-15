@@ -43,28 +43,6 @@ std::map<HWND, MovieBase*> MovieBase::sMovieWindows;
 
 //////////////////////////////////////////////////////////////////////////////////////////
 
-template <class Q>
-HRESULT GetEventObject( IMFMediaEvent *pEvent, Q **ppObject )
-{
-	*ppObject = NULL;
-
-	PROPVARIANT var;
-	HRESULT hr = pEvent->GetValue( &var );
-	if( SUCCEEDED( hr ) ) {
-		if( var.vt == VT_UNKNOWN ) {
-			hr = var.punkVal->QueryInterface( ppObject );
-		}
-		else {
-			hr = MF_E_INVALIDTYPE;
-		}
-		PropVariantClear( &var );
-	}
-
-	return hr;
-}
-
-//////////////////////////////////////////////////////////////////////////////////////////
-
 MovieBase::MovieBase()
 	: mPlayer( NULL ), mHwnd( NULL ), mWidth( 0 ), mHeight( 0 )
 	, mIsLoaded( false ), mPlayThroughOk( false ), mIsPlayable( false ), mIsProtected( false ), mIsPlaying( false ), mIsInitialized( false )
@@ -82,75 +60,6 @@ MovieBase::~MovieBase()
 
 	destroyWindow( mHwnd );
 	mHwnd = NULL;
-}
-
-void MovieBase::init( const std::wstring &url )
-{
-	HRESULT hr = S_OK;
-
-	assert( mHwnd != NULL );
-
-	for( int i = 0; i < BE_COUNT; ++i ) {
-		SafeRelease( mPlayer );
-
-		if( i == BE_MEDIA_FOUNDATION ) {
-			// Try to play the movie using Media Foundation.
-			mPlayer = new MediaFoundationPlayer( hr, mHwnd );
-			mPlayer->AddRef();
-			if( SUCCEEDED( hr ) ) {
-				hr = mPlayer->OpenFile( url.c_str() );
-				if( SUCCEEDED( hr ) ) {
-					mCurrentBackend = (PlayerBackends) i;
-					break;
-				}
-			}
-		}
-		else if( i == BE_DIRECTSHOW ) {
-			// Try to play the movie using DirectShow.
-			mPlayer = new DirectShowPlayer( hr, mHwnd );
-			mPlayer->AddRef();
-			if( SUCCEEDED( hr ) ) {
-				hr = mPlayer->OpenFile( url.c_str() );
-				if( SUCCEEDED( hr ) ) {
-					mCurrentBackend = (PlayerBackends) i;
-					break;
-				}
-			}
-		}
-	}
-
-	if( FAILED( hr ) ) {
-		mCurrentBackend = BE_UNKNOWN;
-
-		SafeRelease( mPlayer );
-		CI_LOG_E( "Failed to play movie: " << url.c_str() );
-
-		return;
-	}
-
-	// Get width and height of the video.
-	mWidth = mPlayer->GetWidth();
-	mHeight = mPlayer->GetHeight();
-
-	// Delete existing shared textures if their size is different.
-	for( auto itr = mTextures.rbegin(); itr != mTextures.rend(); ++itr ) {
-		gl::Texture2dRef texture = itr->second;
-		if( texture && ( mWidth != texture->getWidth() || mHeight != texture->getHeight() ) ) {
-			mPlayer->ReleaseSharedTexture( texture->getId() );
-			mTextures.erase( texture->getId() );
-		}
-	}
-
-	// Create shared textures.
-	for( size_t i = 0; i < 3 - mTextures.size(); ++i ) {
-		gl::Texture2d::Format fmt;
-		fmt.setTarget( GL_TEXTURE_RECTANGLE );
-		fmt.loadTopDown( true );
-
-		gl::Texture2dRef texture = gl::Texture2d::create( mWidth, mHeight, fmt );
-		if( mPlayer->CreateSharedTexture( mWidth, mHeight, texture->getId() ) )
-			mTextures[texture->getId()] = texture;
-	}
 }
 
 LRESULT MovieBase::WndProc( HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam )

@@ -11,9 +11,7 @@
 
 #include <d3d9.h>
 #include <d3d9types.h>
-
 #include <dxva2api.h>
-
 #include <shobjidl.h> 
 #include <shlwapi.h>
 
@@ -23,15 +21,37 @@
 #include <mferror.h>
 #include <evr.h>
 
+// Include these libraries.
 #pragma comment(lib, "winmm.lib")
 #pragma comment(lib,"d3d9.lib")
 #pragma comment(lib,"dxva2.lib")
 #pragma comment (lib,"evr.lib")
-//#pragma comment(lib, "strmiids") // required?
 
 namespace cinder {
 namespace msw {
 namespace video {
+
+template <class Q>
+HRESULT GetEventObject( IMFMediaEvent *pEvent, Q **ppObject )
+{
+	*ppObject = NULL;
+
+	PROPVARIANT var;
+	HRESULT hr = pEvent->GetValue( &var );
+	if( SUCCEEDED( hr ) ) {
+		if( var.vt == VT_UNKNOWN ) {
+			hr = var.punkVal->QueryInterface( ppObject );
+		}
+		else {
+			hr = MF_E_INVALIDTYPE;
+		}
+		PropVariantClear( &var );
+	}
+
+	return hr;
+}
+
+//-----------------------------------------------------------------------------
 
 inline LONG MFTimeToMsec( const LONGLONG& time )
 {
@@ -764,7 +784,7 @@ public:
 
 		if( bPresentNow || ( m_pClock == NULL ) ) {
 			// Present the sample immediately.
-			m_pCB->PresentSample( pSample, 0 );
+			hr = m_pCB->PresentSample( pSample, 0 );
 		}
 		else {
 			// Queue the sample and ask the scheduler thread to wake up.

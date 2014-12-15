@@ -32,6 +32,7 @@ POSSIBILITY OF SUCH DAMAGE.
 
 #if defined( CINDER_MSW )
 
+#include "IRenderer.h"
 #include "MediaFoundationFramework.h"
 
 namespace cinder {
@@ -39,18 +40,6 @@ namespace msw {
 namespace video {
 
 inline float MFOffsetToFloat( const MFOffset& offset ) { return offset.value + ( float( offset.fract ) / 65536 ); }
-
-struct SharedTexture {
-	GLuint name;
-	HANDLE handle;
-	DWORD  value;
-	BOOL   locked;
-
-	IDirect3DSurface9* pD3DSurface;
-	IDirect3DTexture9* pD3DTexture;
-
-	SharedTexture() : pD3DSurface( NULL ), pD3DTexture( NULL ), handle( NULL ), locked( FALSE ) {}
-};
 
 class D3DPresentEngine : public SchedulerCallback {
 public:
@@ -63,7 +52,7 @@ public:
 
 public:
 	static const int PRESENTER_BUFFER_COUNT = 3;
-	static const int SHARED_TEXTURE_COUNT = 3;
+	//static const int SHARED_TEXTURE_COUNT = 3;
 
 	D3DPresentEngine( HRESULT& hr );
 	virtual ~D3DPresentEngine();
@@ -128,8 +117,6 @@ protected:
 	BOOL                            mHasNewFrame;
 	int                             mWidth;                 // Width of all shared textures.
 	int                             mHeight;                // Height of all shared textures.
-	std::map<GLuint, SharedTexture> mSharedTextures;        // Shared textures used for buffering.
-	std::deque<GLuint>              mSharedTextureFreeIDs;  // List of unlocked (free) shared texture IDs.
 
 	msw::CriticalSection            mSharedTexturesLock;
 
@@ -139,10 +126,10 @@ public:
 
 	virtual void OnReleaseResources() {}
 
-	bool CreateSharedTexture( int w, int h, int textureID );
-	void ReleaseSharedTexture( int textureID );
-	bool LockSharedTexture( int *pTextureID );
-	bool UnlockSharedTexture( int textureID );
+	bool CreateSharedTexture( int w, int h, int textureID ) { return false; }
+	void ReleaseSharedTexture( int textureID ) {}
+	bool LockSharedTexture( int *pTextureID, int *pFreeTextures ) { return false; }
+	bool UnlockSharedTexture( int textureID ) { return false; }
 };
 
 // MFSamplePresenter_SampleCounter
@@ -162,9 +149,11 @@ static const GUID MFSamplePresenter_SampleSwapChain =
 { 0xad885bd1, 0x7def, 0x414a, { 0xb5, 0xb0, 0xd3, 0xd2, 0x63, 0xd6, 0xe9, 0x6d } };
 
 class __declspec( uuid( "9A6E430D-27EE-4DBB-9A7F-7782EA4036A0" ) ) EVRCustomPresenter :
+	public IRenderer,
 	public IMFVideoDeviceID,
 	public IMFVideoPresenter, // Inherits IMFClockStateSink
 	public IMFRateSupport,
+	//public IMFRateControl,
 	public IMFGetService,
 	public IMFTopologyServiceLookupClient,
 	public IMFVideoDisplayControl {
@@ -194,6 +183,9 @@ public:
 	STDMETHOD_( ULONG, AddRef )( ) override;
 	STDMETHOD_( ULONG, Release )( ) override;
 
+	// IRenderer methods
+
+
 	// IMFGetService methods
 	STDMETHOD( GetService )( REFGUID guidService, REFIID riid, LPVOID *ppvObject ) override;
 
@@ -212,6 +204,10 @@ public:
 	STDMETHOD( GetSlowestRate )( MFRATE_DIRECTION eDirection, BOOL bThin, float *pflRate ) override;
 	STDMETHOD( GetFastestRate )( MFRATE_DIRECTION eDirection, BOOL bThin, float *pflRate ) override;
 	STDMETHOD( IsRateSupported )( BOOL bThin, float flRate, float *pflNearestSupportedRate ) override;
+
+	// IMFRateControl methods
+	//STDMETHOD( GetRate )( BOOL *pfThin, float *pflRate ) override;
+	//STDMETHOD( SetRate )( BOOL fThin, float flRate ) override;
 
 	// IMFVideoDeviceID methods
 	STDMETHOD( GetDeviceID )( IID* pDeviceID ) override;
@@ -366,7 +362,7 @@ public:
 
 	bool CreateSharedTexture( int w, int h, int textureID ) { return m_pD3DPresentEngine->CreateSharedTexture( w, h, textureID ); }
 	void ReleaseSharedTexture( int textureID ) { return m_pD3DPresentEngine->ReleaseSharedTexture( textureID ); };
-	bool LockSharedTexture( int *pTextureID ) { return m_pD3DPresentEngine->LockSharedTexture( pTextureID ); }
+	bool LockSharedTexture( int *pTextureID, int *pFreeTextures ) { return m_pD3DPresentEngine->LockSharedTexture( pTextureID, pFreeTextures ); }
 	bool UnlockSharedTexture( int textureID ) { return m_pD3DPresentEngine->UnlockSharedTexture( textureID ); }
 };
 

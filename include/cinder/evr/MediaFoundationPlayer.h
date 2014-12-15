@@ -32,7 +32,7 @@ public:
 	// IPlayer methods
 	bool CreateSharedTexture( int w, int h, int textureID ) override { return mPresenterPtr->CreateSharedTexture( w, h, textureID ); }
 	void ReleaseSharedTexture( int textureID ) override { mPresenterPtr->ReleaseSharedTexture( textureID ); }
-	bool LockSharedTexture( int *pTextureID ) override { return mPresenterPtr->LockSharedTexture( pTextureID ); }
+	bool LockSharedTexture( int *pTextureID, int *pFreeTextures ) override { return mPresenterPtr->LockSharedTexture( pTextureID, pFreeTextures ); }
 	bool UnlockSharedTexture( int textureID ) override { return mPresenterPtr->UnlockSharedTexture( textureID ); }
 
 protected:
@@ -61,6 +61,7 @@ protected:
 	BOOL    CheckNewFrame() const override { return mPresenterPtr->CheckNewFrame(); }
 
 	//
+	HRESULT SkipToPosition( MFTIME seekTime );
 
 	HRESULT CreateSession();
 	HRESULT CloseSession();
