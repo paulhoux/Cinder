@@ -373,7 +373,7 @@ public:
 		COMPILE_ASSERT( sizeof( ScopedComPtr<Interface, interface_id> ) ==
 						sizeof( Interface* ), ScopedComPtrSize );
 	}
-
+		
 	// Explicit Release() of the held object.  Useful for reuse of the
 	// ScopedComPtr instance.
 	// Note that this function equates to IUnknown::Release and should not

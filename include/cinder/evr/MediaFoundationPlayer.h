@@ -30,10 +30,10 @@ public:
 	~MediaFoundationPlayer();
 
 	// IPlayer methods
-	bool CreateSharedTexture( int w, int h, int textureID ) override { return mPresenterPtr->CreateSharedTexture( w, h, textureID ); }
-	void ReleaseSharedTexture( int textureID ) override { mPresenterPtr->ReleaseSharedTexture( textureID ); }
-	bool LockSharedTexture( int *pTextureID, int *pFreeTextures ) override { return mPresenterPtr->LockSharedTexture( pTextureID, pFreeTextures ); }
-	bool UnlockSharedTexture( int textureID ) override { return mPresenterPtr->UnlockSharedTexture( textureID ); }
+	//bool CreateSharedTexture( int w, int h, int textureID ) override { return mPresenterPtr->CreateSharedTexture( w, h, textureID ); }
+	//void ReleaseSharedTexture( int textureID ) override { mPresenterPtr->ReleaseSharedTexture( textureID ); }
+	//bool LockSharedTexture( int *pTextureID, int *pFreeTextures ) override { return mPresenterPtr->LockSharedTexture( pTextureID, pFreeTextures ); }
+	//bool UnlockSharedTexture( int textureID ) override { return mPresenterPtr->UnlockSharedTexture( textureID ); }
 
 protected:
 	// IUnknown methods
@@ -59,6 +59,7 @@ protected:
 	UINT32  GetHeight() const override { return mHeight; }
 
 	BOOL    CheckNewFrame() const override { return mPresenterPtr->CheckNewFrame(); }
+	ci::gl::Texture2dRef GetTexture() override { return mPresenterPtr->GetTexture(); }
 
 	//
 	HRESULT SkipToPosition( MFTIME seekTime );

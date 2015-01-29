@@ -1,4 +1,4 @@
-#include "vld.h"
+//#include "vld.h"
 
 #include "cinder/app/AppNative.h"
 #include "cinder/app/RendererGl.h"
@@ -30,6 +30,7 @@ public:
 	void fileDrop( FileDropEvent event ) override;
 
 	bool playVideo( const fs::path &path );
+
 private:
 	video::MovieGlRef              mMovieRef;
 	glm::mat4                      mTransform;
@@ -47,6 +48,8 @@ void WindowsEnhancedVideoApp::prepareSettings( Settings* settings )
 
 void WindowsEnhancedVideoApp::setup()
 {
+	auto p = getAssetPath( "test.txt" );
+
 	fs::path path = getOpenFilePath();
 	playVideo( path );
 
@@ -117,6 +120,18 @@ void WindowsEnhancedVideoApp::keyDown( KeyEvent event )
 		break;
 	case KeyEvent::KEY_o:
 		playVideo( getOpenFilePath() );
+		break;
+	case KeyEvent::KEY_r:
+		mMovieRef.reset();
+		break;
+	case KeyEvent::KEY_v:
+		gl::enableVerticalSync( !gl::isVerticalSyncEnabled() );
+		break;
+	case KeyEvent::KEY_l:
+		if( isFrameRateEnabled() )
+			disableFrameRate();
+		else
+			setFrameRate( 60.0f );
 		break;
 	}
 }

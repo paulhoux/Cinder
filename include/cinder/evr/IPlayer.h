@@ -1,6 +1,7 @@
 #pragma once
 
 #include "cinder/Cinder.h"
+#include "cinder/gl/Texture.h"
 
 #if defined(CINDER_MSW)
 
@@ -31,11 +32,12 @@ public:
 	virtual UINT32  GetHeight() const = 0;
 
 	virtual BOOL    CheckNewFrame() const = 0;
+	virtual ci::gl::Texture2dRef GetTexture() = 0;
 
-	virtual bool CreateSharedTexture( int w, int h, int textureID ) = 0;
-	virtual void ReleaseSharedTexture( int textureID ) = 0;
-	virtual bool LockSharedTexture( int *pTextureID, int *pFreeTextures ) = 0;
-	virtual bool UnlockSharedTexture( int textureID ) = 0;
+	//virtual bool CreateSharedTexture( int w, int h, int textureID ) = 0;
+	//virtual void ReleaseSharedTexture( int textureID ) = 0;
+	//virtual bool LockSharedTexture( int *pTextureID, int *pFreeTextures ) = 0;
+	//virtual bool UnlockSharedTexture( int textureID ) = 0;
 };
 
 } // namespace video

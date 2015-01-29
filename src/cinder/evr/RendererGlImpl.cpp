@@ -35,176 +35,153 @@ POSSIBILITY OF SUCH DAMAGE.
 #include "cinder/app/AppBasic.h"
 
 namespace cinder {
-namespace msw {
-namespace video {
+	namespace msw {
+		namespace video {
 
-MovieGl::MovieGl()
-	: MovieBase(), mPreferredBackend( BE_MEDIA_FOUNDATION )
-{
-	if( !wglext_NV_DX_interop ) {
-		throw std::runtime_error( "WGL_NV_DX_interop extension not supported. Upgrade your graphics drivers and try again." );
-	}
-
-	// Instantiate the texture pool on the main thread.
-	auto pool = SharedTexturePool::instance();
-}
-
-MovieGl::~MovieGl()
-{
-}
-
-MovieGl::MovieGl( const Url& url )
-	: MovieGl()
-{
-	MovieBase::initFromUrl( url );
-}
-
-MovieGl::MovieGl( const fs::path& filePath )
-	: MovieGl()
-{
-	MovieBase::initFromPath( filePath );
-}
-
-void MovieGl::initFromUrl( const Url& url )
-{
-	MovieBase::initFromUrl( url );
-}
-
-void MovieGl::initFromPath( const fs::path& filePath )
-{
-	MovieBase::initFromPath( filePath );
-}
-
-void MovieGl::init( const std::wstring &url )
-{
-	HRESULT hr = E_FAIL;
-
-	// Try preferred backend first.
-	if( mPreferredBackend != BE_UNKNOWN ) {
-		if( initPlayer( mPreferredBackend ) )
-			hr = mPlayer->OpenFile( url.c_str() );
-	}
-
-	// Try all other backends next.
-	if( FAILED( hr ) ) {
-		for( int i = 0; i < BE_COUNT; ++i ) {
-			if( i != mPreferredBackend && initPlayer( (Backend) i ) ) {
-				hr = mPlayer->OpenFile( url.c_str() );
-				if( SUCCEEDED( hr ) )
-					break;
+			MovieGl::MovieGl()
+				: MovieBase(), mPreferredBackend( BE_MEDIA_FOUNDATION )
+			{
+				// Instantiate the texture pool on the main thread.
+				//auto pool = SharedTexturePool::instance();
 			}
-		}
-	}
 
-	if( FAILED( hr ) ) {
-		CI_LOG_E( "Failed to open movie: " << url.c_str() );
-		return;
-	}
+			MovieGl::~MovieGl()
+			{
+			}
 
-	// Get width and height of the video.
-	mWidth = mPlayer->GetWidth();
-	mHeight = mPlayer->GetHeight();
+			MovieGl::MovieGl( const Url& url )
+				: MovieGl()
+			{
+				MovieBase::initFromUrl( url );
+			}
 
-	/*// Delete existing shared textures if their size is different.
-	for( auto itr = mTextures.rbegin(); itr != mTextures.rend(); ++itr ) {
-	gl::Texture2dRef texture = itr->second;
-	if( texture && ( mWidth != texture->getWidth() || mHeight != texture->getHeight() ) ) {
-	mPlayer->ReleaseSharedTexture( texture->getId() );
-	mTextures.erase( texture->getId() );
-	}
-	}
-	//*/
+			MovieGl::MovieGl( const fs::path& filePath )
+				: MovieGl()
+			{
+				MovieBase::initFromPath( filePath );
+			}
 
-	// Create shared textures.
-	for( size_t i = 0; i < 2; ++i ) {
-		//gl::Texture2dRef texture = gl::Texture2d::create( mWidth, mHeight, gl::Texture2d::Format().target( GL_TEXTURE_RECTANGLE ) );
-		//texture->setDoNotDispose( true );
-		//if( mPlayer->CreateSharedTexture( mWidth, mHeight, texture->getId() ) ) {}
-		SharedTexturePool::instance().createTexture( mWidth, mHeight );
-	}
-}
+			void MovieGl::initFromUrl( const Url& url )
+			{
+				MovieBase::initFromUrl( url );
+			}
 
-bool MovieGl::initPlayer( Backend backend )
-{
-	if( mPlayer && mCurrentBackend == backend )
-		return true;
+			void MovieGl::initFromPath( const fs::path& filePath )
+			{
+				MovieBase::initFromPath( filePath );
+			}
 
-	HRESULT hr = S_OK;
+			void MovieGl::init( const std::wstring &url )
+			{
+				HRESULT hr = E_FAIL;
 
-	SafeRelease( mPlayer );
+				// Try preferred backend first.
+				if( mPreferredBackend != BE_UNKNOWN ) {
+					if( initPlayer( mPreferredBackend ) )
+						hr = mPlayer->OpenFile( url.c_str() );
+				}
 
-	assert( mHwnd != NULL );
+				// Try all other backends next.
+				if( FAILED( hr ) ) {
+					for( int i = 0; i < BE_COUNT; ++i ) {
+						if( i != mPreferredBackend && initPlayer( (Backend) i ) ) {
+							hr = mPlayer->OpenFile( url.c_str() );
+							if( SUCCEEDED( hr ) )
+								break;
+						}
+					}
+				}
 
-	switch( backend ) {
-	case BE_MEDIA_FOUNDATION:
-		// Try to play the movie using Media Foundation.
-		mPlayer = new MediaFoundationPlayer( hr, mHwnd );
-		mPlayer->AddRef();
-		break;
-	case BE_DIRECTSHOW:
-		// Try to play the movie using Media Foundation.
-		mPlayer = new DirectShowPlayer( hr, mHwnd );
-		mPlayer->AddRef();
-		break;
-	}
+				if( FAILED( hr ) ) {
+					CI_LOG_E( "Failed to open movie: " << url.c_str() );
+					return;
+				}
 
-	if( FAILED( hr ) ) {
-		mCurrentBackend = BE_UNKNOWN;
-		SafeRelease( mPlayer );
-		return false;
-	}
-	else {
-		mCurrentBackend = backend;
-		return true;
-	}
-}
+				// Get width and height of the video.
+				mWidth = mPlayer->GetWidth();
+				mHeight = mPlayer->GetHeight();
 
-void MovieGl::draw( int x, int y, int w, int h )
-{
-	if( mPlayer && mPlayer->CheckNewFrame() ) {
-		gl::Texture2dRef tex = getTexture();
-		if( tex )
-			gl::draw( tex, Rectf( float( x ), float( y ), float( x + w ), float( y + h ) ) );
-	}
-}
+				/*// Delete existing shared textures if their size is different.
+				for( auto itr = mTextures.rbegin(); itr != mTextures.rend(); ++itr ) {
+				gl::Texture2dRef texture = itr->second;
+				if( texture && ( mWidth != texture->getWidth() || mHeight != texture->getHeight() ) ) {
+				mPlayer->ReleaseSharedTexture( texture->getId() );
+				mTextures.erase( texture->getId() );
+				}
+				}
+				//*/
 
-gl::Texture2dRef MovieGl::getTexture()
-{
-	static auto deleter = [&]( gl::Texture* tex ) {
-		try {
-			mPlayer->UnlockSharedTexture( tex->getId() );
-		}
-		catch( ... ) {}
-	};
+				// Create shared textures.
+				for( size_t i = 0; i < 2; ++i ) {
+					//gl::Texture2dRef texture = gl::Texture2d::create( mWidth, mHeight, gl::Texture2d::Format().target( GL_TEXTURE_RECTANGLE ) );
+					//texture->setDoNotDispose( true );
+					//if( mPlayer->CreateSharedTexture( mWidth, mHeight, texture->getId() ) ) {}
+					//SharedTexturePool::instance().createTexture( mWidth, mHeight );
+				}
+			}
 
-	int textureID;
-	int freeTextures;
+			bool MovieGl::initPlayer( Backend backend )
+			{
+				if( mPlayer && mCurrentBackend == backend )
+					return true;
 
-	if( mPlayer && mPlayer->LockSharedTexture( &textureID, &freeTextures ) ) {
-		app::console() << freeTextures << std::endl;
+				HRESULT hr = S_OK;
 
-		// If only one free texture is left, create a new shared texture to ensure double buffering works.
-		if( freeTextures < 2 ) {
-			gl::Texture2dRef texture = gl::Texture2d::create( mWidth, mHeight, gl::Texture2d::Format().target( GL_TEXTURE_RECTANGLE ) );
-			texture->setDoNotDispose( true );
-			if( !mPlayer->CreateSharedTexture( mWidth, mHeight, texture->getId() ) )
-				CI_LOG_W( "Failed to created shared texture." );
-		}
+				SafeRelease( mPlayer );
 
-		// Now create a Texture2dRef from the already returned texture.
-		int width = mPlayer->GetWidth();
-		int height = mPlayer->GetHeight();
-		gl::Texture2dRef tex = gl::Texture2d::create( GL_TEXTURE_RECTANGLE_ARB, textureID, width, height, true, deleter );
-		tex->setTopDown( true );
+				assert( mHwnd != NULL );
 
-		return tex;
-	}
+				switch( backend ) {
+				case BE_MEDIA_FOUNDATION:
+					// Try to play the movie using Media Foundation.
+					mPlayer = new MediaFoundationPlayer( hr, mHwnd );
+					mPlayer->AddRef();
+					break;
+				case BE_DIRECTSHOW:
+					// Try to play the movie using Media Foundation.
+					mPlayer = new DirectShowPlayer( hr, mHwnd );
+					mPlayer->AddRef();
+					break;
+				}
 
-	return gl::Texture2dRef();
-}
+				if( FAILED( hr ) ) {
+					mCurrentBackend = BE_UNKNOWN;
+					SafeRelease( mPlayer );
+					return false;
+				}
+				else {
+					mCurrentBackend = backend;
+					return true;
+				}
+			}
 
-} // namespace video
-} // namespace msw
+			void MovieGl::draw( int x, int y, int w, int h )
+			{
+				if( mPlayer ) {
+					auto texture = mPlayer->GetTexture();
+					if( texture )
+						mTexture = texture;
+				}
+
+				if( mTexture )
+					gl::draw( mTexture, Rectf( float( x ), float( y ), float( x + w ), float( y + h ) ) );
+			}
+
+			gl::Texture2dRef MovieGl::getTexture()
+			{
+				gl::Texture2dRef tex;
+
+				if( mPlayer ) {
+					auto texture = mPlayer->GetTexture();
+					if( texture )
+						mTexture = texture;
+				}
+
+				return mTexture;
+			}
+
+		} // namespace video
+	} // namespace msw
 } // namespace cinder
 
 #endif // CINDER_MSW

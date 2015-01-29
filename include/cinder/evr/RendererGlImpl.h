@@ -76,6 +76,7 @@ protected:
 
 protected:
 	gl::GlslProgRef          mShader;
+	gl::Texture2dRef         mTexture;
 	Backend                  mPreferredBackend;
 };
 
