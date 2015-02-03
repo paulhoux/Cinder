@@ -59,7 +59,7 @@ POSSIBILITY OF SUCH DAMAGE.
 namespace cinder {
 namespace msw {
 
-//! Initializes COM on this thread. Uses Boost's thread local storage to prevent multiple initializations per thread
+//! Initializes COM on this thread. Uses thread local storage to prevent multiple initializations per thread
 void initializeCom( DWORD params = COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE );
 
 //! Releases a COM pointer if the pointer is not NULL, and sets the pointer to NULL.

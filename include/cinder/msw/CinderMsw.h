@@ -101,7 +101,4 @@ public:
 	}
 };
 
-//! Initializes COM on this thread. Uses thread local storage to prevent multiple initializations per thread
-void initializeCom( DWORD params = COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE );
-
 } } // namespace cinder::msw

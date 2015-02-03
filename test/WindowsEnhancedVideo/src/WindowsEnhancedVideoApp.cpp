@@ -19,11 +19,13 @@ using namespace ci::msw::video;
 using namespace std;
 
 struct Circle {
-	ci::vec4  color;
+	ci::vec2  size;
+	int       index;
+	int       pad0;
 
 	ci::vec2  position;
 	float     radius;
-	float     pad0;
+	float     pad1;
 
 	float     thickness;
 	float     length;
@@ -49,7 +51,7 @@ public:
 	bool playVideo( const fs::path &path );
 
 private:
-	static const int kMaxMovieCount = 16;
+	static const int kMaxMovieCount = 8;
 
 	std::vector<MovieGlRef>        mMovies;
 
@@ -78,7 +80,7 @@ void WindowsEnhancedVideoApp::setup()
 	mData = gl::Vbo::create( GL_ARRAY_BUFFER, data.size() * sizeof( Circle ), data.data(), GL_DYNAMIC_DRAW );
 
 	geom::BufferLayout instanceDataLayout;
-	instanceDataLayout.append( geom::Attrib::CUSTOM_0, 4, sizeof( Circle ), offsetof( Circle, color ), 1 /* per instance */ );
+	instanceDataLayout.append( geom::Attrib::CUSTOM_0, 4, sizeof( Circle ), offsetof( Circle, size ), 1 /* per instance */ );
 	instanceDataLayout.append( geom::Attrib::CUSTOM_1, 4, sizeof( Circle ), offsetof( Circle, position ), 1 /* per instance */ );
 	instanceDataLayout.append( geom::Attrib::CUSTOM_2, 4, sizeof( Circle ), offsetof( Circle, thickness ), 1 /* per instance */ );
 
@@ -87,11 +89,19 @@ void WindowsEnhancedVideoApp::setup()
 	mMesh->appendVbo( instanceDataLayout, mData );
 
 	//
-	mShader = gl::GlslProg::create( loadAsset( "circle.vert" ), loadAsset( "circle.frag" ) );
+	try {
+		mShader = gl::GlslProg::create( loadAsset( "circle.vert" ), loadAsset( "circle.frag" ) );
+		mShader->uniform( "uTex0", 0 );
 
-	//
-	mBatch = gl::Batch::create( mMesh, mShader, { { geom::Attrib::CUSTOM_0, "vInstanceColor" }, { geom::Attrib::CUSTOM_1, "vInstancePosition" }, { geom::Attrib::CUSTOM_2, "vInstanceAttribs" } } );
-
+		mBatch = gl::Batch::create( mMesh, mShader, {
+			{ geom::Attrib::CUSTOM_0, "vInstanceSize" },
+			{ geom::Attrib::CUSTOM_1, "vInstancePosition" },
+			{ geom::Attrib::CUSTOM_2, "vInstanceAttribs" } } );
+	}
+	catch( const std::exception &e ) {
+		console() << e.what() << std::endl;
+		quit();
+	}
 }
 
 void WindowsEnhancedVideoApp::shutdown()
@@ -114,22 +124,10 @@ void WindowsEnhancedVideoApp::update()
 void WindowsEnhancedVideoApp::draw()
 {
 	gl::clear();
+	gl::setMatricesWindow( getWindowSize(), false );
 
-	// Update instance data.
-	double time = getElapsedSeconds();
-	Circle *ptr = (Circle*) mData->mapWriteOnly( true );
-	size_t base = (size_t) ptr;
-	for( size_t i = 0; i < mMovies.size(); ++i ) {
-		ptr->color = vec4( 1 );
-		//ptr->color.a = 0.45f + 0.4f * sinf( float( 2.0 * M_PI ) * ( i / float( mMovies.size() ) ) - (float) time * 8.0f );
-		ptr->position = vec2( getWindowSize() / 2 );
-		ptr->radius = 0.8f * math<float>::max( getWindowWidth(), getWindowHeight() );
-		ptr->thickness = 0.5f;
-		ptr->length = 1.0f / mMovies.size();
-		ptr->offset = float( time * 0.05 ) + float( i ) / mMovies.size();
-		++ptr;
-	}
-	mData->unmap();
+	// Bind shader, so we can set uniforms.
+	gl::ScopedGlslProg shader( mShader );
 
 	// Bind textures.
 	for( int i = 0; i < (int) mMovies.size(); ++i ) {
@@ -142,8 +140,39 @@ void WindowsEnhancedVideoApp::draw()
 		}
 	}
 
+	double time = getElapsedSeconds();
+
 	// Draw movies.
-	mBatch->drawInstanced( mMovies.size() );
+	gl::ScopedAlphaBlend blend( false );
+
+	for( size_t i = 0; i < mMovies.size(); ++i ) {
+		auto movie = mMovies[i];
+		if( !movie )
+			continue;
+
+		auto texture = movie->getTexture();
+		if( !texture )
+			continue;
+
+		// Update instance data.
+		Circle *ptr = (Circle*) mData->mapWriteOnly( true );
+		ptr->size = movie->getSize();
+		ptr->index = i;
+		ptr->position = vec2( 0 );
+		ptr->radius = 0.48f * math<float>::max( getWindowWidth(), getWindowHeight() );
+		ptr->thickness = 1.0f;
+		ptr->length = 1.0f / mMovies.size();
+		ptr->offset = 0.25f;
+		mData->unmap();
+
+		gl::ScopedTextureBind tex0( texture );
+		gl::ScopedModelMatrix model;
+
+		gl::translate( 0.5f * vec2( getWindowSize() ) );
+		gl::rotate( glm::radians( float( time ) * 15.0f + 360.0f * i / float( mMovies.size() ) ) );
+
+		mBatch->drawInstanced( 1 );
+	}
 }
 
 void WindowsEnhancedVideoApp::mouseDown( MouseEvent event )
@@ -154,7 +183,12 @@ void WindowsEnhancedVideoApp::keyDown( KeyEvent event )
 {
 	switch( event.getCode() ) {
 	case KeyEvent::KEY_ESCAPE:
+		mMovies.clear();
 		quit();
+		break;
+	case KeyEvent::KEY_DELETE:
+		if( !mMovies.empty() )
+			mMovies.erase( mMovies.begin() );
 		break;
 	case KeyEvent::KEY_o:
 		playVideo( getOpenFilePath() );
@@ -168,6 +202,12 @@ void WindowsEnhancedVideoApp::keyDown( KeyEvent event )
 		else
 			setFrameRate( 60.0f );
 		break;
+	case KeyEvent::KEY_r:
+		mMovies.clear();
+		break;
+	case KeyEvent::KEY_f:
+		setFullScreen( !isFullScreen() );
+		break;
 	}
 }
 
@@ -177,8 +217,10 @@ void WindowsEnhancedVideoApp::resize()
 
 void WindowsEnhancedVideoApp::fileDrop( FileDropEvent event )
 {
-	const fs::path& path = event.getFile( 0 );
-	playVideo( path );
+	for( size_t i = 0; i < event.getNumFiles(); ++i ) {
+		const fs::path& path = event.getFile( i );
+		playVideo( path );
+	}
 }
 
 bool WindowsEnhancedVideoApp::playVideo( const fs::path &path )
