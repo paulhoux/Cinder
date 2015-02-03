@@ -55,6 +55,10 @@ protected:
 
 	HRESULT HandleEvent( UINT_PTR pEventPtr ) override;
 
+	BOOL    IsPlaying() const override { return ( mState == Started ); }
+	BOOL    IsPaused() const override { return ( mState == Paused ); }
+	BOOL    IsStopped() const override { return ( mState == Stopped ); }
+
 	UINT32  GetWidth() const override { return mWidth; }
 	UINT32  GetHeight() const override { return mHeight; }
 

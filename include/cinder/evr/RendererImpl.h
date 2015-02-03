@@ -131,9 +131,9 @@ public:
 	//! Gets the audio playback volume ranging from [0 - 1.0]
 	float		getVolume() const { /*TODO*/ return 0.0f; }
 	//! Returns whether the movie is currently playing or is paused/stopped.
-	bool		isPlaying() const { /*TODO*/ return false; }
+	bool		isPlaying() const { assert( mPlayer ); return mPlayer->IsPlaying(); }
 	//! Returns whether the movie has completely finished playing
-	bool		isDone() const { assert( mPlayer ); /*return mPlayer->*/ }
+	bool		isDone() const { assert( mPlayer ); return mPlayer->IsStopped(); }
 	//! Begins movie playback.
 	void		play() { assert( mPlayer ); mPlayer->Play(); mIsPlaying = true; }
 	//! Stops movie playback.

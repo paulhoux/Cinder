@@ -112,9 +112,8 @@ void WindowsEnhancedVideoApp::keyDown( KeyEvent event )
 		quit();
 		break;
 	case KeyEvent::KEY_SPACE:
-		if( mMovieRef ) {
+		if( mMovieRef )
 			mCapturedFrames.push_back( mMovieRef->getTexture() );
-		}
 		break;
 	case KeyEvent::KEY_DELETE:
 		if( !mCapturedFrames.empty() )
@@ -157,9 +156,6 @@ void WindowsEnhancedVideoApp::fileDrop( FileDropEvent event )
 bool WindowsEnhancedVideoApp::playVideo( const fs::path &path )
 {
 	if( !path.empty() && fs::exists( path ) ) {
-		// 
-		mCapturedFrames.clear();
-
 		// TODO: make sure the movie can play
 		mMovieRef = video::MovieGl::create( path );
 		mMovieRef->play();

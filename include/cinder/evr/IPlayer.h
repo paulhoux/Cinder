@@ -29,6 +29,8 @@ public:
 	virtual HRESULT HandleEvent( UINT_PTR pEventPtr ) = 0;
 
 	virtual BOOL    IsPlaying() const = 0;
+	virtual BOOL    IsPaused() const = 0;
+	virtual BOOL    IsStopped() const = 0;
 
 	virtual UINT32  GetWidth() const = 0;
 	virtual UINT32  GetHeight() const = 0;

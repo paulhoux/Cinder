@@ -359,45 +359,22 @@ namespace cinder {
 							if( !glIsTexture( s.m_uTextureId ) )
 								glGenTextures( 1, &( s.m_uTextureId ) );
 
-							tex = gl::Texture2d::create( GL_TEXTURE_RECTANGLE, s.m_uTextureId, desc.Width, desc.Height, false, [&]( ci::gl::Texture *tex ) {
-								CI_LOG_V( "Texture destroyed" );
-
-								std::lock_guard<std::mutex> lock( mUsedLock );
-
-								// Find corresponding texture in mUsed.
-								auto itr = std::find( mUsed.begin(), mUsed.end(), tex->getId() );
-								if( itr != mUsed.end() ) {
-									SharedTexture &s = *itr;
-
-									CI_LOG_V( "Unlocking texture " << s.m_hGLHandle );
-									if( !wglDXUnlockObjectsNV( m_pD3DDeviceHandle, 1, &( s.m_hGLHandle ) ) ) {
-										CI_LOG_E( "Failed to unlock object." );
-									}
-									else
-										CI_LOG_V( "Succeeded." );
-
-									//CI_LOG_V( "Unregistering object " << s.m_hGLHandle );
-									//if( !wglDXUnregisterObjectNV( m_pD3DDeviceHandle, s.m_hGLHandle ) ) {
-									//	CI_LOG_E( "Failed to unregister object." );
-									//}
-									//else
-									//	CI_LOG_V( "Succeeded." );
-
-									// Return texture to free surfaces.
-									std::lock_guard<std::mutex> surlock( mFreeLock );
-									mFree.push_back( s );
-
-									// Warning: 's' no longer exists after this call!
-									mUsed.erase( itr );
+							// Define a custom deleter for the texture.
+							std::weak_ptr<SharedTexturePool> weakPtr( shared_from_this() );
+							auto deleter = [weakPtr]( gl::Texture2d *pTexture ) {
+								// Check if the pool still exists.
+								std::shared_ptr<SharedTexturePool> pool = weakPtr.lock();
+								if( pool ) {
+									pool->FreeUsedTexture( pTexture );
 								}
-
-								// Don't actually delete the texture, we're gonna reuse it later. But we do need to notify the gl::context() we're done using it.
-								auto ctx = gl::context();
-								if( ctx )
-									ctx->textureDeleted( tex );
-							} );
-
-							// Make sure the texture is not rendered upside down.
+								else {
+									// Pool no longer exists. Delete the texture in the usual way.
+									delete pTexture;
+								}
+							};
+							
+							// Create the texture and make sure the texture is not rendered upside down.
+							tex = gl::Texture2d::create( GL_TEXTURE_RECTANGLE, s.m_uTextureId, desc.Width, desc.Height, false, deleter );
 							tex->setTopDown( true );
 
 							// Store a weak pointer to the texture.
@@ -460,6 +437,40 @@ namespace cinder {
 					} while( false );
 
 					return ci::gl::Texture2dRef();
+				}
+
+				void FreeUsedTexture( ci::gl::Texture2d *pTexture )
+				{
+					CI_LOG_V( "Texture destroyed" );
+
+					std::lock_guard<std::mutex> lock( mUsedLock );
+
+					// Find corresponding texture in mUsed.
+					auto itr = std::find( mUsed.begin(), mUsed.end(), pTexture->getId() );
+					if( itr != mUsed.end() ) {
+						SharedTexture &s = *itr;
+
+						CI_LOG_V( "Unlocking texture " << s.m_hGLHandle );
+						if( !wglDXUnlockObjectsNV( m_pD3DDeviceHandle, 1, &( s.m_hGLHandle ) ) ) {
+							CI_LOG_E( "Failed to unlock object." );
+						}
+						else
+							CI_LOG_V( "Succeeded." );
+
+						// Don't call wglDXUnregisterObjectNV() here, as we intend to reuse the texture later.
+
+						// Return texture to free surfaces.
+						std::lock_guard<std::mutex> surlock( mFreeLock );
+						mFree.push_back( s );
+
+						// Warning: 's' no longer exists after this call!
+						mUsed.erase( itr );
+					}
+
+					// Don't actually delete the texture, we're gonna reuse it later. But we do need to notify the gl::context() we're done using it.
+					auto ctx = gl::context();
+					if( ctx )
+						ctx->textureDeleted( pTexture );
 				}
 
 			private:
