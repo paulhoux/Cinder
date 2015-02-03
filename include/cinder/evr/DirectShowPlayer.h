@@ -49,13 +49,7 @@ public:
 	UINT32  GetWidth() const override { return (UINT32) m_Width; }
 	UINT32  GetHeight() const override { return (UINT32) m_Height; }
 
-	BOOL    CheckNewFrame() const override { return m_pVideo->CheckNewFrame(); }
 	ci::gl::Texture2dRef GetTexture() override { return ci::gl::Texture2dRef(); }
-
-	//bool CreateSharedTexture( int w, int h, int textureID ) override { return m_pVideo->CreateSharedTexture( w, h, textureID ); }
-	//void ReleaseSharedTexture( int textureID ) override { m_pVideo->ReleaseSharedTexture( textureID ); }
-	//bool LockSharedTexture( int *pTextureID, int *pFreeTextures ) override { return m_pVideo->LockSharedTexture( pTextureID, pFreeTextures ); }
-	//bool UnlockSharedTexture( int textureID ) override { return m_pVideo->UnlockSharedTexture( textureID ); }
 
 	//
 	PlayerState State() const { return m_state; }

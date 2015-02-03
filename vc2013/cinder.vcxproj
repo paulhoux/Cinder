@@ -475,7 +475,6 @@
     <ClInclude Include="..\include\cinder\dx\PlatformHelpers.h" />
     <ClInclude Include="..\include\cinder\evr\DirectShowPlayer.h" />
     <ClInclude Include="..\include\cinder\evr\DirectShowVideo.h" />
-    <ClInclude Include="..\include\cinder\evr\IRenderer.h" />
     <ClInclude Include="..\include\cinder\evr\MediaFoundationPlayer.h" />
     <ClInclude Include="..\include\cinder\evr\IPlayer.h" />
     <ClInclude Include="..\include\cinder\evr\RendererGlImpl.h" />

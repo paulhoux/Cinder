@@ -380,6 +380,8 @@ class Texture2d : public TextureBase {
 		bool	mLoadTopDown;
 		friend	Texture;
 	};
+
+	virtual ~Texture2d() {}
 	
 	//! Constructs a texture of size(\a width, \a height) and allocates storage.
 	static Texture2dRef	create( int width, int height, Format format = Format() );
@@ -542,6 +544,8 @@ class Texture3d : public TextureBase {
 		friend Texture3d;
 	};
 
+	virtual ~Texture3d() {}
+
 	static Texture3dRef create( GLint width, GLint height, GLint depth, Format format = Format() );
 	static Texture3dRef create( GLint width, GLint height, GLint depth, GLenum dataFormat, const uint8_t *data, Format format = Format() );	
   
@@ -594,6 +598,8 @@ class TextureCubeMap : public TextureBase
 		
 		friend TextureCubeMap;
 	};
+
+	virtual ~TextureCubeMap() {}
   
 	static TextureCubeMapRef	create( int32_t width, int32_t height, const Format &format = Format() );
 	static TextureCubeMapRef	createHorizontalCross( const ImageSourceRef &imageSource, const Format &format = Format() );
@@ -618,6 +624,8 @@ typedef std::shared_ptr<class Texture2dCache> Texture2dCacheRef;
 class Texture2dCache : public std::enable_shared_from_this<Texture2dCache>
 {
   public:
+	virtual ~Texture2dCache() {}
+
 	static Texture2dCacheRef create();
 	static Texture2dCacheRef create( const Surface8u &prototypeSurface, const Texture2d::Format &format );
 	

@@ -214,8 +214,8 @@ void AppImplMswBasic::destroyBlankingWindows()
 void AppImplMswBasic::quit()
 {
 	// Close all windows, forcing the application to quit.
-	//while( !mWindows.empty() )
-	//	mWindows.back()->close();
+	while( !mWindows.empty() )
+		mWindows.back()->close();
 
 	// Always quit, even if !isQuitOnLastWindowCloseEnabled()
 	mShouldQuit = true;

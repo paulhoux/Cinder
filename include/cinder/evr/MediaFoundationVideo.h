@@ -80,24 +80,21 @@ namespace cinder {
 				HRESULT CheckDeviceState( DeviceState *pState );
 				HRESULT PresentSample( IMFSample* pSample, LONGLONG llTarget );
 
-				BOOL    CheckNewFrame() const { return mHasNewFrame; }
-
 				UINT    RefreshRate() const { return m_DisplayMode.RefreshRate; }
 
-				HRESULT CreateTexturePool( int width, int height );
-				SharedTexturePool* GetTexturePool() { return m_pTexturePool; } // TEMP
+				//! Returns the latest frame as an OpenGL texture, if available. Returns an empty texture if no (new) frame is available.
 				ci::gl::Texture2dRef GetTexture();
 
 			protected:
 				HRESULT InitializeD3D();
 				HRESULT GetSwapChainPresentParameters( IMFMediaType *pType, D3DPRESENT_PARAMETERS* pPP );
 				HRESULT CreateD3DDevice();
+				HRESULT CreateTexturePool( IDirect3DDevice9Ex *pDevice );
 				HRESULT CreateD3DSample( IDirect3DSwapChain9 *pSwapChain, IMFSample **ppVideoSample );
 				HRESULT UpdateDestRect();
 
 				// A derived class can override these handlers to allocate any additional D3D resources.
 				virtual HRESULT OnCreateVideoSamples( D3DPRESENT_PARAMETERS& pp ) { return S_OK; }
-				// virtual void    OnReleaseResources() ;
 
 				virtual HRESULT PresentSwapChain( IDirect3DSwapChain9* pSwapChain, IDirect3DSurface9* pSurface );
 				virtual void    PaintFrameWithGDI();
@@ -118,25 +115,13 @@ namespace cinder {
 				IDirect3DSurface9           *m_pSurfaceRepaint;     // Surface for repaint requests.
 
 			protected:
-				//HANDLE                          m_pD3DDeviceHandle;     // Shared device handle for OpenGL interop.
-				BOOL                            mHasNewFrame;
-				int                             mWidth;                 // Width of all shared textures.
-				int                             mHeight;                // Height of all shared textures.
+				int                          mWidth;                // Width of all shared textures.
+				int                          mHeight;               // Height of all shared textures.
 
-				//msw::CriticalSection            mSharedTexturesLock;
-
-				SharedTexturePool            *m_pTexturePool;
+				std::shared_ptr<SharedTexturePool>  m_pTexturePool;
 
 			public:
-
-				//HANDLE GetSharedDeviceHandle() { return m_pD3DDeviceHandle; }
-
 				virtual void OnReleaseResources() {}
-
-				//bool CreateSharedTexture( int w, int h, int textureID ) { return false; }
-				//void ReleaseSharedTexture( int textureID ) {}
-				//bool LockSharedTexture( int *pTextureID, int *pFreeTextures ) { return false; }
-				//bool UnlockSharedTexture( int textureID ) { return false; }
 			};
 
 			// MFSamplePresenter_SampleCounter
@@ -241,9 +226,7 @@ namespace cinder {
 				STDMETHOD( SetFullscreen )( BOOL bFullscreen ) override { return E_NOTIMPL; }
 				STDMETHOD( GetFullscreen )( BOOL* pbFullscreen ) override { return E_NOTIMPL; }
 
-				// Custom methods
-				HRESULT CreateTexturePool( int width, int height ) { assert( m_pD3DPresentEngine ); return m_pD3DPresentEngine->CreateTexturePool( width, height ); }
-				SharedTexturePool* GetTexturePool() { return m_pD3DPresentEngine->GetTexturePool(); }
+				//! Returns the latest frame as an OpenGL texture, if available. Returns an empty texture if no (new) frame is available.
 				ci::gl::Texture2dRef GetTexture() { assert( m_pD3DPresentEngine ); return m_pD3DPresentEngine->GetTexture(); };
 
 			protected:
@@ -369,13 +352,6 @@ namespace cinder {
 				volatile long               mRefCount;
 			public:
 				HANDLE GetSharedDeviceHandle();
-
-				BOOL   CheckNewFrame() const { return m_pD3DPresentEngine->CheckNewFrame(); }
-
-				//bool CreateSharedTexture( int w, int h, int textureID ) { return m_pD3DPresentEngine->CreateSharedTexture( w, h, textureID ); }
-				//void ReleaseSharedTexture( int textureID ) { return m_pD3DPresentEngine->ReleaseSharedTexture( textureID ); };
-				//bool LockSharedTexture( int *pTextureID, int *pFreeTextures ) { return m_pD3DPresentEngine->LockSharedTexture( pTextureID, pFreeTextures ); }
-				//bool UnlockSharedTexture( int textureID ) { return m_pD3DPresentEngine->UnlockSharedTexture( textureID ); }
 			};
 
 		} // namespace video

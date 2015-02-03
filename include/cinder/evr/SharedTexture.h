@@ -61,6 +61,8 @@ POSSIBILITY OF SUCH DAMAGE.
 //#pragma comment(lib,"dxva2.lib")
 //#pragma comment (lib,"evr.lib")
 
+#define USE_OFFSCREEN_PLAIN_SURFACE 1
+
 namespace cinder {
 	namespace msw {
 		namespace video {
@@ -163,7 +165,7 @@ namespace cinder {
 				int myUuid;
 			};
 
-			class SharedTexturePool {
+			class SharedTexturePool : public std::enable_shared_from_this < SharedTexturePool > {
 			public:
 				SharedTexturePool( IDirect3DDevice9Ex *pDevice )
 					: m_pDevice( pDevice ), m_pD3DDeviceHandle( NULL )
@@ -214,13 +216,15 @@ namespace cinder {
 						}
 					}
 
+					// The following textures are still in use, so don't delete them, just unlock and unregister them (?)
 					for( auto &shared : mUsed ) {
+						if( shared.m_hGLHandle != NULL ) {
+							CI_LOG_V( "Unlocking texture " << shared.m_hGLHandle );
+							BOOL success = wglDXUnlockObjectsNV( m_pD3DDeviceHandle, 1, &( shared.m_hGLHandle ) );
+						}
 						if( shared.m_hGLHandle != NULL ) {
 							CI_LOG_V( "Unregistering texture " << shared.m_hGLHandle );
 							BOOL success = wglDXUnregisterObjectNV( m_pD3DDeviceHandle, shared.m_hGLHandle );
-						}
-						if( glIsTexture( shared.m_uTextureId ) ) {
-							glDeleteTextures( 1, &( shared.m_uTextureId ) );
 						}
 					}
 
@@ -279,18 +283,22 @@ namespace cinder {
 							CI_LOG_V( "Creating new surface to render to." );
 
 							SharedTexture s;
-#if 0
+#if USE_OFFSCREEN_PLAIN_SURFACE
+							// Create D3DSurface only.
+							hr = m_pDevice->CreateOffscreenPlainSurface( desc.Width, desc.Height, /*D3DFMT_A8R8G8B8*/ desc.Format, D3DPOOL_DEFAULT, &( s.m_pD3DSurface ), &( s.m_hD3DHandle ) );
+							BREAK_ON_FAIL( hr );
+#else
 							// Create both a D3DSurface and D3DTexture.
 							hr = m_pDevice->CreateTexture( desc.Width, desc.Height, 1, D3DUSAGE_RENDERTARGET, /*D3DFMT_A8R8G8B8*/ desc.Format, D3DPOOL_DEFAULT, &( s.m_pD3DTexture ), &( s.m_hD3DHandle ) );
 							BREAK_ON_FAIL( hr );
 
 							hr = s.m_pD3DTexture->GetSurfaceLevel( 0, &( s.m_pD3DSurface ) );
 							BREAK_ON_FAIL( hr );
-#else
-							// Create D3DSurface only.
-							hr = m_pDevice->CreateOffscreenPlainSurface( desc.Width, desc.Height, /*D3DFMT_A8R8G8B8*/ desc.Format, D3DPOOL_DEFAULT, &( s.m_pD3DSurface ), &( s.m_hD3DHandle ) );
-							BREAK_ON_FAIL( hr );
 #endif
+							D3DSURFACE_DESC desc;
+							hr = s.m_pD3DSurface->GetDesc( &desc );
+							BREAK_ON_FAIL( hr );
+
 							*pShared = s;
 						}
 						else {

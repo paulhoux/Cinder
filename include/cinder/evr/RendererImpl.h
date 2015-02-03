@@ -96,7 +96,7 @@ public:
 	virtual bool hasAlpha() const { return false; }
 
 	//! Returns whether a movie has a new frame available
-	bool		checkNewFrame() { return mPlayer->CheckNewFrame() == TRUE; }
+	//bool		checkNewFrame() { return false; }
 
 	//! Returns the current time of a movie in seconds
 	float		getCurrentTime() const;

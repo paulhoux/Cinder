@@ -72,27 +72,29 @@ void WindowsEnhancedVideoApp::update()
 
 void WindowsEnhancedVideoApp::draw()
 {
-	if( mMovieRef && mMovieRef->checkNewFrame() ) {
-		gl::clear();
+	gl::clear();
+
+	if( mMovieRef ) {
 
 		// Draw movie.
 		mQuery->begin();
 
 		gl::Texture2dRef tex = mMovieRef->getTexture();
-		gl::draw( tex );
+		if( tex )
+			gl::draw( tex, (Rectf) Area::proportionalFit( tex->getBounds(), getWindowBounds(), true, true ) );
 
 		mQuery->end();
 
 		// Draw captured frames.
-		int x = 0, y = 0;
+		float x = 0.0f, y = 0.0f;
 		for( auto &frame : mCapturedFrames ) {
-			int w = frame->getWidth() / 4;
-			int h = frame->getHeight() / 4;
+			float w = frame->getWidth() * 0.25f;
+			float h = frame->getHeight() * 0.25f;
 			gl::draw( frame, Rectf( x, y, x + w, y + h ) );
 
 			x += w;
-			if( ( x + w ) > getWindowWidth() ) {
-				x = 0;
+			if( ( x + w ) > float( getWindowWidth() ) ) {
+				x = 0.0f;
 				y += h;
 			}
 		}

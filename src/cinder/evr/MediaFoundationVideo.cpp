@@ -214,7 +214,7 @@ namespace cinder {
 
 			D3DPresentEngine::D3DPresentEngine( HRESULT& hr )
 				: m_hwnd( NULL ), m_DeviceResetToken( 0 ), m_pD3D9( NULL ), m_pDevice( NULL ), m_pDeviceManager( NULL )
-				, m_pSurfaceRepaint( NULL ), m_pTexturePool( NULL ), mHasNewFrame( FALSE )
+				, m_pSurfaceRepaint( NULL ), m_pTexturePool( NULL )
 			{
 				hr = S_OK;
 
@@ -230,13 +230,12 @@ namespace cinder {
 
 					hr = CreateD3DDevice();
 					BREAK_ON_FAIL( hr );
-
 				} while( false );
 			}
 
 			D3DPresentEngine::~D3DPresentEngine()
 			{
-				SafeDelete( m_pTexturePool );
+				m_pTexturePool.reset();
 
 				SafeRelease( m_pDevice );
 				SafeRelease( m_pSurfaceRepaint );
@@ -246,199 +245,6 @@ namespace cinder {
 				CI_LOG_V( "Destroyed D3DPresentEngine." );
 			}
 
-			/*
-			bool D3DPresentEngine::CreateSharedTexture( int w, int h, int textureID )
-			{
-			// Make sure OpenGL interop is initialized.
-			if( !m_pD3DDeviceHandle ) {
-			m_pD3DDeviceHandle = wglDXOpenDeviceNV( m_pDevice );
-
-			if( !m_pD3DDeviceHandle ) {
-			CI_LOG_E( "Failed to open shared device." );
-			return false;
-			}
-			}
-
-			ScopedCriticalSection lock( mSharedTexturesLock );
-
-			// Sanity check.
-			if( !mSharedTextures.empty() ) {
-			// Texture size should match.
-			assert( mWidth == w );
-			assert( mHeight == h );
-			// Texture should not exist yet.
-			assert( mSharedTextures.find( textureID ) == mSharedTextures.end() );
-			}
-
-			// Set texture size.
-			mWidth = w;
-			mHeight = h;
-
-			// We need to create a shared handle for the resource, otherwise the extension fails on ATI/Intel cards.
-			HANDLE pSharedHandle = NULL;
-
-			SharedTexture shared;
-			HRESULT hr = m_pDevice->CreateTexture( w, h, 1, D3DUSAGE_RENDERTARGET, D3DFMT_A8R8G8B8, D3DPOOL_DEFAULT, &( shared.pD3DTexture ), &pSharedHandle );
-
-			if( FAILED( hr ) ) {
-			CI_LOG_E( "Failed to create D3D texture." );
-			return false;
-			}
-
-			if( !pSharedHandle ) {
-			CI_LOG_E( "Failed to create shared handle." );
-			return false;
-			}
-
-			if( !wglDXSetResourceShareHandleNV( shared.pD3DTexture, pSharedHandle ) ) {
-			CI_LOG_E( "Failed to shared resource." );
-			SafeRelease( shared.pD3DTexture );
-			return false;
-			}
-
-			shared.handle = wglDXRegisterObjectNV( m_pD3DDeviceHandle, shared.pD3DTexture, textureID, GL_TEXTURE_RECTANGLE, WGL_ACCESS_READ_ONLY_NV );
-			if( !shared.handle ) {
-			switch( GetLastError() ) {
-			case ERROR_INVALID_HANDLE:
-			CI_LOG_E( "No GL context is made current to the calling thread." );
-			break;
-			case ERROR_INVALID_DATA:
-			CI_LOG_E( "Incorrect <name> <type> or <access> parameters." );
-			break;
-			case ERROR_OPEN_FAILED:
-			CI_LOG_E( "Opening the Direct3D resource failed." );
-			break;
-			default:
-			CI_LOG_E( "Failed to register objects: " << GetLastError() );
-			break;
-			}
-			return false;
-			}
-
-			shared.name = textureID;
-			shared.pD3DTexture->GetSurfaceLevel( 0, &( shared.pD3DSurface ) );
-
-			#if MFV_LOCK_ONCE
-			// Now lock it once, it's an expensive operation. We'll promise to make sure we're not writing to the texture while OpenGL is using it.
-			if( !wglDXLockObjectsNV( m_pD3DDeviceHandle, 1, &( shared.handle ) ) ) {
-			CI_LOG_E( "Failed to lock texture." );
-			}
-			#endif
-
-			// Store texture in map.
-			mSharedTextures[textureID] = shared;
-			mSharedTextureFreeIDs.push_back( textureID );
-
-			return true;
-			}
-			*/
-			/*
-			void D3DPresentEngine::ReleaseSharedTexture( int textureID )
-			{
-			if( !m_pD3DDeviceHandle ) return;
-
-			ScopedCriticalSection lock( mSharedTexturesLock );
-
-			auto itr = mSharedTextures.find( textureID );
-			if( itr == mSharedTextures.end() )
-			return;
-
-			SharedTexture &shared = itr->second;
-
-			if( !wglDXUnlockObjectsNV( m_pD3DDeviceHandle, 1, &( shared.handle ) ) ) {
-			switch( GetLastError() ) {
-			case ERROR_NOT_LOCKED:
-			CI_LOG_E( "One or more of the objects was not locked." );
-			break;
-			case ERROR_INVALID_DATA:
-			CI_LOG_E( "One or more of the objects does not belong to the interop device." );
-			break;
-			case ERROR_LOCK_FAILED:
-			CI_LOG_E( "One or more of the objects failed to unlock." );
-			break;
-			default:
-			CI_LOG_E( "Failed to unlock objects: " << GetLastError() );
-			break;
-			}
-			}
-
-			// TODO: This always seems to crash :(
-			//if( !wglDXUnregisterObjectNV( m_pD3DDeviceHandle, shared.handle ) ) {
-			//	CI_LOG_E( "Failed to unregister object: " << GetLastError() );
-			//}
-
-			SafeRelease( shared.pD3DSurface );
-			SafeRelease( shared.pD3DTexture );
-
-			mSharedTextures.erase( itr );
-
-			auto itr2 = std::find( mSharedTextureFreeIDs.begin(), mSharedTextureFreeIDs.end(), textureID );
-			if( itr2 != mSharedTextureFreeIDs.end() )
-			mSharedTextureFreeIDs.erase( itr2 );
-
-			//
-			GLuint texID = textureID;
-			glDeleteTextures( 1, &texID );
-			}
-
-			bool D3DPresentEngine::LockSharedTexture( int *pTextureID, int *pFreeTextures )
-			{
-			if( !m_pD3DDeviceHandle ) return false;
-
-			ScopedCriticalSection lock( mSharedTexturesLock );
-
-			int id = mSharedTextureFreeIDs.front();
-			mSharedTextureFreeIDs.pop_front();
-
-			auto itr = mSharedTextures.find( id );
-			if( itr == mSharedTextures.end() )
-			return false;
-
-			SharedTexture &shared = itr->second;
-			if( !shared.handle )
-			return false;
-
-			if( MFV_LOCK_ONCE || wglDXLockObjectsNV( m_pD3DDeviceHandle, 1, &( shared.handle ) ) == GL_TRUE ) {
-			shared.locked = true;
-			*pTextureID = id;
-			*pFreeTextures = (int) mSharedTextureFreeIDs.size();
-			mHasNewFrame = FALSE;
-			return true;
-			}
-
-			return false;
-			}
-			*/
-			/*
-			bool D3DPresentEngine::UnlockSharedTexture( int textureID )
-			{
-			if( !m_pD3DDeviceHandle ) return false;
-
-			ScopedCriticalSection lock( mSharedTexturesLock );
-
-			auto itr = mSharedTextures.find( textureID );
-			if( itr == mSharedTextures.end() )
-			return false;
-
-			SharedTexture &shared = itr->second;
-			if( !shared.handle || !shared.locked )
-			return false;
-
-			if( MFV_LOCK_ONCE || wglDXUnlockObjectsNV( m_pD3DDeviceHandle, 1, &( shared.handle ) ) ) {
-			shared.locked = false;
-
-			// If there are more than 2 free IDs already, simply release this texture.
-			if( mSharedTextureFreeIDs.size() < 3 )
-			mSharedTextureFreeIDs.push_back( textureID );
-			else
-			ReleaseSharedTexture( textureID );
-
-			return true;
-			}
-
-			return false;
-			}
-			*/
 			HRESULT D3DPresentEngine::GetService( REFGUID guidService, REFIID riid, void** ppv )
 			{
 				assert( ppv != NULL );
@@ -586,7 +392,6 @@ namespace cinder {
 				// Let the derived class release any resources it created.
 				OnReleaseResources();
 
-				//SafeDelete( m_pTexturePool );
 				SafeRelease( m_pSurfaceRepaint );
 			}
 
@@ -682,24 +487,9 @@ namespace cinder {
 				return hr;
 			}
 
-			HRESULT D3DPresentEngine::CreateTexturePool( int width, int height )
-			{
-				HRESULT hr = S_OK;
-
-				if( m_pTexturePool != NULL && !m_pTexturePool->IsCompatibleWith( width, height ) )
-					SafeDelete( m_pTexturePool );
-
-				if( !m_pTexturePool )
-					m_pTexturePool = new SharedTexturePool( m_pDevice );
-
-				return hr;
-			}
-
 			ci::gl::Texture2dRef D3DPresentEngine::GetTexture()
 			{
-				if( !m_pTexturePool )
-					return ci::gl::Texture2dRef();
-
+				assert( m_pTexturePool );
 				return m_pTexturePool->GetTexture();
 			}
 
@@ -792,6 +582,10 @@ namespace cinder {
 					hr = m_pDeviceManager->ResetDevice( pDevice, m_DeviceResetToken );
 					BREAK_ON_FAIL( hr );
 
+					// Create the texture pool.
+					hr = CreateTexturePool(pDevice);
+					BREAK_ON_FAIL( hr );
+
 					CopyComPtr( m_pDevice, pDevice.get() );
 				} while( false );
 
@@ -799,6 +593,15 @@ namespace cinder {
 					CI_LOG_E( "Failed to CreateD3DDevice: " << hr );
 
 				return hr;
+			}
+
+			HRESULT D3DPresentEngine::CreateTexturePool( IDirect3DDevice9Ex *pDevice )
+			{
+				assert( pDevice != NULL );
+
+				m_pTexturePool = std::make_shared<SharedTexturePool>( pDevice );
+
+				return S_OK;
 			}
 
 
@@ -859,15 +662,21 @@ namespace cinder {
 					hr = m_pTexturePool->GetFreeSurface( desc, &shared );
 					BREAK_ON_FAIL( hr );
 
+#if _DEBUG
+					D3DSURFACE_DESC shared_desc;
+					hr = shared.m_pD3DSurface->GetDesc( &shared_desc );
+					if( SUCCEEDED( hr ) )
+						assert( desc.Width == shared_desc.Width && desc.Height == shared_desc.Height );
+#endif
+
 					// Blit texture.
 					hr = m_pDevice->StretchRect( pSurface, NULL, shared.m_pD3DSurface, NULL, D3DTEXF_NONE );
 					if( SUCCEEDED( hr ) ) {
-						mHasNewFrame = TRUE;
 						m_pTexturePool->AddAvailableSurface( shared );
 					}
 					else {
 						assert( hr == D3DERR_INVALIDCALL );
-						m_pTexturePool->AddFreeSurface( shared );
+						//m_pTexturePool->AddFreeSurface( shared );
 					}
 
 					//

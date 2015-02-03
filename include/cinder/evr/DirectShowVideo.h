@@ -33,12 +33,6 @@ public:
 	virtual HRESULT Repaint( HWND hwnd, HDC hdc ) = 0;
 	virtual HRESULT DisplayModeChanged() = 0;
 	virtual HRESULT GetNativeVideoSize( LONG *lpWidth, LONG *lpHeight ) const = 0;
-	virtual BOOL    CheckNewFrame() const = 0;
-
-	//virtual bool CreateSharedTexture( int w, int h, int textureID ) = 0;
-	//virtual void ReleaseSharedTexture( int textureID ) = 0;
-	//virtual bool LockSharedTexture( int *pTextureID, int *pFreeTextures ) = 0;
-	//virtual bool UnlockSharedTexture( int textureID ) = 0;
 };
 
 // Manages the VMR-7 video renderer filter.
@@ -55,12 +49,6 @@ public:
 	HRESULT Repaint( HWND hwnd, HDC hdc ) override;
 	HRESULT DisplayModeChanged() override;
 	HRESULT GetNativeVideoSize( LONG *lpWidth, LONG *lpHeight ) const override;
-	BOOL    CheckNewFrame() const override { return TRUE; /* TODO */ }
-
-	//bool CreateSharedTexture( int w, int h, int textureID ) override { throw std::runtime_error( "Not implemented" ); }
-	//void ReleaseSharedTexture( int textureID ) override { throw std::runtime_error( "Not implemented" ); }
-	//bool LockSharedTexture( int *pTextureID, int *pFreeTextures ) override { throw std::runtime_error( "Not implemented" ); }
-	//bool UnlockSharedTexture( int textureID ) override { throw std::runtime_error( "Not implemented" ); }
 };
 
 
@@ -78,12 +66,6 @@ public:
 	HRESULT Repaint( HWND hwnd, HDC hdc ) override;
 	HRESULT DisplayModeChanged() override;
 	HRESULT GetNativeVideoSize( LONG *lpWidth, LONG *lpHeight ) const override;
-	BOOL    CheckNewFrame() const override { return TRUE; /* TODO */ }
-
-	//bool CreateSharedTexture( int w, int h, int textureID ) override { throw std::runtime_error( "Not implemented" ); }
-	//void ReleaseSharedTexture( int textureID ) override { throw std::runtime_error( "Not implemented" ); }
-	//bool LockSharedTexture( int *pTextureID, int *pFreeTextures ) override { throw std::runtime_error( "Not implemented" ); }
-	//bool UnlockSharedTexture( int textureID ) override { throw std::runtime_error( "Not implemented" ); }
 };
 
 
@@ -103,12 +85,6 @@ public:
 	HRESULT Repaint( HWND hwnd, HDC hdc ) override;
 	HRESULT DisplayModeChanged() override;
 	HRESULT GetNativeVideoSize( LONG *lpWidth, LONG *lpHeight ) const override;
-	BOOL    CheckNewFrame() const override { assert( m_pPresenter != NULL ); return m_pPresenter->CheckNewFrame(); }
-
-	//bool CreateSharedTexture( int w, int h, int textureID ) override { assert( m_pPresenter != NULL ); return m_pPresenter->CreateSharedTexture( w, h, textureID ); }
-	//void ReleaseSharedTexture( int textureID ) override { assert( m_pPresenter != NULL ); m_pPresenter->ReleaseSharedTexture( textureID ); }
-	//bool LockSharedTexture( int *pTextureID, int *pFreeTextures ) override { assert( m_pPresenter != NULL ); return m_pPresenter->LockSharedTexture( pTextureID, pFreeTextures ); }
-	//bool UnlockSharedTexture( int textureID ) override { assert( m_pPresenter != NULL ); return m_pPresenter->UnlockSharedTexture( textureID ); }
 };
 
 

@@ -251,10 +251,6 @@ namespace cinder {
 
 							hr = MFGetAttributeSize( pMediaType, MF_MT_FRAME_SIZE, &mWidth, &mHeight );
 							BREAK_ON_FAIL( hr );
-
-							// Make sure we have a texture pool of the correct size.
-							hr = mPresenterPtr->CreateTexturePool( mWidth, mHeight );
-							BREAK_ON_FAIL( hr );
 						}
 					}
 				}

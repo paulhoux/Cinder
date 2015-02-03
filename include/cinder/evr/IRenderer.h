@@ -26,13 +26,6 @@ public:
 
 	virtual UINT32  GetWidth() const = 0;
 	virtual UINT32  GetHeight() const = 0;
-
-	virtual BOOL    CheckNewFrame() const = 0;
-
-	virtual bool CreateSharedTexture( int w, int h, int textureID ) = 0;
-	virtual void ReleaseSharedTexture( int textureID ) = 0;
-	virtual bool LockSharedTexture( int *pTextureID, int *pFreeTextures ) = 0;
-	virtual bool UnlockSharedTexture( int textureID ) = 0;
 	*/
 };
 

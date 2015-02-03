@@ -58,7 +58,7 @@ protected:
 	UINT32  GetWidth() const override { return mWidth; }
 	UINT32  GetHeight() const override { return mHeight; }
 
-	BOOL    CheckNewFrame() const override { return mPresenterPtr->CheckNewFrame(); }
+	//! Returns the latest frame as an OpenGL texture, if available. Returns an empty texture if no (new) frame is available.
 	ci::gl::Texture2dRef GetTexture() override { return mPresenterPtr->GetTexture(); }
 
 	//

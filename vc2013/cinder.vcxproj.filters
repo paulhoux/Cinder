@@ -1634,9 +1634,6 @@
     <ClInclude Include="..\include\cinder\evr\MediaFoundationVideo.h">
       <Filter>Header Files\evr</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\cinder\evr\IRenderer.h">
-      <Filter>Header Files\evr</Filter>
-    </ClInclude>
     <ClInclude Include="..\include\cinder\evr\SharedTexture.h">
       <Filter>Header Files\evr</Filter>
     </ClInclude>

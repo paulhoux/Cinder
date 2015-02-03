@@ -41,8 +41,6 @@ namespace cinder {
 			MovieGl::MovieGl()
 				: MovieBase(), mPreferredBackend( BE_MEDIA_FOUNDATION )
 			{
-				// Instantiate the texture pool on the main thread.
-				//auto pool = SharedTexturePool::instance();
 			}
 
 			MovieGl::~MovieGl()
@@ -100,24 +98,6 @@ namespace cinder {
 				// Get width and height of the video.
 				mWidth = mPlayer->GetWidth();
 				mHeight = mPlayer->GetHeight();
-
-				/*// Delete existing shared textures if their size is different.
-				for( auto itr = mTextures.rbegin(); itr != mTextures.rend(); ++itr ) {
-				gl::Texture2dRef texture = itr->second;
-				if( texture && ( mWidth != texture->getWidth() || mHeight != texture->getHeight() ) ) {
-				mPlayer->ReleaseSharedTexture( texture->getId() );
-				mTextures.erase( texture->getId() );
-				}
-				}
-				//*/
-
-				// Create shared textures.
-				for( size_t i = 0; i < 2; ++i ) {
-					//gl::Texture2dRef texture = gl::Texture2d::create( mWidth, mHeight, gl::Texture2d::Format().target( GL_TEXTURE_RECTANGLE ) );
-					//texture->setDoNotDispose( true );
-					//if( mPlayer->CreateSharedTexture( mWidth, mHeight, texture->getId() ) ) {}
-					//SharedTexturePool::instance().createTexture( mWidth, mHeight );
-				}
 			}
 
 			bool MovieGl::initPlayer( Backend backend )
@@ -155,22 +135,9 @@ namespace cinder {
 				}
 			}
 
-			void MovieGl::draw( int x, int y, int w, int h )
-			{
-				if( mPlayer ) {
-					auto texture = mPlayer->GetTexture();
-					if( texture )
-						mTexture = texture;
-				}
-
-				if( mTexture )
-					gl::draw( mTexture, Rectf( float( x ), float( y ), float( x + w ), float( y + h ) ) );
-			}
-
 			gl::Texture2dRef MovieGl::getTexture()
 			{
-				gl::Texture2dRef tex;
-
+				// Update texture.
 				if( mPlayer ) {
 					auto texture = mPlayer->GetTexture();
 					if( texture )
