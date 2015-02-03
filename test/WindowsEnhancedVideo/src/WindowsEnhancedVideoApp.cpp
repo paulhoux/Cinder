@@ -53,7 +53,7 @@ public:
 	void close() { mMovies.clear(); }
 
 private:
-	static const int kMaxMovieCount = 8;
+	static const int kMaxMovieCount = 1;
 
 	std::vector<MovieGlRef>        mMovies;
 
@@ -74,36 +74,6 @@ void WindowsEnhancedVideoApp::setup()
 	gl::enableVerticalSync( true );
 	gl::clear();
 	gl::color( 1, 1, 1 );
-
-	// create an array of initial per-instance data
-	std::vector<Circle> data( kMaxMovieCount );
-
-	// create the VBO which will contain per-instance (rather than per-vertex) data
-	mData = gl::Vbo::create( GL_ARRAY_BUFFER, data.size() * sizeof( Circle ), data.data(), GL_DYNAMIC_DRAW );
-
-	geom::BufferLayout instanceDataLayout;
-	instanceDataLayout.append( geom::Attrib::CUSTOM_0, 4, sizeof( Circle ), offsetof( Circle, size ), 1 /* per instance */ );
-	instanceDataLayout.append( geom::Attrib::CUSTOM_1, 4, sizeof( Circle ), offsetof( Circle, position ), 1 /* per instance */ );
-	instanceDataLayout.append( geom::Attrib::CUSTOM_2, 4, sizeof( Circle ), offsetof( Circle, thickness ), 1 /* per instance */ );
-
-	// 
-	mMesh = gl::VboMesh::create( geom::Rect( Rectf( -1, -1, 1, 1 ) ) );
-	mMesh->appendVbo( instanceDataLayout, mData );
-
-	//
-	try {
-		mShader = gl::GlslProg::create( loadAsset( "circle.vert" ), loadAsset( "circle.frag" ) );
-		mShader->uniform( "uTex0", 0 );
-
-		mBatch = gl::Batch::create( mMesh, mShader, {
-			{ geom::Attrib::CUSTOM_0, "vInstanceSize" },
-			{ geom::Attrib::CUSTOM_1, "vInstancePosition" },
-			{ geom::Attrib::CUSTOM_2, "vInstanceAttribs" } } );
-	}
-	catch( const std::exception &e ) {
-		console() << e.what() << std::endl;
-		quit();
-	}
 
 	//
 	getWindow()->connectClose( &WindowsEnhancedVideoApp::close, this );
@@ -129,27 +99,9 @@ void WindowsEnhancedVideoApp::update()
 void WindowsEnhancedVideoApp::draw()
 {
 	gl::clear();
-	gl::setMatricesWindow( getWindowSize(), false );
-
-	// Bind shader, so we can set uniforms.
-	gl::ScopedGlslProg shader( mShader );
-
-	// Bind textures.
-	for( int i = 0; i < (int) mMovies.size(); ++i ) {
-		auto movie = mMovies[i];
-		if( movie ) {
-			auto texture = movie->getTexture();
-			if( texture ) {
-				texture->bind( i );
-			}
-		}
-	}
-
-	double time = getElapsedSeconds();
+	gl::setMatricesWindow( getWindowSize(), true );
 
 	// Draw movies.
-	gl::ScopedAlphaBlend blend( false );
-
 	for( size_t i = 0; i < mMovies.size(); ++i ) {
 		auto movie = mMovies[i];
 		if( !movie )
@@ -159,25 +111,7 @@ void WindowsEnhancedVideoApp::draw()
 		if( !texture )
 			continue;
 
-		// Update instance data.
-		Circle *ptr = (Circle*) mData->mapWriteOnly( true );
-		ptr->size = movie->getSize();
-		ptr->index = i;
-		ptr->position = vec2( 0 );
-		//ptr->radius = 0.5f * glm::length( vec2( getWindowSize() ) );
-		ptr->radius = 0.49f * math<float>::min( getWindowWidth(), getWindowHeight() );
-		ptr->thickness = 0.95f;
-		ptr->length = 1.0f / mMovies.size();
-		ptr->offset = 0.25f;
-		mData->unmap();
-
-		gl::ScopedTextureBind tex0( texture );
-		gl::ScopedModelMatrix model;
-
-		gl::translate( 0.5f * vec2( getWindowSize() ) );
-		gl::rotate( glm::radians( float( time ) * 5.0f + 360.0f * i / float( mMovies.size() ) ) );
-
-		mBatch->drawInstanced( 1 );
+		gl::draw( texture, Rectf( Area::proportionalFit( texture->getBounds(), getWindowBounds(), true, true ) ) );
 	}
 }
 
@@ -231,8 +165,9 @@ void WindowsEnhancedVideoApp::fileDrop( FileDropEvent event )
 
 bool WindowsEnhancedVideoApp::playVideo( const fs::path &path )
 {
+	mMovies.clear();
+
 	if( mMovies.size() < kMaxMovieCount && !path.empty() && fs::exists( path ) ) {
-		// TODO: make sure the movie can play
 		auto movie = video::MovieGl::create( path );
 		movie->play();
 
