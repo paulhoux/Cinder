@@ -469,9 +469,9 @@ namespace cinder {
 				hr = mMediaSessionPtr->Start( &GUID_NULL, &varStart );
 
 				//if( !mLoop )
-				mMediaSessionPtr->Pause();
+				//mMediaSessionPtr->Pause();
 				//else
-				//	mState = Started;
+				mState = Started;
 
 				PropVariantClear( &varStart );
 

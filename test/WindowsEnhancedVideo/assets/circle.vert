@@ -3,7 +3,7 @@
 uniform mat4 ciModelViewProjection;
 
 in vec4 ciPosition;
-in vec4 ciTexCoord0;
+in vec2 ciTexCoord0;
 in vec4 ciColor;
 
 in vec3 vInstanceSize; // per-instance
@@ -16,7 +16,14 @@ out vec3 vertAttribs;
 
 void main(void)
 {
-	vertTexCoord0 = ciTexCoord0;
+	vertTexCoord0.xy = ciTexCoord0.xy;	
+
+	float aspect = vInstanceSize.y / vInstanceSize.x;
+	float offset = 0.5 * (vInstanceSize.x - vInstanceSize.y);
+	vertTexCoord0.zw = ciTexCoord0.xy * vInstanceSize.xy;
+	vertTexCoord0.z *= aspect;
+	vertTexCoord0.z += offset;
+
 	vertSize = vInstanceSize;
 	vertAttribs = vInstanceAttribs.xyz;
 

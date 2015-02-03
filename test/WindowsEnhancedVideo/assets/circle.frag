@@ -31,13 +31,12 @@ void main(void)
 	alpha *= mix( segment, 1.0, step( 1.0, len ) );
 
 	alpha = clamp( alpha, 0.0, 1.0 );
+	
+	vec3 color = texture( uTex0, vertTexCoord0.zw ).rgb;
 
-	float aspect = vertSize.y / vertSize.x;
-	float offset = 0.5 * (vertSize.x - vertSize.y);
-	vec2  uv = vertTexCoord0.xy * vertSize.xy;
-	uv.x *= aspect;
-	uv.x += offset;
-	vec3 color = texture( uTex0, uv ).rgb;
+	float bevel = smoothstep( 1.0 - 0.2, 1.0, radius );
+	bevel += smoothstep( 1.0 - thickness, 1.0 - thickness + 0.2, radius );  
+	color += 0.2 * bevel;  
 
 	fragColor.rgb = color;
 	fragColor.a = alpha;

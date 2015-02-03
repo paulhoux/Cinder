@@ -50,6 +50,8 @@ public:
 
 	bool playVideo( const fs::path &path );
 
+	void close() { mMovies.clear(); }
+
 private:
 	static const int kMaxMovieCount = 8;
 
@@ -102,6 +104,9 @@ void WindowsEnhancedVideoApp::setup()
 		console() << e.what() << std::endl;
 		quit();
 	}
+
+	//
+	getWindow()->connectClose( &WindowsEnhancedVideoApp::close, this );
 }
 
 void WindowsEnhancedVideoApp::shutdown()
@@ -159,8 +164,9 @@ void WindowsEnhancedVideoApp::draw()
 		ptr->size = movie->getSize();
 		ptr->index = i;
 		ptr->position = vec2( 0 );
-		ptr->radius = 0.48f * math<float>::max( getWindowWidth(), getWindowHeight() );
-		ptr->thickness = 1.0f;
+		//ptr->radius = 0.5f * glm::length( vec2( getWindowSize() ) );
+		ptr->radius = 0.49f * math<float>::min( getWindowWidth(), getWindowHeight() );
+		ptr->thickness = 0.95f;
 		ptr->length = 1.0f / mMovies.size();
 		ptr->offset = 0.25f;
 		mData->unmap();
@@ -169,7 +175,7 @@ void WindowsEnhancedVideoApp::draw()
 		gl::ScopedModelMatrix model;
 
 		gl::translate( 0.5f * vec2( getWindowSize() ) );
-		gl::rotate( glm::radians( float( time ) * 15.0f + 360.0f * i / float( mMovies.size() ) ) );
+		gl::rotate( glm::radians( float( time ) * 5.0f + 360.0f * i / float( mMovies.size() ) ) );
 
 		mBatch->drawInstanced( 1 );
 	}
