@@ -38,7 +38,7 @@ GlslProg::AttribSemanticMap		GlslProg::sDefaultAttribNameToSemanticMap;
 //////////////////////////////////////////////////////////////////////////
 // GlslProg::Format
 GlslProg::Format::Format()
-#if ! defined( CINDER_GL_ES )
+#if ! defined( CINDER_GL_ES_2 )
 	: mTransformFormat( -1 )
 #endif
 {
@@ -117,6 +117,54 @@ GlslProg::Format& GlslProg::Format::geometry( const char *geometryShader )
 
 	return *this;
 }
+
+GlslProg::Format& GlslProg::Format::tessellationCtrl( const DataSourceRef &dataSource )
+{
+	if( dataSource ) {
+		Buffer buffer( dataSource );
+		mTessellationCtrlShader.resize( buffer.getDataSize() + 1 );
+		memcpy( (void*)mTessellationCtrlShader.data(), buffer.getData(), buffer.getDataSize() );
+		mTessellationCtrlShader[buffer.getDataSize()] = 0;
+	}
+	else
+		mTessellationCtrlShader.clear();
+	
+	return *this;
+}
+
+GlslProg::Format& GlslProg::Format::tessellationCtrl( const char *tessellationCtrlShader )
+{
+	if( tessellationCtrlShader ) {
+		mTessellationCtrlShader = string( tessellationCtrlShader );	}
+	else
+		mTessellationCtrlShader.clear();
+	
+	return *this;
+}
+
+GlslProg::Format& GlslProg::Format::tessellationEval( const DataSourceRef &dataSource )
+{
+	if( dataSource ) {
+		Buffer buffer( dataSource );
+		mTessellationEvalShader.resize( buffer.getDataSize() + 1 );
+		memcpy( (void*)mTessellationEvalShader.data(), buffer.getData(), buffer.getDataSize() );
+		mTessellationEvalShader[buffer.getDataSize()] = 0;
+	}
+	else
+		mTessellationEvalShader.clear();
+	
+	return *this;
+}
+
+GlslProg::Format& GlslProg::Format::tessellationEval( const char *tessellationEvalShader )
+{
+	if( tessellationEvalShader ) {
+		mTessellationEvalShader = string( tessellationEvalShader );	}
+	else
+		mTessellationEvalShader.clear();
+	
+	return *this;
+}
 #endif // ! defined( CINDER_GL_ES )
 
 GlslProg::Format& GlslProg::Format::attrib( geom::Attrib semantic, const std::string &attribName )
@@ -159,6 +207,18 @@ GlslProgRef GlslProg::create( const Format &format )
 	return GlslProgRef( new GlslProg( format ) );
 }
 
+#if ! defined( CINDER_GL_ES )
+GlslProgRef GlslProg::create( DataSourceRef vertexShader, DataSourceRef fragmentShader, DataSourceRef geometryShader, DataSourceRef tessEvalShader, DataSourceRef tessCtrlShader )
+{
+	return GlslProgRef( new GlslProg( GlslProg::Format().vertex( vertexShader ).fragment( fragmentShader ).geometry( geometryShader ).tessellationEval( tessEvalShader ).tessellationCtrl( tessCtrlShader ) ) );
+}
+
+GlslProgRef GlslProg::create( const char *vertexShader, const char *fragmentShader, const char *geometryShader, const char *tessEvalShader, const char *tessCtrlShader )
+{
+	return GlslProgRef( new GlslProg( GlslProg::Format().vertex( vertexShader ).fragment( fragmentShader ).geometry( geometryShader ).tessellationEval( tessEvalShader ).tessellationCtrl( tessCtrlShader ) ) );
+}
+	
+#else
 GlslProgRef GlslProg::create( DataSourceRef vertexShader, DataSourceRef fragmentShader )
 {
 	return GlslProgRef( new GlslProg( GlslProg::Format().vertex( vertexShader ).fragment( fragmentShader ) ) );
@@ -168,6 +228,8 @@ GlslProgRef GlslProg::create( const char *vertexShader, const char *fragmentShad
 {
 	return GlslProgRef( new GlslProg( GlslProg::Format().vertex( vertexShader ).fragment( fragmentShader ) ) );
 }
+	
+#endif
 	
 GlslProg::~GlslProg()
 {
@@ -197,6 +259,10 @@ GlslProg::GlslProg( const Format &format )
 #if ! defined( CINDER_GL_ES )
 	if( ! format.getGeometry().empty() )
 		loadShader( format.getGeometry(), GL_GEOMETRY_SHADER );
+	if( ! format.getTessellationCtrl().empty() )
+		loadShader( format.getTessellationCtrl(), GL_TESS_CONTROL_SHADER );
+	if( ! format.getTessellationEval().empty() )
+		loadShader( format.getTessellationEval(), GL_TESS_EVALUATION_SHADER );
 #endif
 
 	// copy the Format's attribute-semantic map
@@ -231,7 +297,7 @@ GlslProg::GlslProg( const Format &format )
 	for( auto &attribLoc : attribLocations )
 		glBindAttribLocation( mHandle, attribLoc.second, attribLoc.first.c_str() );
 	
-#if ! defined( CINDER_GL_ES )
+#if ! defined( CINDER_GL_ES_2 )
 	if( ! format.getVaryings().empty() && format.getTransformFormat() > 0 ) {
 		// This is a mess due to an NVidia driver bug on MSW which expects the memory passed to glTransformFeedbackVaryings
 		// to still be around after the call. We allocate the storage and put it on the GlslProg itself to be freed at destruction
@@ -248,14 +314,16 @@ GlslProg::GlslProg( const Format &format )
 			memcpy( &(*mTransformFeedbackVaryingsChars)[curOffset], v.c_str(), v.length() + 1 );
 			curOffset += v.length() + 1;
 		}
-		glTransformFeedbackVaryings( mHandle, format.getVaryings().size(), mTransformFeedbackVaryingsCharStarts->data(), format.getTransformFormat() );
+		glTransformFeedbackVaryings( mHandle, (GLsizei)format.getVaryings().size(), mTransformFeedbackVaryingsCharStarts->data(), format.getTransformFormat() );
 	}
+#endif
 
+#if ! defined( CINDER_GL_ES )
 	// setup fragment data locations
 	for( const auto &fragDataLocation : format.getFragDataLocations() )
 		glBindFragDataLocation( mHandle, fragDataLocation.second, fragDataLocation.first.c_str() );
 #endif
-	
+
 	link();
 	
 	setLabel( format.getLabel() );
@@ -770,6 +838,50 @@ GLint GlslProg::getUniformLocation( const std::string &name ) const
 	}
 }
 
+#if ! defined( CINDER_GL_ES_2 )
+void GlslProg::uniformBlock( int loc, int binding )
+{
+	glUniformBlockBinding( mHandle, loc, binding );
+}
+
+void GlslProg::uniformBlock( const std::string &name, GLint binding )
+{
+	GLint loc = getUniformBlockLocation( name );
+	if( loc == -1 )
+		CI_LOG_E( "Unknown uniform block: \"" << name << "\"" );
+	else
+		glUniformBlockBinding( mHandle, loc, binding );
+}
+
+GLint GlslProg::getUniformBlockLocation( const std::string &name ) const
+{
+	auto existing = mUniformBlockLocs.find( name );
+	if( existing == mUniformBlockLocs.end() ) {
+		const GLuint loc = glGetUniformBlockIndex( mHandle, name.c_str() );
+		if( loc == GL_INVALID_INDEX )
+			return -1;
+		else
+			mUniformBlockLocs[name] = loc;
+		return loc;
+	}
+	else
+		return existing->second;
+}
+
+GLint GlslProg::getUniformBlockSize( GLint blockIndex ) const
+{
+	auto existing = mUniformBlockSizes.find( blockIndex );
+	if( existing == mUniformBlockSizes.end() ) {
+		GLint blockSize = 0;
+		glGetActiveUniformBlockiv( mHandle, blockIndex, GL_UNIFORM_BLOCK_DATA_SIZE, &blockSize );
+		mUniformBlockSizes[blockIndex] = blockSize;
+		return blockSize;
+	}
+	else
+		return existing->second;
+}
+#endif // ! defined( CINDER_GL_ES_2 )
+
 const std::map<std::string,GLenum>& GlslProg::getActiveUniformTypes() const
 {
 	if( ! mActiveUniformTypesCached ) {
@@ -937,15 +1049,22 @@ std::ostream& operator<<( std::ostream &os, const GlslProg &rhs )
 
 //////////////////////////////////////////////////////////////////////////
 // GlslProgCompileExc
-GlslProgCompileExc::GlslProgCompileExc( const std::string &log, GLint aShaderType ) throw()
-	: mShaderType( aShaderType )
+GlslProgCompileExc::GlslProgCompileExc( const std::string &log, GLint shaderType )
 {
-	if( mShaderType == GL_VERTEX_SHADER )
-		mMessage = "VERTEX: " + log;
-	else if( mShaderType == GL_FRAGMENT_SHADER )
-		mMessage = "FRAGMENT: " + log;
-	else
-		mMessage = "UNKNOWN: " + log;
+	string typeString;
+
+	switch( shaderType ) {
+		case GL_VERTEX_SHADER:			typeString = "VERTEX: "; break;
+		case GL_FRAGMENT_SHADER:		typeString = "FRAGMENT: "; break;
+#if ! defined( CINDER_GL_ES )
+		case GL_GEOMETRY_SHADER:		typeString = "GEOMETRY: "; break;
+		case GL_TESS_CONTROL_SHADER:	typeString = "TESSELLATION CONTROL: "; break;
+		case GL_TESS_EVALUATION_SHADER:	typeString = "TESSELLATION EVALUATION: "; break;
+#endif
+		default:						typeString = "UNKNOWN: ";
+	}
+
+	setDescription( typeString + log );
 }
 	
 } } // namespace cinder::gl

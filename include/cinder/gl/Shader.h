@@ -25,6 +25,12 @@
 #include "cinder/Camera.h"
 #include "cinder/gl/GlslProg.h"
 
+// forward declarations
+namespace cinder { namespace gl {
+	typedef std::shared_ptr<class Texture2d>		Texture2dRef;
+	typedef Texture2dRef							TextureRef;
+} }
+
 namespace cinder { namespace gl {
 
 class ShaderDef {
@@ -52,7 +58,7 @@ class ShaderDef {
 	bool			mColor;
 	
 	friend class EnvironmentCore;
-	friend class EnvironmentEs2;
+	friend class EnvironmentEs;
 };
 	
 } } // namespace cinder::gl

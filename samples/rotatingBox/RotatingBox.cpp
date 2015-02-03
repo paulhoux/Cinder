@@ -29,7 +29,10 @@ void RotatingCubeApp::setup()
 		mCapture = Capture( 320, 240 );
 		mCapture.start();
 	}
-	catch( ... ) { // failed to initialize the webcam, create a warning texture
+	catch( CaptureExc &exc ) {
+	    console() << "failed to initialize the webcam, what: " << exc.what() << std::endl;
+
+	    // create a warning texture
 		// if we threw in the start, we'll set the Capture to null
 		mCapture.reset();
 		
@@ -56,7 +59,7 @@ void RotatingCubeApp::resize()
 void RotatingCubeApp::update()
 {
 	if( mCapture && mCapture.checkNewFrame() )
-		mTexture = gl::Texture2d::create( mCapture.getSurface() );
+		mTexture = gl::Texture2d::create( *mCapture.getSurface(), gl::Texture2d::Format().loadTopDown() );
 	
 	// Rotate the cube by .03 radians around an arbitrary axis
 	mCubeRotation *= rotate( 0.03f, vec3( 1 ) );

@@ -67,11 +67,9 @@ namespace cinder {
 class Timeline;
 } // namespace cinder
 
-#if !defined( CINDER_WINRT )
-namespace boost { namespace asio {
+namespace asio {
 class io_service;
-} } // namespace boost::asio
-#endif
+} // namespace asio
 
 namespace cinder { namespace app { 
 
@@ -192,7 +190,7 @@ class App {
 		bool		isMultiTouchEnabled() const { return mEnableMultiTouch; }
 
 		//! a value of \c true allows screensavers or the system's power management to hide the app. Default value is \c false on desktop, and \c true on mobile
-		void	enablePowerManagement( bool aPowerManagement = true );
+		void	enablePowerManagement( bool enable = true );
 		//! is power management enabled, allowing screensavers and the system's power management to hide the application
 		bool	isPowerManagementEnabled() const { return mPowerManagement; }
 
@@ -453,8 +451,8 @@ class App {
 	static bool		isPrimaryThread();
 
 #if !defined( CINDER_WINRT )
-	//! Returns a reference to the App's boost::asio::io_service()
-	boost::asio::io_service&	io_service() { return *mIo; }
+	//! Returns a reference to the App's asio::io_service()
+	asio::io_service&	io_service() { return *mIo; }
 #endif //!defined( CINDER_WINRT )
 
 	
@@ -547,10 +545,10 @@ class App {
 
 	signals::signal<void()>		mSignalUpdate, mSignalShutdown, mSignalWillResignActive, mSignalDidBecomeActive;
 
-#if !defined( CINDER_WINRT )
-	std::shared_ptr<boost::asio::io_service>	mIo;
-	std::shared_ptr<void>						mIoWork; // boost::asio::io_service::work, but can't fwd declare member class
-#endif // !defined( CINDER_WINRT )
+#if ! defined( CINDER_WINRT )
+	std::shared_ptr<asio::io_service>	mIo;
+	std::shared_ptr<void>				mIoWork; // asio::io_service::work, but can't fwd declare member class
+#endif // ! defined( CINDER_WINRT )
 
 	// have we already setup the default path to assets?
 	bool						mAssetDirectoriesInitialized;
@@ -707,20 +705,12 @@ class ResourceLoadExc : public Exception {
 	ResourceLoadExc( int mswID, const std::string &mswType );
 	ResourceLoadExc( const std::string &macPath, int mswID, const std::string &mswType );
 #endif
-
-	virtual const char * what() const throw() { return mMessage; }
-
-	char mMessage[4096];
 };
 
 //! Exception for failed asset loading
 class AssetLoadExc : public Exception {
   public:
 	AssetLoadExc( const fs::path &relativePath );
-
-	virtual const char * what() const throw() { return mMessage; }
-
-	char mMessage[4096];
 };
 
 } } // namespace cinder::app

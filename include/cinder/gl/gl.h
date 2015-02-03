@@ -26,13 +26,20 @@
 
 #if defined( CINDER_GL_ANGLE )
 	#define GL_GLEXT_PROTOTYPES
-	#include "GLES2/gl2.h"
-	#include "GLES2/gl2ext.h"
 	#define CINDER_GL_ES
-	#define CINDER_GL_ES_2
+	// the default for ANGLE is GL ES 3, but can be overridden with CINDER_GL_ES_2
+	#if defined( CINDER_GL_ES_2 )
+		#include "GLES2/gl2.h"
+		#include "GLES2/gl2ext.h"
+	#else
+		#include "GLES3/gl3.h"
+		#include "GLES3/gl3ext.h"
+		#include "GLES2/gl2ext.h"
+		#define CINDER_GL_ES_3
+	#endif
 	#pragma comment( lib, "libEGL.lib" )
 	#pragma comment( lib, "libGLESv2.lib" )
-#elif ! defined( CINDER_COCOA_TOUCH )
+#elif ! defined( CINDER_COCOA_TOUCH ) // OS X
 	#if defined( __clang__ )
 		#pragma clang diagnostic push
 		#pragma clang diagnostic ignored "-Wtypedef-redefinition"
@@ -41,15 +48,19 @@
 	#if defined( __clang__ )
 		#pragma clang diagnostic pop
 	#endif
-#else
-	#include <OpenGLES/ES2/gl.h>
-	#include <OpenGLES/ES2/glext.h>
+#else // iOS
 	#define CINDER_GL_ES
-	#define CINDER_GL_ES_2
+	// the default for iOS is GL ES 2, but can be overridden with CINDER_GL_ES_3
+	#if ! defined( CINDER_GL_ES_3 )
+		#include <OpenGLES/ES2/gl.h>
+		#include <OpenGLES/ES2/glext.h>
+		#define CINDER_GL_ES_2
+	#else
+		#include <OpenGLES/ES3/gl.h>
+		#include <OpenGLES/ES3/glext.h>
+	#endif
 #endif
 #include <boost/noncopyable.hpp>
-
-#include "cinder/gl/Texture.h"
 
 #include "cinder/Area.h"
 #include "cinder/Rect.h"
@@ -98,24 +109,17 @@ enum UniformSemantic {
 	UNIFORM_ELAPSED_SECONDS
 };
 
-class Vbo;
-typedef std::shared_ptr<Vbo>			VboRef;
-class VboMesh;
-typedef std::shared_ptr<VboMesh>		VboMeshRef;
-class Texture2d;
-typedef std::shared_ptr<Texture2d>		Texture2dRef;
-class TextureBase;
-typedef std::shared_ptr<TextureBase>	TextureBaseRef;
-class BufferObj;
-typedef std::shared_ptr<BufferObj>		BufferObjRef;
-class GlslProg;
-typedef std::shared_ptr<GlslProg>		GlslProgRef;
-class Vao;
-typedef std::shared_ptr<Vao>			VaoRef;
-class Fbo;
-typedef std::shared_ptr<Fbo>			FboRef;
-class Renderbuffer;
-typedef std::shared_ptr<Renderbuffer>	RenderbufferRef;
+typedef std::shared_ptr<class Vbo>				VboRef;
+typedef std::shared_ptr<class VboMesh>			VboMeshRef;
+typedef std::shared_ptr<class TextureBase>		TextureBaseRef;
+typedef std::shared_ptr<class Texture2d>		Texture2dRef;
+typedef std::shared_ptr<class Texture3d>		Texture3dRef;
+typedef std::shared_ptr<class TextureCubeMap>	TextureCubeMapRef;
+typedef std::shared_ptr<class BufferObj>		BufferObjRef;
+typedef std::shared_ptr<class GlslProg>			GlslProgRef;
+typedef std::shared_ptr<class Vao>				VaoRef;
+typedef std::shared_ptr<class Fbo>				FboRef;
+typedef std::shared_ptr<class Renderbuffer>		RenderbufferRef;
 
 class Context* context();
 class Environment* env();
@@ -250,17 +254,36 @@ inline void translate( float x, float y, float z ) { translate( vec3( x, y, z ) 
 inline void translate( const ci::vec2 &v ) { translate( vec3( v, 0 ) ); }
 //! Translates the Model matrix by (\a x,\a y)
 inline void translate( float x, float y ) { translate( vec3( x, y, 0 ) ); }
-	
+
+//! Returns the object space coordinate of the specified window \a coordinate, using the specified \a modelMatrix and the currently active view and projection matrices.
+vec3 windowToObjectCoord( const mat4 &modelMatrix, const vec2 &coordinate, float z = 0.0f );
+//! Returns the window coordinate of the specified world \a coordinate, using the specified \a modelMatrix and the currently active view and projection matrices.
+vec2 objectToWindowCoord( const mat4 &modelMatrix, const vec3 &coordinate );
+//! Returns the object space coordinate of the specified window \a coordinate, using the currently active model, view and projection matrices.
+inline vec3 windowToObjectCoord( const vec2 &coordinate, float z = 0.0f ) { return windowToObjectCoord( gl::getModelMatrix(), coordinate, z ); }
+//! Returns the window coordinate of the specified world \a coordinate, using the currently active model, view and projection matrices.
+inline vec2 objectToWindowCoord( const vec3 &coordinate ) { return objectToWindowCoord( gl::getModelMatrix(), coordinate ); }
+//! Returns the world space coordinate of the specified window \a coordinate, using the currently active view and projection matrices.
+inline vec3 windowToWorldCoord( const vec2 &coordinate, float z = 0.0f ) { return windowToObjectCoord( mat4(), coordinate, z ); }
+//! Returns the window coordinate of the specified world \a coordinate, using the currently active view and projection matrices.
+inline vec2 worldToWindowCoord( const vec3 &coordinate ) { return objectToWindowCoord( mat4(), coordinate ); }
+
 void begin( GLenum mode );
 void end();
 
-#if ! defined( CINDER_GL_ES )
+#if ! defined( CINDER_GL_ES_2 )
 void bindBufferBase( GLenum target, int index, BufferObjRef buffer );
 	
 void beginTransformFeedback( GLenum primitiveMode );
 void endTransformFeedback();
 void resumeTransformFeedback();
-void pauseTransformFeedback();	
+void pauseTransformFeedback();
+
+// Tesselation
+//! Specifies the parameters that will be used for patch primitives. Analogous to glPatchParameteri().
+void patchParameteri( GLenum pname, GLint value );
+//! Specifies the parameters that will be used for patch primitives. Analogous to glPatchParameterfv().
+void patchParameterfv( GLenum pname, GLfloat *value );
 #endif
 	
 void color( float r, float g, float b );
@@ -315,8 +338,8 @@ void draw( const Texture2dRef &texture, const Rectf &dstRect );
 //! Draws a subregion \a srcArea of a Texture (expressed as upper-left origin pixels).
 void draw( const Texture2dRef &texture, const Area &srcArea, const Rectf &dstRect );
 void draw( const Texture2dRef &texture, const vec2 &dstOffset = vec2() );
-void draw( const class PolyLine<vec2> &polyLine );
-void draw( const class PolyLine<vec3> &polyLine );
+void draw( const PolyLine2 &polyLine );
+void draw( const PolyLine3 &polyLine );
 //! Draws a Path2d \a pathd using approximation scale \a approximationScale. 1.0 corresponds to screenspace, 2.0 is double screen resolution, etc
 void draw( const Path2d &path, float approximationScale = 1.0f );
 //! Draws a Shaped2d \a shaped using approximation scale \a approximationScale. 1.0 corresponds to screenspace, 2.0 is double screen resolution, etc
@@ -330,7 +353,7 @@ void draw( const geom::Source &source );
 void drawSolid( const Path2d &path2d, float approximationScale = 1.0f );
 //! Draws a solid (filled) Shape2d \a shape using approximation scale \a approximationScale. 1.0 corresponds to screenspace, 2.0 is double screen resolution, etc. Performance warning: This routine tesselates the polygon into triangles. Consider using Triangulator directly.
 void drawSolid( const Shape2d &shape, float approximationScale = 1.0f );
-void drawSolid( const class PolyLine<vec2> &polyLine );
+void drawSolid( const PolyLine2 &polyLine );
 
 //! Renders a solid cube centered at \a center of size \a size. Normals and created texture coordinates are generated.
 void drawCube( const vec3 &center, const vec3 &size );
@@ -404,6 +427,12 @@ void	bindBuffer( const BufferObjRef &buffer );
 #if ! defined( CINDER_GL_ES_2 )
 //! Specifies a color buffer as the source for subsequent glReadPixels(), glCopyTexImage2D(), glCopyTexSubImage2D(), and glCopyTexSubImage3D() commands. Analogous to glReadBuffer().
 void	readBuffer( GLenum src );
+//! Specifies an array of buffers into which fragment color values or fragment data will be written for subsequent draw calls. Analogous to glDrawBuffers().
+void	drawBuffers( GLsizei num, const GLenum *bufs );
+#endif
+#if ! defined( CINDER_GL_ES )
+//! Specifies a color buffer as the destination for subsequent draw calls. Analogous to glDrawBuffer().
+void	drawBuffer( GLenum dst );
 #endif
 
 //! Reads a block of pixels from the framebuffer. Analogous to glReadPixels().
@@ -445,6 +474,7 @@ struct ScopedState : public boost::noncopyable {
 };
 
 struct ScopedColor : public boost::noncopyable {
+	ScopedColor();
 	ScopedColor( const ColorAf &color );
 	~ScopedColor();
 
@@ -519,6 +549,17 @@ struct ScopedTextureBind : public boost::noncopyable
 	ScopedTextureBind( GLenum target, GLuint textureId, uint8_t textureUnit );
 	ScopedTextureBind( const TextureBaseRef &texture );
 	ScopedTextureBind( const TextureBaseRef &texture, uint8_t textureUnit );
+
+	//! \cond
+	// These overloads are to alleviate a VS2013 bug where it cannot deduce
+	// the correct constructor when a TextureBaseRef subclass is passed in
+	ScopedTextureBind( const Texture2dRef &texture, uint8_t textureUnit );
+#if ! defined( CINDER_GL_ES_2 )
+	ScopedTextureBind( const Texture3dRef &texture, uint8_t textureUnit );
+#endif // ! defined( CINDER_GL_ES_2 )
+	ScopedTextureBind( const TextureCubeMapRef &texture, uint8_t textureUnit );
+	//! \endcond
+
 	~ScopedTextureBind();
 	
   private:
@@ -530,7 +571,7 @@ struct ScopedTextureBind : public boost::noncopyable
 struct ScopedScissor : public boost::noncopyable
 {
 	//! Implicitly enables scissor test
-	ScopedScissor( const ivec2 &lowerLeftPostion, const ivec2 &dimension );
+	ScopedScissor( const ivec2 &lowerLeftPosition, const ivec2 &dimension );
 	//! Implicitly enables scissor test	
 	ScopedScissor( int lowerLeftX, int lowerLeftY, int width, int height );
 	~ScopedScissor();
@@ -541,7 +582,7 @@ struct ScopedScissor : public boost::noncopyable
 
 struct ScopedViewport : public boost::noncopyable
 {
-	ScopedViewport( const ivec2 &lowerLeftPostion, const ivec2 &dimension );
+	ScopedViewport( const ivec2 &lowerLeftPosition, const ivec2 &dimension );
 	ScopedViewport( int lowerLeftX, int lowerLeftY, int width, int height );
 	~ScopedViewport();
 
@@ -591,6 +632,9 @@ struct ScopedRenderbuffer : public boost::noncopyable
 };
 
 class Exception : public cinder::Exception {
+  public:
+	Exception()	{}
+	Exception( const std::string &description ) : cinder::Exception( description )	{}
 };
 
 class ExceptionUnknownTarget : public Exception {

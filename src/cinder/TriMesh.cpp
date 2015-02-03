@@ -28,6 +28,7 @@ uint8_t	TriMeshGeomTarget::getAttribDims( geom::Attrib attr ) const
 
 void TriMeshGeomTarget::copyAttrib( geom::Attrib attr, uint8_t dims, size_t strideBytes, const float *srcData, size_t count )
 {
+	// copyAttrib will ignore it if 'mMesh' doesn't have this attribute
 	mMesh->copyAttrib( attr, dims, strideBytes, srcData, count );
 }
 
@@ -49,6 +50,44 @@ TriMesh::Format::Format()
 // TriMesh
 TriMesh::TriMesh( const TriMesh::Format &format )
 {
+	initFromFormat( format );
+}
+
+TriMesh::TriMesh( const geom::Source &source )
+{
+	initFromFormat( formatFromSource( source ) );
+	loadFromSource( source );
+}
+
+TriMesh::TriMesh( const geom::Source &source, const TriMesh::Format &format )
+{
+	initFromFormat( format );
+	loadFromSource( source );
+}
+
+void TriMesh::loadFromSource( const geom::Source &source )
+{
+	geom::AttribSet attribs;
+	if( mPositionsDims ) attribs.insert( geom::Attrib::POSITION );
+	if( mNormalsDims ) attribs.insert( geom::Attrib::NORMAL );
+	if( mTangentsDims ) attribs.insert( geom::Attrib::TANGENT );
+	if( mBitangentsDims ) attribs.insert( geom::Attrib::BITANGENT );
+	if( mColorsDims ) attribs.insert( geom::Attrib::COLOR );
+	if( mTexCoords0Dims ) attribs.insert( geom::Attrib::TEX_COORD_0 );
+	if( mTexCoords1Dims ) attribs.insert( geom::Attrib::TEX_COORD_1 );
+	if( mTexCoords2Dims ) attribs.insert( geom::Attrib::TEX_COORD_2 );
+	if( mTexCoords3Dims ) attribs.insert( geom::Attrib::TEX_COORD_3 );
+	
+	TriMeshGeomTarget target( this );
+	source.loadInto( &target, attribs );
+	
+	// if source is-nonindexed, generate indices
+	if( source.getNumIndices() == 0 )
+		target.generateIndices( source.getPrimitive(), source.getNumVertices() );
+}
+
+void TriMesh::initFromFormat( const TriMesh::Format &format )
+{
 	mPositionsDims = format.mPositionsDims;
 	mNormalsDims = format.mNormalsDims;
 	mTangentsDims = format.mTangentsDims;
@@ -60,89 +99,63 @@ TriMesh::TriMesh( const TriMesh::Format &format )
 	mTexCoords3Dims = format.mTexCoords3Dims;
 }
 
-TriMesh::TriMesh( const geom::Source &source )
+TriMesh::Format TriMesh::formatFromSource( const geom::Source &source )
 {
-	mPositionsDims = mNormalsDims = mTangentsDims = mBitangentsDims = mColorsDims = 0;
-	mTexCoords0Dims = mTexCoords1Dims = mTexCoords2Dims = mTexCoords3Dims = 0;
+	Format result;
 
-	size_t numPositions = source.getNumVertices();
-	
 	// positions
-	if( source.getAttribDims( geom::Attrib::POSITION ) > 0 ) {
-		mPositionsDims = source.getAttribDims( geom::Attrib::POSITION );
-		mPositions.resize( mPositionsDims * numPositions );
-	}
+	if( source.getAttribDims( geom::Attrib::POSITION ) > 0 )
+		result.mPositionsDims = source.getAttribDims( geom::Attrib::POSITION );
 
 	// normals
-	if( source.getAttribDims( geom::Attrib::NORMAL ) > 0 ) {
-		mNormalsDims = 3;
-		mNormals.resize( numPositions );
-	}
+	if( source.getAttribDims( geom::Attrib::NORMAL ) > 0 )
+		result.mNormalsDims = 3;
 
 	// tangents
-	if( source.getAttribDims( geom::Attrib::TANGENT ) > 0 ) {
-		mTangentsDims = 3;
-		mTangents.resize( numPositions );
-	}
+	if( source.getAttribDims( geom::Attrib::TANGENT ) > 0 )
+		result.mTangentsDims = 3;
 
 	// bitangents
-	if( source.getAttribDims( geom::Attrib::BITANGENT ) > 0 ) {
-		mBitangentsDims = 3;
-		mBitangents.resize( numPositions );
-	}
+	if( source.getAttribDims( geom::Attrib::BITANGENT ) > 0 )
+		result.mBitangentsDims = 3;
 
 	// colors
-	if( source.getAttribDims( geom::Attrib::COLOR ) > 0 ) {
-		mColorsDims = source.getAttribDims( geom::Attrib::COLOR );
-		mColors.resize( mColorsDims * numPositions );
-	}
+	if( source.getAttribDims( geom::Attrib::COLOR ) > 0 )
+		result.mColorsDims = source.getAttribDims( geom::Attrib::COLOR );
 
 	// tex coords 0
-	if( source.getAttribDims( geom::Attrib::TEX_COORD_0 ) > 0 ) {
-		mTexCoords0Dims = source.getAttribDims( geom::Attrib::TEX_COORD_0 );
-		mTexCoords0.resize( mTexCoords0Dims * numPositions );
-	}
+	if( source.getAttribDims( geom::Attrib::TEX_COORD_0 ) > 0 )
+		result.mTexCoords0Dims = source.getAttribDims( geom::Attrib::TEX_COORD_0 );
 
 	// tex coords 1
-	if( source.getAttribDims( geom::Attrib::TEX_COORD_1 ) > 0 ) {
-		mTexCoords1Dims = source.getAttribDims( geom::Attrib::TEX_COORD_1 );
-		mTexCoords1.resize( mTexCoords1Dims * numPositions );
-	}
+	if( source.getAttribDims( geom::Attrib::TEX_COORD_1 ) > 0 )
+		result.mTexCoords1Dims = source.getAttribDims( geom::Attrib::TEX_COORD_1 );
 
 	// tex coords 2
-	if( source.getAttribDims( geom::Attrib::TEX_COORD_2 ) > 0 ) {
-		mTexCoords2Dims = source.getAttribDims( geom::Attrib::TEX_COORD_2 );
-		mTexCoords2.resize( mTexCoords2Dims * numPositions );
-	}
+	if( source.getAttribDims( geom::Attrib::TEX_COORD_2 ) > 0 )
+		result.mTexCoords2Dims = source.getAttribDims( geom::Attrib::TEX_COORD_2 );
 
 	// tex coords 3
-	if( source.getAttribDims( geom::Attrib::TEX_COORD_3 ) > 0 ) {
-		mTexCoords3Dims = source.getAttribDims( geom::Attrib::TEX_COORD_3 );
-		mTexCoords3.resize( mTexCoords3Dims * numPositions );
-	}
-
-	TriMeshGeomTarget target( this );
-	source.loadInto( &target );
+	if( source.getAttribDims( geom::Attrib::TEX_COORD_3 ) > 0 )
+		result.mTexCoords3Dims = source.getAttribDims( geom::Attrib::TEX_COORD_3 );
 	
-	// if source is-nonindexed, generate indices
-	if( source.getNumIndices() == 0 )
-		target.generateIndices( source.getPrimitive(), source.getNumVertices() );
+	return result;
 }
 
-void TriMesh::loadInto( geom::Target *target ) const
+void TriMesh::loadInto( geom::Target *target, const geom::AttribSet &requestedAttribs ) const
 {
 	// copy attributes
-	for( int attribIt = 0; attribIt < (int)geom::Attrib::NUM_ATTRIBS; ++attribIt ) {
-		size_t attribDims = getAttribDims( (geom::Attrib)attribIt );
+	for( auto &attrib : requestedAttribs ) {
+		size_t attribDims = getAttribDims( (geom::Attrib)attrib );
 		if( attribDims ) {
 			uint8_t dims;
 			const float *pointer;
 			size_t strideBytes;
 
-			getAttribPointer( (geom::Attrib)attribIt, &pointer, &strideBytes, &dims );
+			getAttribPointer( attrib, &pointer, &strideBytes, &dims );
 			
 			if( pointer )
-				target->copyAttrib( (geom::Attrib)attribIt, dims, strideBytes, pointer, getNumVertices() );
+				target->copyAttrib( attrib, dims, strideBytes, pointer, getNumVertices() );
 		}
 	}
 	
@@ -554,13 +567,11 @@ bool TriMesh::recalculateNormals( bool smooth, bool weighted )
 		}
 	}
 
+	mNormalsDims = 3;
+
 	return true;
 }
 
-// Code taken from:
-// Lengyel, Eric. "Computing Tangent Space Basis Vectors for an Arbitrary Mesh". 
-// Terathon Software 3D Graphics Library, 2001.
-// http://www.terathon.com/code/tangent.html
 bool TriMesh::recalculateTangents()
 {
 	// requires valid 2D texture coords and 3D normals
@@ -570,48 +581,12 @@ bool TriMesh::recalculateTangents()
 	if( ! hasNormals() )
 		return false;
 
-	mTangents.assign( mNormals.size(), vec3() );
+	mTangents.clear();
 
-	size_t n = getNumTriangles();
-	for( size_t i = 0; i < n; ++i ) {
-		uint32_t index0 = mIndices[i * 3];
-		uint32_t index1 = mIndices[i * 3 + 1];
-		uint32_t index2 = mIndices[i * 3 + 2];
-
-		const vec3 &v0 = *(const vec3*)(&mPositions[index0*3]);
-		const vec3 &v1 = *(const vec3*)(&mPositions[index1*3]);
-		const vec3 &v2 = *(const vec3*)(&mPositions[index2*3]);
-
-		const vec2 &w0 = *(const vec2*)(&mTexCoords0[index0*2]);
-		const vec2 &w1 = *(const vec2*)(&mTexCoords0[index1*2]);
-		const vec2 &w2 = *(const vec2*)(&mTexCoords0[index2*2]);
-
-		float x1 = v1.x - v0.x;
-		float x2 = v2.x - v0.x;
-		float y1 = v1.y - v0.y;
-		float y2 = v2.y - v0.y;
-		float z1 = v1.z - v0.z;
-		float z2 = v2.z - v0.z;
-
-		float s1 = w1.x - w0.x;
-		float s2 = w2.x - w0.x;
-		float t1 = w1.y - w0.y;
-		float t2 = w2.y - w0.y;
-
-		float r = 1.0f / (s1 * t2 - s2 * t1);
-		vec3 tangent((t2 * x1 - t1 * x2) * r, (t2 * y1 - t1 * y2) * r, (t2 * z1 - t1 * z2) * r);
-
-		mTangents[ index0 ] += tangent;
-		mTangents[ index1 ] += tangent;
-		mTangents[ index2 ] += tangent;
-	}
-
-	n = getNumVertices();
-	for( size_t i = 0; i < n; ++i ) {
-		vec3 normal = mNormals[i];
-		vec3 tangent = mTangents[i];
-		mTangents[i] = normalize( tangent - normal * dot( normal, tangent ) );
-	}
+	const vec3 *positions = reinterpret_cast<const vec3*>( mPositions.data() );
+	const vec3 *normals = reinterpret_cast<const vec3*>( mNormals.data() );
+	const vec2 *texCoords = reinterpret_cast<const vec2*>( mTexCoords0.data() );
+	geom::calculateTangents( mIndices.size(), mIndices.data(), mPositions.size(), positions, normals, texCoords, &mTangents, nullptr );
 
 	mTangentsDims = 3;
 
@@ -880,33 +855,6 @@ void TriMesh::subdivide( int division, bool normalize )
 	}
 }
 
-/*TriMesh TriMesh::create( vector<uint32_t> &indices, const vector<ColorAf> &colors,
-						const vector<vec3> &normals, const vector<vec3> &positions,
-						const vector<vec2> &texCoords )
-{
-	TriMesh mesh;
-	if ( indices.size() > 0 ) {
-		mesh.appendIndices( &indices[ 0 ], indices.size() );
-	}
-	if ( colors.size() > 0 ) {
-		mesh.appendColorsRgba( &colors[ 0 ], colors.size() );
-	}
-	if ( normals.size() > 0 ) {
-		for ( vector<vec3>::const_iterator iter = normals.begin(); iter != normals.end(); ++iter ) {
-			mesh.appendNormal( *iter );
-		}
-	}
-	if ( positions.size() > 0 ) {
-		mesh.appendVertices( &positions[ 0 ], positions.size() );
-	}
-	if ( texCoords.size() > 0 ) {
-		for ( vector<vec2>::const_iterator iter = texCoords.begin(); iter != texCoords.end(); ++iter ) {
-			mesh.appendTexCoord( *iter );
-		}
-	}
-	return mesh;
-}*/
-
 uint8_t TriMesh::getAttribDims( geom::Attrib attr ) const
 {
 	switch( attr ) {
@@ -922,6 +870,23 @@ uint8_t TriMesh::getAttribDims( geom::Attrib attr ) const
 		default:
 			return 0;
 	}
+}
+
+geom::AttribSet	TriMesh::getAvailableAttribs() const
+{
+	geom::AttribSet result;
+
+	if( mPositionsDims ) result.insert( geom::Attrib::POSITION );
+	if( mColorsDims ) result.insert( geom::Attrib::COLOR );
+	if( mTexCoords0Dims ) result.insert( geom::Attrib::TEX_COORD_0 );
+	if( mTexCoords1Dims ) result.insert( geom::Attrib::TEX_COORD_1 );
+	if( mTexCoords2Dims ) result.insert( geom::Attrib::TEX_COORD_2 );
+	if( mTexCoords3Dims ) result.insert( geom::Attrib::TEX_COORD_3 );
+	if( mNormalsDims ) result.insert( geom::Attrib::NORMAL );
+	if( mTangentsDims ) result.insert( geom::Attrib::TANGENT );
+	if( mBitangentsDims ) result.insert( geom::Attrib::BITANGENT );
+
+	return result;
 }
 
 void TriMesh::getAttribPointer( geom::Attrib attr, const float **resultPtr, size_t *resultStrideBytes, uint8_t *resultDims ) const
@@ -941,61 +906,67 @@ void TriMesh::getAttribPointer( geom::Attrib attr, const float **resultPtr, size
 	}
 }
 
-//void Source::copyData( uint8_t srcDimensions, const float *srcData, size_t numElements, uint8_t dstDimensions, size_t dstStrideBytes, float *dstData )
-
-void TriMesh::copyAttrib( geom::Attrib attr, uint8_t dims, size_t stride, const float *srcData, size_t numPositions )
+void TriMesh::copyAttrib( geom::Attrib attr, uint8_t dims, size_t stride, const float *srcData, size_t numVertices )
 {
 	if( getAttribDims( attr ) == 0 )
 		return;
 
 	switch( attr ) {
 		case geom::Attrib::POSITION:
-			geom::copyData( dims, srcData, numPositions, mPositionsDims, 0, mPositions.data() );
+			mPositions.resize( mPositionsDims * numVertices );
+			geom::copyData( dims, srcData, numVertices, mPositionsDims, 0, mPositions.data() );
 		break;
 		case geom::Attrib::COLOR:
-			geom::copyData( dims, srcData, numPositions, mColorsDims, 0, mColors.data() );
+			mColors.resize( mColorsDims * numVertices );
+			geom::copyData( dims, srcData, numVertices, mColorsDims, 0, mColors.data() );
 		break;
 		case geom::Attrib::TEX_COORD_0:
-			geom::copyData( dims, srcData, numPositions, mTexCoords0Dims, 0, mTexCoords0.data() );
+			mTexCoords0.resize( mTexCoords0Dims * numVertices );
+			geom::copyData( dims, srcData, numVertices, mTexCoords0Dims, 0, mTexCoords0.data() );
 		break;
 		case geom::Attrib::TEX_COORD_1:
-			geom::copyData( dims, srcData, numPositions, mTexCoords1Dims, 0, mTexCoords1.data() );
+			mTexCoords1.resize( mTexCoords1Dims * numVertices );
+			geom::copyData( dims, srcData, numVertices, mTexCoords1Dims, 0, mTexCoords1.data() );
 		break;
 		case geom::Attrib::TEX_COORD_2:
-			geom::copyData( dims, srcData, numPositions, mTexCoords2Dims, 0, mTexCoords2.data() );
+			mTexCoords2.resize( mTexCoords2Dims * numVertices );
+			geom::copyData( dims, srcData, numVertices, mTexCoords2Dims, 0, mTexCoords2.data() );
 		break;
 		case geom::Attrib::TEX_COORD_3:
-			geom::copyData( dims, srcData, numPositions, mTexCoords3Dims, 0, mTexCoords3.data() );
+			mTexCoords3.resize( mTexCoords3Dims * numVertices );
+			geom::copyData( dims, srcData, numVertices, mTexCoords3Dims, 0, mTexCoords3.data() );
 		break;
 		case geom::Attrib::NORMAL:
-			geom::copyData( dims, srcData, numPositions, 3, 0, (float*)mNormals.data() );
+			mNormals.resize( numVertices );
+			geom::copyData( dims, srcData, numVertices, 3, 0, (float*)mNormals.data() );
 		break;
 		case geom::Attrib::TANGENT:
-			geom::copyData( dims, srcData, numPositions, 3, 0, (float*)mTangents.data() );
+			mTangents.resize( numVertices );
+			geom::copyData( dims, srcData, numVertices, 3, 0, (float*)mTangents.data() );
 		break;
 		case geom::Attrib::BITANGENT:
-			geom::copyData( dims, srcData, numPositions, 3, 0, (float*)mBitangents.data() );
+			mBitangents.resize( numVertices );
+			geom::copyData( dims, srcData, numVertices, 3, 0, (float*)mBitangents.data() );
 		break;
 		default:
 			throw geom::ExcMissingAttrib();
 	}
 }
 
-bool TriMesh::isEqual( uint32_t indexA, uint32_t indexB ) const
+bool TriMesh::verticesEqual( uint32_t indexA, uint32_t indexB ) const
 {
 	const size_t numPositions = getNumVertices();
 
 	if( indexA >= numPositions || indexB >= numPositions )
 		return false;
 
-	if( true ) {
-		const vec3 &a = *reinterpret_cast<const vec3*>(&mPositions[indexA*mPositionsDims]);
-		const vec3 &b = *reinterpret_cast<const vec3*>(&mPositions[indexB*mPositionsDims]);
-		if( distance2( a, b ) > FLT_EPSILON )
-			return false;
-	}
+	// positions
+	const vec3 &a = *reinterpret_cast<const vec3*>(&mPositions[indexA*mPositionsDims]);
+	const vec3 &b = *reinterpret_cast<const vec3*>(&mPositions[indexB*mPositionsDims]);
+	if( distance2( a, b ) > FLT_EPSILON )
+		return false;
 
-	if( isEnabled( geom::Attrib::COLOR ) ) {
+	if( mColorsDims > 0 ) {
 		if( mColorsDims == 3 ) {
 			const vec3 &a = *reinterpret_cast<const vec3*>(&mColors[indexA*mColorsDims]);
 			const vec3 &b = *reinterpret_cast<const vec3*>(&mColors[indexB*mColorsDims]);
@@ -1010,14 +981,14 @@ bool TriMesh::isEqual( uint32_t indexA, uint32_t indexB ) const
 		}
 	}
 
-	if( isEnabled( geom::Attrib::NORMAL ) ) {
+	if( mNormalsDims > 0 ) {
 		const vec3 &a = *reinterpret_cast<const vec3*>(&mNormals[indexA*mNormalsDims]);
 		const vec3 &b = *reinterpret_cast<const vec3*>(&mNormals[indexB*mNormalsDims]);
 		if( distance2( a, b ) > FLT_EPSILON )
 		return false;
 	}
 
-	if( isEnabled( geom::Attrib::TEX_COORD_0 ) ) {
+	if( mTexCoords0Dims > 0 ) {
 		if( mTexCoords0Dims == 2 ) {
 			const vec2 &a = *reinterpret_cast<const vec2*>(&mTexCoords0[indexA*mTexCoords0Dims]);
 			const vec2 &b = *reinterpret_cast<const vec2*>(&mTexCoords0[indexB*mTexCoords0Dims]);
@@ -1038,7 +1009,7 @@ bool TriMesh::isEqual( uint32_t indexA, uint32_t indexB ) const
 		}
 	}
 
-	if( isEnabled( geom::Attrib::TEX_COORD_1 ) ) {
+	if( mTexCoords1Dims > 0 ) {
 		if( mTexCoords1Dims == 2 ) {
 			const vec2 &a = *reinterpret_cast<const vec2*>(&mTexCoords1[indexA*mTexCoords1Dims]);
 			const vec2 &b = *reinterpret_cast<const vec2*>(&mTexCoords1[indexB*mTexCoords1Dims]);
@@ -1059,7 +1030,7 @@ bool TriMesh::isEqual( uint32_t indexA, uint32_t indexB ) const
 		}
 	}
 
-	if( isEnabled( geom::Attrib::TEX_COORD_2) ) {
+	if( mTexCoords2Dims > 0 ) {
 		if( mTexCoords2Dims == 2 ) {
 			const vec2 &a = *reinterpret_cast<const vec2*>(&mTexCoords2[indexA*mTexCoords2Dims]);
 			const vec2 &b = *reinterpret_cast<const vec2*>(&mTexCoords2[indexB*mTexCoords2Dims]);
@@ -1080,7 +1051,7 @@ bool TriMesh::isEqual( uint32_t indexA, uint32_t indexB ) const
 		}
 	}
 
-	if( isEnabled( geom::Attrib::TEX_COORD_3 ) ) {
+	if( mTexCoords3Dims > 0 ) {
 		if( mTexCoords3Dims == 2 ) {
 			const vec2 &a = *reinterpret_cast<const vec2*>(&mTexCoords3[indexA*mTexCoords3Dims]);
 			const vec2 &b = *reinterpret_cast<const vec2*>(&mTexCoords3[indexB*mTexCoords3Dims]);
@@ -1101,14 +1072,14 @@ bool TriMesh::isEqual( uint32_t indexA, uint32_t indexB ) const
 		}
 	}
 
-	if( isEnabled( geom::Attrib::TANGENT ) ) {
+	if( mTangentsDims > 0 ) {
 		const vec3 &a = *reinterpret_cast<const vec3*>(&mTangents[indexA*mTangentsDims]);
 		const vec3 &b = *reinterpret_cast<const vec3*>(&mTangents[indexB*mTangentsDims]);
 		if( distance2( a, b ) > FLT_EPSILON )
 		return false;
 	}
 
-	if( isEnabled( geom::Attrib::BITANGENT ) ) {
+	if( mBitangentsDims > 0 ) {
 		const vec3 &a = *reinterpret_cast<const vec3*>(&mBitangents[indexA*mBitangentsDims]);
 		const vec3 &b = *reinterpret_cast<const vec3*>(&mBitangents[indexB*mBitangentsDims]);
 		if( distance2( a, b ) > FLT_EPSILON )

@@ -88,9 +88,6 @@
     <Filter Include="Header Files\dx">
       <UniqueIdentifier>{1a305511-2204-4100-81d9-aecef552ae09}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Source Files\dx">
-      <UniqueIdentifier>{aaf12809-97ce-4c25-bb74-4c111e438a25}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Header Files\audio\dsp">
       <UniqueIdentifier>{547d2686-dd07-4302-befa-3d0815504249}</UniqueIdentifier>
     </Filter>
@@ -411,15 +408,6 @@
     <ClCompile Include="..\src\cinder\Base64.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\jsoncpp\json_reader.cpp">
-      <Filter>Source Files\jsoncpp</Filter>
-    </ClCompile>
-    <ClCompile Include="..\src\jsoncpp\json_value.cpp">
-      <Filter>Source Files\jsoncpp</Filter>
-    </ClCompile>
-    <ClCompile Include="..\src\jsoncpp\json_writer.cpp">
-      <Filter>Source Files\jsoncpp</Filter>
-    </ClCompile>
     <ClCompile Include="..\src\cinder\Json.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -648,9 +636,6 @@
     <ClCompile Include="..\src\cinder\gl\EnvironmentCore.cpp">
       <Filter>Source Files\gl</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\cinder\gl\EnvironmentEs2.cpp">
-      <Filter>Source Files\gl</Filter>
-    </ClCompile>
     <ClCompile Include="..\src\cinder\gl\Fbo.cpp">
       <Filter>Source Files\gl</Filter>
     </ClCompile>
@@ -749,6 +734,18 @@
     </ClCompile>
     <ClCompile Include="..\src\cinder\ImageSourceFileRadiance.cpp">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\cinder\app\AppImplMswRendererAngle.cpp">
+      <Filter>Source Files\app</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\cinder\gl\EnvironmentEs.cpp">
+      <Filter>Source Files\gl</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\cinder\gl\Ubo.cpp">
+      <Filter>Source Files\gl</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\jsoncpp\jsoncpp.cpp">
+      <Filter>Source Files\jsoncpp</Filter>
     </ClCompile>
     <ClCompile Include="..\src\cinder\evr\RendererGlImpl.cpp">
       <Filter>Source Files\evr</Filter>
@@ -1139,35 +1136,8 @@
     <ClInclude Include="..\include\cinder\Plane.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\json\autolink.h">
-      <Filter>Header Files\json</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\json\config.h">
-      <Filter>Header Files\json</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\json\features.h">
-      <Filter>Header Files\json</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\json\forwards.h">
-      <Filter>Header Files\json</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\json\json.h">
-      <Filter>Header Files\json</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\json\reader.h">
-      <Filter>Header Files\json</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\json\value.h">
-      <Filter>Header Files\json</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\json\writer.h">
-      <Filter>Header Files\json</Filter>
-    </ClInclude>
     <ClInclude Include="..\include\cinder\Json.h">
       <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\src\jsoncpp\json_batchallocator.h">
-      <Filter>Source Files\jsoncpp</Filter>
     </ClInclude>
     <ClInclude Include="..\include\cinder\svg\Svg.h">
       <Filter>Header Files\svg</Filter>
@@ -1607,6 +1577,18 @@
     <ClInclude Include="..\include\cinder\ImageSourceFileRadiance.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\include\cinder\app\AppImplMswRendererAngle.h">
+      <Filter>Header Files\app</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\cinder\gl\Ubo.h">
+      <Filter>Header Files\gl</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\jsoncpp\json\json.h">
+      <Filter>Header Files\json</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\jsoncpp\json\json-forwards.h">
+      <Filter>Header Files\json</Filter>
+    </ClInclude>
     <ClInclude Include="..\include\cinder\evr\RendererImpl.h">
       <Filter>Header Files\evr</Filter>
     </ClInclude>
@@ -1637,16 +1619,5 @@
     <ClInclude Include="..\include\cinder\evr\SharedTexture.h">
       <Filter>Header Files\evr</Filter>
     </ClInclude>
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="..\src\jsoncpp\json_internalarray.inl">
-      <Filter>Source Files\jsoncpp</Filter>
-    </None>
-    <None Include="..\src\jsoncpp\json_internalmap.inl">
-      <Filter>Source Files\jsoncpp</Filter>
-    </None>
-    <None Include="..\src\jsoncpp\json_valueiterator.inl">
-      <Filter>Source Files\jsoncpp</Filter>
-    </None>
   </ItemGroup>
 </Project>

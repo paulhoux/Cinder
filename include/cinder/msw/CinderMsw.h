@@ -43,7 +43,7 @@ namespace cinder { namespace msw {
 
 /** Converts a Win32 HBITMAP to a cinder::Surface8u
 	\note Currently always copies the alpha channel **/
-Surface8u convertHBitmap( HBITMAP hbitmap );
+Surface8uRef convertHBitmap( HBITMAP hbitmap );
 
 //! Converts a UTF-8 string into a wide string (wstring). Note that wstring is not a good cross-platform choice and this is here for interop with Windows APIs.
 std::wstring toWideString( const std::string &utf8String );
@@ -100,5 +100,8 @@ public:
 		mCriticalSectionPtr->Unlock();
 	}
 };
+
+//! Initializes COM on this thread. Uses thread local storage to prevent multiple initializations per thread
+void initializeCom( DWORD params = COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE );
 
 } } // namespace cinder::msw

@@ -26,7 +26,6 @@
 #include <sstream>
 #include <iostream>
 #include <fstream>
-#include <exception>
 #include <map>
 #include <set>
 
@@ -36,6 +35,7 @@
 #include "cinder/Matrix.h"
 #include "cinder/DataSource.h"
 #include "cinder/GeomIo.h"
+#include "cinder/Exception.h"
 
 //! Convenience macro that allows one to embed raw glsl code in-line. The \a VERSION parameter will be used for the glsl's '#version' define.
 //! \note Some strings will confuse different compilers, most commonly being preprocessor derictives (hence the need for \a VERSION to be a pamaeter).
@@ -65,6 +65,16 @@ class GlslProg : public std::enable_shared_from_this<GlslProg> {
 		Format&		geometry( const DataSourceRef &dataSource );
 		//! Supplies the GLSL source for the geometry shader
 		Format&		geometry( const char *geometryShader );
+		//! Supplies the GLSL source for the tessellation control shader
+		Format&		tessellationCtrl( const DataSourceRef &dataSource );
+		//! Supplies the GLSL source for the tessellation control shader
+		Format&		tessellationCtrl( const char *tessellationCtrlShader );
+		//! Supplies the GLSL source for the tessellation control shader
+		Format&		tessellationEval( const DataSourceRef &dataSource );
+		//! Supplies the GLSL source for the tessellation control shader
+		Format&		tessellationEval( const char *tessellationEvalShader );
+#endif
+#if ! defined( CINDER_GL_ES_2 )		
 		//! Sets the TransformFeedback varyings
 		Format&		feedbackVaryings( const std::vector<std::string>& varyings ) { mTransformVaryings = varyings; return *this; }
 		//! Sets the TransformFeedback format
@@ -93,6 +103,10 @@ class GlslProg : public std::enable_shared_from_this<GlslProg> {
 #if ! defined( CINDER_GL_ES )
 		//! Returns the GLSL source for the geometry shader
 		const std::string&	getGeometry() const { return mGeometryShader; }
+		const std::string&	getTessellationCtrl() const { return mTessellationCtrlShader; }
+		const std::string&	getTessellationEval() const { return mTessellationEvalShader; }
+#endif
+#if ! defined( CINDER_GL_ES_2 )
 		const std::vector<std::string>&  getVaryings() const { return mTransformVaryings; }
 		//! Returns the TransFormFeedback format
 		GLenum			getTransformFormat() const { return mTransformFormat; }
@@ -122,6 +136,10 @@ class GlslProg : public std::enable_shared_from_this<GlslProg> {
 		std::string					mFragmentShader;
 #if ! defined( CINDER_GL_ES )
 		std::string								mGeometryShader;
+		std::string								mTessellationCtrlShader;
+		std::string								mTessellationEvalShader;
+#endif
+#if ! defined( CINDER_GL_ES_2 )
 		GLenum									mTransformFormat;
 		std::vector<std::string>				mTransformVaryings;
 		std::map<std::string,GLuint>			mFragDataLocations;
@@ -131,16 +149,30 @@ class GlslProg : public std::enable_shared_from_this<GlslProg> {
 		std::map<std::string,UniformSemantic>	mUniformSemanticMap;
 		std::map<std::string,geom::Attrib>		mAttribSemanticMap;
 		
+		
 		std::string								mLabel;
 	};
   
 	typedef std::map<std::string,UniformSemantic>	UniformSemanticMap;
 	typedef std::map<std::string,geom::Attrib>		AttribSemanticMap;
 
-	static GlslProgRef create( const Format &format );  
+	static GlslProgRef create( const Format &format );
+
+#if ! defined( CINDER_GL_ES )
+	static GlslProgRef create( DataSourceRef vertexShader,
+								   DataSourceRef fragmentShader = DataSourceRef(),
+								   DataSourceRef geometryShader = DataSourceRef(),
+								   DataSourceRef tessEvalShader = DataSourceRef(),
+								   DataSourceRef tessCtrlShader = DataSourceRef() );
+	static GlslProgRef create( const char *vertexShader,
+								   const char *fragmentShader = 0,
+								   const char *geometryShader = 0,
+								   const char *tessEvalShader = 0,
+								   const char *tessCtrlShader = 0 );
+#else
 	static GlslProgRef create( DataSourceRef vertexShader, DataSourceRef fragmentShader = DataSourceRef() );
 	static GlslProgRef create( const char *vertexShader, const char *fragmentShader = 0 );
-	
+#endif
 	~GlslProg();
 	
 	void			bind() const;
@@ -205,7 +237,17 @@ class GlslProg : public std::enable_shared_from_this<GlslProg> {
 	
 	GLint	getAttribLocation( const std::string &name ) const;
 	GLint	getUniformLocation( const std::string &name ) const;
-	
+
+#if ! defined( CINDER_GL_ES_2 )
+	// Uniform blocks
+	//! Analogous to glUniformBlockBinding()
+	void	uniformBlock( const std::string &name, GLint binding );
+	//! Analogous to glUniformBlockBinding()
+	void	uniformBlock( GLint loc, GLint binding );
+	GLint	getUniformBlockLocation( const std::string &name ) const;
+	GLint	getUniformBlockSize( GLint blockIndex ) const;
+#endif
+
 	std::string		getShaderLog( GLuint handle ) const;
 
 	//! Returns the debugging label associated with the Program.
@@ -246,41 +288,35 @@ class GlslProg : public std::enable_shared_from_this<GlslProg> {
 	std::string								mLabel; // debug label
 
 	// storage as a work-around for NVidia on MSW driver bug expecting persistent memory in calls to glTransformFeedbackVaryings
-#if ! defined( CINDER_GL_ES )
+#if ! defined( CINDER_GL_ES_2 )
 	std::unique_ptr<std::vector<GLchar>>	mTransformFeedbackVaryingsChars;
 	std::unique_ptr<std::vector<GLchar*>>	mTransformFeedbackVaryingsCharStarts;
+	mutable std::map<std::string, GLint>	mUniformBlockLocs; // map between name and location
+	mutable std::map<GLint, GLint>			mUniformBlockSizes;
 #endif
 
 	friend class Context;
 	friend std::ostream& operator<<( std::ostream &os, const GlslProg &rhs );
 };
 
-class GlslProgCompileExc : public std::exception {
+class GlslProgExc : public cinder::gl::Exception {
   public:
-	GlslProgCompileExc( const std::string &log, GLint aShaderType ) throw();
-	virtual const char* what() const throw()
-	{
-		return mMessage.c_str();
-	}
-	
-  private:
-	std::string		mMessage;
-	GLint			mShaderType;
+	GlslProgExc()	{}
+	GlslProgExc( const std::string &description ) : cinder::gl::Exception( description )	{}
 };
 
-class GlslProgLinkExc : public std::exception {
+
+class GlslProgCompileExc : public GlslProgExc {
   public:
-	GlslProgLinkExc( const std::string &log ) throw() : mMessage( log ) {}
-	virtual const char* what() const throw()
-	{
-		return mMessage.c_str();
-	}
-	
-  private:
-	std::string		mMessage;
+	GlslProgCompileExc( const std::string &log, GLint shaderType );
 };
 
-class GlslNullProgramExc : public std::exception {
+class GlslProgLinkExc : public GlslProgExc {
+  public:
+	GlslProgLinkExc( const std::string &log ) : GlslProgExc( log ) {}
+};
+
+class GlslNullProgramExc : public GlslProgExc {
   public:
 	virtual const char* what() const throw()
 	{

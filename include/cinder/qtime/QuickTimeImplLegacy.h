@@ -28,6 +28,7 @@
 
 #include "cinder/Surface.h"
 #include "cinder/Display.h"
+#include "cinder/Exception.h"
 #include "cinder/Url.h"
 #include "cinder/DataSource.h"
 #include "cinder/Thread.h"
@@ -218,7 +219,7 @@ class MovieSurface : public MovieBase {
 	{ return std::shared_ptr<MovieSurface>( new MovieSurface( dataSource, mimeTypeHint ) ); }
 	
 	//! Returns the Surface8u representing the Movie's current frame
-	Surface		getSurface();
+	SurfaceRef	getSurface();
 	
   protected:
 	MovieSurface() : MovieBase() {}
@@ -237,7 +238,7 @@ class MovieSurface : public MovieBase {
 		virtual void		releaseFrame();
 		virtual void		newFrame( CVImageBufferRef cvImage );
 		
-		Surface				mSurface;
+		SurfaceRef			mSurface;
 	};
 	
 	std::shared_ptr<Obj>		mObj;
@@ -318,7 +319,7 @@ extern std::string getQuickTimeVersionString();
 //! Gives QuickTime an opportunity to update all playing movies by calling \c ::MoviesTask. Generally only necessary when playing audio-only movies on Windows.
 extern void quickTimeTask();
 
-class QuickTimeExc : public std::exception {
+class QuickTimeExc : public Exception {
 };
 
 class QuickTimePathInvalidExc : public QuickTimeExc {

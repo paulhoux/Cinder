@@ -28,6 +28,7 @@
 #include "cinder/gl/Texture.h"
 #include "cinder/DataSource.h"
 #include "cinder/Display.h"
+#include "cinder/Exception.h"
 #include "cinder/Surface.h"
 #include "cinder/Thread.h"
 #include "cinder/Url.h"
@@ -227,7 +228,7 @@ class MovieSurface : public MovieBase {
 	virtual bool hasAlpha() const;
 	
 	//! Returns the Surface8u representing the Movie's current frame
-	Surface		getSurface();
+	Surface8uRef		getSurface();
 
   protected:
 	MovieSurface() : MovieBase() {}
@@ -240,7 +241,7 @@ class MovieSurface : public MovieBase {
 	virtual void		newFrame( CVImageBufferRef cvImage ) override;
 	virtual void		releaseFrame() override;
 
-	Surface				mSurface;
+	Surface8uRef		mSurface;
 };
 
 class MovieResponder {
@@ -305,7 +306,7 @@ protected:
 
 inline int32_t floatToFixed( float fl ) { return ((int32_t)((float)(fl) * ((int32_t) 0x00010000L))); }
 
-class AvfExc : public std::exception {
+class AvfExc : public Exception {
 };
 
 class AvfPathInvalidExc : public AvfExc {

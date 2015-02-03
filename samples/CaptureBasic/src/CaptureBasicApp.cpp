@@ -34,8 +34,8 @@ void CaptureBasicApp::setup()
 		mCapture = Capture::create( 640, 480 );
 		mCapture->start();
 	}
-	catch( ... ) {
-		console() << "Failed to initialize capture" << std::endl;
+	catch( ci::Exception &exc ) {
+		console() << "Failed to initialize capture, what: " << exc.what() << std::endl;
 	}
 }
 
@@ -52,7 +52,7 @@ void CaptureBasicApp::keyDown( KeyEvent event )
 void CaptureBasicApp::update()
 {
 	if( mCapture && mCapture->checkNewFrame() ) {
-		mTexture = gl::Texture::create( mCapture->getSurface() );
+		mTexture = gl::Texture::create( *mCapture->getSurface() );
 	}
 }
 

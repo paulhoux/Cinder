@@ -26,8 +26,6 @@
 
 #include "AntTweakBar.h"
 
-#include <boost/assign/list_of.hpp>
-
 #if defined( USE_DIRECTX )
 	#include "cinder/dx/dx.h"
 	#include "cinder/app/AppImplMswRendererDx.h"
@@ -42,34 +40,34 @@ namespace {
 
 #undef DELETE
 
-#define SYNONYM(ck,ak) ((int)cinder::app::KeyEvent::KEY_ ## ck, TW_KEY_ ## ak)
+#define SYNONYM(ck,ak) {(int)cinder::app::KeyEvent::KEY_ ## ck, TW_KEY_ ## ak}
 #define HOMONYM(k) SYNONYM(k,k)
-    std::map<int,TwKeySpecial> specialKeys = boost::assign::map_list_of
-        HOMONYM(RIGHT)
-        HOMONYM(LEFT)
-        HOMONYM(BACKSPACE)
-        HOMONYM(DELETE)
-        HOMONYM(TAB)
-        HOMONYM(F1)
-        HOMONYM(F2)
-        HOMONYM(F3)
-        HOMONYM(F4)
-        HOMONYM(F5)
-        HOMONYM(F6)
-        HOMONYM(F7)
-        HOMONYM(F8)
-        HOMONYM(F9)
-        HOMONYM(F10)
-        HOMONYM(F11)
-        HOMONYM(F12)
-        HOMONYM(F13)
-        HOMONYM(F14)
-        HOMONYM(F15)
-        HOMONYM(HOME)
-        HOMONYM(END)
-        SYNONYM(PAGEUP,PAGE_UP)
+    std::map<int,TwKeySpecial> specialKeys = {
+        HOMONYM(RIGHT),
+        HOMONYM(LEFT),
+        HOMONYM(BACKSPACE),
+        HOMONYM(DELETE),
+        HOMONYM(TAB),
+        HOMONYM(F1),
+        HOMONYM(F2),
+        HOMONYM(F3),
+        HOMONYM(F4),
+        HOMONYM(F5),
+        HOMONYM(F6),
+        HOMONYM(F7),
+        HOMONYM(F8),
+        HOMONYM(F9),
+        HOMONYM(F10),
+        HOMONYM(F11),
+        HOMONYM(F12),
+        HOMONYM(F13),
+        HOMONYM(F14),
+        HOMONYM(F15),
+        HOMONYM(HOME),
+        HOMONYM(END),
+        SYNONYM(PAGEUP,PAGE_UP),
         SYNONYM(PAGEDOWN,PAGE_DOWN)
-        ;
+        };
 #undef SYNONYM
 #undef HOMONYM
 
@@ -262,6 +260,11 @@ InterfaceGlRef InterfaceGl::create( const cinder::app::WindowRef &window, const 
 
 void InterfaceGl::init( app::WindowRef window, const std::string &title, const ivec2 &size, const ColorA color )
 {
+	// preserve the current context
+	auto prevCtx = gl::context();
+	// set the context to 'window'
+	window->getRenderer()->makeCurrentContext();
+
 	mTwWindowId = initAntGl( window );
 	// due to a bug in Ant we need to restore the currently bound VAO as well as the buffer bindings
 	gl::context()->restoreInvalidatedVao();
@@ -287,6 +290,8 @@ void InterfaceGl::init( app::WindowRef window, const std::string &title, const i
 	window->getSignalMouseDrag().connect( std::bind( mouseMove, mWindow, mTwWindowId, std::placeholders::_1 ) );
 	window->getSignalKeyDown().connect( std::bind( keyDown, mTwWindowId, std::placeholders::_1 ) );
 	window->getSignalResize().connect( std::bind( resize, mWindow, mTwWindowId ) );
+
+	prevCtx->makeCurrent();
 }
 
 void InterfaceGl::draw()

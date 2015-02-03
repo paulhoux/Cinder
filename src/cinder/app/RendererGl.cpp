@@ -44,8 +44,6 @@
 
 namespace cinder { namespace app {
 
-const int RendererGl::sAntiAliasingSamples[] = { 0, 2, 4, 6, 8, 16, 32 };
-
 RendererGl::RendererGl( const RendererGl::Options &options )
 	: Renderer(), mImpl( 0 ), mOptions( options )
 {}
@@ -79,12 +77,18 @@ void RendererGl::setup( App *aApp, CGRect frame, NSView *cinderView, RendererRef
 
 void RendererGl::startDraw()
 {
-	[mImpl makeCurrentContext];
+	if( mStartDrawFn )
+		mStartDrawFn( this );
+	else
+		[mImpl makeCurrentContext];
 }
 
 void RendererGl::finishDraw()
 {
-	[mImpl flushBuffer];
+	if( mFinishDrawFn )
+		mFinishDrawFn( this );
+	else
+		[mImpl flushBuffer];
 }
 
 void RendererGl::setFrameSize( int width, int height )
@@ -214,7 +218,7 @@ void RendererGl::setup( App *aApp, HWND wnd, HDC dc, RendererRef sharedRenderer 
 		mImpl = new AppImplMswRendererGl( mApp, this );
 #endif
 	if( ! mImpl->initialize( wnd, dc, sharedRenderer ) )
-		throw ExcRendererAllocation();
+		throw ExcRendererAllocation( "AppImplMswRendererGl initialization failed." );
 }
 
 void RendererGl::kill()

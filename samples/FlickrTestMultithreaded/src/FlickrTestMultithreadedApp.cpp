@@ -1,6 +1,7 @@
 #include "cinder/app/AppNative.h"
 #include "cinder/app/RendererGl.h"
 #include "cinder/gl/Context.h"
+#include "cinder/gl/Texture.h"
 #include "cinder/Xml.h"
 #include "cinder/Timeline.h"
 #include "cinder/ImageIo.h"
@@ -68,7 +69,8 @@ void FlickrTestMTApp::loadImagesThreadFn( gl::ContextRef context )
 			mImages->pushFront( gl::Texture::create( loadImage( loadUrl( urls.back() ) ) ) );
 			urls.pop_back();
 		}
-		catch( ... ) { // just ignore any exceptions
+		catch( ci::Exception &exc ) {
+			console() << "failed to create texture, what: " << exc.what() << std::endl;
 		}
 	}
 }

@@ -22,17 +22,17 @@
  POSSIBILITY OF SUCH DAMAGE.
 */
 
-#if ! defined ( CINDER_WINRT )
-	#define BOOST_REGEX_NO_LIB
-	#include <boost/asio.hpp>
-#endif
+#define ASIO_STANDALONE 1
+#include "asio/asio.hpp"
 
 #include "cinder/app/App.h"
 #include "cinder/app/Renderer.h"
 #include "cinder/Camera.h"
+#include "cinder/System.h"
 #include "cinder/Utilities.h"
 #include "cinder/Timeline.h"
 #include "cinder/Thread.h"
+#include "cinder/Log.h"
 
 #if defined( CINDER_COCOA )
 	#if defined( CINDER_MAC )
@@ -83,14 +83,14 @@ void App::Settings::disableFrameRate()
 	mFrameRateEnabled = false;
 }
 
-void App::Settings::setFrameRate( float aFrameRate )
+void App::Settings::setFrameRate( float frameRate )
 {
-	mFrameRate = aFrameRate;
+	mFrameRate = frameRate;
 }
 
-void App::Settings::enablePowerManagement( bool aPowerManagement )
+void App::Settings::enablePowerManagement( bool powerManagement )
 {
-	mPowerManagement = aPowerManagement;
+	mPowerManagement = powerManagement;
 }
 
 void App::Settings::prepareWindow( const Window::Format &format )
@@ -108,8 +108,8 @@ App::App()
 	mAssetDirectoriesInitialized = false;
 
 #if !defined( CINDER_WINRT )
-	mIo = shared_ptr<boost::asio::io_service>( new boost::asio::io_service() );
-	mIoWork = shared_ptr<boost::asio::io_service::work>( new boost::asio::io_service::work( *mIo ) );
+	mIo = shared_ptr<asio::io_service>( new asio::io_service() );
+	mIoWork = shared_ptr<asio::io_service::work>( new asio::io_service::work( *mIo ) );
 #endif
 
 	// due to an issue with boost::filesystem's static initialization on Windows, 
@@ -138,9 +138,15 @@ void App::privateUpdate__()
 	mFrameCount++;
 
 #if !defined( CINDER_WINRT )
-	// service boost::asio::io_service
+	// service asio::io_service
 	mIo->poll();
 #endif
+
+	if( getNumWindows() > 0 ) {
+		WindowRef mainWin = getWindowIndex( 0 );
+		if( mainWin )
+			mainWin->getRenderer()->makeCurrentContext();
+	}
 
 	mSignalUpdate();
 
@@ -362,8 +368,13 @@ fs::path App::getOpenFilePath( const fs::path &initialPath, vector<string> exten
 	restoreWindowContext();
 
 	if( resultCode == NSFileHandlingPanelOKButton ) {
-		NSString *result = [[[cinderOpen URLs] objectAtIndex:0] path];
-		return fs::path( [result UTF8String] );
+		NSString *result = [[[cinderOpen URLs] firstObject] path];
+		if( ! result ) {
+			CI_LOG_E( "empty path result" );
+			return fs::path();
+		}
+		else
+			return fs::path( [result UTF8String] );
 	}
 	else
 		return fs::path();
@@ -403,8 +414,13 @@ fs::path App::getFolderPath( const fs::path &initialPath )
 	restoreWindowContext();
 	
 	if( resultCode == NSFileHandlingPanelOKButton ) {
-		NSString *result = [[[cinderOpen URLs] objectAtIndex:0] path];
-		return fs::path([result UTF8String]);
+		NSString *result = [[[cinderOpen URLs] firstObject] path];
+		if( ! result ) {
+			CI_LOG_E( "empty path result" );
+			return fs::path();
+		}
+		else
+			return fs::path([result UTF8String]);
 	}
 	else
 		return fs::path();
@@ -551,7 +567,14 @@ void App::executeLaunch( App *app, RendererRef defaultRenderer, const char *titl
 {
 	sInstance = app;
 	app->mDefaultRenderer = defaultRenderer;
-	app->launch( title, argc, argv );
+
+	try {
+		app->launch( title, argc, argv );
+	}
+	catch( std::exception &exc ) {
+		CI_LOG_E( "Uncaught exception, type: " << ci::System::demangleTypeName( typeid( exc ).name() ) << ", what : " << exc.what() );
+		throw;
+	}
 }
 
 void App::cleanupLaunch()
@@ -578,29 +601,25 @@ ivec2 App::getMousePos()
 #if defined( CINDER_COCOA )
 ResourceLoadExc::ResourceLoadExc( const string &macPath )
 {
-	sprintf( mMessage, "Failed to load resource: %s", macPath.c_str() );
+	setDescription( "Failed to load resource: " + macPath );
 }
 
 #elif defined( CINDER_MSW )
 
 ResourceLoadExc::ResourceLoadExc( int mswID, const string &mswType )
 {
-	sprintf( mMessage, "Failed to load resource: #%d type: %s", mswID, mswType.c_str() );
+	setDescription( "Failed to load resource: #" + to_string( mswID ) + " type: " + mswType );
 }
 
 ResourceLoadExc::ResourceLoadExc( const string &macPath, int mswID, const string &mswType )
 {
-	sprintf( mMessage, "Failed to load resource: #%d type: %s Mac path: %s", mswID, mswType.c_str(), macPath.c_str() );
+	setDescription( "Failed to load resource: #" + to_string( mswID ) + " type: " + mswType + " Mac path: " + macPath );
 }
 #endif // defined( CINDER_MSW )
 
 AssetLoadExc::AssetLoadExc( const fs::path &relativePath )
 {
-#if defined( CINDER_WINRT )
-	strncpy_s( mMessage, relativePath.string().c_str(), sizeof(mMessage) );
-#else
-	strncpy( mMessage, relativePath.string().c_str(), sizeof(mMessage) );
-#endif
+	setDescription( string( "Failed to load asset with relative path: " ) + relativePath.string() );
 }
 
 } } // namespace cinder::app
