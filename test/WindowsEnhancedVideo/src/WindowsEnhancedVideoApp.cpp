@@ -3,6 +3,9 @@
 #include "cinder/app/AppNative.h"
 #include "cinder/app/RendererGl.h"
 #include "cinder/gl/gl.h"
+#include "cinder/gl/Batch.h"
+#include "cinder/gl/GlslProg.h"
+#include "cinder/gl/VboMesh.h"
 #include "cinder/Log.h"
 #include "cinder/Utilities.h"
 
@@ -12,7 +15,21 @@
 using namespace ci;
 using namespace ci::app;
 using namespace ci::msw;
+using namespace ci::msw::video;
 using namespace std;
+
+struct Circle {
+	ci::vec4  color;
+
+	ci::vec2  position;
+	float     radius;
+	float     pad0;
+
+	float     thickness;
+	float     length;
+	float     offset;
+	float     pad2;
+};
 
 class WindowsEnhancedVideoApp : public AppNative {
 public:
@@ -32,12 +49,14 @@ public:
 	bool playVideo( const fs::path &path );
 
 private:
-	video::MovieGlRef              mMovieRef;
-	glm::mat4                      mTransform;
+	static const int kMaxMovieCount = 16;
 
-	std::vector<gl::Texture2dRef>  mCapturedFrames;
+	std::vector<MovieGlRef>        mMovies;
 
-	gl::QueryTimeSwappedRef        mQuery;
+	ci::gl::GlslProgRef            mShader;
+	ci::gl::VboRef                 mData;
+	ci::gl::VboMeshRef             mMesh;
+	ci::gl::BatchRef               mBatch;
 };
 
 void WindowsEnhancedVideoApp::prepareSettings( Settings* settings )
@@ -48,57 +67,83 @@ void WindowsEnhancedVideoApp::prepareSettings( Settings* settings )
 
 void WindowsEnhancedVideoApp::setup()
 {
-	//fs::path path = getOpenFilePath();
-	//playVideo( path );
-
 	gl::enableVerticalSync( true );
 	gl::clear();
 	gl::color( 1, 1, 1 );
 
-	mQuery = gl::QueryTimeSwapped::create();
+	// create an array of initial per-instance data
+	std::vector<Circle> data( kMaxMovieCount );
+
+	// create the VBO which will contain per-instance (rather than per-vertex) data
+	mData = gl::Vbo::create( GL_ARRAY_BUFFER, data.size() * sizeof( Circle ), data.data(), GL_DYNAMIC_DRAW );
+
+	geom::BufferLayout instanceDataLayout;
+	instanceDataLayout.append( geom::Attrib::CUSTOM_0, 4, sizeof( Circle ), offsetof( Circle, color ), 1 /* per instance */ );
+	instanceDataLayout.append( geom::Attrib::CUSTOM_1, 4, sizeof( Circle ), offsetof( Circle, position ), 1 /* per instance */ );
+	instanceDataLayout.append( geom::Attrib::CUSTOM_2, 4, sizeof( Circle ), offsetof( Circle, thickness ), 1 /* per instance */ );
+
+	// 
+	mMesh = gl::VboMesh::create( geom::Rect( Rectf( -1, -1, 1, 1 ) ) );
+	mMesh->appendVbo( instanceDataLayout, mData );
+
+	//
+	mShader = gl::GlslProg::create( loadAsset( "circle.vert" ), loadAsset( "circle.frag" ) );
+
+	//
+	mBatch = gl::Batch::create( mMesh, mShader, { { geom::Attrib::CUSTOM_0, "vInstanceColor" }, { geom::Attrib::CUSTOM_1, "vInstancePosition" }, { geom::Attrib::CUSTOM_2, "vInstanceAttribs" } } );
+
 }
 
 void WindowsEnhancedVideoApp::shutdown()
 {
-	mCapturedFrames.clear();
-	mMovieRef.reset();
 }
 
 void WindowsEnhancedVideoApp::update()
 {
-	if( mMovieRef && mMovieRef->isDone() )
-		mMovieRef.reset();
+	for( auto itr = mMovies.begin(); itr != mMovies.end(); ) {
+		auto &movie = *itr;
+		if( !movie || movie->isDone() ) {
+			itr = mMovies.erase( itr );
+		}
+		else {
+			++itr;
+		}
+	}
 }
 
 void WindowsEnhancedVideoApp::draw()
 {
 	gl::clear();
 
-	if( mMovieRef ) {
+	// Update instance data.
+	double time = getElapsedSeconds();
+	Circle *ptr = (Circle*) mData->mapWriteOnly( true );
+	size_t base = (size_t) ptr;
+	for( size_t i = 0; i < mMovies.size(); ++i ) {
+		ptr->color = vec4( 1 );
+		//ptr->color.a = 0.45f + 0.4f * sinf( float( 2.0 * M_PI ) * ( i / float( mMovies.size() ) ) - (float) time * 8.0f );
+		ptr->position = vec2( getWindowSize() / 2 );
+		ptr->radius = 0.8f * math<float>::max( getWindowWidth(), getWindowHeight() );
+		ptr->thickness = 0.5f;
+		ptr->length = 1.0f / mMovies.size();
+		ptr->offset = float( time * 0.05 ) + float( i ) / mMovies.size();
+		++ptr;
+	}
+	mData->unmap();
 
-		// Draw movie.
-		mQuery->begin();
-
-		gl::Texture2dRef tex = mMovieRef->getTexture();
-		if( tex )
-			gl::draw( tex, (Rectf) Area::proportionalFit( tex->getBounds(), getWindowBounds(), true, true ) );
-
-		mQuery->end();
-
-		// Draw captured frames.
-		float x = 0.0f, y = 0.0f;
-		for( auto &frame : mCapturedFrames ) {
-			float w = frame->getWidth() * 0.25f;
-			float h = frame->getHeight() * 0.25f;
-			gl::draw( frame, Rectf( x, y, x + w, y + h ) );
-
-			x += w;
-			if( ( x + w ) > float( getWindowWidth() ) ) {
-				x = 0.0f;
-				y += h;
+	// Bind textures.
+	for( int i = 0; i < (int) mMovies.size(); ++i ) {
+		auto movie = mMovies[i];
+		if( movie ) {
+			auto texture = movie->getTexture();
+			if( texture ) {
+				texture->bind( i );
 			}
 		}
 	}
+
+	// Draw movies.
+	mBatch->drawInstanced( mMovies.size() );
 }
 
 void WindowsEnhancedVideoApp::mouseDown( MouseEvent event )
@@ -111,19 +156,8 @@ void WindowsEnhancedVideoApp::keyDown( KeyEvent event )
 	case KeyEvent::KEY_ESCAPE:
 		quit();
 		break;
-	case KeyEvent::KEY_SPACE:
-		if( mMovieRef )
-			mCapturedFrames.push_back( mMovieRef->getTexture() );
-		break;
-	case KeyEvent::KEY_DELETE:
-		if( !mCapturedFrames.empty() )
-			mCapturedFrames.pop_back();
-		break;
 	case KeyEvent::KEY_o:
 		playVideo( getOpenFilePath() );
-		break;
-	case KeyEvent::KEY_r:
-		mMovieRef.reset();
 		break;
 	case KeyEvent::KEY_v:
 		gl::enableVerticalSync( !gl::isVerticalSyncEnabled() );
@@ -139,12 +173,6 @@ void WindowsEnhancedVideoApp::keyDown( KeyEvent event )
 
 void WindowsEnhancedVideoApp::resize()
 {
-	if( mMovieRef ) {
-		Area bounds = mMovieRef->getBounds();
-		Area scaled = Area::proportionalFit( bounds, getWindowBounds(), true, true );
-		mTransform = glm::translate( vec3( vec2( scaled.getUL() - bounds.getUL() ) + vec2( 0.5 ), 0 ) ) * glm::scale( vec3( vec2( scaled.getSize() ) / vec2( bounds.getSize() ), 1 ) );
-		gl::setModelMatrix( mTransform );
-	}
 }
 
 void WindowsEnhancedVideoApp::fileDrop( FileDropEvent event )
@@ -155,22 +183,12 @@ void WindowsEnhancedVideoApp::fileDrop( FileDropEvent event )
 
 bool WindowsEnhancedVideoApp::playVideo( const fs::path &path )
 {
-	if( !path.empty() && fs::exists( path ) ) {
+	if( mMovies.size() < kMaxMovieCount && !path.empty() && fs::exists( path ) ) {
 		// TODO: make sure the movie can play
-		mMovieRef = video::MovieGl::create( path );
-		mMovieRef->play();
+		auto movie = video::MovieGl::create( path );
+		movie->play();
 
-		Area bounds = Area::proportionalFit( mMovieRef->getBounds(), getDisplay()->getBounds(), true, false );
-		getWindow()->setSize( bounds.getSize() );
-		getWindow()->setPos( bounds.getUL() );
-
-		std::string title = "WindowsEnhancedVideo";
-		if( mMovieRef->isUsingDirectShow() )
-			title += " (DirectShow)";
-		else if( mMovieRef->isUsingMediaFoundation() )
-			title += " (Media Foundation)";
-
-		getWindow()->setTitle( title );
+		mMovies.push_back( movie );
 
 		return true;
 	}
