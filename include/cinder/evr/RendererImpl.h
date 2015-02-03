@@ -133,11 +133,11 @@ public:
 	//! Returns whether the movie is currently playing or is paused/stopped.
 	bool		isPlaying() const { /*TODO*/ return false; }
 	//! Returns whether the movie has completely finished playing
-	bool		isDone() const { /*TODO*/ return false; }
+	bool		isDone() const { assert( mPlayer ); /*return mPlayer->*/ }
 	//! Begins movie playback.
-	void		play() { if( mPlayer ) mPlayer->Play(); mIsPlaying = true; }
+	void		play() { assert( mPlayer ); mPlayer->Play(); mIsPlaying = true; }
 	//! Stops movie playback.
-	void		stop() { if( mPlayer ) mPlayer->Stop(); }
+	void		stop() { assert( mPlayer ); mPlayer->Stop(); }
 
 	//! TODO: implement getPlayerHandle();
 

@@ -43,15 +43,13 @@ private:
 void WindowsEnhancedVideoApp::prepareSettings( Settings* settings )
 {
 	settings->disableFrameRate();
-	settings->setWindowSize( 1920, 1080 );
+	settings->setWindowSize( 1280, 720 );
 }
 
 void WindowsEnhancedVideoApp::setup()
 {
-	auto p = getAssetPath( "test.txt" );
-
-	fs::path path = getOpenFilePath();
-	playVideo( path );
+	//fs::path path = getOpenFilePath();
+	//playVideo( path );
 
 	gl::enableVerticalSync( true );
 	gl::clear();
@@ -68,6 +66,8 @@ void WindowsEnhancedVideoApp::shutdown()
 
 void WindowsEnhancedVideoApp::update()
 {
+	if( mMovieRef && mMovieRef->isDone() )
+		mMovieRef.reset();
 }
 
 void WindowsEnhancedVideoApp::draw()

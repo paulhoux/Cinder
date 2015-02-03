@@ -46,6 +46,8 @@ public:
 
 	HRESULT HandleEvent( UINT_PTR pEventPtr ) override;
 
+	BOOL    IsPlaying() const override { return; }
+
 	UINT32  GetWidth() const override { return (UINT32) m_Width; }
 	UINT32  GetHeight() const override { return (UINT32) m_Height; }
 
