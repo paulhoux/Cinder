@@ -765,6 +765,9 @@
     <ClCompile Include="..\src\cinder\evr\RendererImpl.cpp">
       <Filter>Source Files\evr</Filter>
     </ClCompile>
+    <ClCompile Include="..\src\cinder\evr\SharedTexture.cpp">
+      <Filter>Source Files\evr</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\src\AntTweakBar\AntPerfTimer.h">

@@ -442,6 +442,7 @@
     <ClCompile Include="..\src\cinder\evr\MediaFoundationVideo.cpp" />
     <ClCompile Include="..\src\cinder\evr\RendererGlImpl.cpp" />
     <ClCompile Include="..\src\cinder\evr\RendererImpl.cpp" />
+    <ClCompile Include="..\src\cinder\evr\SharedTexture.cpp" />
     <ClCompile Include="..\src\cinder\Exception.cpp" />
     <ClCompile Include="..\src\cinder\Font.cpp" />
     <ClCompile Include="..\src\cinder\Frustum.cpp" />

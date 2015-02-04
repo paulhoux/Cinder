@@ -1,4 +1,4 @@
-//#include "vld.h"
+#include "vld.h"
 
 #include "cinder/app/AppNative.h"
 #include "cinder/app/RendererGl.h"

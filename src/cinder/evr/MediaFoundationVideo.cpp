@@ -11,9 +11,6 @@ namespace cinder {
 	namespace msw {
 		namespace video {
 
-			//std::atomic<int> SharedTexture::uuid = 0;
-			//std::atomic<int> SharedTexture::count = 0;
-
 			RECT CorrectAspectRatio( const RECT& src, const MFRatio& srcPAR, const MFRatio& destPAR )
 			{
 				// Start with a rectangle the same size as src, but offset to the origin (0,0).
@@ -661,17 +658,9 @@ namespace cinder {
 					SharedTextureRef shared;
 					hr = m_pTexturePool->GetFreeSurface( desc, shared );
 					BREAK_ON_FAIL( hr );
-#if _DEBUG
-					D3DSURFACE_DESC shared_desc;
-					hr = shared->m_pD3DSurface->GetDesc( &shared_desc );
-					if( SUCCEEDED( hr ) )
-						assert( desc.Width == shared_desc.Width && desc.Height == shared_desc.Height );
-#endif
+
 					// Blit texture.
-					hr = m_pDevice->StretchRect( pSurface, NULL, shared->m_pD3DSurface, NULL, D3DTEXF_NONE );
-					if( SUCCEEDED( hr ) ) {
-						m_pTexturePool->AddAvailableSurface( shared );
-					}
+					hr = shared->BlitTo( m_pDevice, pSurface );
 
 					//
 					hr = pSwapChain->Present( NULL, &m_rcDestRect, m_hwnd, NULL, 0 ); // <-- Is this required if we can't see the window anyway?
