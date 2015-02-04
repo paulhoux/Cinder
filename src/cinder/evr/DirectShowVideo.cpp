@@ -164,6 +164,12 @@ HRESULT InitWindowlessVMR(
 	return hr;
 }
 
+gl::Texture2dRef RendererVMR7::GetTexture()
+{
+	assert( false ); // E_NOT_IMPL
+	return gl::Texture2dRef();
+}
+
 
 /// VMR-9 Wrapper
 
@@ -274,6 +280,12 @@ HRESULT RendererVMR9::GetNativeVideoSize( LONG *lpWidth, LONG *lpHeight ) const
 	}
 }
 
+gl::Texture2dRef RendererVMR9::GetTexture()
+{
+	assert( false ); // E_NOT_IMPL
+	return gl::Texture2dRef();
+}
+
 
 // Initialize the VMR-9 for windowless mode. 
 
@@ -363,10 +375,8 @@ HRESULT RendererEVR::AddToGraph( IGraphBuilder *pGraph, HWND hwnd )
 		hr = InitializeEVR( pEVR, hwnd, m_pPresenter, &m_pVideoDisplay );
 		BREAK_ON_FAIL( hr );
 
-		m_pEVR = pEVR;
+		CopyComPtr( m_pEVR, pEVR.get() );
 
-		// We have to add an extra reference to prevent the Graph from destroying our filter.
-		m_pEVR->AddRef();
 		m_pEVR->AddRef();
 	} while( false );
 
@@ -449,6 +459,12 @@ HRESULT RendererEVR::GetNativeVideoSize( LONG *lpWidth, LONG *lpHeight ) const
 	else {
 		return E_POINTER;
 	}
+}
+
+gl::Texture2dRef RendererEVR::GetTexture()
+{
+	assert( m_pPresenter );
+	return m_pPresenter->GetTexture();
 }
 
 // Initialize the EVR filter. 

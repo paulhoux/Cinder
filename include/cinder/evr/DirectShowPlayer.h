@@ -53,7 +53,7 @@ namespace cinder {
 				UINT32  GetWidth() const override { return (UINT32) m_Width; }
 				UINT32  GetHeight() const override { return (UINT32) m_Height; }
 
-				ci::gl::Texture2dRef GetTexture() override { return ci::gl::Texture2dRef(); }
+				ci::gl::Texture2dRef GetTexture() override { assert( m_pVideo ); return m_pVideo->GetTexture(); }
 
 				//
 				PlayerState State() const { return m_state; }

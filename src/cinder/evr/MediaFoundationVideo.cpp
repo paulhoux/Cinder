@@ -11,8 +11,8 @@ namespace cinder {
 	namespace msw {
 		namespace video {
 
-			int SharedTexture::uuid = 0;
-			int SharedTexture::count = 0;
+			//std::atomic<int> SharedTexture::uuid = 0;
+			//std::atomic<int> SharedTexture::count = 0;
 
 			RECT CorrectAspectRatio( const RECT& src, const MFRatio& srcPAR, const MFRatio& destPAR )
 			{
@@ -658,25 +658,19 @@ namespace cinder {
 					// Obtain free surface from the texture pool.
 					assert( m_pTexturePool );
 
-					SharedTexture shared;
-					hr = m_pTexturePool->GetFreeSurface( desc, &shared );
+					SharedTextureRef shared;
+					hr = m_pTexturePool->GetFreeSurface( desc, shared );
 					BREAK_ON_FAIL( hr );
-
 #if _DEBUG
 					D3DSURFACE_DESC shared_desc;
-					hr = shared.m_pD3DSurface->GetDesc( &shared_desc );
+					hr = shared->m_pD3DSurface->GetDesc( &shared_desc );
 					if( SUCCEEDED( hr ) )
 						assert( desc.Width == shared_desc.Width && desc.Height == shared_desc.Height );
 #endif
-
 					// Blit texture.
-					hr = m_pDevice->StretchRect( pSurface, NULL, shared.m_pD3DSurface, NULL, D3DTEXF_NONE );
+					hr = m_pDevice->StretchRect( pSurface, NULL, shared->m_pD3DSurface, NULL, D3DTEXF_NONE );
 					if( SUCCEEDED( hr ) ) {
 						m_pTexturePool->AddAvailableSurface( shared );
-					}
-					else {
-						assert( hr == D3DERR_INVALIDCALL );
-						//m_pTexturePool->AddFreeSurface( shared );
 					}
 
 					//

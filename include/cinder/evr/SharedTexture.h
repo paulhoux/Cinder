@@ -39,8 +39,7 @@ POSSIBILITY OF SUCH DAMAGE.
 
 //#include <mmsystem.h> // for timeBeginPeriod and timeEndPeriod
 
-#include <unordered_map>
-#include <deque>
+#include <map>
 #include <thread>
 
 #include <d3d9.h>
@@ -55,6 +54,9 @@ POSSIBILITY OF SUCH DAMAGE.
 //#include <mferror.h>
 //#include <evr.h>
 
+// TEMP for debugging
+#include <atomic>
+
 // Include these libraries.
 #pragma comment(lib, "winmm.lib")
 #pragma comment(lib,"d3d9.lib")
@@ -62,23 +64,26 @@ POSSIBILITY OF SUCH DAMAGE.
 //#pragma comment (lib,"evr.lib")
 
 #define USE_OFFSCREEN_PLAIN_SURFACE 1
+#define USE_ONCE 0
 
 namespace cinder {
 	namespace msw {
 		namespace video {
 
+			typedef std::shared_ptr<class SharedTexture> SharedTextureRef;
+
 			class SharedTexture {
 			public:
 				SharedTexture() : m_uTextureId( ~0 ), m_hGLHandle( NULL ), m_hD3DHandle( NULL ), m_pD3DSurface( NULL ), m_pD3DTexture( NULL )
 				{
-					myUuid = ++uuid;
-					++count;
-					CI_LOG_V( "Created SharedTexture " << myUuid << " (" << count << " in total)" );
+					//myUuid = ++uuid;
+					//++count;
+					//CI_LOG_V( "Created SharedTexture " << myUuid << " (" << count << " in total)" );
 				}
 
 				SharedTexture( const SharedTexture &other ) : SharedTexture()
 				{
-					CI_LOG_V( "Copy constructor called from " << other.myUuid << " to " << myUuid );
+					//CI_LOG_V( "Copy constructor called from " << other.myUuid << " to " << myUuid );
 
 					m_uTextureId = other.m_uTextureId;
 					m_hGLHandle = other.m_hGLHandle;
@@ -91,7 +96,7 @@ namespace cinder {
 
 				SharedTexture( SharedTexture &&other ) : SharedTexture()
 				{
-					CI_LOG_V( "Move constructor called from " << other.myUuid << " to " << myUuid );
+					//CI_LOG_V( "Move constructor called from " << other.myUuid << " to " << myUuid );
 
 					std::swap( m_uTextureId, other.m_uTextureId );
 					std::swap( m_hGLHandle, other.m_hGLHandle );
@@ -104,16 +109,16 @@ namespace cinder {
 
 				~SharedTexture()
 				{
-					--count;
+					//--count;
 
-					CI_LOG_V( "Destroying SharedTexture " << myUuid << " (" << count << " in total)" );
+					//CI_LOG_V( "Destroying SharedTexture " << myUuid << " (" << count << " in total)" );
 					SafeRelease( m_pD3DSurface );
 					SafeRelease( m_pD3DTexture );
 				}
 
 				SharedTexture& operator=( SharedTexture &other ) throw( )
 				{
-					CI_LOG_V( "Copy operator called from " << other.myUuid << " to " << myUuid );
+					//CI_LOG_V( "Copy operator called from " << other.myUuid << " to " << myUuid );
 
 					m_uTextureId = other.m_uTextureId;
 					m_hGLHandle = other.m_hGLHandle;
@@ -128,7 +133,7 @@ namespace cinder {
 
 				SharedTexture& operator=( SharedTexture &&other ) throw( )
 				{
-					CI_LOG_V( "Move operator called from " << other.myUuid << " to " << myUuid );
+					//CI_LOG_V( "Move operator called from " << other.myUuid << " to " << myUuid );
 
 					std::swap( m_uTextureId, other.m_uTextureId );
 					std::swap( m_hGLHandle, other.m_hGLHandle );
@@ -161,8 +166,8 @@ namespace cinder {
 				IDirect3DSurface9*            m_pD3DSurface;
 				IDirect3DTexture9*            m_pD3DTexture;
 
-				static int uuid, count;
-				int myUuid;
+				//static std::atomic<int> uuid, count;
+				//std::atomic<int>        myUuid;
 			};
 
 			class SharedTexturePool : public std::enable_shared_from_this < SharedTexturePool > {
@@ -176,16 +181,13 @@ namespace cinder {
 					m_pDevice->AddRef();
 
 					// Make sure OpenGL interop is initialized.
-					if( !wglext_NV_DX_interop ) {
-						throw std::runtime_error( "WGL_NV_DX_interop extension not supported. Upgrade your graphics drivers and try again." );
-					}
-					else {
-						CI_LOG_V( "Opening DX/GL interop" );
+					if( wglext_NV_DX_interop ) {
+						CI_LOG_V( "Opening DX/GL interop for device " << m_pDevice );
 						m_pD3DDeviceHandle = wglDXOpenDeviceNV( m_pDevice );
-						if( m_pD3DDeviceHandle == NULL ) {
-							DWORD err = GetLastError(); // ERROR_OPEN_FAILED or ERROR_NOT_SUPPORTED
-							throw std::runtime_error( "WGL_NV_DX_interop extension not supported. Upgrade your graphics drivers and try again." );
-						}
+					}
+
+					if( m_pD3DDeviceHandle == NULL ) {
+						throw std::runtime_error( "WGL_NV_DX_interop extension not supported. Upgrade your graphics drivers and try again." );
 					}
 				}
 
@@ -193,55 +195,54 @@ namespace cinder {
 				{
 					std::lock_guard<std::mutex> lock1( mFreeLock );
 					std::lock_guard<std::mutex> lock2( mAvailableLock );
-					std::lock_guard<std::mutex> lock3( mUsedLock );
 
 					// Release all textures and surfaces. ( now is the time to actually call wglDXUnregisterObjectNV() & glDeleteTextures() )
-					for( auto &shared : mFree ) {
-						if( shared.m_hGLHandle != NULL ) {
-							CI_LOG_V( "Unregistering surface " << shared.m_hGLHandle );
-							BOOL success = wglDXUnregisterObjectNV( m_pD3DDeviceHandle, shared.m_hGLHandle );
+					if( mFree ) {
+						if( mFree->m_hGLHandle != NULL ) {
+							CI_LOG_V( "Unregistering surface " << mFree->m_hGLHandle );
+							BOOL success = wglDXUnregisterObjectNV( m_pD3DDeviceHandle, mFree->m_hGLHandle );
 						}
-						if( glIsTexture( shared.m_uTextureId ) ) {
-							glDeleteTextures( 1, &( shared.m_uTextureId ) );
+						if( glIsTexture( mFree->m_uTextureId ) ) {
+							glDeleteTextures( 1, &( mFree->m_uTextureId ) );
 						}
 					}
+					mFree.reset();
 
-					for( auto &shared : mAvailable ) {
-						if( shared.m_hGLHandle != NULL ) {
-							CI_LOG_V( "Unregistering texture " << shared.m_hGLHandle );
-							BOOL success = wglDXUnregisterObjectNV( m_pD3DDeviceHandle, shared.m_hGLHandle );
+					if( mAvailable ) {
+						if( mAvailable->m_hGLHandle != NULL ) {
+							CI_LOG_V( "Unregistering texture " << mAvailable->m_hGLHandle );
+							BOOL success = wglDXUnregisterObjectNV( m_pD3DDeviceHandle, mAvailable->m_hGLHandle );
 						}
-						if( glIsTexture( shared.m_uTextureId ) ) {
-							glDeleteTextures( 1, &( shared.m_uTextureId ) );
+						if( glIsTexture( mAvailable->m_uTextureId ) ) {
+							glDeleteTextures( 1, &( mAvailable->m_uTextureId ) );
 						}
 					}
+					mAvailable.reset();
 
 					// The following textures are still in use, so don't delete them, just unlock and unregister them (?)
-					for( auto &shared : mUsed ) {
-						if( shared.m_hGLHandle != NULL ) {
-							CI_LOG_V( "Unlocking texture " << shared.m_hGLHandle );
-							BOOL success = wglDXUnlockObjectsNV( m_pD3DDeviceHandle, 1, &( shared.m_hGLHandle ) );
+					for( auto itr = mUsed.begin(); itr != mUsed.end(); ++itr ) {
+						SharedTextureRef &shared = itr->second;
+						if( shared->m_hGLHandle != NULL ) {
+							CI_LOG_V( "Unlocking texture " << shared->m_hGLHandle );
+							BOOL success = wglDXUnlockObjectsNV( m_pD3DDeviceHandle, 1, &( shared->m_hGLHandle ) );
 						}
-						if( shared.m_hGLHandle != NULL ) {
-							CI_LOG_V( "Unregistering texture " << shared.m_hGLHandle );
-							BOOL success = wglDXUnregisterObjectNV( m_pD3DDeviceHandle, shared.m_hGLHandle );
+						if( shared->m_hGLHandle != NULL ) {
+							CI_LOG_V( "Unregistering texture " << shared->m_hGLHandle );
+							BOOL success = wglDXUnregisterObjectNV( m_pD3DDeviceHandle, shared->m_hGLHandle );
 						}
 					}
-
-					mFree.clear();
-					mAvailable.clear();
 					mUsed.clear();
 
 					// Close OpenGL interop.
 					if( m_pD3DDeviceHandle ) {
-						try {
-							CI_LOG_V( "Closing DX/GL interop..." );
-							BOOL success = wglDXCloseDeviceNV( m_pD3DDeviceHandle );
+						CI_LOG_V( "Closing DX/GL interop for device " << m_pDevice << "..." );
+
+						BOOL success = wglDXCloseDeviceNV( m_pD3DDeviceHandle );
+						if( success )
 							CI_LOG_V( "Succeeded." );
-						}
-						catch( const std::exception &e ) {
-							CI_LOG_E( "Failed: " << e.what() );
-						}
+						else
+							CI_LOG_V( "Failed." );
+
 						m_pD3DDeviceHandle = NULL;
 					}
 
@@ -259,7 +260,7 @@ namespace cinder {
 				}
 
 				//! Will be called from a separate thread controlled by the presenter engine.
-				HRESULT GetFreeSurface( const D3DSURFACE_DESC &desc, SharedTexture *pShared )
+				HRESULT GetFreeSurface( const D3DSURFACE_DESC &desc, SharedTextureRef &shared )
 				{
 					HRESULT hr = S_OK;
 
@@ -267,62 +268,65 @@ namespace cinder {
 						// Check if we have a surface that we can reuse, if not then create one.
 						std::lock_guard<std::mutex> lock( mFreeLock );
 
+#if !USE_ONCE
 						do {
-							// First, try to reuse an available surface if there are more than 1.
+							// First, try to reuse an available surface.
 							std::lock_guard<std::mutex> lock( mAvailableLock );
 
-							while( mAvailable.size() > 1 ) {
-								SharedTexture s = mAvailable[0];
+							if( mAvailable ) {
+								shared = mAvailable;
+								mAvailable.reset();
 
-								mAvailable.erase( mAvailable.begin() );
-								mFree.push_back( s );
+								return hr;
 							}
 						} while( false );
-
-						if( mFree.empty() ) {
+#endif
+						if( !mFree ) {
 							CI_LOG_V( "Creating new surface to render to." );
 
-							SharedTexture s;
+							shared = std::make_shared<SharedTexture>();
 #if USE_OFFSCREEN_PLAIN_SURFACE
 							// Create D3DSurface only.
-							hr = m_pDevice->CreateOffscreenPlainSurface( desc.Width, desc.Height, /*D3DFMT_A8R8G8B8*/ desc.Format, D3DPOOL_DEFAULT, &( s.m_pD3DSurface ), &( s.m_hD3DHandle ) );
+							hr = m_pDevice->CreateOffscreenPlainSurface( desc.Width, desc.Height, /*D3DFMT_A8R8G8B8*/ desc.Format, D3DPOOL_DEFAULT, &( shared->m_pD3DSurface ), &( shared->m_hD3DHandle ) );
 							BREAK_ON_FAIL( hr );
 #else
 							// Create both a D3DSurface and D3DTexture.
-							hr = m_pDevice->CreateTexture( desc.Width, desc.Height, 1, D3DUSAGE_RENDERTARGET, /*D3DFMT_A8R8G8B8*/ desc.Format, D3DPOOL_DEFAULT, &( s.m_pD3DTexture ), &( s.m_hD3DHandle ) );
+							hr = m_pDevice->CreateTexture( desc.Width, desc.Height, 1, D3DUSAGE_RENDERTARGET, /*D3DFMT_A8R8G8B8*/ desc.Format, D3DPOOL_DEFAULT, &( shared->m_pD3DTexture ), &( shared->m_hD3DHandle ) );
 							BREAK_ON_FAIL( hr );
 
-							hr = s.m_pD3DTexture->GetSurfaceLevel( 0, &( s.m_pD3DSurface ) );
+							hr = shared->m_pD3DTexture->GetSurfaceLevel( 0, &( shared->m_pD3DSurface ) );
 							BREAK_ON_FAIL( hr );
 #endif
 							D3DSURFACE_DESC desc;
-							hr = s.m_pD3DSurface->GetDesc( &desc );
+							hr = shared->m_pD3DSurface->GetDesc( &desc );
 							BREAK_ON_FAIL( hr );
 
-							*pShared = s;
+							CI_LOG_V( "Succeeded." );
 						}
 						else {
-							CI_LOG_V( "reusing existing surface to render frame." );
-							*pShared = mFree.back();
-							mFree.pop_back();
+							CI_LOG_V( "Reusing existing surface to render frame." );
+							shared = mFree;
+							mFree.reset();
 						}
 					} while( false );
 
 					return hr;
 				}
-
+				/*
 				HRESULT AddFreeSurface( const SharedTexture &shared )
 				{
-					std::lock_guard<std::mutex> lock( mFreeLock );
-					mFree.push_back( shared );
+				std::lock_guard<std::mutex> lock( mFreeLock );
+				mFree.push_back( shared );
 
-					return S_OK;
+				return S_OK;
 				}
-
-				HRESULT AddAvailableSurface( const SharedTexture &shared )
+				*/
+				HRESULT AddAvailableSurface( const SharedTextureRef &shared )
 				{
+					CI_LOG_V( "Adding surface containing movie frame to available surfaces." );
 					std::lock_guard<std::mutex> lock( mAvailableLock );
-					mAvailable.push_back( shared );
+					mAvailable = shared;
+					CI_LOG_V( "Succeeded." );
 
 					return S_OK;
 				}
@@ -332,32 +336,31 @@ namespace cinder {
 				{
 					HRESULT hr = S_OK;
 
-					SharedTexture s;
+					SharedTextureRef shared;
 
 					do {
 						std::lock_guard<std::mutex> lock( mAvailableLock );
 
-						if( mAvailable.empty() )
+						if( !mAvailable )
 							return ci::gl::Texture2dRef();
 
 						CI_LOG_V( "Getting available surface..." );
-
-						s = mAvailable.back();
-						mAvailable.pop_back();
+						shared = mAvailable;
+						mAvailable.reset();
 					} while( false );
 
 					do {
 						D3DSURFACE_DESC desc;
-						hr = s.m_pD3DSurface->GetDesc( &desc );
+						hr = shared->m_pD3DSurface->GetDesc( &desc );
 						BREAK_ON_FAIL( hr );
 
-						auto tex = s.m_pGLTexture.lock();
+						auto tex = shared->m_pGLTexture.lock();
 
 						if( !tex ) {
 							CI_LOG_V( "Creating OpenGL texture for this frame." );
 
-							if( !glIsTexture( s.m_uTextureId ) )
-								glGenTextures( 1, &( s.m_uTextureId ) );
+							if( !glIsTexture( shared->m_uTextureId ) )
+								glGenTextures( 1, &( shared->m_uTextureId ) );
 
 							// Define a custom deleter for the texture.
 							std::weak_ptr<SharedTexturePool> weakPtr( shared_from_this() );
@@ -369,21 +372,22 @@ namespace cinder {
 								}
 								else {
 									// Pool no longer exists. Delete the texture in the usual way.
+									pTexture->setDoNotDispose( false );
 									delete pTexture;
 								}
 							};
-							
+
 							// Create the texture and make sure the texture is not rendered upside down.
-							tex = gl::Texture2d::create( GL_TEXTURE_RECTANGLE, s.m_uTextureId, desc.Width, desc.Height, false, deleter );
+							tex = gl::Texture2d::create( GL_TEXTURE_RECTANGLE, shared->m_uTextureId, desc.Width, desc.Height, true, deleter );
 							tex->setTopDown( true );
 
 							// Store a weak pointer to the texture.
-							s.m_pGLTexture = std::weak_ptr<ci::gl::Texture2d>( tex );
+							shared->m_pGLTexture = std::weak_ptr<ci::gl::Texture2d>( tex );
 
 							// Share the 3D surface with OpenGL.
-							if( !s.m_hGLHandle ) {
+							if( !shared->m_hGLHandle ) {
 								CI_LOG_V( "Setting resource share handle..." );
-								if( !wglDXSetResourceShareHandleNV( s.m_pD3DSurface, s.m_hD3DHandle ) ) {
+								if( !wglDXSetResourceShareHandleNV( shared->m_pD3DSurface, shared->m_hD3DHandle ) ) {
 									CI_LOG_E( "Failed." );
 									hr = E_FAIL;
 									break;
@@ -391,8 +395,8 @@ namespace cinder {
 								CI_LOG_V( "Succeeded." );
 
 								CI_LOG_V( "Registering object..." );
-								s.m_hGLHandle = wglDXRegisterObjectNV( m_pD3DDeviceHandle, s.m_pD3DSurface, s.m_uTextureId, GL_TEXTURE_RECTANGLE, WGL_ACCESS_READ_ONLY_NV );
-								if( !s.m_hGLHandle ) {
+								shared->m_hGLHandle = wglDXRegisterObjectNV( m_pD3DDeviceHandle, shared->m_pD3DSurface, shared->m_uTextureId, GL_TEXTURE_RECTANGLE, WGL_ACCESS_READ_ONLY_NV );
+								if( !shared->m_hGLHandle ) {
 									DWORD err = GetLastError();
 									switch( err ) {
 									case ERROR_INVALID_HANDLE:
@@ -417,8 +421,8 @@ namespace cinder {
 
 							CI_LOG_V( "Texture created." );
 
-							CI_LOG_V( "Locking texture " << s.m_hGLHandle );
-							if( !wglDXLockObjectsNV( m_pD3DDeviceHandle, 1, &( s.m_hGLHandle ) ) ) {
+							CI_LOG_V( "Locking texture " << shared->m_hGLHandle );
+							if( !wglDXLockObjectsNV( m_pD3DDeviceHandle, 1, &( shared->m_hGLHandle ) ) ) {
 								CI_LOG_E( "Failed." );
 								hr = E_FAIL;
 								break;
@@ -430,8 +434,7 @@ namespace cinder {
 							__debugbreak();
 						}
 
-						std::lock_guard<std::mutex> lock( mUsedLock );
-						mUsed.push_back( s );
+						mUsed[tex->getId()] = shared;
 
 						return tex;
 					} while( false );
@@ -443,51 +446,55 @@ namespace cinder {
 				{
 					CI_LOG_V( "Texture destroyed" );
 
-					std::lock_guard<std::mutex> lock( mUsedLock );
-
 					// Find corresponding texture in mUsed.
-					auto itr = std::find( mUsed.begin(), mUsed.end(), pTexture->getId() );
+					auto itr = mUsed.find( pTexture->getId() );
 					if( itr != mUsed.end() ) {
-						SharedTexture &s = *itr;
+						SharedTextureRef s = itr->second;
+						mUsed.erase( itr );
 
-						CI_LOG_V( "Unlocking texture " << s.m_hGLHandle );
-						if( !wglDXUnlockObjectsNV( m_pD3DDeviceHandle, 1, &( s.m_hGLHandle ) ) ) {
+						CI_LOG_V( "Unlocking texture " << s->m_hGLHandle );
+						if( !wglDXUnlockObjectsNV( m_pD3DDeviceHandle, 1, &( s->m_hGLHandle ) ) ) {
 							CI_LOG_E( "Failed to unlock object." );
 						}
 						else
 							CI_LOG_V( "Succeeded." );
 
 						// Don't call wglDXUnregisterObjectNV() here, as we intend to reuse the texture later.
-
+#if !USE_ONCE
 						// Return texture to free surfaces.
 						std::lock_guard<std::mutex> surlock( mFreeLock );
-						mFree.push_back( s );
 
-						// Warning: 's' no longer exists after this call!
-						mUsed.erase( itr );
+						if( !mFree ) {
+							CI_LOG_V( "Adding unlocked texture " << pTexture->getId() << " to free surfaces." );
+							mFree = s;
+							CI_LOG_V( "Added." );
+						}
+#endif
 					}
 
-					// Don't actually delete the texture, we're gonna reuse it later. But we do need to notify the gl::context() we're done using it.
+					// Don't actually delete the texture id, we're gonna reuse it later. But we do need to notify the gl::context() we're done using the Texture2d.
+					pTexture->setDoNotDispose( true );
+
 					auto ctx = gl::context();
 					if( ctx )
 						ctx->textureDeleted( pTexture );
+
+					delete pTexture;
 				}
 
 			private:
-				IDirect3DDevice9Ex         *m_pDevice;
-				HANDLE                      m_pD3DDeviceHandle;     // Shared device handle for OpenGL interop.
+				IDirect3DDevice9Ex            *m_pDevice;
+				HANDLE                         m_pD3DDeviceHandle;     // Shared device handle for OpenGL interop.
 
-				std::thread::id             mMainThreadID;
+				std::thread::id                mMainThreadID;
 
-				std::mutex                  mFreeLock;
-				std::vector<SharedTexture>  mFree;					// Free surfaces ready to be rendered to.
+				std::mutex                     mFreeLock;
+				SharedTextureRef               mFree;
 
-				std::mutex                  mAvailableLock;
-				std::vector<SharedTexture>  mAvailable;				// Surfaces containing rendered frames.
+				std::mutex                     mAvailableLock;
+				SharedTextureRef               mAvailable;
 
-				std::mutex                  mUsedLock;
-				std::vector<SharedTexture>  mUsed;					// Surfaces in use as textures.
-
+				std::map<GLuint, SharedTextureRef>  mUsed;				// Surfaces in use as textures. Used on the main thread only.
 			};
 		} // namespace video
 	} // namespace msw

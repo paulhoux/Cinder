@@ -244,7 +244,7 @@ namespace cinder {
 						BREAK_ON_FAIL( hr );
 
 						if( MFMediaType_Video == guidMajorType ) {
-							// first get the source video size and allocate a new texture
+							// Obtain width and height of the video.
 							ScopedComPtr<IMFMediaType> pMediaType;
 							hr = pHandler->GetCurrentMediaType( &pMediaType );
 							BREAK_ON_FAIL( hr );

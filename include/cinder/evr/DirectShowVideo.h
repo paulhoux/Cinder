@@ -14,6 +14,10 @@
 #include <evr.h>
 
 namespace cinder {
+	// Forward declare the GL texture.
+	namespace gl {
+		typedef std::shared_ptr<class Texture2d> Texture2dRef;
+	}
 namespace msw {
 namespace video {
 
@@ -33,6 +37,7 @@ public:
 	virtual HRESULT Repaint( HWND hwnd, HDC hdc ) = 0;
 	virtual HRESULT DisplayModeChanged() = 0;
 	virtual HRESULT GetNativeVideoSize( LONG *lpWidth, LONG *lpHeight ) const = 0;
+	virtual ci::gl::Texture2dRef GetTexture() = 0;
 };
 
 // Manages the VMR-7 video renderer filter.
@@ -49,6 +54,7 @@ public:
 	HRESULT Repaint( HWND hwnd, HDC hdc ) override;
 	HRESULT DisplayModeChanged() override;
 	HRESULT GetNativeVideoSize( LONG *lpWidth, LONG *lpHeight ) const override;
+	ci::gl::Texture2dRef GetTexture() override;
 };
 
 
@@ -66,6 +72,7 @@ public:
 	HRESULT Repaint( HWND hwnd, HDC hdc ) override;
 	HRESULT DisplayModeChanged() override;
 	HRESULT GetNativeVideoSize( LONG *lpWidth, LONG *lpHeight ) const override;
+	ci::gl::Texture2dRef GetTexture() override;
 };
 
 
@@ -85,6 +92,7 @@ public:
 	HRESULT Repaint( HWND hwnd, HDC hdc ) override;
 	HRESULT DisplayModeChanged() override;
 	HRESULT GetNativeVideoSize( LONG *lpWidth, LONG *lpHeight ) const override;
+	ci::gl::Texture2dRef GetTexture() override;
 };
 
 
