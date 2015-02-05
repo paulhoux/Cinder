@@ -230,12 +230,9 @@ namespace cinder {
 					do {
 						std::lock_guard<std::mutex> lock( mFreeLock );
 						if( !mFree ) {
-							CI_LOG_V( "Creating new surface to render to." );
 							shared = std::make_shared<SharedTexture>( shared_from_this(), desc );
-							CI_LOG_V( "Succeeded." );
 						}
 						else {
-							CI_LOG_V( "Reusing existing surface to render frame." );
 							shared = mFree;
 							mFree.reset();
 						}
@@ -246,10 +243,8 @@ namespace cinder {
 
 				HRESULT AddAvailableSurface( const SharedTextureRef &shared )
 				{
-					CI_LOG_V( "Adding surface containing movie frame to available surfaces." );
 					std::lock_guard<std::mutex> lock( mAvailableLock );
 					mAvailable = shared;
-					CI_LOG_V( "Succeeded." );
 
 					return S_OK;
 				}
@@ -278,8 +273,6 @@ namespace cinder {
 
 				void FreeUsedTexture( gl::Texture2d *pTexture )
 				{
-					CI_LOG_V( "Texture destroyed" );
-
 					// Find corresponding texture in mUsed.
 					auto itr = mUsed.find( pTexture->getId() );
 					if( itr != mUsed.end() ) {
@@ -288,23 +281,26 @@ namespace cinder {
 
 						shared->Unlock();
 
-						// Don't call wglDXUnregisterObjectNV() here, as we intend to reuse the texture later.
-
-						// Return texture to free surfaces.
 						std::lock_guard<std::mutex> surlock( mFreeLock );
-
-						if( !mFree )
+						if( mFree ) {
+							// Destroy texture.
+							pTexture->setDoNotDispose( false );
+							delete pTexture;
+						}
+						else {
+							// Reuse texture.
 							mFree = shared;
+
+							// Don't actually delete the texture id, we're gonna reuse it later. But we do need to notify the gl::context() we're done using the Texture2d wrapper.
+							pTexture->setDoNotDispose( true );
+
+							auto ctx = gl::context();
+							if( ctx )
+								ctx->textureDeleted( pTexture );
+
+							delete pTexture;
+						}
 					}
-
-					// Don't actually delete the texture id, we're gonna reuse it later. But we do need to notify the gl::context() we're done using the Texture2d.
-					pTexture->setDoNotDispose( true );
-
-					auto ctx = gl::context();
-					if( ctx )
-						ctx->textureDeleted( pTexture );
-
-					delete pTexture;
 				}
 
 			private:

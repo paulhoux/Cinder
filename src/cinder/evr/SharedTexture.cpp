@@ -21,6 +21,8 @@ namespace cinder {
 				if( SUCCEEDED( hr ) )
 					hr = m_pD3DTexture->GetSurfaceLevel( 0, &m_pD3DSurface );
 #endif
+				if(!SUCCEEDED(hr))
+					CI_LOG_E("Failed to create D3DSurface.");
 			}
 
 			bool SharedTexture::Share()
@@ -66,7 +68,7 @@ namespace cinder {
 							m_hGLHandle = NULL;
 						}
 						else {
-							CI_LOG_E( "Failed to unregister object." );
+							CI_LOG_E( "Failed to unregister D3DSurface." );
 						}
 					}
 				}
@@ -124,16 +126,21 @@ namespace cinder {
 						// Store a weak pointer to the texture. We don't own it, the application does. This way, we can detect when it has gone out of scope.
 						m_pGLTexture = std::weak_ptr<gl::Texture2d>( texture );
 
-						// Share the 3D surface with OpenGL.
-						Share();
+						// Try to share the 3D surface with OpenGL.
+						if( !Share() ) {
+							texture->setDoNotDispose( false );
+							texture.reset();
+
+							m_uTextureId = ~0;
+						}
 					}
 				}
 
-				// Sanity check.
-				assert( m_pPool.lock() );
-
 				// Lock the texture.
 				if( texture ) {
+					// Sanity check.
+					assert( m_pPool.lock() );
+
 					if( !wglDXLockObjectsNV( m_pPool.lock()->GetDeviceHandle(), 1, &m_hGLHandle ) ) {
 						CI_LOG_E( "Failed to lock the OpenGL texture." );
 						return gl::Texture2dRef();
@@ -155,7 +162,7 @@ namespace cinder {
 						m_bLocked = FALSE;
 					}
 					else {
-						CI_LOG_E( "Failed to unlock object." );
+						CI_LOG_E( "Failed to unlock the OpenGL texture." );
 					}
 				}
 			}
@@ -172,6 +179,9 @@ namespace cinder {
 				HRESULT hr = pDevice->StretchRect( pSurface, NULL, m_pD3DSurface, NULL, D3DTEXF_NONE );
 				if( SUCCEEDED( hr ) ) {
 					m_pPool.lock()->AddAvailableSurface( shared_from_this() );
+				}
+				else {
+					CI_LOG_E( "Failed to blit to D3DSurface." );
 				}
 
 				return hr;
