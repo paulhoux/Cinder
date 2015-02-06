@@ -5,6 +5,8 @@
 #include "cinder/Camera.h"
 #include "cinder/MayaCamUI.h"
 
+#include "cinder/MatrixAlgo.h"
+
 using namespace ci;
 using namespace ci::app;
 using namespace std;
@@ -33,6 +35,24 @@ void SketchApp::prepareSettings( Settings *settings )
 {
 	settings->setWindowSize( 960, 720 );
 	settings->setResizable( false );
+
+	// test MatrixAlgo
+	mat4 m;
+	vec3 s, h, r, t;
+
+	ci::extractSHRT( m, s, h, r, t );
+
+	m = glm::translate( m, vec3( 10, 20, 30 ) );
+
+	ci::extractSHRT( m, s, h, r, t );
+
+	m = glm::rotate( m, glm::radians( 45.0f ), vec3( 0, 1, 0 ) );
+
+	ci::extractSHRT( m, s, h, r, t );
+
+	m = glm::scale( m, vec3( 15, 2, 1 ) );
+
+	ci::extractSHRT( m, s, h, r, t );
 }
 
 void SketchApp::setup()
@@ -86,7 +106,7 @@ void SketchApp::update()
 	// When sketching with auto transforms, the current coordinate space is respected,
 	// so let's draw in 3D using our camera.
 	gl::setMatrices( mCamera );
-	
+
 	// Let's draw a rotating capsule.
 	{
 		gl::ScopedModelMatrix model;

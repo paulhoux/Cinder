@@ -1598,6 +1598,9 @@
     <ClInclude Include="..\include\cinder\gl\Sketch.h">
       <Filter>Header Files\gl</Filter>
     </ClInclude>
+    <ClInclude Include="..\include\cinder\MatrixAlgo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\src\jsoncpp\json_internalarray.inl">
