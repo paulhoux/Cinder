@@ -4,8 +4,7 @@
 #include "cinder/gl/Sketch.h"
 #include "cinder/Camera.h"
 #include "cinder/MayaCamUI.h"
-
-#include "cinder/MatrixAlgo.h"
+#include "cinder/Rand.h"
 
 using namespace ci;
 using namespace ci::app;
@@ -23,6 +22,9 @@ public:
 	void mouseDrag( MouseEvent event ) override;
 
 	void resize() override;
+
+	void getRandTRS( Rand &random, vec3 &trans, vec3 &rot, vec3 &scale );
+	mat4 createRandomMat( Rand& random, vec3& trans, vec3& rot, vec3& scale );
 public:
 	gl::SketchRef   mSketchStatic;
 	gl::SketchRef   mSketchDynamic;
@@ -37,22 +39,91 @@ void SketchApp::prepareSettings( Settings *settings )
 	settings->setResizable( false );
 
 	// test MatrixAlgo
-	mat4 m;
-	vec3 s, h, r, t;
+	Rand random( 1612112 );
+	for( int i = 0; i < 100000; ++i ) {
+		vec3 trans, rot, scale;
+		createRandomMat( random, trans, rot, scale );
+	}
+}
 
-	ci::extractSHRT( m, s, h, r, t );
+void SketchApp::getRandTRS( Rand &random, vec3 &trans, vec3 &rot, vec3 &scale )
+{
+	// Translate 
+	trans = vec3( random.nextFloat( -10, 10 ),
+				  random.nextFloat( -10, 10 ),
+				  random.nextFloat( -10, 10 ) );
+	// Rotate 
+	vec3 r( glm::radians( random.nextFloat( -180, 180 ) ),
+			glm::radians( random.nextFloat( -180, 180 ) ),
+			glm::radians( random.nextFloat( -180, 180 ) ) );
+	rot = r;
 
-	m = glm::translate( m, vec3( 10, 20, 30 ) );
+	// Scale 
+	vec3 s( random.nextFloat( 0.000001, 2.0 ),
+			random.nextFloat( 0.000001, 2.0 ),
+			random.nextFloat( 0.000001, 2.0 ) );
 
-	ci::extractSHRT( m, s, h, r, t );
+	for( int j = 0; j < 3; j++ ) {
+		if( random.nextFloat( 0.0, 1.0 ) >= 0.5 ) {
+			s[j] *= -1;
+		}
+	}
 
-	m = glm::rotate( m, glm::radians( 45.0f ), vec3( 0, 1, 0 ) );
+	scale = s;
+}
 
-	ci::extractSHRT( m, s, h, r, t );
+mat4 SketchApp::createRandomMat( Rand& random, vec3& trans, vec3& rot, vec3& scale )
+{
+	glm::mat4 M;
+	glm::vec3 t, r, s;
+	getRandTRS( random, t, r, s );
 
-	m = glm::scale( m, vec3( 15, 2, 1 ) );
+	M = glm::translate( M, t );
 
-	ci::extractSHRT( m, s, h, r, t );
+	//M = glm::toMat4( glm::quat( r ) ) * M;
+
+	/*// Shear M.
+	vec3 h( random.nextFloat( 0.000001, 2.0 ),
+	random.nextFloat( 0.000001, 2.0 ),
+	random.nextFloat( 0.000001, 2.0 ) );
+
+	for( int j = 0; j < 3; j++ )
+	if( random.nextFloat( 0.0, 1.0 ) >= 0.5 )
+	h[j] *= -1;
+	M.shear( h );
+	//*/
+
+	M = glm::scale( M, s );
+
+	//
+	// Add a small random error to the elements of M
+	//
+	for( int j = 0; j < 4; ++j )
+		for( int k = 0; k < 3; ++k )
+			M[j][k] += random.nextFloat( -1e-7, 1e-7 );
+
+	vec3 sh;
+	glm::extractSHRT( M, scale, sh, rot, trans );
+
+	//debug( ( "Scale   : %f %f %f\n", s[0], s[1], s[2] ) );
+	//debug( ( "Shear   : %f %f %f\n", h[0], h[1], h[2] ) );
+	//debug( ( "Rot     : %f %f %f\n", r[0], r[1], r[2] ) );
+	//debug( ( "Trans   : %f %f %f\n", t[0], t[1], t[2] ) );
+
+	const float eps = 0.0001f;
+	assert( abs( scale.x ) - abs( s.x ) <= eps ); // different sign is allowed
+	assert( abs( scale.y ) - abs( s.y ) <= eps ); // different sign is allowed
+	assert( abs( scale.z ) - abs( s.z ) <= eps ); // different sign is allowed
+
+	//assert( abs( rot.x ) - abs( r.x ) <= eps ); // different sign is allowed?
+	//assert( abs( rot.y ) - abs( r.y ) <= eps ); // different sign is allowed?
+	//assert( abs( rot.z ) - abs( r.z ) <= eps ); // different sign is allowed?
+
+	assert( abs( trans.x - t.x ) <= eps );
+	assert( abs( trans.y - t.y ) <= eps );
+	assert( abs( trans.z - t.z ) <= eps );
+
+	return M;
 }
 
 void SketchApp::setup()

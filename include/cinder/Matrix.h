@@ -39,6 +39,8 @@
 #include "glm/gtx/euler_angles.hpp"
 #include "glm/gtx/io.hpp"
 
+#include "glm/gtx/decomposition.hpp"
+
 namespace cinder {
 
 glm::mat4 alignZAxisWithTarget( vec3 targetDir, vec3 upDir );
