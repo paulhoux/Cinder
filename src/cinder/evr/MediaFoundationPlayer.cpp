@@ -249,6 +249,7 @@ namespace cinder {
 							hr = pHandler->GetCurrentMediaType( &pMediaType );
 							BREAK_ON_FAIL( hr );
 
+							//! Note: on several occassions, the reported width and height were different from the actual width and height!
 							hr = MFGetAttributeSize( pMediaType, MF_MT_FRAME_SIZE, &mWidth, &mHeight );
 							BREAK_ON_FAIL( hr );
 						}

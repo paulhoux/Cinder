@@ -185,7 +185,7 @@ namespace cinder {
 					std::lock_guard<std::mutex> lock2( mAvailableLock );
 
 					// Release all textures and surfaces. ( now is the time to actually call wglDXUnregisterObjectNV() & glDeleteTextures() )
-					mFree.reset();
+					mFree.clear();
 					mAvailable.reset();
 
 					// The following textures are still in use, so don't delete them, just unlock and unregister them.
@@ -229,12 +229,12 @@ namespace cinder {
 
 					do {
 						std::lock_guard<std::mutex> lock( mFreeLock );
-						if( !mFree ) {
+						if( mFree.empty() ) {
 							shared = std::make_shared<SharedTexture>( shared_from_this(), desc );
 						}
 						else {
-							shared = mFree;
-							mFree.reset();
+							shared = mFree.back();
+							mFree.pop_back();
 						}
 					} while( false );
 
@@ -282,14 +282,9 @@ namespace cinder {
 						shared->Unlock();
 
 						std::lock_guard<std::mutex> surlock( mFreeLock );
-						if( mFree ) {
-							// Destroy texture.
-							pTexture->setDoNotDispose( false );
-							delete pTexture;
-						}
-						else {
+						if( mFree.size() < kFreePoolSize ) {
 							// Reuse texture.
-							mFree = shared;
+							mFree.push_back( shared );
 
 							// Don't actually delete the texture id, we're gonna reuse it later. But we do need to notify the gl::context() we're done using the Texture2d wrapper.
 							pTexture->setDoNotDispose( true );
@@ -300,17 +295,26 @@ namespace cinder {
 
 							delete pTexture;
 						}
+						else {
+							shared->Unshare();
+
+							// Destroy texture.
+							pTexture->setDoNotDispose( false );
+							delete pTexture;
+						}
 					}
 				}
 
 			private:
+				static const int kFreePoolSize = 1;
+
 				IDirect3DDevice9Ex            *m_pDevice;
 				HANDLE                         m_pD3DDeviceHandle;     // Shared device handle for OpenGL interop.
 
 				std::thread::id                mMainThreadID;
 
 				std::mutex                     mFreeLock;
-				SharedTextureRef               mFree;
+				std::vector<SharedTextureRef>  mFree;
 
 				std::mutex                     mAvailableLock;
 				SharedTextureRef               mAvailable;

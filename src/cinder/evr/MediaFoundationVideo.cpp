@@ -580,7 +580,7 @@ namespace cinder {
 					BREAK_ON_FAIL( hr );
 
 					// Create the texture pool.
-					hr = CreateTexturePool(pDevice);
+					hr = CreateTexturePool( pDevice );
 					BREAK_ON_FAIL( hr );
 
 					CopyComPtr( m_pDevice, pDevice.get() );

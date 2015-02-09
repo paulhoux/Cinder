@@ -71,6 +71,18 @@ void WindowsEnhancedVideoApp::prepareSettings( Settings* settings )
 
 void WindowsEnhancedVideoApp::setup()
 {
+	auto mgr = log::manager();
+	mgr->setConsoleLoggingEnabled( true );
+
+	auto path = getHomeDirectory() / "cinder-wmf.log";
+	if( !fs::exists( path.stem() ) )
+		fs::create_directories( path.stem() );
+
+	mgr->setFileLoggingEnabled( true, path );
+
+	CI_LOG_I( "Logging enabled for Cinder WMF: " << path.string() );
+
+	//
 	gl::enableVerticalSync( true );
 	gl::clear();
 	gl::color( 1, 1, 1 );
