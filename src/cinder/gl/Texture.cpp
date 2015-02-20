@@ -89,6 +89,7 @@ TextureBase::~TextureBase()
 		auto ctx = gl::context();
 		if( ctx ) {
 			ctx->textureDeleted( this );
+			CI_LOG_V( "glDeleteTextures(" << mTextureId << ")" );
 			glDeleteTextures( 1, &mTextureId );
 		}
 	}
@@ -684,6 +685,7 @@ Texture2d::Texture2d( int width, int height, Format format )
 	mTopDown( false )
 {
 	glGenTextures( 1, &mTextureId );
+	CI_LOG_V( "glGenTextures(" << mTextureId << ")" );
 	mTarget = format.getTarget();
 	ScopedTextureBind texBindScope( mTarget, mTextureId );
 #if ! defined( CINDER_GL_ES_2 )
@@ -702,6 +704,7 @@ Texture2d::Texture2d( const unsigned char *data, int dataFormat, int width, int 
 	mTopDown( false )
 {
 	glGenTextures( 1, &mTextureId );
+	CI_LOG_V( "glGenTextures(" << mTextureId << ")" );
 	mTarget = format.getTarget();
 	ScopedTextureBind texBindScope( mTarget, mTextureId );
 	initParams( format, GL_RGBA );
@@ -714,6 +717,7 @@ Texture2d::Texture2d( const Surface8u &surface, Format format )
 	mTopDown( false )
 {
 	glGenTextures( 1, &mTextureId );
+	CI_LOG_V( "glGenTextures(" << mTextureId << ")" );
 	mTarget = format.getTarget();
 	ScopedTextureBind texBindScope( mTarget, mTextureId );
 	initParams( format, surface.hasAlpha() ? GL_RGBA : GL_RGB );
@@ -726,6 +730,7 @@ Texture2d::Texture2d( const Channel8u &channel, Format format )
 	mTopDown( false )
 {
 	glGenTextures( 1, &mTextureId );
+	CI_LOG_V( "glGenTextures(" << mTextureId << ")" );
 	mTarget = format.getTarget();
 	ScopedTextureBind texBindScope( mTarget, mTextureId );
 #if defined( CINDER_GL_ES )
@@ -746,6 +751,7 @@ Texture2d::Texture2d( const Surface16u &surface, Format format )
 	mTopDown( false )
 {
 	glGenTextures( 1, &mTextureId );
+	CI_LOG_V( "glGenTextures(" << mTextureId << ")" );
 	mTarget = format.getTarget();
 	ScopedTextureBind texBindScope( mTarget, mTextureId );
 #if defined( CINDER_GL_ES )
@@ -763,6 +769,7 @@ Texture2d::Texture2d( const Channel16u &channel, Format format )
 	mTopDown( false )
 {
 	glGenTextures( 1, &mTextureId );
+	CI_LOG_V( "glGenTextures(" << mTextureId << ")" );
 	mTarget = format.getTarget();
 	ScopedTextureBind texBindScope( mTarget, mTextureId );
 #if defined( CINDER_GL_ES )
@@ -784,6 +791,7 @@ Texture2d::Texture2d( const Surface32f &surface, Format format )
 	mTopDown( false )
 {
 	glGenTextures( 1, &mTextureId );
+	CI_LOG_V( "glGenTextures(" << mTextureId << ")" );
 	mTarget = format.getTarget();
 	ScopedTextureBind texBindScope( mTarget, mTextureId );
 #if defined( CINDER_GL_ES )
@@ -801,6 +809,7 @@ Texture2d::Texture2d( const Channel32f &channel, Format format )
 	mTopDown( false )
 {
 	glGenTextures( 1, &mTextureId );
+	CI_LOG_V( "glGenTextures(" << mTextureId << ")" );
 	mTarget = format.getTarget();
 	ScopedTextureBind texBindScope( mTarget, mTextureId );
 #if defined( CINDER_GL_ES )
@@ -849,6 +858,7 @@ Texture2d::Texture2d( const ImageSourceRef &imageSource, Format format )
 	}
 
 	glGenTextures( 1, &mTextureId );
+	CI_LOG_V( "glGenTextures(" << mTextureId << ")" );
 	mTarget = format.getTarget();
 	ScopedTextureBind texBindScope( mTarget, mTextureId );
 	initParams( format, defaultInternalFormat );
@@ -867,6 +877,7 @@ Texture2d::Texture2d( const TextureData &data, Format format )
 	: mTopDown( false )
 {
 	glGenTextures( 1, &mTextureId );
+	CI_LOG_V( "glGenTextures(" << mTextureId << ")" );
 	mTarget = format.getTarget();
 	ScopedTextureBind texBindScope( mTarget, mTextureId );
 	initParams( format, 0 /* unused */ );
@@ -1388,6 +1399,7 @@ Texture3d::Texture3d( GLint width, GLint height, GLint depth, Format format )
 	: mWidth( width ), mHeight( height ), mDepth( depth )
 {
 	glGenTextures( 1, &mTextureId );
+	CI_LOG_V( "glGenTextures(" << mTextureId << ")" );
 	mTarget = format.getTarget();
 	ScopedTextureBind texBindScope( mTarget, mTextureId );
 	TextureBase::initParams( format, GL_RGB );
@@ -1400,6 +1412,7 @@ Texture3d::Texture3d( GLint width, GLint height, GLint depth, GLenum dataFormat,
 	: mWidth( width ), mHeight( height ), mDepth( depth )
 {
 	glGenTextures( 1, &mTextureId );
+	CI_LOG_V( "glGenTextures(" << mTextureId << ")" );
 	mTarget = format.getTarget();
 	ScopedTextureBind texBindScope( mTarget, mTextureId );
 	TextureBase::initParams( format, GL_RGB );
@@ -1505,6 +1518,7 @@ TextureCubeMap::TextureCubeMap( int32_t width, int32_t height, Format format )
 	: mWidth( width ), mHeight( height )
 {
 	glGenTextures( 1, &mTextureId );
+	CI_LOG_V( "glGenTextures(" << mTextureId << ")" );
 	mTarget = format.getTarget();
 	ScopedTextureBind texBindScope( mTarget, mTextureId );	
 	TextureBase::initParams( format, GL_RGB );
@@ -1516,6 +1530,7 @@ template<typename T>
 TextureCubeMap::TextureCubeMap( const SurfaceT<T> images[6], Format format )
 {
 	glGenTextures( 1, &mTextureId );
+	CI_LOG_V( "glGenTextures(" << mTextureId << ")" );
 	mTarget = format.getTarget();
 	ScopedTextureBind texBindScope( mTarget, mTextureId );	
 	TextureBase::initParams( format, ( images[0].hasAlpha() ) ? GL_RGBA : GL_RGB );
