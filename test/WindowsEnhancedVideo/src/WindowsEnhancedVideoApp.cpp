@@ -97,13 +97,10 @@ void WindowsEnhancedVideoApp::shutdown()
 
 void WindowsEnhancedVideoApp::update()
 {
-	for( auto itr = mMovies.begin(); itr != mMovies.end(); ) {
-		auto &movie = *itr;
-		if( !movie || movie->isDone() ) {
-			itr = mMovies.erase( itr );
-		}
-		else {
-			++itr;
+	if( getElapsedFrames() % 30 == 0 ) {
+		for( auto itr = mMovies.begin(); itr != mMovies.end(); ++itr ) {
+			auto &movie = *itr;
+			CI_LOG_V( "Playing:" << ( *itr )->isPlaying() << ", Paused:" << ( *itr )->isPaused() << ", Done:" << ( *itr )->isDone() );
 		}
 	}
 }
@@ -159,6 +156,21 @@ void WindowsEnhancedVideoApp::keyDown( KeyEvent event )
 		break;
 	case KeyEvent::KEY_f:
 		setFullScreen( !isFullScreen() );
+		break;
+	case KeyEvent::KEY_SPACE:
+		if( !mMovies.empty() && mMovies.front() ) {
+			auto &movie = mMovies.front();
+			if( movie->isPlaying() )
+				movie->pause();
+			else //if( movie->isPaused() )
+				movie->play();
+			break;
+		}
+	case KeyEvent::KEY_RIGHT:
+		if( !mMovies.empty() && mMovies.front() ) {
+			auto &movie = mMovies.front();
+			movie->seekToTime( 100.0f );
+		}
 		break;
 	}
 }

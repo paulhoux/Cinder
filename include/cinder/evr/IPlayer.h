@@ -31,13 +31,18 @@ public:
 	virtual BOOL    IsPlaying() const = 0;
 	virtual BOOL    IsPaused() const = 0;
 	virtual BOOL    IsStopped() const = 0;
+	virtual BOOL    IsLooping() const = 0;
 
 	virtual UINT32  GetWidth() const = 0;
 	virtual UINT32  GetHeight() const = 0;
 
+	virtual float   GetTime() const = 0;
 	virtual float   GetDuration() const = 0;
 	virtual float   GetFrameRate() const = 0;
 	virtual UINT32  GetNumFrames() const = 0;
+
+	virtual void    SetLoop( BOOL loop = TRUE ) = 0;
+	virtual void    SeekToTime( FLOAT seconds ) = 0;
 
 	virtual ci::gl::Texture2dRef GetTexture() = 0;
 };

@@ -49,13 +49,18 @@ namespace cinder {
 				BOOL    IsPlaying() const override { return ( m_state == STATE_RUNNING ); }
 				BOOL    IsPaused() const override { return ( m_state == STATE_PAUSED ); }
 				BOOL    IsStopped() const override { return ( m_state == STATE_STOPPED ); }
+				BOOL    IsLooping() const override { return ( mIsLoopEnabled ); }
 
 				UINT32  GetWidth() const override { return (UINT32) m_Width; }
 				UINT32  GetHeight() const override { return (UINT32) m_Height; }
 
+				float   GetTime() const override { return 0.0f; /* TODO */ }
 				float   GetDuration() const override { return 1.0f; /* TODO */ }
 				float   GetFrameRate() const override { return 1.0f; /* TODO */ }
 				UINT32  GetNumFrames() const override { return 1; /* TODO */ }
+
+				void    SetLoop( BOOL loop = TRUE ) override { mIsLoopEnabled = loop; }
+				void    SeekToTime( FLOAT seconds ) override { /* TODO */ }
 
 				//! Returns the latest frame as an OpenGL texture, if available. Returns an empty texture if no (new) frame is available.
 				ci::gl::Texture2dRef GetTexture() override { assert( m_pVideo ); return m_pVideo->GetTexture(); }
@@ -75,6 +80,8 @@ namespace cinder {
 				void            TearDownGraph();
 				virtual HRESULT CreateVideoRenderer();
 				virtual HRESULT RenderStreams( IBaseFilter *pSource );
+
+				BOOL             mIsLoopEnabled;
 
 				PlayerState      m_state;
 
