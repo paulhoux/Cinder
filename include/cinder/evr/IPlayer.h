@@ -35,6 +35,10 @@ public:
 	virtual UINT32  GetWidth() const = 0;
 	virtual UINT32  GetHeight() const = 0;
 
+	virtual float   GetDuration() const = 0;
+	virtual float   GetFrameRate() const = 0;
+	virtual UINT32  GetNumFrames() const = 0;
+
 	virtual ci::gl::Texture2dRef GetTexture() = 0;
 };
 

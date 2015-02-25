@@ -20,7 +20,8 @@ namespace cinder {
 			//////////////////////////////////////////////////////////////////////////////////////////
 
 			MediaFoundationPlayer::MediaFoundationPlayer( HRESULT &hr, HWND hwnd )
-				: mRefCount( 0 ), mHwnd( hwnd ), mState( Closed ), mIsInitialized( false ), mCurrentVolume( 1 ), mWidth( 0 ), mHeight( 0 )
+				: mRefCount( 0 ), mHwnd( hwnd ), mState( Closed ), mIsInitialized( false ), mCurrentVolume( 1 )
+				, mWidth( 0 ), mHeight( 0 ), mFrameRateNumerator( 0 ), mFrameRateDenominator( 1 ), mPixelAspectNumerator( 0 ), mPixelAspectDenominator( 1 )
 				, mMediaSessionPtr( NULL ), mSequencerSourcePtr( NULL ), mMediaSourcePtr( NULL ), mVideoDisplayControlPtr( NULL ), mAudioStreamVolumePtr( NULL ), mPresenterPtr( NULL )
 				, mOpenEventHandle( NULL ), mCloseEventHandle( NULL )
 			{
@@ -105,6 +106,41 @@ namespace cinder {
 				} while( false );
 
 				return hr;
+			}
+
+			float MediaFoundationPlayer::GetDuration() const
+			{
+				float duration = 0.0f;
+
+				HRESULT hr = S_OK;
+
+				do {
+					BREAK_ON_NULL( mMediaSourcePtr, E_POINTER );
+
+					ScopedComPtr<IMFPresentationDescriptor> pPD;
+					hr = mMediaSourcePtr->CreatePresentationDescriptor( &pPD );
+					BREAK_ON_FAIL( hr );
+
+					UINT64 pDuration = 0;
+					hr = pPD->GetUINT64( MF_PD_DURATION, (UINT64*) &pDuration );
+					BREAK_ON_FAIL( hr );
+
+					// Convert from 100 nanosecond units to seconds
+					duration = pDuration * 1.0e-7f;
+				} while( false );
+
+				return duration;
+			}
+
+			float MediaFoundationPlayer::GetFrameRate() const
+			{
+				assert( mFrameRateDenominator > 0 );
+				return mFrameRateNumerator / float( mFrameRateDenominator );
+			}
+
+			UINT32 MediaFoundationPlayer::GetNumFrames() const
+			{
+				return 0;
 			}
 
 			//  Create a new instance of the media session.
@@ -244,14 +280,19 @@ namespace cinder {
 						BREAK_ON_FAIL( hr );
 
 						if( MFMediaType_Video == guidMajorType ) {
-							// Obtain width and height of the video.
+							// Obtain attributes of the video.
 							ScopedComPtr<IMFMediaType> pMediaType;
 							hr = pHandler->GetCurrentMediaType( &pMediaType );
 							BREAK_ON_FAIL( hr );
 
-							//! Note: on several occassions, the reported width and height were different from the actual width and height!
 							hr = MFGetAttributeSize( pMediaType, MF_MT_FRAME_SIZE, &mWidth, &mHeight );
-							BREAK_ON_FAIL( hr );
+							hr = MFGetAttributeRatio( pMediaType, MF_MT_PIXEL_ASPECT_RATIO, &mPixelAspectNumerator, &mPixelAspectDenominator );
+							hr = MFGetAttributeRatio( pMediaType, MF_MT_FRAME_RATE, &mFrameRateNumerator, &mFrameRateDenominator );
+
+							// Adjust width and height for pixel aspect ratio.
+							CorrectAspectRatio( &mWidth, &mHeight, mPixelAspectNumerator, mPixelAspectDenominator );
+
+							// TODO: support Pan & Scan, see https://msdn.microsoft.com/en-us/library/windows/desktop/bb530115(v=vs.85).aspx
 						}
 					}
 				}
@@ -344,6 +385,20 @@ namespace cinder {
 				PropVariantClear( &var );
 
 				return hr;
+			}
+
+			HRESULT MediaFoundationPlayer::CorrectAspectRatio( UINT32 *pWidth, UINT32 *pHeight, UINT32 pixelAspectNumerator, UINT32 pixelAspectDenominator )
+			{
+				if( pixelAspectNumerator > pixelAspectDenominator ) {
+					// The source has "wide" pixels, so stretch the width.
+					*pWidth = MulDiv( *pWidth, pixelAspectNumerator, pixelAspectDenominator );
+				}
+				else if( pixelAspectNumerator < pixelAspectDenominator ) {
+					// The source has "tall" pixels, so stretch the height.
+					*pHeight = MulDiv( *pHeight, pixelAspectDenominator, pixelAspectNumerator );
+				}
+
+				return S_OK;
 			}
 
 			HRESULT MediaFoundationPlayer::HandleEvent( UINT_PTR pEventPtr )

@@ -57,9 +57,9 @@ public:
 	bool		isUsingMediaFoundation() { return mCurrentBackend == BE_MEDIA_FOUNDATION; }
 
 	//! Returns whether the movie has loaded and buffered enough to playback without interruption
-	bool		checkPlayable() { /*TODO*/ return false; }
+	//bool		checkPlayable() { /*TODO*/ return true; }
 	//! Returns whether the movie has loaded and buffered enough to playback without interruption
-	bool		checkPlaythroughOk() { /*TODO*/ return false; }
+	//bool		checkPlaythroughOk() { /*TODO*/ return true; }
 
 	//! Returns the width of the movie in pixels
 	uint32_t	getWidth() const { return mWidth; }
@@ -76,24 +76,24 @@ public:
 	float		getPixelAspectRatio() const { /*TODO*/ return 1.0f; }
 
 	//! Returns whether the movie is in a loaded state, implying its structures are ready for reading but it may not be ready for playback
-	bool		isLoaded() const { return mIsLoaded; }
+	//bool		isLoaded() const { return mIsLoaded; }
 	//! Returns whether the movie is playable, implying the movie is fully formed and can be played but media data is still downloading
-	bool		isPlayable() const { return mIsPlayable; }
+	//bool		isPlayable() const { return mIsPlayable; }
 	//! Returns true if the content represented by the movie is protected by DRM
-	bool		isProtected() const { return mIsProtected; }
+	//bool		isProtected() const { return mIsProtected; }
 	//! Returns the movie's length measured in seconds
-	float		getDuration() const { return mDuration; }
+	float		getDuration() const { assert( mPlayer ); return mPlayer->GetDuration(); }
 	//! Returns the movie's framerate measured as frames per second
-	float		getFramerate() const { return mFrameRate; }
+	float		getFramerate() const { assert( mPlayer ); return mPlayer->GetFrameRate(); }
 	//! Returns the total number of frames (video samples) in the movie
-	uint32_t	getNumFrames() const { /*TODO*/ return 0; }
+	uint32_t	getNumFrames() const { assert( mPlayer ); return mPlayer->GetNumFrames(); }
 
 	//! Returns whether a movie contains at least one visual track, defined as Video, MPEG, Sprite, QuickDraw3D, Text, or TimeCode tracks
-	bool		hasVisuals() const { return mHasVideo; }
+	//bool		hasVisuals() const { return mHasVideo; }
 	//! Returns whether a movie contains at least one audio track, defined as Sound, Music, or MPEG tracks
-	bool		hasAudio() const { return mHasAudio; }
+	//bool		hasAudio() const { return mHasAudio; }
 	//! Returns whether the first video track in the movie contains an alpha channel. Returns false in the absence of visual media.
-	virtual bool hasAlpha() const { return false; }
+	//virtual bool hasAlpha() const { return false; }
 
 	//! Returns whether a movie has a new frame available
 	//bool		checkNewFrame() { return false; }
@@ -116,9 +116,9 @@ public:
 	//! Sets whether the movie is set to loop during playback.
 	void		setLoop( bool loop = true /*, bool palindrome = false */ );
 	//! Advances the movie by one frame (a single video sample). Ignores looping settings.
-	void		stepForward() { /*TODO*/ return; }
+	//void		stepForward() { /*TODO*/ return; }
 	//! Steps backward by one frame (a single video sample). Ignores looping settings.
-	void		stepBackward() { /*TODO*/ return; }
+	//void		stepBackward() { /*TODO*/ return; }
 	/** Sets the playback rate, which begins playback immediately for nonzero values.
 	* 1.0 represents normal speed. Negative values indicate reverse playback and \c 0 stops.
 	*
@@ -127,9 +127,9 @@ public:
 	bool		setRate( float rate ) { /*TODO*/ return ( rate == 1.0f ); }
 
 	//! Sets the audio playback volume ranging from [0 - 1.0]
-	void		setVolume( float volume ) { /*TODO*/ }
+	//void		setVolume( float volume ) { /*TODO*/ }
 	//! Gets the audio playback volume ranging from [0 - 1.0]
-	float		getVolume() const { /*TODO*/ return 0.0f; }
+	//float		getVolume() const { /*TODO*/ return 1.0f; }
 	//! Returns whether the movie is currently playing or is paused/stopped.
 	bool		isPlaying() const { assert( mPlayer ); return mPlayer->IsPlaying() == TRUE; }
 	//! Returns whether the movie has completely finished playing

@@ -62,6 +62,10 @@ protected:
 	UINT32  GetWidth() const override { return mWidth; }
 	UINT32  GetHeight() const override { return mHeight; }
 
+	float   GetDuration() const override;
+	float   GetFrameRate() const override;
+	UINT32  GetNumFrames() const override;
+
 	//! Returns the latest frame as an OpenGL texture, if available. Returns an empty texture if no (new) frame is available.
 	ci::gl::Texture2dRef GetTexture() override { return mPresenterPtr->GetTexture(); }
 
@@ -72,6 +76,8 @@ protected:
 	HRESULT CloseSession();
 	HRESULT CreatePartialTopology( IMFPresentationDescriptor *pPD );// { return E_NOTIMPL; }
 	HRESULT SetMediaInfo( IMFPresentationDescriptor *pPD );
+
+	HRESULT CorrectAspectRatio( UINT32 *pWidth, UINT32 *pHeight, UINT32 pixelAspectNumerator, UINT32 pixelAspectDenominator );
 
 	HRESULT HandleSessionTopologySetEvent( IMFMediaEvent *pEvent );
 	HRESULT HandleSessionTopologyStatusEvent( IMFMediaEvent *pEvent );
@@ -90,7 +96,9 @@ protected:
 protected:
 	bool                     mIsInitialized;
 
-	uint32_t                 mWidth, mHeight;
+	UINT32                   mWidth, mHeight;
+	UINT32                   mPixelAspectNumerator, mPixelAspectDenominator;
+	UINT32                   mFrameRateNumerator, mFrameRateDenominator;
 	float                    mCurrentVolume;
 
 	IMFMediaSession*         mMediaSessionPtr;

@@ -53,6 +53,11 @@ namespace cinder {
 				UINT32  GetWidth() const override { return (UINT32) m_Width; }
 				UINT32  GetHeight() const override { return (UINT32) m_Height; }
 
+				float   GetDuration() const override { return 1.0f; /* TODO */ }
+				float   GetFrameRate() const override { return 1.0f; /* TODO */ }
+				UINT32  GetNumFrames() const override { return 1; /* TODO */ }
+
+				//! Returns the latest frame as an OpenGL texture, if available. Returns an empty texture if no (new) frame is available.
 				ci::gl::Texture2dRef GetTexture() override { assert( m_pVideo ); return m_pVideo->GetTexture(); }
 
 				//

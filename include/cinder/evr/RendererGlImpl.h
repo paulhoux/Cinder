@@ -52,7 +52,7 @@ public:
 	//static MovieGlRef create( const MovieLoaderRef &loader ) { return std::shared_ptr<MovieGl>( new MovieGl( *loader ) ); }
 
 	//!
-	virtual bool hasAlpha() const override { /*TODO*/ return false; }
+	//virtual bool hasAlpha() const override { /*TODO*/ return false; }
 
 	//! Returns the gl::Texture representing the Movie's current frame, bound to the \c GL_TEXTURE_RECTANGLE_ARB target.
 	gl::Texture2dRef	getTexture();
