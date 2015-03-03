@@ -451,7 +451,7 @@ HRESULT RendererEVR::GetNativeVideoSize( LONG *lpWidth, LONG *lpHeight ) const
 
 		if( SUCCEEDED( hr ) ) {
 			*lpWidth = szVideo.cx;
-			*lpHeight = szVideo.cy;
+			*lpHeight = MulDiv( szVideo.cy, szARVideo.cy, szARVideo.cx );
 		}
 
 		return hr;

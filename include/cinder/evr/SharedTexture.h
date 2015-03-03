@@ -227,7 +227,7 @@ namespace cinder {
 				HRESULT GetFreeSurface( const D3DSURFACE_DESC &desc, SharedTextureRef &shared )
 				{
 					HRESULT hr = S_OK;
-
+#if 0
 					// Check if we have a surface that we can reuse, if not then create one.
 					do {
 						std::lock_guard<std::mutex> lock( mAvailableLock );
@@ -239,15 +239,17 @@ namespace cinder {
 							return hr;
 						}
 					} while( false );
-
+#endif
 					do {
 						std::lock_guard<std::mutex> lock( mFreeLock );
 						if( mFree.empty() ) {
 							shared = std::make_shared<SharedTexture>( shared_from_this(), desc );
+							CI_LOG_V( "Created new surface (" << shared << ")" );
 						}
 						else {
 							shared = mFree.front();
 							mFree.pop_front();
+							CI_LOG_V( "Used existing surface (" << shared << ")" );
 						}
 					} while( false );
 
@@ -257,6 +259,13 @@ namespace cinder {
 				HRESULT AddAvailableSurface( const SharedTextureRef &shared )
 				{
 					std::lock_guard<std::mutex> lock( mAvailableLock );
+
+					// Free currently available frame.
+					if( mAvailable ) {
+						std::lock_guard<std::mutex> surlock( mFreeLock );
+						mFree.push_back( mAvailable );
+					}
+
 					mAvailable = shared;
 
 					return S_OK;
