@@ -199,6 +199,7 @@ namespace cinder {
 				HRESULT hr = pDevice->StretchRect( pSurface, NULL, m_pD3DSurface, NULL, D3DTEXF_NONE );
 
 				if( SUCCEEDED( hr ) ) {
+#if 0
 					// Create an event query.
 					ScopedComPtr<IDirect3DQuery9> pEventQuery;
 					hr = pDevice->CreateQuery( D3DQUERYTYPE_EVENT, &pEventQuery );
@@ -212,7 +213,7 @@ namespace cinder {
 							::Sleep( 1 );
 						}
 					}
-
+#endif
 					// Make surface available to OpenGL.
 					m_pPool.lock()->AddAvailableSurface( shared_from_this() );
 				}

@@ -396,6 +396,8 @@ namespace cinder {
 
 			HRESULT MediaFoundationPlayer::CorrectAspectRatio( UINT32 *pWidth, UINT32 *pHeight, UINT32 pixelAspectNumerator, UINT32 pixelAspectDenominator )
 			{
+				// TODO: there's also a similar function in MediaFoundationVideo.cpp!
+
 				if( pixelAspectNumerator > pixelAspectDenominator ) {
 					// The source has "wide" pixels, so stretch the width.
 					*pWidth = MulDiv( *pWidth, pixelAspectNumerator, pixelAspectDenominator );
