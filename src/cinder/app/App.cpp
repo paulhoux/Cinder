@@ -246,15 +246,12 @@ void App::prepareAssetLoading()
 		fs::path curAssetPath = curPath / fs::path( "Assets" );
 		mAssetDirectories.push_back( curAssetPath );
 #else
-		// first search the local directory, then its parent, up to 5 levels up
+		// first search the local directory, then its parent
 		int parentCt = 0;
 		for( fs::path curPath = appPath; 
 			curPath.has_parent_path() || ( curPath == appPath ); //check at least the app path, even if it has no parent directory
 			curPath = curPath.parent_path(), ++parentCt ) 
-		{   
-			if( parentCt >= 5 )
-				break;
-    
+		{       
 			const fs::path curAssetPath = curPath / "assets";
 			if( fs::exists( curAssetPath ) && fs::is_directory( curAssetPath ) ) {
 				mAssetDirectories.push_back( curAssetPath );
