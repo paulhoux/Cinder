@@ -31,11 +31,12 @@
 	#include "cinder/UrlImplWinInet.h"
 	typedef cinder::IStreamUrlImplWinInet	IStreamUrlPlatformImpl;
 #elif defined( CINDER_COCOA )
+	#include <CoreFoundation/CoreFoundation.h>
 	#include "cinder/cocoa/CinderCocoa.h"
 	#include "cinder/UrlImplCocoa.h"
 	typedef cinder::IStreamUrlImplCocoa		IStreamUrlPlatformImpl;
 #elif defined( CINDER_WINRT )
-	#include "cinder/WinRTUtils.h"
+	#include "cinder/winrt/WinRTUtils.h"
 	#include "cinder/msw/CinderMsw.h"
 	#include <wrl/client.h>
 	#include <agile.h>

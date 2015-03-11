@@ -35,29 +35,28 @@
 
 #include <string>
 
-#if defined( CINDER_MAC ) || defined( CINDER_COCOA_TOUCH )
-	#include <CoreVideo/CoreVideo.h>
-	#include <CoreVideo/CVBase.h>
-	#if defined( __OBJC__ )
-		@class AVPlayer, AVPlayerItem, AVPlayerItemTrack, AVPlayerItemVideoOutput, AVPlayerItemOutput;
-		@class AVAsset, AVURLAsset, AVAssetTrack, AVAssetReader;
-		@class MovieDelegate;
-		@class NSURL;
-	#else
-		class AVPlayer;
-		class AVPlayerItem;
-		class AVPlayerItemTrack;
-		class AVPlayerItemOutput;
-		class AVPlayerItemVideoOutput;
-		class AVAsset;
-		class AVAssetTrack;
-		class AVAssetReader;
-		class AVURLAsset;
-		class NSArray;
-		class NSError;
-		// -- 
-		class MovieDelegate;
-	#endif
+typedef struct __CVBuffer *CVBufferRef;
+typedef CVBufferRef CVImageBufferRef;
+
+#if defined( __OBJC__ )
+	@class AVPlayer, AVPlayerItem, AVPlayerItemTrack, AVPlayerItemVideoOutput, AVPlayerItemOutput;
+	@class AVAsset, AVURLAsset, AVAssetTrack, AVAssetReader;
+	@class MovieDelegate;
+	@class NSURL;
+#else
+	class AVPlayer;
+	class AVPlayerItem;
+	class AVPlayerItemTrack;
+	class AVPlayerItemOutput;
+	class AVPlayerItemVideoOutput;
+	class AVAsset;
+	class AVAssetTrack;
+	class AVAssetReader;
+	class AVURLAsset;
+	class NSArray;
+	class NSError;
+	// -- 
+	class MovieDelegate;
 #endif
 
 namespace cinder { namespace qtime {
@@ -153,12 +152,12 @@ class MovieBase {
 	//! Returns the native AvFoundation Player data structure
 	AVPlayer*	getPlayerHandle() const { return mPlayer; }
 	
-	signals::signal<void()>&	getNewFrameSignal() { return mSignalNewFrame; }
-	signals::signal<void()>&	getReadySignal() { return mSignalReady; }
-	signals::signal<void()>&	getCancelledSignal() { return mSignalCancelled; }
-	signals::signal<void()>&	getEndedSignal() { return mSignalEnded; }
-	signals::signal<void()>&	getJumpedSignal() { return mSignalJumped; }
-	signals::signal<void()>&	getOutputWasFlushedSignal() { return mSignalOutputWasFlushed; }
+	signals::Signal<void()>&	getNewFrameSignal() { return mSignalNewFrame; }
+	signals::Signal<void()>&	getReadySignal() { return mSignalReady; }
+	signals::Signal<void()>&	getCancelledSignal() { return mSignalCancelled; }
+	signals::Signal<void()>&	getEndedSignal() { return mSignalEnded; }
+	signals::Signal<void()>&	getJumpedSignal() { return mSignalJumped; }
+	signals::Signal<void()>&	getOutputWasFlushedSignal() { return mSignalOutputWasFlushed; }
 	
  protected:
 	MovieBase();
@@ -201,7 +200,7 @@ class MovieBase {
 
 	std::mutex					mMutex;
 	
-	signals::signal<void()>		mSignalNewFrame, mSignalReady, mSignalCancelled, mSignalEnded, mSignalJumped, mSignalOutputWasFlushed;
+	signals::Signal<void()>		mSignalNewFrame, mSignalReady, mSignalCancelled, mSignalEnded, mSignalJumped, mSignalOutputWasFlushed;
 
 	// internal callbacks used from NSObject delegate
 	void playerReady();
@@ -255,13 +254,13 @@ class MovieResponder {
 	void playerItemTimeJumpedCallback() { mParent->playerItemJumped(); }
 	void outputSequenceWasFlushedCallback(AVPlayerItemOutput* output) { mParent->outputWasFlushed(output); }
 	
-private:
+  private:
 	MovieBase* const mParent;
 };
 	
 
 class MovieLoader {
-public:
+  public:
 	MovieLoader() {}
 	MovieLoader( const Url &url );
 	~MovieLoader();
@@ -296,7 +295,7 @@ public:
 	//! Returns the native QuickTime Movie and marks itself as no longer the owner. In general you should not call this.
 	AVPlayer*		transferMovieHandle() const { mOwnsMovie = false; return mPlayer; }
 	
-protected:
+  protected:
 	void	updateLoadState() const;
 	
 	AVPlayer*		mPlayer;

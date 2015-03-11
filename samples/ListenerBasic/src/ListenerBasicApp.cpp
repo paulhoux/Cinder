@@ -1,5 +1,7 @@
-#include "cinder/app/AppBasic.h"
+#include "cinder/app/App.h"
+#include "cinder/app/RendererGl.h"
 #include "cinder/Color.h"
+
 #include <list>
 #include <utility>
 
@@ -9,7 +11,7 @@ using namespace ci;
 using namespace ci::app;
 using namespace std;
 
-class ListenerBasicApp : public AppBasic {
+class ListenerBasicApp : public App {
  public:
 	void setup();
 	void mouseDown( MouseEvent event );
@@ -52,4 +54,4 @@ void ListenerBasicApp::draw()
 	mSquare->draw();
 }
 
-CINDER_APP_BASIC( ListenerBasicApp, RendererGl )
+CINDER_APP( ListenerBasicApp, RendererGl )

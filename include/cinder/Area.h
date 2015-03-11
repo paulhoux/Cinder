@@ -77,7 +77,7 @@ class Area {
 
 	bool			contains( const ivec2 &offset ) const;
 	template<typename T>
-	bool			contains( const glm::detail::tvec2<T, glm::defaultp> &offset ) const { return contains( ivec2( (int32_t)math<T>::ceil( offset. x ), (int32_t)math<T>::ceil( offset.y ) ) ); }
+	bool			contains( const glm::tvec2<T, glm::defaultp> &offset ) const { return contains( ivec2( (int32_t)math<T>::ceil( offset. x ), (int32_t)math<T>::ceil( offset.y ) ) ); }
 	bool			intersects( const Area &area ) const;
 
 	//! Expands the Area to include \a point in its interior
@@ -101,7 +101,8 @@ class Area {
 
 	int32_t			x1, y1, x2, y2;
 
-	bool			operator==( const Area &aArea ) const { return ( ( x1 == aArea.x1 ) && ( y1 == aArea.y1 ) && ( x2 == aArea.x2 ) && ( y2 == aArea.y2 ) ); }
+	bool			operator==( const Area &rhs ) const { return ( ( x1 == rhs.x1 ) && ( y1 == rhs.y1 ) && ( x2 == rhs.x2 ) && ( y2 == rhs.y2 ) ); }
+	bool			operator!=( const Area &rhs ) const { return ! ( *this == rhs ); }
 	bool			operator<( const Area &aArea ) const;
 
 	const Area		operator+( const ivec2 &o ) const { return this->getOffset( o ); }

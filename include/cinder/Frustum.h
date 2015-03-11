@@ -42,9 +42,9 @@ namespace cinder {
 template<typename T>
 class Frustum {
   public:
-	enum { NEAR, FAR, LEFT, RIGHT, TOP, BOTTOM };
+	enum FrustumSection { NEAR, FAR, LEFT, RIGHT, TOP, BOTTOM };
 
-	typedef glm::detail::tvec3<T, glm::defaultp> Vec3T;
+	typedef glm::tvec3<T, glm::defaultp> Vec3T;
 
   public:
 	Frustum() {}
@@ -77,6 +77,9 @@ class Frustum {
 	//! Returns true if the box is partially contained within frustum. See also 'contains'.
 	bool intersects( const AxisAlignedBox3f &box ) const;
 
+	//! Returns a const reference to the Plane associated with /a section of the Frustum.
+	const Plane<T>& getPlane( FrustumSection section ) const { return mFrustumPlanes[section]; }
+	
   protected:
 	Plane<T>	mFrustumPlanes[6];
 };

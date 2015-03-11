@@ -1,7 +1,8 @@
-#include "cinder/app/AppNative.h"
+#include "cinder/app/App.h"
 #include "cinder/ImageIo.h"
 #if defined( CINDER_COCOA )
 	#include "cinder/cocoa/CinderCocoa.h"
+	#include <CoreGraphics/CoreGraphics.h>
 #elif defined( CINDER_MSW )
 	#include "cinder/msw/CinderMswGdiplus.h"
 #endif
@@ -12,7 +13,7 @@ using namespace ci;
 using namespace ci::app;
 using namespace std;
 
-class Renderer2dApp : public AppNative {
+class Renderer2dApp : public App {
   public:
 	void setup();
 	void draw();
@@ -64,4 +65,4 @@ void Renderer2dApp::draw()
 #endif
 }
 
-CINDER_APP_NATIVE( Renderer2dApp, Renderer2d )
+CINDER_APP( Renderer2dApp, Renderer2d )

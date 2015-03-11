@@ -1,4 +1,4 @@
-#include "cinder/app/AppNative.h"
+#include "cinder/app/App.h"
 #include "cinder/app/RendererGl.h"
 #include "cinder/gl/Shader.h"
 #include "cinder/gl/Batch.h"
@@ -12,7 +12,7 @@
 using namespace ci;
 using namespace ci::app;
 
-class ExtrudeApp : public AppNative {
+class ExtrudeApp : public App {
   public:	
 	void	setup() override;
 	void	keyDown( KeyEvent event ) override;
@@ -104,19 +104,19 @@ void ExtrudeApp::makeGeom()
 	
 	if( mUseSpline ) {
 		auto extrudeSource = geom::ExtrudeSpline( shape, mSpline, mSubdivisions, mApproximation ).caps( mCaps );
-		mBatch = gl::Batch::create( geom::ColorFromAttrib( extrudeSource, geom::TEX_COORD_0,
+		mBatch = gl::Batch::create( extrudeSource >> geom::ColorFromAttrib( geom::TEX_COORD_0,
 											texCoordToColor ), mGlsl );
 
-		mNormalsBatch = gl::Batch::create( geom::VertexNormalLines( extrudeSource, 3.0f ), gl::getStockShader( gl::ShaderDef().color() ) );
+		mNormalsBatch = gl::Batch::create( extrudeSource >> geom::VertexNormalLines( 3.0f ), gl::getStockShader( gl::ShaderDef().color() ) );
 		mSplineBatch = gl::Batch::create( geom::BSpline( mSpline, 100 ), gl::getStockShader( gl::ShaderDef().color() ) );
 	}
 	else {
 		auto extrudeSource = geom::Extrude( shape, mDepth, mApproximation ).caps( mCaps ).subdivisions( mSubdivisions );
 		// this remaps the TEX_COORD_0s to color
-		mBatch = gl::Batch::create( geom::ColorFromAttrib( extrudeSource, geom::TEX_COORD_0,
+		mBatch = gl::Batch::create( extrudeSource >> geom::ColorFromAttrib( geom::TEX_COORD_0,
 											texCoordToColor ), mGlsl );
 		
-		mNormalsBatch = gl::Batch::create( geom::VertexNormalLines( extrudeSource, 3.0f ), gl::getStockShader( gl::ShaderDef().color() ) );
+		mNormalsBatch = gl::Batch::create( extrudeSource >> geom::VertexNormalLines( 3.0f ), gl::getStockShader( gl::ShaderDef().color() ) );
 	}
 }
 
@@ -157,4 +157,4 @@ void ExtrudeApp::draw()
 	mParams->draw();
 }
 
-CINDER_APP_NATIVE( ExtrudeApp, RendererGl )
+CINDER_APP( ExtrudeApp, RendererGl )

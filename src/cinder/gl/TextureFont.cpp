@@ -35,17 +35,17 @@
 	#include "cinder/cocoa/CinderCocoa.h"
 	#if defined( CINDER_MAC )
 		#include <ApplicationServices/ApplicationServices.h>
+	#else
+		#include <CoreGraphics/CoreGraphics.h>
 	#endif
+#elif defined( CINDER_MSW )
+	#include <Windows.h>
 #endif
 #include "cinder/Unicode.h"
 
 #include <set>
 
-#if defined( _MSC_VER ) && ( _MSC_VER >= 1600 ) || defined( _LIBCPP_VERSION )
-	using std::unordered_map;
-#else
-	using boost::unordered_map;
-#endif
+using std::unordered_map;
 
 using namespace std;
 
@@ -432,7 +432,7 @@ void TextureFont::drawGlyphs( const vector<pair<uint16_t,vec2> > &glyphMeasures,
 		defaultElementVbo->bufferSubData( 0, indices.size() * sizeof(curIdx), indices.data() );
 		ctx->getDefaultVao()->replacementBindEnd();
 		gl::setDefaultShaderVars();
-		ctx->drawElements( GL_TRIANGLES, indices.size(), indexType, 0 );
+		ctx->drawElements( GL_TRIANGLES, (GLsizei)indices.size(), indexType, 0 );
 	}
 }
 
@@ -569,7 +569,7 @@ void TextureFont::drawGlyphs( const std::vector<std::pair<uint16_t,vec2> > &glyp
 		defaultElementVbo->bufferSubData( 0, indices.size() * sizeof(curIdx), indices.data() );
 		ctx->getDefaultVao()->replacementBindEnd();
 		gl::setDefaultShaderVars();
-		ctx->drawElements( GL_TRIANGLES, indices.size(), indexType, 0 );
+		ctx->drawElements( GL_TRIANGLES, (GLsizei)indices.size(), indexType, 0 );
 	}
 }
 

@@ -1,4 +1,4 @@
-#include "cinder/app/AppNative.h"
+#include "cinder/app/App.h"
 #include "cinder/app/RendererGl.h"
 #include "cinder/ImageIo.h"
 #include "cinder/gl/gl.h"
@@ -10,7 +10,7 @@ using namespace ci;
 using namespace ci::app;
 using namespace std;
 
-class CubeMappingApp : public AppNative {
+class CubeMappingApp : public App {
   public:
 	void setup();
 	void resize();
@@ -27,7 +27,7 @@ const int SKY_BOX_SIZE = 500;
 
 void CubeMappingApp::setup()
 {
-	mCubeMap = gl::TextureCubeMap::createHorizontalCross( loadImage( loadAsset( "env_map.jpg" ) ), gl::TextureCubeMap::Format().mipmap() );
+	mCubeMap = gl::TextureCubeMap::create( loadImage( loadAsset( "env_map.jpg" ) ), gl::TextureCubeMap::Format().mipmap() );
 
 #if defined( CINDER_GL_ES )
 	auto envMapGlsl = gl::GlslProg::create( loadAsset( "env_map_es2.vert" ), loadAsset( "env_map_es2.frag" ) );
@@ -80,4 +80,4 @@ void CubeMappingApp::draw()
 	gl::popMatrices();		
 }
 
-CINDER_APP_NATIVE( CubeMappingApp, RendererGl )
+CINDER_APP( CubeMappingApp, RendererGl )

@@ -21,7 +21,6 @@
  POSSIBILITY OF SUCH DAMAGE.
 */
 
-#include "cinder/App/App.h"
 #include "cinder/GeomIo.h"
 #include "cinder/Quaternion.h"
 #include "cinder/Log.h"
@@ -3388,6 +3387,12 @@ SourceModsContext::SourceModsContext( const SourceModsBase *sourceMods )
 	: mNumIndices( 0 ), mNumVertices( 0 )
 {
 	mSource = sourceMods->getSource();
+	
+	if( sourceMods->mParamsStack.empty() )
+		CI_LOG_E( "SourceModsContext constructed with empty mParamsStack" );
+	else // this allows for a non-indexed Source to have never specified the primitive via copyIndices()
+		mPrimitive = sourceMods->mParamsStack.front().mPrimitive;
+	
 	
 	for( auto &modifier : sourceMods->mModifiers )
 		mModiferStack.push_back( modifier.get() );

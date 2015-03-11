@@ -1,4 +1,4 @@
-#include "cinder/app/AppBasic.h"
+#include "cinder/app/App.h"
 #include "cinder/app/RendererGl.h"
 #include "cinder/Camera.h"
 #include "cinder/params/Params.h"
@@ -8,7 +8,7 @@
 using namespace ci;
 using namespace ci::app;
 
-class TweakBarApp : public AppBasic {
+class TweakBarApp : public App {
   public:
 	void prepareSettings( Settings *settings ) { settings->enableHighDensityDisplay(); }
 	void setup();
@@ -95,6 +95,9 @@ void TweakBarApp::draw()
 	glLightfv( GL_LIGHT0, GL_POSITION, lightPosition );
 	glMaterialfv( GL_FRONT, GL_DIFFUSE,	mColor );*/
 
+	if( getElapsedFrames() % 100 == 0 )
+		std::cout << getAverageFps() << std::endl;
+
 	gl::setMatrices( mCam );
 	gl::rotate( mObjOrientation );
 	gl::color( mColor );
@@ -104,4 +107,4 @@ void TweakBarApp::draw()
 	mParams->draw();
 }
 
-CINDER_APP_BASIC( TweakBarApp, RendererGl )
+CINDER_APP( TweakBarApp, RendererGl )

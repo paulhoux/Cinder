@@ -1,4 +1,4 @@
-#include "cinder/app/AppNative.h"
+#include "cinder/app/App.h"
 #include "cinder/app/RendererGl.h"
 #include "cinder/ImageIo.h"
 #include "cinder/gl/gl.h"
@@ -17,7 +17,7 @@ struct Satellite {
 	Colorf		mColor;
 };
 
-class DynamicCubeMappingApp : public AppNative {
+class DynamicCubeMappingApp : public App {
   public:
 	void setup();
 	void resize();
@@ -42,7 +42,7 @@ const int SKY_BOX_SIZE = 500;
 
 void DynamicCubeMappingApp::setup()
 {
-	mSkyBoxCubeMap = gl::TextureCubeMap::createHorizontalCross( loadImage( loadAsset( "env_map.jpg" ) ), gl::TextureCubeMap::Format().mipmap() );
+	mSkyBoxCubeMap = gl::TextureCubeMap::create( loadImage( loadAsset( "env_map.jpg" ) ), gl::TextureCubeMap::Format().mipmap() );
 
 #if defined( CINDER_GL_ES )
 	auto envMapGlsl = gl::GlslProg::create( loadAsset( "env_map_es2.vert" ), loadAsset( "env_map_es2.frag" ) );
@@ -147,4 +147,4 @@ void DynamicCubeMappingApp::draw()
 	gl::popMatrices();
 }
 
-CINDER_APP_NATIVE( DynamicCubeMappingApp, RendererGl )
+CINDER_APP( DynamicCubeMappingApp, RendererGl )

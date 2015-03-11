@@ -1,5 +1,5 @@
 #include "cinder/Cinder.h"
-#include "cinder/app/AppNative.h"
+#include "cinder/app/App.h"
 #include "cinder/app/RendererGl.h"
 #include "cinder/gl/Texture.h"
 #include "cinder/Capture.h"
@@ -7,7 +7,7 @@
 using namespace ci;
 using namespace ci::app;
 
-class CaptureBasicApp : public AppNative {
+class CaptureBasicApp : public App {
   public:
 	void setup();
 	void keyDown( KeyEvent event );
@@ -52,7 +52,13 @@ void CaptureBasicApp::keyDown( KeyEvent event )
 void CaptureBasicApp::update()
 {
 	if( mCapture && mCapture->checkNewFrame() ) {
-		mTexture = gl::Texture::create( *mCapture->getSurface() );
+		if( ! mTexture ) {
+			// Capture images come back as top-down, and it's more efficient to keep them that way
+			mTexture = gl::Texture::create( *mCapture->getSurface(), gl::Texture::Format().loadTopDown() );
+		}
+		else {
+			mTexture->update( *mCapture->getSurface() );
+		}
 	}
 }
 
@@ -77,4 +83,4 @@ void CaptureBasicApp::draw()
 	}
 }
 
-CINDER_APP_NATIVE( CaptureBasicApp, RendererGl )
+CINDER_APP( CaptureBasicApp, RendererGl )
