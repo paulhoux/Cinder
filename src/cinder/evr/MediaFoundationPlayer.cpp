@@ -20,7 +20,8 @@ namespace cinder {
 			//////////////////////////////////////////////////////////////////////////////////////////
 
 			MediaFoundationPlayer::MediaFoundationPlayer( HRESULT &hr, HWND hwnd )
-				: mRefCount( 0 ), mHwnd( hwnd ), mState( Closed ), mIsInitialized( false ), mCurrentVolume( 1 ), mWidth( 0 ), mHeight( 0 )
+				: mRefCount( 0 ), mHwnd( hwnd ), mState( Closed ), mIsInitialized( FALSE ), mIsLoopEnabled( FALSE ), mHasEnded( FALSE ), mCurrentVolume( 1 )
+				, mWidth( 0 ), mHeight( 0 ), mFrameRateNumerator( 0 ), mFrameRateDenominator( 1 ), mPixelAspectNumerator( 0 ), mPixelAspectDenominator( 1 )
 				, mMediaSessionPtr( NULL ), mSequencerSourcePtr( NULL ), mMediaSourcePtr( NULL ), mVideoDisplayControlPtr( NULL ), mAudioStreamVolumePtr( NULL ), mPresenterPtr( NULL )
 				, mOpenEventHandle( NULL ), mCloseEventHandle( NULL )
 			{
@@ -33,7 +34,7 @@ namespace cinder {
 					hr = MFStartup( MF_VERSION );
 					BREAK_ON_FAIL( hr );
 
-					mIsInitialized = true;
+					mIsInitialized = TRUE;
 
 					// Create custom EVR presenter.
 					mPresenterPtr = new EVRCustomPresenter( hr );
@@ -57,7 +58,7 @@ namespace cinder {
 				if( mIsInitialized )
 					MFShutdown();
 
-				mIsInitialized = false;
+				mIsInitialized = FALSE;
 
 				CloseHandle( mCloseEventHandle );
 				CloseHandle( mOpenEventHandle );
@@ -105,6 +106,61 @@ namespace cinder {
 				} while( false );
 
 				return hr;
+			}
+
+			float MediaFoundationPlayer::GetTime() const
+			{
+				HRESULT hr = S_OK;
+
+				do {
+					BREAK_ON_NULL( mMediaSessionPtr, E_POINTER );
+
+					ScopedComPtr<IMFPresentationClock> pClock;
+					HRESULT hr = mMediaSessionPtr->GetClock( (IMFClock**) &pClock );
+					BREAK_ON_FAIL( hr );
+
+					MFTIME mfTime;
+					hr = pClock->GetTime( &mfTime );
+					BREAK_ON_FAIL( hr );
+
+					// Convert from 100 nanosecond units to seconds.
+					return mfTime * 1.0e-7f;
+				} while( false );
+
+				return 0.0f;
+			}
+
+			float MediaFoundationPlayer::GetDuration() const
+			{
+				HRESULT hr = S_OK;
+
+				do {
+					BREAK_ON_NULL( mMediaSourcePtr, E_POINTER );
+
+					ScopedComPtr<IMFPresentationDescriptor> pPD;
+					hr = mMediaSourcePtr->CreatePresentationDescriptor( &pPD );
+					BREAK_ON_FAIL( hr );
+
+					UINT64 pDuration = 0;
+					hr = pPD->GetUINT64( MF_PD_DURATION, (UINT64*) &pDuration );
+					BREAK_ON_FAIL( hr );
+
+					// Convert from 100 nanosecond units to seconds.
+					return pDuration * 1.0e-7f;
+				} while( false );
+
+				return 0.0f;
+			}
+
+			float MediaFoundationPlayer::GetFrameRate() const
+			{
+				assert( mFrameRateDenominator > 0 );
+				return mFrameRateNumerator / float( mFrameRateDenominator );
+			}
+
+			UINT32 MediaFoundationPlayer::GetNumFrames() const
+			{
+				return 0;
 			}
 
 			//  Create a new instance of the media session.
@@ -244,14 +300,19 @@ namespace cinder {
 						BREAK_ON_FAIL( hr );
 
 						if( MFMediaType_Video == guidMajorType ) {
-							// Obtain width and height of the video.
+							// Obtain attributes of the video.
 							ScopedComPtr<IMFMediaType> pMediaType;
 							hr = pHandler->GetCurrentMediaType( &pMediaType );
 							BREAK_ON_FAIL( hr );
 
-							//! Note: on several occassions, the reported width and height were different from the actual width and height!
 							hr = MFGetAttributeSize( pMediaType, MF_MT_FRAME_SIZE, &mWidth, &mHeight );
-							BREAK_ON_FAIL( hr );
+							hr = MFGetAttributeRatio( pMediaType, MF_MT_PIXEL_ASPECT_RATIO, &mPixelAspectNumerator, &mPixelAspectDenominator );
+							hr = MFGetAttributeRatio( pMediaType, MF_MT_FRAME_RATE, &mFrameRateNumerator, &mFrameRateDenominator );
+
+							// Adjust width and height for pixel aspect ratio.
+							CorrectAspectRatio( &mWidth, &mHeight, mPixelAspectNumerator, mPixelAspectDenominator );
+
+							// TODO: support Pan & Scan, see https://msdn.microsoft.com/en-us/library/windows/desktop/bb530115(v=vs.85).aspx
 						}
 					}
 				}
@@ -261,23 +322,7 @@ namespace cinder {
 
 			HRESULT MediaFoundationPlayer::Play()
 			{
-				assert( mMediaSessionPtr != NULL );
-
-				PROPVARIANT varStart;
-				PropVariantInit( &varStart );
-
-				HRESULT hr = mMediaSessionPtr->Start( &GUID_NULL, &varStart );
-				if( SUCCEEDED( hr ) ) {
-					// Note: Start is an asynchronous operation. However, we
-					// can treat our state as being already started. If Start
-					// fails later, we'll get an MESessionStarted event with
-					// an error code, and we will update our state then.
-					mState = Started;
-				}
-
-				PropVariantClear( &varStart );
-
-				return hr;
+				return SkipToPosition( mHasEnded ? 0 : PRESENTATION_CURRENT_POSITION );
 			}
 
 			HRESULT MediaFoundationPlayer::Pause()
@@ -317,33 +362,52 @@ namespace cinder {
 				PROPVARIANT var;
 				PropVariantInit( &var );
 
-				// Get the rate control service.
-				ScopedComPtr<IMFRateControl> pRateControl;
-				hr = MFGetService( mMediaSessionPtr, MF_RATE_CONTROL_SERVICE, IID_PPV_ARGS( &pRateControl ) );
+				do {
+					// Pause the presentation.
+					hr = mMediaSessionPtr->Pause();
+					BREAK_ON_FAIL( hr );
 
-				// Set the playback rate to zero without thinning.
-				if( SUCCEEDED( hr ) ) {
-					hr = pRateControl->SetRate( FALSE, 0.0F );
-				}
+					// Create the Media Session start position.
+					if( seekTime == PRESENTATION_CURRENT_POSITION ) {
+						var.vt = VT_EMPTY;
+					}
+					else {
+						var.vt = VT_I8;
+						var.hVal.QuadPart = seekTime;
+					}
 
-				// Create the Media Session start position.
-				if( seekTime == PRESENTATION_CURRENT_POSITION ) {
-					var.vt = VT_EMPTY;
-				}
-				else {
-					var.vt = VT_I8;
-					var.hVal.QuadPart = seekTime;
-				}
-
-				// Start the Media Session.
-				if( SUCCEEDED( hr ) ) {
+					// Start the Media Session.
 					hr = mMediaSessionPtr->Start( NULL, &var );
-				}
+					BREAK_ON_FAIL( hr );
+
+					// Note: Start is an asynchronous operation. However, we
+					// can treat our state as being already started. If Start
+					// fails later, we'll get an MESessionStarted event with
+					// an error code, and we will update our state then.
+					mState = Started;
+					mHasEnded = FALSE;
+				} while( false );
 
 				// Clean up.
 				PropVariantClear( &var );
 
 				return hr;
+			}
+
+			HRESULT MediaFoundationPlayer::CorrectAspectRatio( UINT32 *pWidth, UINT32 *pHeight, UINT32 pixelAspectNumerator, UINT32 pixelAspectDenominator )
+			{
+				// TODO: there's also a similar function in MediaFoundationVideo.cpp!
+
+				if( pixelAspectNumerator > pixelAspectDenominator ) {
+					// The source has "wide" pixels, so stretch the width.
+					*pWidth = MulDiv( *pWidth, pixelAspectNumerator, pixelAspectDenominator );
+				}
+				else if( pixelAspectNumerator < pixelAspectDenominator ) {
+					// The source has "tall" pixels, so stretch the height.
+					*pHeight = MulDiv( *pHeight, pixelAspectDenominator, pixelAspectNumerator );
+				}
+
+				return S_OK;
 			}
 
 			HRESULT MediaFoundationPlayer::HandleEvent( UINT_PTR pEventPtr )
@@ -402,8 +466,10 @@ namespace cinder {
 					case MESessionStarted:
 						if( FAILED( hr ) )
 							CI_LOG_V( "MESessionStarted failed: " << hrStatus );
-						else
+						else {
 							mState = Started;
+							mHasEnded = FALSE;
+						}
 						break;
 					case MESessionScrubSampleComplete:
 						if( SUCCEEDED( hr ) )
@@ -458,25 +524,16 @@ namespace cinder {
 			{
 				HRESULT hr = S_OK;
 
-				mMediaSessionPtr->Pause();
-				mState = Paused;
+				if( mIsLoopEnabled ) {
+					// Seek to the beginning.
+					hr = SkipToPosition( 0 );
+				}
+				else {
+					mHasEnded = TRUE;
 
-				// Seek to the beginning.
-				PROPVARIANT varStart;
-				PropVariantInit( &varStart );
-				varStart.vt = VT_I8;
-				varStart.hVal.QuadPart = 0;
-
-				hr = mMediaSessionPtr->Start( &GUID_NULL, &varStart );
-
-				//if( !mLoop )
-				//mMediaSessionPtr->Pause();
-				//else
-				mState = Started;
-
-				PropVariantClear( &varStart );
-
-				// The session puts itself into the stopped state automatically.
+					// Pause instead of Stop, so we can easily restart the video later.
+					hr = Pause();
+				}
 
 				return hr;
 			}

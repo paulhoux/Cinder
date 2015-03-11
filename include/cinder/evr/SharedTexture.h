@@ -73,6 +73,9 @@ namespace cinder {
 					m_hD3DHandle = other.m_hD3DHandle;
 					msw::CopyComPtr( m_pD3DSurface, other.m_pD3DSurface );
 					msw::CopyComPtr( m_pD3DTexture, other.m_pD3DTexture );
+
+					m_bLocked = other.m_bLocked;
+					m_bResourceShared = other.m_bResourceShared;
 				}
 
 				SharedTexture( SharedTexture &&other )
@@ -86,6 +89,9 @@ namespace cinder {
 					std::swap( m_hD3DHandle, other.m_hD3DHandle );
 					std::swap( m_pD3DSurface, other.m_pD3DSurface );
 					std::swap( m_pD3DTexture, other.m_pD3DTexture );
+
+					std::swap( m_bLocked, other.m_bLocked );
+					std::swap( m_bResourceShared, other.m_bResourceShared );
 				}
 
 				~SharedTexture()
@@ -109,6 +115,9 @@ namespace cinder {
 					msw::CopyComPtr( m_pD3DSurface, other.m_pD3DSurface );
 					msw::CopyComPtr( m_pD3DTexture, other.m_pD3DTexture );
 
+					m_bLocked = other.m_bLocked;
+					m_bResourceShared = other.m_bResourceShared;
+
 					return *this;
 				}
 
@@ -123,6 +132,9 @@ namespace cinder {
 					std::swap( m_hD3DHandle, other.m_hD3DHandle );
 					std::swap( m_pD3DSurface, other.m_pD3DSurface );
 					std::swap( m_pD3DTexture, other.m_pD3DTexture );
+
+					std::swap( m_bLocked, other.m_bLocked );
+					std::swap( m_bResourceShared, other.m_bResourceShared );
 
 					return *this;
 				}
@@ -156,6 +168,7 @@ namespace cinder {
 
 				// State
 				BOOL                              m_bLocked;
+				BOOL                              m_bResourceShared;
 			};
 
 			class SharedTexturePool : public std::enable_shared_from_this < SharedTexturePool > {
@@ -214,7 +227,7 @@ namespace cinder {
 				HRESULT GetFreeSurface( const D3DSURFACE_DESC &desc, SharedTextureRef &shared )
 				{
 					HRESULT hr = S_OK;
-
+#if 0
 					// Check if we have a surface that we can reuse, if not then create one.
 					do {
 						std::lock_guard<std::mutex> lock( mAvailableLock );
@@ -226,15 +239,17 @@ namespace cinder {
 							return hr;
 						}
 					} while( false );
-
+#endif
 					do {
 						std::lock_guard<std::mutex> lock( mFreeLock );
 						if( mFree.empty() ) {
 							shared = std::make_shared<SharedTexture>( shared_from_this(), desc );
+							CI_LOG_V( "Created new surface (" << shared << ")" );
 						}
 						else {
-							shared = mFree.back();
-							mFree.pop_back();
+							shared = mFree.front();
+							mFree.pop_front();
+							CI_LOG_V( "Used existing surface (" << shared << ")" );
 						}
 					} while( false );
 
@@ -244,6 +259,13 @@ namespace cinder {
 				HRESULT AddAvailableSurface( const SharedTextureRef &shared )
 				{
 					std::lock_guard<std::mutex> lock( mAvailableLock );
+
+					// Free currently available frame.
+					if( mAvailable ) {
+						std::lock_guard<std::mutex> surlock( mFreeLock );
+						mFree.push_back( mAvailable );
+					}
+
 					mAvailable = shared;
 
 					return S_OK;
@@ -287,8 +309,6 @@ namespace cinder {
 							mFree.push_back( shared );
 
 							// Don't actually delete the texture id, we're gonna reuse it later. But we do need to notify the gl::context() we're done using the Texture2d wrapper.
-							pTexture->setDoNotDispose( true );
-
 							auto ctx = gl::context();
 							if( ctx )
 								ctx->textureDeleted( pTexture );
@@ -299,14 +319,13 @@ namespace cinder {
 							shared->Unshare();
 
 							// Destroy texture.
-							pTexture->setDoNotDispose( false );
 							delete pTexture;
 						}
 					}
 				}
 
 			private:
-				static const int kFreePoolSize = 1;
+				static const int kFreePoolSize = 3;
 
 				IDirect3DDevice9Ex            *m_pDevice;
 				HANDLE                         m_pD3DDeviceHandle;     // Shared device handle for OpenGL interop.
@@ -314,7 +333,7 @@ namespace cinder {
 				std::thread::id                mMainThreadID;
 
 				std::mutex                     mFreeLock;
-				std::vector<SharedTextureRef>  mFree;
+				std::deque<SharedTextureRef>   mFree;
 
 				std::mutex                     mAvailableLock;
 				SharedTextureRef               mAvailable;
