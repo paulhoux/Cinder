@@ -193,7 +193,7 @@ protected:
 
 	std::mutex					mMutex;
 
-	signals::signal<void()>		mSignalNewFrame, mSignalReady, mSignalCancelled, mSignalEnded, mSignalJumped, mSignalOutputWasFlushed;
+	//signals::signal<void()>		mSignalNewFrame, mSignalReady, mSignalCancelled, mSignalEnded, mSignalJumped, mSignalOutputWasFlushed;
 
 	//! Keeps track of each player's window.
 	static std::map<HWND, MovieBase*> sMovieWindows;

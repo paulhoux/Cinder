@@ -32,7 +32,7 @@ POSSIBILITY OF SUCH DAMAGE.
 #include "cinder/evr/DirectShowPlayer.h"
 #include "cinder/evr/SharedTexture.h"
 
-#include "cinder/app/AppBasic.h"
+#include "cinder/app/App.h"
 
 namespace cinder {
 	namespace msw {

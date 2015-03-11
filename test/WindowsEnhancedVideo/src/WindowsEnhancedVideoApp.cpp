@@ -1,6 +1,6 @@
 #include "vld.h"
 
-#include "cinder/app/AppNative.h"
+#include "cinder/app/App.h"
 #include "cinder/app/RendererGl.h"
 #include "cinder/gl/gl.h"
 #include "cinder/gl/Batch.h"
@@ -33,12 +33,12 @@ struct Circle {
 	float     pad2;
 };
 
-class WindowsEnhancedVideoApp : public AppNative {
+class WindowsEnhancedVideoApp : public App {
 public:
-	void prepareSettings( Settings* settings ) override;
+	//void prepareSettings( Settings* settings ) override;
 
 	void setup() override;
-	void shutdown() override;
+	void cleanup() override;
 	void update() override;
 	void draw() override;
 
@@ -49,8 +49,6 @@ public:
 	void fileDrop( FileDropEvent event ) override;
 
 	bool playVideo( const fs::path &path );
-
-	void close() { mMovies.clear(); }
 
 private:
 	static const int kMaxMovieCount = 1;
@@ -63,11 +61,11 @@ private:
 	ci::gl::BatchRef               mBatch;
 };
 
-void WindowsEnhancedVideoApp::prepareSettings( Settings* settings )
+/*void WindowsEnhancedVideoApp::prepareSettings( Settings* settings )
 {
-	settings->disableFrameRate();
-	settings->setWindowSize( 1280, 720 );
-}
+settings->disableFrameRate();
+settings->setWindowSize( 1280, 720 );
+}*/
 
 void WindowsEnhancedVideoApp::setup()
 {
@@ -88,10 +86,10 @@ void WindowsEnhancedVideoApp::setup()
 	gl::color( 1, 1, 1 );
 
 	//
-	getWindow()->connectClose( &WindowsEnhancedVideoApp::close, this );
+	getWindow()->getSignalClose().connect( [&]() { mMovies.clear(); } );
 }
 
-void WindowsEnhancedVideoApp::shutdown()
+void WindowsEnhancedVideoApp::cleanup()
 {
 }
 
@@ -191,4 +189,4 @@ bool WindowsEnhancedVideoApp::playVideo( const fs::path &path )
 	return false;
 }
 
-CINDER_APP_NATIVE( WindowsEnhancedVideoApp, RendererGl )
+CINDER_APP( WindowsEnhancedVideoApp, RendererGl )
