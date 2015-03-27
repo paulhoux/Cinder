@@ -208,11 +208,11 @@ namespace cinder {
 					if( m_pD3DDeviceHandle ) {
 						CI_LOG_V( "Closing DX/GL interop for device " << m_pDevice << "..." );
 
-						BOOL success = wglDXCloseDeviceNV( m_pD3DDeviceHandle );
-						if( success )
-							CI_LOG_V( "Succeeded." );
-						else
-							CI_LOG_V( "Failed." );
+						//BOOL success = wglDXCloseDeviceNV( m_pD3DDeviceHandle );
+						//if( success )
+						//	CI_LOG_V( "Succeeded." );
+						//else
+						//	CI_LOG_V( "Failed." );
 
 						m_pD3DDeviceHandle = NULL;
 					}

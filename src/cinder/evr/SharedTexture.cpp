@@ -176,12 +176,12 @@ namespace cinder {
 					// Sanity check.
 					assert( m_pPool.lock() );
 
-					if( wglDXUnlockObjectsNV( m_pPool.lock()->GetDeviceHandle(), 1, &m_hGLHandle ) ) {
+					//if( wglDXUnlockObjectsNV( m_pPool.lock()->GetDeviceHandle(), 1, &m_hGLHandle ) ) {
 						m_bLocked = FALSE;
-					}
-					else {
-						CI_LOG_E( "Failed to unlock the OpenGL texture." );
-					}
+					//}
+					//else {
+					//	CI_LOG_E( "Failed to unlock the OpenGL texture." );
+					//}
 				}
 			}
 
