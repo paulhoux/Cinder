@@ -73,10 +73,10 @@ void WindowsEnhancedVideoApp::setup()
 	mgr->setConsoleLoggingEnabled( true );
 
 	auto path = getHomeDirectory() / "cinder-wmf.log";
-	if( !fs::exists( path.stem() ) )
-		fs::create_directories( path.stem() );
+	if( !fs::exists( path.parent_path() ) )
+		fs::create_directories( path.parent_path() );
 
-	mgr->setFileLoggingEnabled( true, path );
+	mgr->setFileLoggingEnabled( true, path, true );
 
 	CI_LOG_I( "Logging enabled for Cinder WMF: " << path.string() );
 
