@@ -22,14 +22,16 @@
 
 #pragma once
 
+#include "cinder/gl/Vao.h"
+#include "cinder/gl/Vbo.h"
+#include "cinder/gl/GlslProg.h"
+
 #include "cinder/Color.h"
 #include "cinder/Vector.h"
 #include "cinder/TriMesh.h"
-#include "cinder/gl/Vao.h"
-#include "cinder/gl/Vbo.h"
-#include "cinder/geomIo.h"
+#include "cinder/GeomIo.h"
 
-#include <ostream>
+#include <iosfwd>
 #include <vector>
 
 namespace cinder { namespace gl {
@@ -80,6 +82,8 @@ class VboMesh {
 	static VboMeshRef	create( const geom::Source &source );
 	//! Creates a VboMesh which represents the geom::Source \a source using \a layout.
 	static VboMeshRef	create( const geom::Source &source, const geom::AttribSet &requestedAttribs );
+	//! Creates a VboMesh which represents the geom::Source \a source using 1 or more VboMesh::Layouts for vertex data.
+	static VboMeshRef	create( const geom::Source &source, const std::vector<VboMesh::Layout> &vertexArrayLayouts );
 	//! Creates a VboMesh which represents the geom::Source \a source using 1 or more Vbo/VboMesh::Layout pairs. A null VboRef requests allocation.
 	static VboMeshRef	create( const geom::Source &source, const std::vector<std::pair<VboMesh::Layout,VboRef>> &vertexArrayLayouts, const VboRef &indexVbo = nullptr );
 	//! Creates a VboMesh which represents the user's vertex buffer objects. Allows optional \a indexVbo to enable indexed vertices; creates a static VBO if none provided.
@@ -91,6 +95,7 @@ class VboMesh {
 	typedef std::map<geom::Attrib,std::string> AttribGlslMap;
 	//! Constructs a VAO (in the currently bound VAO) that matches \a this to GlslProg \a shader, overriding the mapping of a geom::Attrib to a named attribute via the 'a attributeMapping std::map
 	void		buildVao( const GlslProgRef &shader, const AttribGlslMap &attributeMapping = AttribGlslMap() );
+	void		buildVao( const GlslProg* shader, const AttribGlslMap &attributeMapping = AttribGlslMap() );
 
 	//! Returns the number of vertices in the mesh
 	uint32_t	getNumVertices() const { return mNumVertices; }
@@ -205,11 +210,14 @@ class VboMesh {
 	template<typename T>
 	class MappedAttrib : public MappedAttribBase {
 	  public:
-		T&			operator*() { return *(reinterpret_cast<T*>( mPtr )); }
-		const T&	operator*() const { return *(reinterpret_cast<const T*>( mPtr )); }
-		
-		T&			operator[]( size_t i ) { return *(reinterpret_cast<T*>( ((uint8_t*)mPtr) + mStride * i )); }
-		const T&	operator[]( size_t i ) const { return *(reinterpret_cast<T*>( ((uint8_t*)mPtr) + mStride * i )); }
+		T&			operator*()			{ return *(reinterpret_cast<T*>( mPtr )); }
+		const T&	operator*() const	{ return *(reinterpret_cast<const T*>( mPtr )); }
+
+		T*			operator->()		{ return reinterpret_cast<T*>( mPtr ); }
+		const T*	operator->() const	{ return reinterpret_cast<const T*>( mPtr ); }
+
+		T&			operator[]( size_t i )			{ return *(reinterpret_cast<T*>( ((uint8_t*)mPtr) + mStride * i )); }
+		const T&	operator[]( size_t i ) const	{ return *(reinterpret_cast<T*>( ((uint8_t*)mPtr) + mStride * i )); }
 		
 		// pre-increment
 		MappedAttrib	operator++() { mPtr = ((uint8_t*)mPtr) + mStride; return *this; }

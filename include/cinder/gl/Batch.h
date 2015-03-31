@@ -23,7 +23,6 @@
 
 #pragma once
 
-#include "cinder/gl/gl.h"
 #include "cinder/gl/Vbo.h"
 #include "cinder/gl/Vao.h"
 #include "cinder/gl/VboMesh.h"
@@ -66,7 +65,7 @@ class Batch {
 	//! Replaces the shader associated with the Batch. Issues a warning if not all attributes were able to match.
 	void			replaceGlslProg( const GlslProgRef& glsl );
 	//! Returns the VAO mapping the Batch's geometry to its shader
-	const VaoRef&	getVao() const { return mVao; }
+	const VaoRef	getVao() const { return mVao; }
 	//! Returns the VboMesh associated with the Batch
 	VboMeshRef		getVboMesh() const { return mVboMesh; }
 	//! Replaces the VboMesh associated with the Batch. Issues a warning if not all attributes were able to match.
@@ -141,7 +140,8 @@ class VertBatch {
 	std::vector<vec4>		mTexCoords;
 	
 	bool					mOwnsBuffers;
-	VaoRef					mVao;
+	Vao*					mVao;
+	VaoRef					mVaoStorage;
 	VboRef					mVbo;
 };
 

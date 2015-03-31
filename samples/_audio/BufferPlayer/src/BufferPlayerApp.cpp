@@ -1,9 +1,7 @@
 #include "cinder/app/App.h"
 #include "cinder/app/RendererGl.h"
 
-#include "cinder/audio/Context.h"
-#include "cinder/audio/NodeEffects.h"
-#include "cinder/audio/SamplePlayerNode.h"
+#include "cinder/audio/audio.h"
 
 #include "Resources.h"
 #include "../../common/AudioDrawUtils.h"
@@ -14,24 +12,18 @@ using namespace std;
 
 class BufferPlayerNodeApp : public App {
 public:
-	void prepareSettings( Settings *settings );
-	void setup();
-	void fileDrop( FileDropEvent event );
-	void keyDown( KeyEvent event );
-	void mouseDown( MouseEvent event );
-	void mouseDrag( MouseEvent event );
-	void draw();
+	void setup() override;
+	void fileDrop( FileDropEvent event ) override;
+	void keyDown( KeyEvent event ) override;
+	void mouseDown( MouseEvent event ) override;
+	void mouseDrag( MouseEvent event ) override;
+	void draw() override;
 
 	audio::GainNodeRef				mGain;
 	audio::BufferPlayerNodeRef		mBufferPlayerNode;
 
 	WaveformPlot				mWaveformPlot;
 };
-
-void BufferPlayerNodeApp::prepareSettings( Settings *settings )
-{
-	settings->setMultiTouchEnabled( false );
-}
 
 void BufferPlayerNodeApp::setup()
 {
@@ -103,4 +95,6 @@ void BufferPlayerNodeApp::draw()
 	gl::drawSolidRect( Rectf( readPos - 2, 0, readPos + 2, (float)getWindowHeight() ) );
 }
 
-CINDER_APP( BufferPlayerNodeApp, RendererGl )
+CINDER_APP( BufferPlayerNodeApp, RendererGl, []( App::Settings *settings ) {
+	settings->setMultiTouchEnabled( false );
+} )

@@ -17,6 +17,8 @@ using namespace ci;
 using namespace ci::app;
 using namespace std;
 
+void prepareSettings( App::Settings* settings );
+
 class GeometryApp : public App {
   public:
 	enum Primitive { CAPSULE, CONE, CUBE, CYLINDER, HELIX, ICOSAHEDRON, ICOSPHERE, SPHERE, TEAPOT, TORUS, PLANE };
@@ -24,7 +26,6 @@ class GeometryApp : public App {
 	enum ViewMode { SHADED, WIREFRAME };
 	enum TexturingMode { NONE, PROCEDURAL, SAMPLER };
 
-	void prepareSettings( Settings *settings ) override;
 	void setup() override;
 	void resize() override;
 	void update() override;
@@ -78,11 +79,11 @@ class GeometryApp : public App {
 #endif
 };
 
-void GeometryApp::prepareSettings( Settings* settings )
+void prepareSettings( App::Settings* settings )
 {
 	settings->setWindowSize(1024, 768);
-	settings->enableHighDensityDisplay();
-	settings->enableMultiTouch( false );
+	settings->setHighDensityDisplayEnabled();
+	settings->setMultiTouchEnabled( false );
 }
 
 void GeometryApp::setup()
@@ -437,7 +438,10 @@ void GeometryApp::loadGeomSource( const geom::Source &source )
 	vec3 size = bbox.getMax() - bbox.getMin();
 	float scale = std::max( std::max( size.x, size.y ), size.z ) / 25.0f;
 	mPrimitiveNormalLines = gl::Batch::create( mesh >> geom::VertexNormalLines( scale ), gl::getStockShader( gl::ShaderDef().color() ) );
-	mPrimitiveTangentLines = gl::Batch::create( mesh >> geom::VertexNormalLines( scale, geom::TANGENT ), gl::getStockShader( gl::ShaderDef().color() ) );
+	if( mesh.hasTangents() )
+		mPrimitiveTangentLines = gl::Batch::create( mesh >> geom::VertexNormalLines( scale, geom::TANGENT ), gl::getStockShader( gl::ShaderDef().color() ) );
+	else
+		mPrimitiveTangentLines.reset();
 
 	getWindow()->setTitle( "Geometry - " + to_string( mesh.getNumVertices() ) + " vertices" );
 }
@@ -473,4 +477,4 @@ void GeometryApp::createWireframeShader()
 #endif // ! defined( CINDER_GL_ES )
 }
 
-CINDER_APP( GeometryApp, RendererGl )
+CINDER_APP( GeometryApp, RendererGl, prepareSettings )

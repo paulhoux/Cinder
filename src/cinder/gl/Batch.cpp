@@ -25,7 +25,8 @@
 #include "cinder/gl/Context.h"
 #include "cinder/gl/GlslProg.h"
 #include "cinder/gl/VboMesh.h"
-#include "cinder/gl/gl.h"
+#include "cinder/gl/scoped.h"
+
 #include "cinder/Log.h"
 
 namespace cinder { namespace gl {
@@ -254,7 +255,7 @@ void VertBatch::clear()
 	mColors.clear();
 	mTexCoords.clear();
 	mVbo.reset();
-	mVao.reset();
+	mVao = nullptr;
 }
 
 void VertBatch::draw()
@@ -273,7 +274,7 @@ void VertBatch::setupBuffers()
 {
 	auto ctx = gl::context();
 	
-	GlslProgRef glslProg = ctx->getGlslProg();
+	auto glslProg = ctx->getGlslProg();
 	if( ! glslProg )
 		return;
 
@@ -293,7 +294,7 @@ void VertBatch::setupBuffers()
 	
 	ScopedBuffer ScopedBuffer( mVbo );
 	// if this VBO was freshly made, or we don't own the buffer because we use the context defaults
-	if( forceUpload || ( ! mOwnsBuffers ) ) {
+	if( ( forceUpload || ( ! mOwnsBuffers ) ) && ( ! mVertices.empty() ) ) {
 		mVbo->ensureMinimumSize( totalSizeBytes );
 		
 		// upload positions
@@ -325,7 +326,8 @@ void VertBatch::setupBuffers()
 	if( ! mOwnsBuffers )
 		mVao->replacementBindBegin();
 	else {
-		mVao = gl::Vao::create();
+		mVaoStorage = gl::Vao::create();
+		mVao = mVaoStorage.get();
 		mVao->bind();
 	}
 

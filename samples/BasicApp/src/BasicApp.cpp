@@ -1,5 +1,6 @@
 #include "cinder/app/App.h"
 #include "cinder/app/RendererGl.h"
+#include "cinder/gl/gl.h"
 #include <list>
 
 using namespace ci;
@@ -38,8 +39,6 @@ void BasicApp::draw()
 		gl::vertex( point );
 	}
 	gl::end();
-
-	gl::drawSolidRect( Rectf( 20, 20, 200, 100 ) );
 }
 
 // This line tells Cinder to actually create the application

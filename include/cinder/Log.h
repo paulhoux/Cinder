@@ -27,60 +27,13 @@
 #include "cinder/Filesystem.h"
 #include "cinder/CurrentFunction.h"
 #include "cinder/CinderAssert.h"
+#include "cinder/System.h"
 
 #include <sstream>
 #include <fstream>
 #include <vector>
 #include <memory>
 #include <mutex>
-
-#if defined( CINDER_MSW ) && ( _MSC_VER < 1800 )
-	#define CINDER_NO_VARIADIC_TEMPLATES
-	#include <boost/preprocessor/repetition.hpp>
-	#include <boost/preprocessor/control/if.hpp>
-#endif
-
-#define CINDER_LOG_STREAM( level, stream ) ::cinder::log::Entry( level, ::cinder::log::Location( CINDER_CURRENT_FUNCTION, __FILE__, __LINE__ ) ) << stream
-
-// CI_MAX_LOG_LEVEL is designed so that if you set it to 0, nothing logs, 1 only fatal, 2 fatal + error, etc...
-
-#if ! defined( CI_MAX_LOG_LEVEL )
-	#if ! defined( NDEBUG )
-		#define CI_MAX_LOG_LEVEL 5	// debug mode default is LEVEL_VERBOSE
-	#else
-		#define CI_MAX_LOG_LEVEL 4	// release mode default is LEVEL_INFO
-	#endif
-#endif
-
-#if( CI_MAX_LOG_LEVEL >= 5 )
-	#define CI_LOG_V( stream )	CINDER_LOG_STREAM( ::cinder::log::LEVEL_VERBOSE, stream )
-#else
-	#define CI_LOG_V( stream )	((void)0)
-#endif
-
-#if( CI_MAX_LOG_LEVEL >= 4 )
-	#define CI_LOG_I( stream )	CINDER_LOG_STREAM( ::cinder::log::LEVEL_INFO, stream )
-#else
-	#define CI_LOG_I( stream )	((void)0)
-#endif
-
-#if( CI_MAX_LOG_LEVEL >= 3 )
-	#define CI_LOG_W( stream )	CINDER_LOG_STREAM( ::cinder::log::LEVEL_WARNING, stream )
-#else
-	#define CI_LOG_W( stream )	((void)0)
-#endif
-
-#if( CI_MAX_LOG_LEVEL >= 2 )
-	#define CI_LOG_E( stream )	CINDER_LOG_STREAM( ::cinder::log::LEVEL_ERROR, stream )
-#else
-	#define CI_LOG_E( stream )	((void)0)
-#endif
-
-#if( CI_MAX_LOG_LEVEL >= 1 )
-	#define CI_LOG_F( stream )	CINDER_LOG_STREAM( ::cinder::log::LEVEL_FATAL, stream )
-#else
-	#define CI_LOG_F( stream )	((void)0)
-#endif
 
 namespace cinder { namespace log {
 
@@ -139,33 +92,57 @@ class Logger {
 
 class LoggerConsole : public Logger {
   public:
-	virtual ~LoggerConsole()	{}
-
-	virtual void write( const Metadata &meta, const std::string &text ) override;
+	void write( const Metadata &meta, const std::string &text ) override;
 };
 
 class LoggerFile : public Logger {
   public:
 	//! If \a filePath is empty, uses the default ('cinder.log' next to app binary)
-	LoggerFile( const fs::path &filePath = fs::path() );
+	LoggerFile( const fs::path &filePath = fs::path(), bool appendToExisting = true );
+	// daily rotating logger, if folder or format are empty, ignores request
+	LoggerFile( const fs::path &folder, const std::string &formatStr, bool appendToExisting = true );
 	virtual ~LoggerFile();
 
-	virtual void write( const Metadata &meta, const std::string &text ) override;
+	void write( const Metadata &meta, const std::string &text ) override;
 
 	const fs::path&		getFilePath() const		{ return mFilePath; }
 
   protected:
+	fs::path	getDefaultLogFilePath() const;
+	void		ensureDirectoryExists();
+
 	fs::path		mFilePath;
+	fs::path		mFolderPath;
+	std::string		mDailyFormatStr;
+	int				mYearDay;
+	bool			mAppend;
+	bool			mRotating;
 	std::ofstream	mStream;
+};
+
+//! Logger that doesn't actually print anything, but triggers a breakpoint if a log event happens past a specified threshold
+class LoggerBreakpoint : public Logger {
+  public:
+	LoggerBreakpoint( Level triggerLevel = LEVEL_ERROR )
+		: mTriggerLevel( triggerLevel )
+	{}
+
+	void write( const Metadata &meta, const std::string &text ) override;
+
+	void	setTriggerLevel( Level triggerLevel )	{ mTriggerLevel = triggerLevel; }
+	Level	getTriggerLevel() const					{ return mTriggerLevel; }
+  private:
+	Level	mTriggerLevel;
 };
 
 #if defined( CINDER_COCOA )
 
-//! sends output to NSLog so it can be viewed from the Mac Console app
-// TODO: this could probably be much faster with syslog: https://developer.apple.com/library/mac/documentation/Darwin/Reference/ManPages/man3/syslog.3.html
-class LoggerNSLog : public Logger {
-  public:
-	virtual void write( const Metadata &meta, const std::string& text ) override;
+class LoggerSysLog : public Logger {
+public:
+	LoggerSysLog();
+	virtual ~LoggerSysLog();
+
+	void write( const Metadata &meta, const std::string &text ) override;
 };
 
 #endif
@@ -199,23 +176,44 @@ public:
 	void setConsoleLoggingEnabled( bool b = true )		{ b ? enableConsoleLogging() : disableConsoleLogging(); }
 	bool isConsoleLoggingEnabled() const				{ return mConsoleLoggingEnabled; }
 
-	void enableFileLogging( const fs::path &filePath = fs::path() );
+	void enableFileLogging( const fs::path &filePath = fs::path(), bool appendToExisting = true );
+	void enableFileLogging( const fs::path &folder, const std::string& formatStr, bool appendToExisting = true);
 	void disableFileLogging();
-	void setFileLoggingEnabled( bool b = true, const fs::path &filePath = fs::path() )			{ b ? enableFileLogging( filePath ) : disableFileLogging(); }
+	void setFileLoggingEnabled( bool b = true, const fs::path &filePath = fs::path(), bool appendToExisting = true )
+														{ b ? enableFileLogging( filePath, appendToExisting )
+															: disableFileLogging(); }
+
+	void setFileLoggingEnabled( bool b = true, const fs::path &folder = fs::path(),
+								const std::string& formatStr = "", bool appendToExisting = true )
+														{ b ? enableFileLogging( folder, formatStr, appendToExisting )
+															: disableFileLogging(); }
+
 	bool isFileLoggingEnabled() const					{ return mFileLoggingEnabled; }
 
 	void enableSystemLogging();
 	void disableSystemLogging();
 	void setSystemLoggingEnabled( bool b = true )		{ b ? enableSystemLogging() : disableSystemLogging(); }
 	bool isSystemLoggingEnabled() const					{ return mSystemLoggingEnabled; }
+	void setSystemLoggingLevel( Level level );
+	Level getSystemLoggingLevel() const					{ return mSystemLoggingLevel; }
+
+	//! Enables a breakpoint to be triggered when a log message happens at `LEVEL_ERROR` or higher
+	void enableBreakOnError()							{ enableBreakOnLevel( LEVEL_ERROR ); }
+	//! Enables a breakpoint to be triggered when a log message happens at \a trigerLevel or higher.
+	void enableBreakOnLevel( Level trigerLevel );
+	//! Disables any breakpoints set for logging.
+	void disableBreakOnLog();
 
 protected:
 	LogManager();
 
+	bool initFileLogging();
+
 	std::unique_ptr<Logger>	mLogger;
 	LoggerImplMulti			*mLoggerMulti;
 	mutable std::mutex		mMutex;
-	bool					mConsoleLoggingEnabled, mFileLoggingEnabled, mSystemLoggingEnabled;
+	bool					mConsoleLoggingEnabled, mFileLoggingEnabled, mSystemLoggingEnabled, mBreakOnLogEnabled;
+	Level					mSystemLoggingLevel;
 
 	static LogManager *sInstance;
 };
@@ -263,25 +261,12 @@ private:
 template<class LoggerT>
 class ThreadSafeT : public LoggerT {
   public:
-
-#if ! defined( CINDER_NO_VARIADIC_TEMPLATES )
 	template <typename... Args>
 	ThreadSafeT( Args &&... args )
 	: LoggerT( std::forward<Args>( args )... )
 	{}
-#else
-#define CTOR(z, n, unused)														\
-	BOOST_PP_IF( n, template <, ) BOOST_PP_ENUM_PARAMS( n, typename Arg )		\
-		BOOST_PP_IF(n, >, )														\
-			ThreadSafeT( BOOST_PP_ENUM_BINARY_PARAMS( n, Arg, arg ) )			\
-				: LoggerT( BOOST_PP_ENUM_PARAMS( n, arg ) )						\
-			{}
 
-	BOOST_PP_REPEAT(5, CTOR, ~)
-#undef CTOR
-#endif
-
-	virtual void write( const Metadata &meta, const std::string &text ) override
+	void write( const Metadata &meta, const std::string &text ) override
 	{
 		std::lock_guard<std::mutex> lock( manager()->getMutex() );
 		LoggerT::write( meta, text );
@@ -292,3 +277,55 @@ typedef ThreadSafeT<LoggerConsole>		LoggerConsoleThreadSafe;
 typedef ThreadSafeT<LoggerFile>			LoggerFileThreadSafe;
 
 } } // namespace cinder::log
+
+// ----------------------------------------------------------------------------------
+// Logging macros
+
+#define CINDER_LOG_STREAM( level, stream ) ::cinder::log::Entry( level, ::cinder::log::Location( CINDER_CURRENT_FUNCTION, __FILE__, __LINE__ ) ) << stream
+
+// CI_MAX_LOG_LEVEL is designed so that if you set it to 0, nothing logs, 1 only fatal, 2 fatal + error, etc...
+
+#if ! defined( CI_MAX_LOG_LEVEL )
+	#if ! defined( NDEBUG )
+		#define CI_MAX_LOG_LEVEL 5	// debug mode default is LEVEL_VERBOSE
+	#else
+		#define CI_MAX_LOG_LEVEL 4	// release mode default is LEVEL_INFO
+	#endif
+#endif
+
+#if( CI_MAX_LOG_LEVEL >= 5 )
+	#define CI_LOG_V( stream )	CINDER_LOG_STREAM( ::cinder::log::LEVEL_VERBOSE, stream )
+#else
+	#define CI_LOG_V( stream )	((void)0)
+#endif
+
+#if( CI_MAX_LOG_LEVEL >= 4 )
+	#define CI_LOG_I( stream )	CINDER_LOG_STREAM( ::cinder::log::LEVEL_INFO, stream )
+#else
+	#define CI_LOG_I( stream )	((void)0)
+#endif
+
+#if( CI_MAX_LOG_LEVEL >= 3 )
+	#define CI_LOG_W( stream )	CINDER_LOG_STREAM( ::cinder::log::LEVEL_WARNING, stream )
+#else
+	#define CI_LOG_W( stream )	((void)0)
+#endif
+
+#if( CI_MAX_LOG_LEVEL >= 2 )
+	#define CI_LOG_E( stream )	CINDER_LOG_STREAM( ::cinder::log::LEVEL_ERROR, stream )
+#else
+	#define CI_LOG_E( stream )	((void)0)
+#endif
+
+#if( CI_MAX_LOG_LEVEL >= 1 )
+	#define CI_LOG_F( stream )	CINDER_LOG_STREAM( ::cinder::log::LEVEL_FATAL, stream )
+#else
+	#define CI_LOG_F( stream )	((void)0)
+#endif
+
+//! Debug macro to simplify logging an exception, which also prints the exception type
+#define CI_LOG_EXCEPTION( str, exc )	\
+{										\
+	CI_LOG_E( str << ", exception type: " << cinder::System::demangleTypeName( typeid( exc ).name() ) << ", what: " << exc.what() );	\
+}
+
