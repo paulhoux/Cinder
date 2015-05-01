@@ -46,6 +46,11 @@ void CinderBinPackerApp::setup()
 	mUnpacked.clear();
 	mPacked.clear();
 
+	for( size_t i = 0; i < 0; ++i ) {
+		int size = Rand::randInt( 16, 64 );
+		mUnpacked.push_back( Area( 0, 0, size, size ) );
+	}
+
 	pack();
 }
 
@@ -127,17 +132,16 @@ void CinderBinPackerApp::pack()
 
 	switch( mMode ) {
 		case SINGLE:
-		// show the total number of Area's in the window title bar
-		getWindow()->setTitle( "CinderBinPackerApp | Single Bin | " + ci::toString( mUnpacked.size() ) );
-
 		try {
 			// mPacked will contain all Area's of mUnpacked in the exact same order,
 			// but moved to a different spot in the bin and represented as a PackedArea.
 			// BinnedAreas can be used directly as Areas, conversion will happen automatically.
 			// Unpacked will not be altered.
-			mPacked = mBinPackerSingle.pack( mUnpacked );
+			mBinPackerSingle.clear();
+			mPacked = mBinPackerSingle.insert( mUnpacked );
 		}
 		catch( ... ) {
+			console() << "Could not pack " << mUnpacked.size() << " areas." << std::endl;
 			// the bin is not large enough to contain all Area's, so let's
 			// double the size...
 			int size = mBinPackerSingle.getWidth();
@@ -147,28 +151,32 @@ void CinderBinPackerApp::pack()
 			pack();
 			return;
 		}
+
+		// show the total number of Area's in the window title bar
+		getWindow()->setTitle( "CinderBinPackerApp | Single Bin | " + ci::toString( mPacked.size() ) );
 		break;
 		case MULTI:
-		// show the total number of Area's in the window title bar
-		getWindow()->setTitle( "CinderBinPackerApp | Multi Bin | " + ci::toString( mUnpacked.size() ) );
-
 		try {
 			//  mPacked will contain all Area's of mUnpacked in the exact same order,
 			// but moved to a different spot in the bin and represented as a PackedArea.
 			// BinnedAreas can be used directly as Areas, conversion will happen automatically.
 			// Use the PackedArea::getBin() method to find out to which bin the Area belongs.
 			// Unpacked will not be altered.
-			mPacked = mBinPackerMulti.pack( mUnpacked );
+			mBinPackerMulti.clear();
+			mPacked = mBinPackerMulti.insert( mUnpacked );
 		}
 		catch( ... ) {
 			// will only throw if any of the input rects is too big to fit a single bin, 
 			// which is not the case in this demo
 		}
+
+		// show the total number of Area's in the window title bar
+		getWindow()->setTitle( "CinderBinPackerApp | Multi Bin | " + ci::toString( mPacked.size() ) );
 		break;
 	}
 
 	t.stop();
-	console() << "Packing " << mUnpacked.size() << " areas took " << t.getSeconds() << " seconds." << std::endl;
+	console() << "Packing " << mPacked.size() << " areas took " << t.getSeconds() << " seconds." << std::endl;
 }
 
 CINDER_APP( CinderBinPackerApp, RendererGl, &CinderBinPackerApp::prepareSettings )
