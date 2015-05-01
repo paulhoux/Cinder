@@ -1,17 +1,17 @@
 /*
  Copyright (c) 2010, The Barbarian Group
  All rights reserved.
- 
+
  Portions of this code (C) Paul Houx
  All rights reserved.
 
  Redistribution and use in source and binary forms, with or without modification, are permitted provided that
  the following conditions are met:
 
-    * Redistributions of source code must retain the above copyright notice, this list of conditions and
-	the following disclaimer.
-    * Redistributions in binary form must reproduce the above copyright notice, this list of conditions and
-	the following disclaimer in the documentation and/or other materials provided with the distribution.
+ * Redistributions of source code must retain the above copyright notice, this list of conditions and
+ the following disclaimer.
+ * Redistributions in binary form must reproduce the above copyright notice, this list of conditions and
+ the following disclaimer in the documentation and/or other materials provided with the distribution.
 
  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED
  WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
@@ -21,7 +21,7 @@
  HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
  NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  POSSIBILITY OF SUCH DAMAGE.
-*/
+ */
 
 #pragma once
 
@@ -32,158 +32,182 @@
 
 namespace cinder {
 
-class BinnedArea : public Area
-{
-public:
-	BinnedArea() : Area(), mBin(-1), mIsRotated(false) {}
-	BinnedArea( int32_t bin, bool isRotated=false ) : Area(), mBin(bin), mIsRotated(isRotated) {}
+	class PackedArea;
 
-	BinnedArea( const Vec2i &UL, const Vec2i &LR ) : Area(UL, LR), mBin(-1), mIsRotated(false) {}
-	BinnedArea( const Vec2i &UL, const Vec2i &LR, int32_t bin, bool isRotated=false ) : Area(UL, LR), mBin(bin), mIsRotated(isRotated) {}
+	class BinPackerBase {
+	public:
+		BinPackerBase() : mBinWidth( 512 ), mBinHeight( 512 ) { clear(); }
+		BinPackerBase( int width, int height ) :
+			mBinWidth( width ), mBinHeight( height ) { clear(); }
 
-	BinnedArea( int32_t aX1, int32_t aY1, int32_t aX2, int32_t aY2 ) : mBin(-1), mIsRotated(false)
-		{ set( aX1, aY1, aX2, aY2 ); }
-	BinnedArea( int32_t aX1, int32_t aY1, int32_t aX2, int32_t aY2, int32_t bin, bool isRotated=false ) : mBin(bin), mIsRotated(isRotated)
-		{ set( aX1, aY1, aX2, aY2 ); }
+		virtual ~BinPackerBase() {}
 
-	explicit BinnedArea( const RectT<float> &r ) : Area(r), mBin(-1), mIsRotated(false) {}
-	explicit BinnedArea( const RectT<float> &r, int32_t bin, bool isRotated=false ) : Area(r), mBin(bin), mIsRotated(isRotated) {}
-	
-	explicit BinnedArea( const Area &area ) : Area(area), mBin(-1), mIsRotated(false) {}
-	explicit BinnedArea( const Area &area, int32_t bin, bool isRotated=false ) : Area(area), mBin(bin), mIsRotated(isRotated) {}
+		//! Sets the width and height of the bin.
+		virtual BinPackerBase&	setSize( uint32_t width, uint32_t height ) = 0;
+		//! Sets the width and height of the bin.
+		virtual BinPackerBase&	setSize( const ivec2 &size ) = 0;
 
-	//
-	int32_t getBin() const { return mBin; }
-	//
-	bool isRotated() const { return mIsRotated; }
+		//! Takes a list of \a areas, packs them and returns a list of packed areas.
+		virtual std::vector<PackedArea>	pack( const std::vector<Area> &areas, bool allowRotation = false ) = 0;
 
-private:
-	int32_t		mBin;
-	bool		mIsRotated;
-};
+		//! Returns the size of the bin.
+		ivec2		getSize() const { return ivec2( mBinWidth, mBinHeight ); }
+		//! Returns the width of the bin.
+		int			getWidth() const { return mBinWidth; }
+		//! Returns the height of the bin.
+		int			getHeight() const { return mBinHeight; }
 
-class BinPackerBase
-{
-public:
-	BinPackerBase() : mBinWidth(512), mBinHeight(512) { clear(); }
-	BinPackerBase( int width, int height ) :
-		mBinWidth(width), mBinHeight(height) { clear(); }
+	public:
+		struct Rect {
+			int  x;
+			int  y;
+			int  w;
+			int  h;
+			int  order;
+			int  children[2];
+			bool rotated;
+			bool packed;
 
-	virtual ~BinPackerBase() {}	
+			Rect( int w, int h, int order = -1 )
+				: x( 0 ), y( 0 ), w( w ), h( h ), order( order ), rotated( false ), packed( false )
+			{
+				children[0] = -1;
+				children[1] = -1;
+			}
 
-	//!
-	virtual BinPackerBase&	setSize( unsigned width, unsigned height ) = 0;
-	virtual BinPackerBase&	setSize( const Vec2i &size ) = 0;
+			Rect( int x, int y, int w, int h, int order = -1 )
+				: x( x ), y( y ), w( w ), h( h ), order( order ), rotated( false ), packed( false )
+			{
+				children[0] = -1;
+				children[1] = -1;
+			}
 
-	//
-	virtual std::vector<BinnedArea>	pack( const std::vector<Area> &rects, bool allowRotation = false ) = 0;
-	
-	//!
-	Vec2i		getSize() const { return Vec2i( mBinWidth, mBinHeight ); }
-	//!
-	int			getWidth() const { return mBinWidth; }
-	//!
-	int			getHeight() const { return mBinHeight; }
+			int getArea() const
+			{
+				return w * h;
+			}
 
-protected:
-    struct Rect
-    {
-        int  x;
-        int  y;
-        int  w;
-        int  h;
-        int  order;
-        int  children[2];
-        bool rotated;
-        bool packed;
+			void rotate()
+			{
+				std::swap( w, h );
+				rotated = !rotated;
+			}
 
-        Rect(int w, int h, int order = -1)
-            : x(0), y(0), w(w), h(h), order(order), rotated(false), packed(false)
-        {
-            children[0] = -1;
-            children[1] = -1;
-        }
+			bool operator<( const Rect& rhs ) const
+			{
+				return getArea() < rhs.getArea();
+			}
+		};
 
-        Rect(int x, int y, int w, int h, int order = -1)
-            : x(x), y(y), w(w), h(h), order(order), rotated(false), packed(false)
-        {
-            children[0] = -1;
-            children[1] = -1;
-        }
-        
-        int getArea() const {
-            return w * h;
-        }
-        
-        void rotate() {
-            std::swap(w, h);
-            rotated = !rotated;
-        }
-        
-        bool operator<(const Rect& rhs) const {
-            return getArea() < rhs.getArea();
-        }
-    };
+	protected:
+		int					mBinWidth;
+		int					mBinHeight;
 
-protected:
-	int					mBinWidth;
-	int					mBinHeight;
-    
-    int					mNumPacked;
-    std::vector<Rect>	mRects;
-    std::vector<Rect>	mPacks;
+		int					mNumPacked;
+		std::vector<Rect>	mRects;
+		std::vector<Rect>	mPacks;
 
-    virtual void clear();
+		virtual void clear();
 
-    void fill(int pack, bool allowRotation);
-    void split(int pack, int rect);
-    bool fits(Rect& rect1, const Rect& rect2, bool allowRotation) const;
-    
-    bool rectIsValid(int i) const;
-    bool packIsValid(int i) const;
-};
+		void fill( int pack, bool allowRotation );
+		void split( int pack, int rect );
+		bool fits( Rect& rect1, const Rect& rect2, bool allowRotation ) const;
 
-class BinPacker /*final*/ : public BinPackerBase 
-{
-public:
-	BinPacker() : BinPackerBase(512, 512) {}
-	BinPacker( int width, int height ) : BinPackerBase(width, height) {}
-	BinPacker( const Vec2i &size ) : BinPackerBase(size.x, size.y) {}
+		bool rectIsValid( int i ) const;
+		bool packIsValid( int i ) const;
+	};
 
-	~BinPacker() {}
+	class BinPacker /*final*/ : public BinPackerBase {
+	public:
+		BinPacker() : BinPackerBase( 512, 512 ) {}
+		BinPacker( int width, int height ) : BinPackerBase( width, height ) {}
+		BinPacker( const ivec2 &size ) : BinPackerBase( size.x, size.y ) {}
 
-	//!
-	BinPacker&	setSize( unsigned width, unsigned height ) { mBinWidth = width; mBinHeight = height; return *this; }
-	BinPacker&	setSize( const Vec2i &size ) { mBinWidth = size.x; mBinHeight = size.y; return *this; }
+		~BinPacker() {}
 
-	//!
-    std::vector<BinnedArea>	pack( const std::vector<Area> &rects, bool allowRotation = false );
-};
+		//! Sets the width and height of the bin.
+		BinPacker&	setSize( uint32_t width, uint32_t height ) override { mBinWidth = width; mBinHeight = height; return *this; }
+		//! Sets the width and height of the bin.
+		BinPacker&	setSize( const ivec2 &size ) override { mBinWidth = size.x; mBinHeight = size.y; return *this; }
 
-class MultiBinPacker /*final*/ : public BinPackerBase
-{
-public:
-	MultiBinPacker() : BinPackerBase(512, 512) {}
-	MultiBinPacker( int width, int height ) : BinPackerBase(width, height) {}
-	MultiBinPacker( const Vec2i &size ) : BinPackerBase(size.x, size.y) {}
+		//! Takes a list of \a areas, packs them and returns a list of packed areas.
+		std::vector<PackedArea>	pack( const std::vector<Area> &rects, bool allowRotation = false ) override;
+	};
 
-	~MultiBinPacker() {}
+	class MultiBinPacker /*final*/ : public BinPackerBase {
+	public:
+		MultiBinPacker() : BinPackerBase( 512, 512 ) {}
+		MultiBinPacker( int width, int height ) : BinPackerBase( width, height ) {}
+		MultiBinPacker( const ivec2 &size ) : BinPackerBase( size.x, size.y ) {}
 
-	//!
-	MultiBinPacker&	setSize( unsigned width, unsigned height ) { mBinWidth = width; mBinHeight = height; return *this; }
-	MultiBinPacker&	setSize( const Vec2i &size ) { mBinWidth = size.x; mBinHeight = size.y; return *this; }
+		~MultiBinPacker() {}
 
-	//!
-    std::vector<BinnedArea>	pack( const std::vector<Area> &rects, bool allowRotation = false );
-private:
-    void clear();
+		//! Sets the width and height of each bin.
+		MultiBinPacker&	setSize( uint32_t width, uint32_t height ) override { mBinWidth = width; mBinHeight = height; return *this; }
+		//! Sets the width and height of each bin.
+		MultiBinPacker&	setSize( const ivec2 &size ) override { mBinWidth = size.x; mBinHeight = size.y; return *this; }
 
-	std::vector<unsigned>	mBins;
-};
+		//! Takes a list of \a areas, packs them and returns a list of packed areas.
+		std::vector<PackedArea>	pack( const std::vector<Area> &rects, bool allowRotation = false ) override;
 
-class BinPackerTooSmallExc : public std::exception {
- public:
-	virtual const char* what() const throw() { return "Bin size is too small to fit all rectangles."; } 
-};
+	private:
+		void clear();
+
+		std::vector<uint32_t>	mBins;
+	};
+
+	class PackedArea : public Area {
+	public:
+		PackedArea()
+			: Area(), mBin( -1 ), mIsRotated( false ) {}
+		PackedArea( int32_t bin, bool isRotated = false )
+			: Area(), mBin( bin ), mIsRotated( isRotated ) {}
+
+		PackedArea( const ivec2 &UL, const ivec2 &LR )
+			: Area( UL, LR ), mBin( -1 ), mIsRotated( false ) {}
+		PackedArea( const ivec2 &UL, const ivec2 &LR, int32_t bin, bool isRotated = false )
+			: Area( UL, LR ), mBin( bin ), mIsRotated( isRotated ) {}
+
+		PackedArea( int32_t aX1, int32_t aY1, int32_t aX2, int32_t aY2 )
+			: mBin( -1 ), mIsRotated( false )
+		{
+			set( aX1, aY1, aX2, aY2 );
+		}
+
+		PackedArea( int32_t aX1, int32_t aY1, int32_t aX2, int32_t aY2, int32_t bin, bool isRotated = false )
+			: mBin( bin ), mIsRotated( isRotated )
+		{
+			set( aX1, aY1, aX2, aY2 );
+		}
+
+		PackedArea( const BinPackerBase::Rect &rect, uint32_t bin = 0 )
+			: Area( rect.x, rect.y, rect.x + rect.w, rect.y + rect.h ), mBin( bin ), mIsRotated( rect.rotated )
+		{
+		}
+
+		explicit PackedArea( const RectT<float> &r )
+			: Area( r ), mBin( -1 ), mIsRotated( false ) {}
+		explicit PackedArea( const RectT<float> &r, int32_t bin, bool isRotated = false )
+			: Area( r ), mBin( bin ), mIsRotated( isRotated ) {}
+
+		explicit PackedArea( const Area &area )
+			: Area( area ), mBin( -1 ), mIsRotated( false ) {}
+		explicit PackedArea( const Area &area, int32_t bin, bool isRotated = false )
+			: Area( area ), mBin( bin ), mIsRotated( isRotated ) {}
+
+		//! Returns the bin number in which this area is packed.
+		int32_t getBin() const { return mBin; }
+		//! Returns \c true if the area is rotated.
+		bool isRotated() const { return mIsRotated; }
+
+	private:
+		int32_t		mBin;
+		bool		mIsRotated;
+	};
+
+	class BinPackerTooSmallExc : public std::exception {
+	public:
+		virtual const char* what() const throw( ) { return "Bin size is too small to fit all rectangles."; }
+	};
 
 } // namespace cinder
