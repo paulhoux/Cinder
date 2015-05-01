@@ -67,7 +67,7 @@ void CinderBinPackerApp::keyDown( KeyEvent event )
 		break;
 		default:
 		// add an Area of random size to mUnpacked
-		int size = Rand::randInt( 16, 64 );
+		int size = Rand::randInt( 4, 16 );
 		mUnpacked.push_back( Area( 0, 0, size, size ) );
 		break;
 	}

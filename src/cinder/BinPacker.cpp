@@ -83,7 +83,10 @@ namespace cinder {
 		if( mAvailable.empty() )
 			mAvailable.push_back( PackedArea( ivec2( 0 ), getSize() ) );
 
-		for( auto &available : mAvailable ) {
+		auto itr = mAvailable.begin();
+		while( itr != mAvailable.end() ) {
+			auto &available = *itr;
+
 			if( fits( *area, available ) ) {
 				// Place area in top left corner of available space.
 				int32_t w = area->getWidth();
@@ -94,7 +97,13 @@ namespace cinder {
 				area->y2 = available.y1 + h;
 
 				// Split remaining space into 2 new regions.
-				mAvailable.push_back( split( &available, w, h ) );
+				PackedArea a = split( &available, w, h );
+
+				if( available.getWidth() <= 0 || available.getHeight() <= 0 )
+					mAvailable.erase( itr ); // Note: invalidates 'available'!
+
+				if( a.getWidth() > 0 && a.getHeight() > 0 )
+					mAvailable.push_back( a ); // Note: invalidates 'available'!
 
 				// (TODO) Merge regions to maximize space.
 
@@ -103,6 +112,8 @@ namespace cinder {
 
 				return true;
 			}
+
+			++itr;
 		}
 
 		return false;
