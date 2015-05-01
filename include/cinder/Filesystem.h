@@ -2,6 +2,8 @@
  Copyright (c) 2010, The Cinder Project: http://libcinder.org
  All rights reserved.
 
+ Copyright (c) Microsoft Open Technologies, Inc. All rights reserved.
+
  Redistribution and use in source and binary forms, with or without modification, are permitted provided that
  the following conditions are met:
 
@@ -24,12 +26,32 @@
 
 #include "cinder/Cinder.h"
 
-#define BOOST_FILESYSTEM_VERSION 3
-#define BOOST_FILESYSTEM_NO_DEPRECATED
-#include <boost/filesystem.hpp>
+
+#if defined( CINDER_WINRT ) || ( defined( _MSC_VER ) && ( _MSC_VER >= 1900 ) )
+	#include <filesystem>
+#else
+	#define BOOST_FILESYSTEM_VERSION 3
+	#define BOOST_FILESYSTEM_NO_DEPRECATED
+	#include <boost/filesystem.hpp>
+#endif
 
 namespace cinder {
 
-namespace fs = boost::filesystem;
+#if defined( CINDER_WINRT ) || ( defined( _MSC_VER ) && ( _MSC_VER >= 1900 ) )
+	namespace fs = std::tr2::sys;
+#else
+	namespace fs = boost::filesystem;
+#endif
 
 } // namespace cinder
+
+#if defined( CINDER_WINRT ) || ( defined( _MSC_VER ) && ( _MSC_VER >= 1900 ) && ( _MSC_VER < 2000 ) )
+//! kludge to work around VC120's lack of fs::canonical
+namespace std { namespace tr2 { namespace sys {
+template <typename PathT>
+PathT canonical( const PathT &p )
+{
+	return p;
+}
+} } } // namespace std::tr2::sys
+#endif

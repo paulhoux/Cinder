@@ -3,13 +3,21 @@
 *.mode1v3
 *.mode2v3
 *.user
-*.xcworkspace/
+project.xcworkspace
 xcuserdata/
+*.xccheckout
 .DS_Store
 
 build/
 lib/libcinder*.a
-lib/cinder*.lib
+lib/msw/x86/cinder*.lib
+lib/msw/x64/cinder*.lib
+lib/msw/x86/cinder*.idb
+lib/msw/x64/cinder*.idb
+lib/msw/x86/cinder*.pdb
+lib/msw/x64/cinder*.pdb
+lib/winrt/x86/cinder*.lib
+lib/winrt/x64/cinder*.lib
 
 # Windows cruft
 *.suo
@@ -18,4 +26,15 @@ lib/cinder*.lib
 *.opensdf
 Debug/
 Release/
+Debug_ANGLE/
+Release_ANGLE/
 ipch/
+
+# doxygen generated files
+docs/html
+docs/doxygen/cinder.tag
+
+# CinderBlocks
+blocks/
+!blocks/[__AppTemplates,Box2D,Cairo,FMOD,LocationManager,MotionManager,OSC,QuickTime,TUIO]
+

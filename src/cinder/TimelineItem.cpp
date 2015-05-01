@@ -25,7 +25,9 @@
 #include "cinder/TimelineItem.h"
 #include "cinder/Timeline.h"
 #include "cinder/CinderMath.h"
-	
+
+#include <algorithm>
+
 namespace cinder {
 
 TimelineItem::TimelineItem( class Timeline *parent )
@@ -51,11 +53,11 @@ void TimelineItem::stepTo( float newTime, bool reverse )
 {
 	if( mMarkedForRemoval )
 		return;
-	
-	const float absTime = newTime - mStartTime;
-	const float endTime = mStartTime + mDuration;
 
 	updateDuration();
+
+	const float absTime = newTime - mStartTime;
+	const float endTime = mStartTime + mDuration;
 
 	if( ( ! mHasReverseStarted ) && reverse && ( newTime < mStartTime ) ) {
 		// first update the current time to be the start time

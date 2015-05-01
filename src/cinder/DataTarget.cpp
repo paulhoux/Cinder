@@ -21,13 +21,13 @@
 */
 
 #include "cinder/DataTarget.h"
-#include "cinder/Utilities.h"
+#include "cinder/Log.h"
 
 namespace cinder {
 
 /////////////////////////////////////////////////////////////////////////////
 // DataTarget
-void DataTarget::setFilePathHint( const std::string &aFilePathHint )
+void DataTarget::setFilePathHint( const fs::path &aFilePathHint )
 {
 	mFilePathHint = aFilePathHint;
 }
@@ -42,7 +42,7 @@ const Url& DataTarget::getUrl() const
 	return mUrl;
 }
 
-const std::string& DataTarget::getFilePathHint() const
+const fs::path& DataTarget::getFilePathHint() const
 {
 	return mFilePathHint;
 }
@@ -57,7 +57,7 @@ DataTargetPathRef DataTargetPath::createRef( const fs::path &path )
 DataTargetPath::DataTargetPath( const fs::path &path )
 	: DataTarget( path, Url() )
 {
-	setFilePathHint( path.string() );
+	setFilePathHint( path );
 }
 
 OStreamRef DataTargetPath::getStream()
@@ -78,15 +78,17 @@ DataTargetStreamRef DataTargetStream::createRef( OStreamRef stream )
 DataTargetStream::DataTargetStream( OStreamRef stream )
 	: DataTarget( "", Url() ), mStream( stream )
 {
-	setFilePathHint( mStream->getFileName().string() );
+	setFilePathHint( mStream->getFileName() );
 }
 
 /////////////////////////////////////////////////////////////////////////////
 // Free functions
 DataTargetPathRef writeFile( const fs::path &path, bool createParents )
 {
-	if( createParents )
-		createDirectories( path ); 
+	if( createParents ) {
+		if( ! path.parent_path().empty() )
+			fs::create_directories( path.parent_path() );
+	}
 	
  	return DataTargetPath::createRef( path );
 }

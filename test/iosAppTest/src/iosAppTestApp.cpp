@@ -1,15 +1,19 @@
-#include "cinder/app/AppCocoaTouch.h"
-#include "cinder/app/CinderViewCocoaTouch.h"
+#include "cinder/app/cocoa/AppCocoaTouch.h"
+#include "cinder/app/cocoa/CinderViewCocoaTouch.h"
 #include "cinder/app/Renderer.h"
 #include "cinder/Surface.h"
 #include "cinder/gl/gl.h"
+#include "cinder/app/RendererGl.h"
 #include "cinder/gl/Texture.h"
 #include "cinder/gl/TextureFont.h"
+#include "cinder/gl/Shader.h"
 #include "cinder/Camera.h"
 #include "cinder/Rand.h"
 #include "cinder/Utilities.h"
 #include "cinder/System.h"
 #include "cinder/Text.h"
+#include "cinder/Log.h"
+#include "cinder/app/cocoa/PlatformCocoa.h"
 
 #import <UIKit/UIKit.h>
 
@@ -22,12 +26,12 @@ using namespace std;
 
 struct TouchPoint {
 	TouchPoint() {}
-	TouchPoint( const Vec2f &initialPt, const Color &color ) : mColor( color ), mTimeOfDeath( -1.0 ) 
+	TouchPoint( const vec2 &initialPt, const Color &color ) : mColor( color ), mTimeOfDeath( -1.0 ) 
 	{
 		mLine.push_back( initialPt ); 
 	}
 	
-	void addPoint( const Vec2f &pt ) { mLine.push_back( pt ); }
+	void addPoint( const vec2 &pt ) { mLine.push_back( pt ); }
 	
 	void draw() const
 	{
@@ -43,7 +47,7 @@ struct TouchPoint {
 	
 	bool isDead() const { return getElapsedSeconds() > mTimeOfDeath; }
 	
-	PolyLine<Vec2f>	mLine;
+	PolyLine2f	mLine;
 	Color			mColor;
 	float			mTimeOfDeath;
 };
@@ -55,7 +59,7 @@ struct TestCallbackOrder {
 		if( mDone ) return;
 		
 		if( mState != state - 1 )
-			app::console() << "Fail at state: " << mState << "->" << state << std::endl;
+			CI_LOG_E( "Fail at state: " << mState << "->" << state );
 		else
 			mState = state;
 		if( mState == DRAW )
@@ -79,21 +83,26 @@ static string orientationString( InterfaceOrientation orientation )
 	}
 }
 
+TestCallbackOrder	sOrderTester;
+
 class iosAppTestApp : public AppCocoaTouch {
   public:
-	void 			prepareSettings( Settings *settings );
-	virtual void	setup();
-	virtual void	resize();
-	virtual void	update();
-	void 			draw();
-	
-	virtual void	mouseDown( MouseEvent event );
-	virtual void	mouseUp( MouseEvent event );
-	virtual void	mouseDrag( MouseEvent event );
+iosAppTestApp();
+	static 	void prepareSettings( AppCocoaTouch::Settings *settings );
 
-	virtual void	touchesBegan( TouchEvent event );
-	virtual void	touchesMoved( TouchEvent event );
-	virtual void	touchesEnded( TouchEvent event );	
+	void	setup()								override;
+	void	resize()							override;
+	void	update()							override;
+	void 	draw()								override;
+	
+	void	keyDown( KeyEvent event )			override;
+	void	mouseDown( MouseEvent event )		override;
+	void	mouseUp( MouseEvent event )			override;
+	void	mouseDrag( MouseEvent event )		override;
+
+	void	touchesBegan( TouchEvent event )	override;
+	void	touchesMoved( TouchEvent event )	override;
+	void	touchesEnded( TouchEvent event )	override;
 
 	void didEnterBackground();
 	void willEnterForeground();
@@ -101,7 +110,6 @@ class iosAppTestApp : public AppCocoaTouch {
 	void didBecomeActive();
 	void shuttingDown();
 	
-	void keyDown( KeyEvent event );
 	void proximitySensor( bool isClose );
 	void batteryStateChange( bool isUnplugged );
 	void memoryWarning();
@@ -111,36 +119,40 @@ class iosAppTestApp : public AppCocoaTouch {
 	void		willRotate();
 	void		didRotate();
 
-	TestCallbackOrder	tester;
-					
-	Matrix44f		mCubeRotation;
-	gl::Texture 	mTex;
-	gl::Texture		mTextTex;
+	mat4				mCubeRotation;
+	gl::TextureRef		mTex;
+	gl::TextureRef		mTextTex;
 	gl::TextureFontRef	mFont;
-	CameraPersp		mCam;
-	WindowRef		mSecondWindow;
-	string			mSecondWindowMessage;
+	CameraPersp			mCam;
+	WindowRef			mSecondWindow;
+	string				mSecondWindowMessage;
 	
 	map<uint32_t,TouchPoint>	mActivePoints;
 	list<TouchPoint>			mDyingPoints;
 	int							mMouseTouchId; // gives a unique ID to each click to emulate multitouch
+	bool mMultipleDisplays = false;
 };
 
-void iosAppTestApp::prepareSettings( Settings *settings )
+// static
+iosAppTestApp::iosAppTestApp()
 {
-	tester.setState( TestCallbackOrder::PREPARESETTINGS );
-
+	CI_LOG_V( "Displays" );
 	for( auto &display : Display::getDisplays() )
-		console() << *display << std::endl;
+		CI_LOG_V( *display );
+}
 
-	settings->enableMultiTouch( true );
-	settings->enableHighDensityDisplay( true );
-	settings->enablePowerManagement( false );
-	settings->enableStatusBar( true );
-	
-	settings->prepareWindow( Window::Format() );
-	if( Display::getDisplays().size() > 1 )
-			settings->prepareWindow( Window::Format().display( Display::getDisplays()[1] ).size( 800, 600 ) );
+void iosAppTestApp::prepareSettings( AppCocoaTouch::Settings *settings )
+{
+	sOrderTester.setState( TestCallbackOrder::PREPARESETTINGS );
+
+	// THIS DOES NOT WORK ON iOS - Can't query displays in prepareSettings
+//	for( auto &display : Display::getDisplays() )
+//		CI_LOG_V( *display );
+
+//	settings->setMultiTouchEnabled( false );
+//	settings->enableHighDensityDisplay( false ); // FIXME: currently doesn't do anything
+	settings->setPowerManagementEnabled( false );
+	settings->setStatusBarEnabled( false );
 }
 
 void iosAppTestApp::setup()
@@ -156,16 +168,14 @@ void iosAppTestApp::setup()
 	[cinderView addSubview:btn];
 
 	mMouseTouchId = 0;
-	tester.setState( TestCallbackOrder::SETUP );
+	sOrderTester.setState( TestCallbackOrder::SETUP );
 
-	getSignalProximitySensor().connect( std::bind( &iosAppTestApp::proximitySensor, this, std::_1 ) );
+	getSignalProximitySensor().connect( std::bind( &iosAppTestApp::proximitySensor, this, std::placeholders::_1 ) );
 	enableProximitySensor();
 
-	getSignalBatteryState().connect( std::bind( &iosAppTestApp::batteryStateChange, this, std::_1 ) );
+	getSignalBatteryState().connect( std::bind( &iosAppTestApp::batteryStateChange, this, std::placeholders::_1 ) );
 	enableBatteryMonitoring();
 	
-	mCubeRotation.setToIdentity();
-
 	mFont = gl::TextureFont::create( Font( "Helvetica", 16 ) );
 
 	// Create a blue-green gradient as an OpenGL texture
@@ -179,11 +189,15 @@ void iosAppTestApp::setup()
 		}
 	}
 
-	mTex = gl::Texture( surface );
-	
-	std::cout << "Size: " << getWindowSize() << std::endl;
+	mTex = gl::Texture::create( surface );
+
+	CI_LOG_V( "window size: " << getWindowSize() << ", window content scale: " << getWindowContentScale() );
 
 	getWindow()->getSignalDraw().connect( std::bind( &iosAppTestApp::draw, this ) );
+
+	auto displays = Display::getDisplays();
+	if( displays.size() > 1 )
+		createWindow( Window::Format().display( displays[1] ) );
 
 	if( getNumWindows() > 1 ) {
 		mSecondWindow = getWindowIndex( 1 );
@@ -194,7 +208,7 @@ void iosAppTestApp::setup()
 	getSignalWillEnterForeground().connect( bind( &iosAppTestApp::willEnterForeground, this ) );
 	getSignalWillResignActive().connect( bind( &iosAppTestApp::willResignActive, this ) );
 	getSignalDidBecomeActive().connect( bind( &iosAppTestApp::didBecomeActive, this ) );
-	getSignalShutdown().connect( bind( &iosAppTestApp::shuttingDown, this ) );
+	getSignalCleanup().connect( bind( &iosAppTestApp::shuttingDown, this ) );
 	getSignalMemoryWarning().connect( bind( &iosAppTestApp::memoryWarning, this ) );
 
 	getSignalSupportedOrientations().connect( std::bind( &iosAppTestApp::supportAllOrientations, this ) );
@@ -202,76 +216,78 @@ void iosAppTestApp::setup()
 	getSignalWillRotate().connect( std::bind( &iosAppTestApp::willRotate, this ) );
 	getSignalDidRotate().connect( std::bind( &iosAppTestApp::didRotate, this ) );
 
-	console() << "Device is " << ( System::isDeviceIpad() ? "iPad" : "iPhone" ) << std::endl;
+	CI_LOG_V( "Device is " << ( System::isDeviceIpad() ? "iPad" : "iPhone" ) );
 
-	console() << " ### num Windows: " << getNumWindows() << endl;
+	CI_LOG_V( " ### num Windows: " << getNumWindows() );
 
 }
 
 void iosAppTestApp::didEnterBackground()
 {
-	console() << "Did enter background!" << std::endl;
+	CI_LOG_V( "Did enter background!" );
 }
 
 void iosAppTestApp::willEnterForeground()
 {
-	console() << "Will enter foreground!" << std::endl;
+	CI_LOG_V( "Will enter foreground!" );
 }
 
 void iosAppTestApp::willResignActive()
 {
-	console() << "Will resign active!" << std::endl;
+	CI_LOG_V( "Will resign active!" );
 }
 
 void iosAppTestApp::didBecomeActive()
 {
-	console() << "Did become active!" << std::endl;
+	CI_LOG_V( "Did become active!" );
 }
 
 void iosAppTestApp::shuttingDown()
 {
-	console() << "Shutting down!" << std::endl;
+	CI_LOG_V( "Shutting down!" );
 }
 
 void iosAppTestApp::memoryWarning()
 {
-	console() << "Memory warning!" << std::endl;
+	CI_LOG_V( "Memory warning!" );
 }
 
 uint32_t iosAppTestApp::supportAllOrientations()
 {
-	console() << "Supporting all orientations." << std::endl;
+	CI_LOG_V( "Supporting all orientations." );
 	return InterfaceOrientation::All;
 }
 
 uint32_t iosAppTestApp::supportPortraitOrientations()
 {
-	console() << "Supporting only portrait orientations." << std::endl;
+	CI_LOG_V( "Supporting only portrait orientations." );
 	return InterfaceOrientation::PortraitAll;
 }
 
 void iosAppTestApp::willRotate()
 {
 	InterfaceOrientation orientation = getOrientation();
-	console() << __PRETTY_FUNCTION__ << "orientation:" << orientation << std::endl;
+	CI_LOG_V( __PRETTY_FUNCTION__ << "orientation:" << orientation );
 }
 
 void iosAppTestApp::didRotate()
 {
 	InterfaceOrientation orientation = getOrientation();
-	console() << __PRETTY_FUNCTION__ << "orientation:" << orientation << std::endl;
+	CI_LOG_V( __PRETTY_FUNCTION__ << "orientation:" << orientation );
 }
 
 void iosAppTestApp::resize()
 {
-	tester.setState( TestCallbackOrder::RESIZE );
-	console() << "Resize!" << std::endl;
+	sOrderTester.setState( TestCallbackOrder::RESIZE );
+	CI_LOG_V( "Resize!" );
+
+	CI_LOG_V( "window size: " << getWindowSize() );
 }
 
 void iosAppTestApp::mouseDown( MouseEvent event )
 {
 	Color newColor( CM_HSV, Rand::randFloat(), 1, 1 );
-std::cout << "Starting with: " << event.getPos() << std::endl;
+	CI_LOG_V( "Starting with: " << event.getPos() );
 	mActivePoints.insert( make_pair( ++mMouseTouchId, TouchPoint( event.getPos(), newColor ) ) );
 }
 
@@ -293,7 +309,7 @@ void iosAppTestApp::touchesBegan( TouchEvent event )
 		Color newColor( CM_HSV, Rand::randFloat(), 1, 1 );
 		mActivePoints.insert( make_pair( touchIt->getId(), TouchPoint( touchIt->getPos(), newColor ) ) );
 	}
-	console() << "Width: " << getWindowWidth() << std::endl;
+	CI_LOG_V( "Width: " << getWindowWidth() );
 }
 
 void iosAppTestApp::touchesMoved( TouchEvent event )
@@ -310,78 +326,77 @@ void iosAppTestApp::touchesEnded( TouchEvent event )
 		mActivePoints.erase( touchIt->getId() );
 	}
 	
-	/*if( isKeyboardVisible() )
+	if( isKeyboardVisible() )
 		hideKeyboard();
 	else {
 		showKeyboard();
 		mSecondWindowMessage.clear();
-	}*/
+	}
 	
 	if( isStatusBarVisible() )
 		hideStatusBar( StatusBarAnimation::FADE );
 	else {
 		showStatusBar( StatusBarAnimation::SLIDE );
 	}
-	console() << getWindowSize() << std::endl;
+	CI_LOG_V( getWindowSize() );
 	
 //	setFrameRate( 12.0f );
 }
 
 void iosAppTestApp::keyDown( KeyEvent event )
 {
-	std::cout << "Key: " << event.getCharUtf32() << std::endl;
-	if( event.getChar() == '\b' ) {
-		console() << "backspace!" << std::endl;
-	}
-	else if( event.getChar() == '\n' ) {
-		hideKeyboard();
-	}
-	
+	CI_LOG_V( "Key: " << event.getCharUtf32() );
+	if( event.getCode() == KeyEvent::KEY_BACKSPACE )
+		CI_LOG_V( "backspace!" );
+	else if( event.getCode() == KeyEvent::KEY_RETURN )
+		CI_LOG_V( "return!" );
+
 	mSecondWindowMessage = getKeyboardString();
 }
 
 void iosAppTestApp::proximitySensor( bool isClose )
 {
-	std::cout << "Device is" << ( isClose ? " " : " NOT " ) << "close to your head!" << std::endl;
+	CI_LOG_V( "Device is" << ( isClose ? " " : " NOT " ) << "close to your head!" );
 }
 
 void iosAppTestApp::batteryStateChange( bool isUnplugged )
 {
-	std::cout << "Power is" << ( isUnplugged ? " " : " NOT " ) << "unplugged!" << std::endl;
+	CI_LOG_V( "Power is" << ( isUnplugged ? " " : " NOT " ) << "unplugged!" );
 }
 
 void iosAppTestApp::update()
 {
-	tester.setState( TestCallbackOrder::UPDATE );
+	sOrderTester.setState( TestCallbackOrder::UPDATE );
 
-	mCubeRotation.rotate( Vec3f( 1, 1, 1 ), 0.03f );
+	mCubeRotation *= rotate( 0.03f, vec3( 1 ) );
 }
 
 void iosAppTestApp::draw()
 {
 	gl::enableAlphaBlending();
 	gl::enableDepthRead();
-	tester.setState( TestCallbackOrder::DRAW );
+	sOrderTester.setState( TestCallbackOrder::DRAW );
 	CameraPersp mCam;
-	mCam.lookAt( Vec3f( 3, 2, -3 ), Vec3f::zero() );
+	mCam.lookAt( vec3( 3, 2, -3 ), vec3( 0 ) );
 	mCam.setPerspective( 60, getWindowAspectRatio(), 1, 1000 );
 
-	if( isUnplugged() )
-		gl::clear( Color( 0.2f, 0.2f, 0.3f ) );
+	if( getDisplay() == Display::getMainDisplay() )
+		gl::clear( Color( 1.2f, 0.2f, 0.3f ) );
 	else
 		gl::clear( Color( 0.4f, 0.2f, 0.2f ) );		
 
-	gl::enable( GL_TEXTURE_2D );
 	gl::color( Color::white() );
-	gl::enableDepthRead();
-	mTex.bind();
+
+	gl::bindStockShader( gl::ShaderDef().color().texture() );
+	mTex->bind();
+
 	gl::setMatrices( mCam );
-	glPushMatrix();
-		gl::multModelView( mCubeRotation );
-		gl::drawCube( Vec3f::zero(), Vec3f( 2.0f, 2.0f, 2.0f ) );
-	glPopMatrix();
-	gl::disable( GL_TEXTURE_2D );
-	
+	{
+		gl::ScopedModelMatrix modelScope;
+		gl::multModelMatrix( mCubeRotation );
+		gl::drawCube( vec3( 0 ), vec3( 2 ) );
+	}
+
 	gl::setMatricesWindow( getWindowSize() );
 	for( map<uint32_t,TouchPoint>::const_iterator activeIt = mActivePoints.begin(); activeIt != mActivePoints.end(); ++activeIt ) {
 		activeIt->second.draw();
@@ -403,24 +418,25 @@ void iosAppTestApp::draw()
 	if( getWindow() == mSecondWindow || Display::getDisplays().size() < 2 ) {
 		static Font font = Font( "Arial", 48 );
 		static std::string lastMessage;
-		static gl::Texture messageTex;
+		static gl::TextureRef messageTex;
 		if( lastMessage != mSecondWindowMessage ) {
 			TextBox box = TextBox().font( font ).text( mSecondWindowMessage );
-			messageTex = box.render();
+			messageTex = gl::Texture::create( box.render() );
 			lastMessage = mSecondWindowMessage;
 		}
 		if( messageTex ) {
 			gl::color( Color::white() );
-			gl::draw( messageTex, Vec2i( ( getWindowWidth() - messageTex.getCleanWidth() ) / 2, getWindowCenter().y ) );
+			gl::draw( messageTex, ivec2( ( getWindowWidth() - messageTex->getCleanWidth() ) / 2, getWindowCenter().y ) );
 		}
 	}
-//
+
 	gl::disableDepthRead();
 	gl::color( Color( 0.0f, 1.0f, 0.0f ) );
-	mFont->drawString( orientationString( getWindowOrientation() ) + "@ " + toString( getWindowContentScale() ), Vec2f( 10.0f, 60.0f ) );
-//	gl::drawStringCentered( "Orientation: " + orientationString( getInterfaceOrientation() ), Vec2f( getWindowCenter().x, 30.0f ), Color( 0.0f, 1.0f, 0.0f ), Font::getDefault() ); // ???: why not centered?
+	mFont->drawString( orientationString( getWindowOrientation() ) + "@ " + toString( getWindowContentScale() ), vec2( 10.0f, 60.0f ) );
+//	gl::drawStringCentered( "Orientation: " + orientationString( getInterfaceOrientation() ), vec2( getWindowCenter().x, 30.0f ), Color( 0.0f, 1.0f, 0.0f ), Font::getDefault() ); // ???: why not centered?
 
-	mFont->drawString( toString( floor(getAverageFps()) ) + " fps", Vec2f( 10.0f, 90.0f ) );
+	mFont->drawString( toString( floor(getAverageFps()) ) + " fps", vec2( 10.0f, 90.0f ) );
+	mFont->drawString( "Displays " + toString( Display::getDisplays().size() ), vec2( 10.0f, 140.0f ) );	
 }
 
-CINDER_APP_COCOA_TOUCH( iosAppTestApp, RendererGl(RendererGl::AA_NONE) )
+CINDER_APP_COCOA_TOUCH( iosAppTestApp, RendererGl( RendererGl::Options().msaa( 0 ) ), iosAppTestApp::prepareSettings )

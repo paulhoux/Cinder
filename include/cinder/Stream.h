@@ -26,31 +26,28 @@
 #include "cinder/Buffer.h"
 #include "cinder/Exception.h"
 #include "cinder/Filesystem.h"
-
-#include <boost/noncopyable.hpp>
+#include "cinder/Noncopyable.h"
 
 #include <string>
-#ifndef __OBJC__
-#	include <boost/iostreams/concepts.hpp>
-#	include <boost/iostreams/stream.hpp>
-#endif
 
 namespace cinder {
 
-class StreamBase : private boost::noncopyable {
+class StreamBase : private Noncopyable {
  public:
 	virtual ~StreamBase() {}
 	
 	enum Endianness { STREAM_BIG_ENDIAN, STREAM_LITTLE_ENDIAN };
  
-	/** Returns the platform's endianness as a StreamBase::Endianness **/
+	//! Returns the platform's endianness as a StreamBase::Endianness
 	static uint8_t		getNativeEndianness()
+	{
 #ifdef CINDER_LITTLE_ENDIAN
-		{ return STREAM_LITTLE_ENDIAN; }
+		 return STREAM_LITTLE_ENDIAN;
 #else
-		{ return STREAM_BIG_ENDIAN; }
+		 return STREAM_BIG_ENDIAN;
 #endif
- 
+	}
+
 	//! Returns the file name of the path from which a Stream originated when relevant. Empty string when undefined.
   	const fs::path&		getFileName() const { return mFileName; }
 	//! Sets the file name of the path from which a Stream originated when relevant. Empty string when undefined.
@@ -83,7 +80,6 @@ class OStream : public virtual StreamBase {
 
 	//! Writes null-terminated string, including terminator
 	void		write( const std::string &s ) { writeData( s.c_str(), s.length() + 1 ); }
-	void		write( const fs::path &p ) { writeData( p.string().c_str(), p.string().length() + 1 ); }
 	template<typename T>
 	void		write( T t ) { IOWrite( &t, sizeof(T) ); }
 	template<typename T>
@@ -105,9 +101,9 @@ class OStream : public virtual StreamBase {
 
 typedef std::shared_ptr<class OStream>	OStreamRef;
 
-class IStream : public virtual StreamBase {
+class IStreamCinder : public virtual StreamBase {
  public:
-	virtual ~IStream() {};
+	virtual ~IStreamCinder() {};
 
 	template<typename T>
 	void		read( T *t ) { IORead( t, sizeof(T) ); }
@@ -132,18 +128,18 @@ class IStream : public virtual StreamBase {
 	virtual bool		isEof() const = 0;
 
  protected:
-	IStream() : StreamBase() {}
+	IStreamCinder() : StreamBase() {}
 
 	virtual void		IORead( void *t, size_t size ) = 0;
 		
 	static const int	MINIMUM_BUFFER_SIZE = 8; // minimum bytes of random access a stream must offer relative to the file start
 };
-typedef std::shared_ptr<IStream>		IStreamRef;
+typedef std::shared_ptr<IStreamCinder>		IStreamRef;
 
 
-class IoStream : public IStream, public OStream {
+class IoStream : public IStreamCinder, public OStream {
  public:
-	IoStream() : IStream(), OStream() {}
+	IoStream() : IStreamCinder(), OStream() {}
 	virtual ~IoStream() {}
 };
 typedef std::shared_ptr<IoStream>		IoStreamRef;
@@ -151,7 +147,7 @@ typedef std::shared_ptr<IoStream>		IoStreamRef;
 
 typedef std::shared_ptr<class IStreamFile>	IStreamFileRef;
 
-class IStreamFile : public IStream {
+class IStreamFile : public IStreamCinder {
  public:
 	//! Creates a new IStreamFileRef from a C-style file pointer \a FILE as returned by fopen(). If \a ownsFile the returned stream will destroy the stream upon its own destruction.
 	static IStreamFileRef create( FILE *file, bool ownsFile = true, int32_t defaultBufferSize = 2048 );
@@ -248,7 +244,7 @@ class IoStreamFile : public IoStream {
 
 
 typedef std::shared_ptr<class IStreamMem>	IStreamMemRef;
-class IStreamMem : public IStream {
+class IStreamMem : public IStreamCinder {
  public:
 	//! Creates a new IStreamMemRef from the memory pointed to by \a data which is of size \a size bytes.
 	static IStreamMemRef		create( const void *data, size_t size );
@@ -299,7 +295,7 @@ class OStreamMem : public OStream {
 
 	virtual void		IOWrite( const void *t, size_t size );
 
-	void			*mBuffer;
+	void*			mBuffer;
 	size_t			mDataSize;
 	size_t			mOffset;
 };
@@ -308,14 +304,15 @@ class OStreamMem : public OStream {
 // This class is a utility to save and restore a stream's state
 class IStreamStateRestore {
  public:
-	IStreamStateRestore( IStream &aStream ) : mStream( aStream ), mOffset( aStream.tell() ) {}
-	~IStreamStateRestore() {
+	IStreamStateRestore( IStreamCinder &aStream ) : mStream( aStream ), mOffset( aStream.tell() ) {}
+	~IStreamStateRestore()
+	{
 		mStream.seekAbsolute( mOffset );
 	}
 	
  private:
-	IStream		&mStream;
-	off_t		mOffset;
+	IStreamCinder&	mStream;
+	off_t			mOffset;
 };
 
 //! Opens the file lcoated at \a path for read access as a stream.
@@ -338,85 +335,5 @@ class StreamExc : public Exception {
 class StreamExcOutOfMemory : public StreamExc {
 };
 
-#ifndef __OBJC__
-class cinder_stream_source {
- public:
-	typedef char char_type;
-    typedef boost::iostreams::source_tag category;
-
-	cinder_stream_source( cinder::IStreamRef aStream ) : mStream( aStream ) {}
-
-	std::streamsize read( char *s, std::streamsize n )
-	{
-		if( mStream->isEof() )
-			return -1;
-		
-		return (std::streamsize)mStream->readDataAvailable( s, (size_t)n );
-	}
-
- protected:
-	IStreamRef		mStream; // a little kludgy but this is for convenience
-};
-
-typedef boost::iostreams::stream<cinder_stream_source> cinder_istream;
-
-class cinder_stream_sink {
- public:
-	typedef char char_type;
-    typedef boost::iostreams::sink_tag category;
-
-	cinder_stream_sink( OStreamRef aStream ) : mStream( aStream ) {}
-
-	std::streamsize write( const char *s, std::streamsize n )
-	{
-		mStream->writeData( s, (size_t)n );
-		return n;
-	}
-
- protected:
-	OStreamRef		mStream;
-};
-
-typedef boost::iostreams::stream<cinder_stream_sink> cinder_ostream;
-
-class cinder_stream_bidirectional_device {
- public:
-	typedef char char_type;
-    typedef boost::iostreams::seekable_device_tag category;
-
-	cinder_stream_bidirectional_device( cinder::IoStreamRef aStream ) : mStream( aStream ) {}
-
-	std::streamsize read( char *s, std::streamsize n )
-	{
-		return static_cast<std::streamsize>( mStream->readDataAvailable( s, (size_t)n ) );
-	}
-
-	std::streamsize write( const char *s, std::streamsize n )
-	{
-		mStream->writeData( s, (size_t)n );
-		return n;
-	}
-
-	boost::iostreams::stream_offset seek( boost::iostreams::stream_offset off, std::ios_base::seekdir way)
-	{
-		if( way == std::ios_base::beg ) {
-			mStream->seekAbsolute( (off_t)off );
-		}
-		else if( way == std::ios_base::cur ) {
-			mStream->seekRelative( (off_t)off );
-		}
-		else { // way == std::ios_base::end
-			mStream->seekAbsolute( -(off_t)off );
-		}
-		return mStream->tell();
-	}
-
- protected:
-	IoStreamRef		mStream;
-};
-
-typedef boost::iostreams::stream<cinder_stream_bidirectional_device> cinder_iostream;
-
-#endif // ! __OBJC__
 
 } // namespace cinder

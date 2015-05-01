@@ -2,6 +2,8 @@
  Copyright (c) 2010, The Barbarian Group
  All rights reserved.
 
+ Copyright (c) Microsoft Open Technologies, Inc. All rights reserved.
+
  Redistribution and use in source and binary forms, with or without modification, are permitted provided that
  the following conditions are met:
 
@@ -24,6 +26,8 @@
 
 #include <string>
 #include <vector>
+#include <map>
+
 #include "cinder/Cinder.h"
 #include "cinder/Url.h"
 #include "cinder/DataSource.h"
@@ -32,31 +36,16 @@
 
 namespace cinder {
 
-//! Returns a canonical version of \a path by expanding a "~" and symlinks on the Mac "..", "." and "//"
+//! Returns a canonical version of \a path. Collapses '.', ".." and "//". Converts '~' on Cocoa. Expands environment variables on MSW.
 fs::path expandPath( const fs::path &path );
 //! Returns a path to the user's home directory.
 fs::path getHomeDirectory();
 //! Returns a path to the user's documents directory.
 fs::path getDocumentsDirectory();
-//! Returns a path to the user's temporary directory.
-fs::path getTemporaryDirectory();
-//! Returns a path that is gauranteed to be unique and is suitable for creating a temporary file. An optional \a prefix parameters allows specification of a file name prefix, some portion of which will be incorporated into the result. Note a race condition that can exist between the uniqueness of the path and the creation of the file.
-fs::path getTemporaryFilePath( const std::string &prefix = "" );
-//! Returns the directory portion of file path \a path, the last component of which must be a file name or a terminating path separator. 
-std::string getPathDirectory( const std::string &path );
-//! Returns the file name portion of file path \a path. For example \c "C:\Images\Beyonce.jpg" returns \c "Beyonce.jpg".
-std::string getPathFileName( const std::string &path );
-//! Returns the file extension of the file located at \a path
-std::string getPathExtension( const std::string &path );
-//! Creates a directory at \a path and optionally creates any missing parent directories when \a createParents is \c true. Returns \c true upon success.
-bool createDirectories( const fs::path &path, bool createParents = true );
 
 //! Launches a path in a web browser
 void launchWebBrowser( const Url &url );
 	
-//! Delete the file at \a path. Fails quietly if the path does not exist.
-void deleteFile( const fs::path &path );
-
 //! Returns a vector of substrings split by the separator \a separator. <tt>split( "one two three", ' ' ) -> [ "one", "two", "three" ]</tt> If \a compress is TRUE, it will consider consecutive separators as one.
 std::vector<std::string> split( const std::string &str, char separator, bool compress = true );
 //! Returns a vector of substrings split by the characters in \a separators. <tt>split( "one, two, three", " ," ) -> [ "one", "two", "three" ]</tt> If \a compress is TRUE, it will consider consecutive separators as one.
@@ -65,20 +54,18 @@ std::vector<std::string> split( const std::string &str, const std::string &separ
 //! Loads the contents of \a dataSource and returns it as a std::string
 std::string loadString( DataSourceRef dataSource );
 
-//! Returns a utf-16 encoded std::wstring by converting the utf-8 encoded string \a utf8
-std::wstring toUtf16( const std::string &utf8 );
-//! Returns a utf-8 encoded std::string by converting the utf-16 encoded string \a utf16
-std::string toUtf8( const std::wstring &utf16 );
-
 //! Suspends the execution of the current thread until \a milliseconds have passed. Supports sub-millisecond precision only on Mac OS X.
 void sleep( float milliseconds );
 
 //! Returns the path separator for the host operating system's file system, \c '\' on Windows and \c '/' on Mac OS
-#if defined( CINDER_MSW )
+#if (defined( CINDER_MSW ) || defined( CINDER_WINRT ))
 inline char getPathSeparator() { return '\\'; }
 #else
 inline char getPathSeparator() { return '/'; }
 #endif
+
+//! Returns a std::map of the system's environment variables. Empty on WinRT.
+std::map<std::string, std::string> getEnvironmentVariables();
 
 template<typename T>
 inline std::string toString( const T &t ) { return boost::lexical_cast<std::string>( t ); }
@@ -87,6 +74,11 @@ inline T fromString( const std::string &s ) { return boost::lexical_cast<T>( s )
 // This specialization seems to only be necessary with more recent versions of Boost
 template<>
 inline Url fromString( const std::string &s ) { return Url( s ); }
+#if defined(CINDER_COCOA_TOUCH)
+// Necessary because boost::lexical_cast crashes when trying to convert a string to a double on iOS
+template<>
+inline double fromString( const std::string &s ) { return atof( s.c_str() ); }
+#endif
 
 //! Returns a stack trace (aka backtrace) where \c stackTrace()[0] == caller, \c stackTrace()[1] == caller's parent, etc
 std::vector<std::string> stackTrace();
