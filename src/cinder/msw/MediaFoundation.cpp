@@ -39,16 +39,348 @@ LRESULT CALLBACK MFWndProc( HWND wnd, UINT uMsg, WPARAM wParam, LPARAM lParam )
 	return 0;
 }
 
+// ----------------------------------------------------------------------------
+
 MFPlayer::MFPlayer()
-	: mRefCount( 1 ), mWnd( NULL )
+	: mRefCount( 1 ), mState( Closed ), mWnd( NULL ), mWidth( 0 ), mHeight( 0 )
+	, mSessionPtr( NULL ), mSourcePtr( NULL ), mPresenterPtr( NULL )
 {
+	mCloseEvent = ::CreateEventA( NULL, FALSE, FALSE, NULL );
+	if( mCloseEvent == NULL )
+		throw Exception( "MFPlayer error: failed to create Close event." );
+
 	CreateWnd();
+
+	// TODO: create EVR custom presenter.
 }
 
 MFPlayer::~MFPlayer()
 {
-	Shutdown();
+	// TODO: destroy EVR custom presenter.
+
 	DestroyWnd();
+
+	if( mCloseEvent ) {
+		::CloseHandle( mCloseEvent );
+		mCloseEvent = NULL;
+	}
+}
+
+HRESULT MFPlayer::OpenURL( const WCHAR *url, const WCHAR *audioDeviceId )
+{
+	HRESULT hr = S_OK;
+
+	// Sanity check.
+	assert( mState == Closed );
+	assert( url );
+
+	do {
+		// Create the media session.
+		hr = CreateSession();
+		BREAK_ON_FAIL( hr );
+
+		// Create the media source.
+		hr = CreateMediaSource( url, &mSourcePtr );
+		BREAK_ON_FAIL( hr );
+
+		// Create the presentation descriptor for the media source.
+		ScopedComPtr<IMFPresentationDescriptor> pDescriptor;
+		hr = mSourcePtr->CreatePresentationDescriptor( &pDescriptor );
+		BREAK_ON_FAIL( hr );
+
+		// Create a partial topology.
+		ScopedComPtr<IMFTopology> pTopology;
+		hr = CreatePlaybackTopology( mSourcePtr, pDescriptor, mWnd, &pTopology, mPresenterPtr );
+		BREAK_ON_FAIL( hr );
+
+		SetMediaInfo( pDescriptor );
+
+		// Set the topology on the media session.
+		hr = mSessionPtr->SetTopology( 0, pTopology );
+		BREAK_ON_FAIL( hr );
+
+		// If SetTopology succeeds, the media session will queue an MESessionTopologySet event.
+		mState = OpenPending;
+
+	} while( false );
+
+	return hr;
+}
+
+HRESULT MFPlayer::CreateSession()
+{
+	HRESULT hr = S_OK;
+
+	do {
+		// Close the old session.
+		hr = CloseSession();
+		BREAK_ON_FAIL( hr );
+
+		// Sanity check.
+		assert( mState == Closed );
+
+		// Create the media session.
+		hr = ::MFCreateMediaSession( NULL, &mSessionPtr );
+		BREAK_ON_FAIL( hr );
+
+		// Start pulling events from the media session
+		hr = mSessionPtr->BeginGetEvent( ( IMFAsyncCallback* ) this, NULL );
+		BREAK_ON_FAIL( hr );
+
+		mState = Ready;
+	} while( false );
+
+	return hr;
+}
+
+HRESULT MFPlayer::CloseSession()
+{
+	HRESULT hr = S_OK;
+
+	//  The IMFMediaSession::Close method is asynchronous, but the 
+	//  MFPlayer::CloseSession method waits on the MESessionClosed event.
+	//  
+	//  MESessionClosed is guaranteed to be the last event that the media session fires.
+
+	// First close the media session.
+	if( mSessionPtr ) {
+		DWORD dwWaitResult = 0;
+
+		mState = Closing;
+
+		hr = mSessionPtr->Close();
+
+		// Wait for the close operation to complete
+		if( SUCCEEDED( hr ) ) {
+			dwWaitResult = WaitForSingleObject( mCloseEvent, 5000 );
+			if( dwWaitResult == WAIT_TIMEOUT ) {
+				assert( 0 );
+			}
+			// Now there will be no more events from this session.
+		}
+	}
+
+	// Complete shutdown operations.
+	if( SUCCEEDED( hr ) ) {
+		// Shut down the media source. (Synchronous operation, no events.)
+		if( mSourcePtr ) {
+			(void) mSourcePtr->Shutdown();
+		}
+
+		// Shut down the media session. (Synchronous operation, no events.)
+		if( mSessionPtr ) {
+			(void) mSessionPtr->Shutdown();
+		}
+	}
+
+	SafeRelease( mSourcePtr );
+	SafeRelease( mSessionPtr );
+
+	mState = Closed;
+
+	return hr;
+}
+
+HRESULT MFPlayer::CreatePartialTopology( IMFPresentationDescriptor *pDescriptor )
+{
+	HRESULT hr = S_OK;
+
+	do {
+		ScopedComPtr<IMFTopology> pTopology;
+		hr = CreatePlaybackTopology( mSourcePtr, pDescriptor, mWnd, &pTopology, mPresenterPtr );
+		BREAK_ON_FAIL( hr );
+
+		hr = SetMediaInfo( pDescriptor );
+		BREAK_ON_FAIL( hr );
+
+		// Set the topology on the media session.
+		hr = mSessionPtr->SetTopology( 0, pTopology );
+		BREAK_ON_FAIL( hr );
+
+		// If SetTopology succeeds, the media session will queue an MESessionTopologySet event.
+
+	} while( false );
+
+	return hr;
+}
+
+HRESULT MFPlayer::SetMediaInfo( IMFPresentationDescriptor *pDescriptor )
+{
+	HRESULT hr = S_OK;
+
+	// Sanity check.
+	assert( pDescriptor != NULL );
+
+	do {
+		DWORD count;
+		hr = pDescriptor->GetStreamDescriptorCount( &count );
+		BREAK_ON_FAIL( hr );
+
+		for( DWORD i = 0; i < count; i++ ) {
+			BOOL selected;
+
+			ScopedComPtr<IMFStreamDescriptor> pStreamDesc;
+			hr = pDescriptor->GetStreamDescriptorByIndex( i, &selected, &pStreamDesc );
+			BREAK_ON_FAIL( hr );
+
+			if( selected ) {
+				ScopedComPtr<IMFMediaTypeHandler> pHandler;
+				hr = pStreamDesc->GetMediaTypeHandler( &pHandler );
+				BREAK_ON_FAIL( hr );
+
+				GUID guidMajorType = GUID_NULL;
+				hr = pHandler->GetMajorType( &guidMajorType );
+				BREAK_ON_FAIL( hr );
+
+				if( MFMediaType_Video == guidMajorType ) {
+					ScopedComPtr<IMFMediaType> pMediaType;
+					hr = pHandler->GetCurrentMediaType( &pMediaType );
+					BREAK_ON_FAIL( hr );
+
+					hr = MFGetAttributeSize( pMediaType, MF_MT_FRAME_SIZE, &mWidth, &mHeight );
+					BREAK_ON_FAIL( hr );
+				}
+			}
+		}
+	} while( false );
+
+	return hr;
+}
+
+// IUnknown methods
+
+HRESULT MFPlayer::QueryInterface( REFIID riid, void** ppv )
+{
+	static const QITAB qit[] =
+	{
+		QITABENT( MFPlayer, IMFAsyncCallback ),
+		{ 0 }
+	};
+	return QISearch( this, qit, riid, ppv );
+}
+
+ULONG MFPlayer::AddRef()
+{
+	return ::InterlockedIncrement( &mRefCount );
+}
+
+ULONG MFPlayer::Release()
+{
+	ULONG uCount = ::InterlockedDecrement( &mRefCount );
+	if( uCount == 0 ) {
+		delete this;
+	}
+	return uCount;
+}
+
+// IMFAsyncCallback methods
+
+HRESULT MFPlayer::Invoke( IMFAsyncResult *pResult )
+{
+	HRESULT hr = S_OK;
+	IMFMediaEvent* pEvent = NULL;
+
+	do {
+		// Sometimes Invoke is called when mSessionPtr is closed.
+		BREAK_ON_NULL( mSessionPtr, S_OK );
+
+		// Get the event from the event queue.
+		hr = mSessionPtr->EndGetEvent( pResult, &pEvent );
+		BREAK_ON_FAIL( hr );
+
+		// Get the event type.
+		MediaEventType eventType = MEUnknown;
+		hr = pEvent->GetType( &eventType );
+		BREAK_ON_FAIL( hr );
+
+		if( eventType == MESessionClosed ) {
+			// The session was closed. The application is waiting on the mCloseEvent event handle. 
+			SetEvent( mCloseEvent );
+		}
+		else {
+			// For all other events, get the next event in the queue.
+			hr = mSessionPtr->BeginGetEvent( this, NULL );
+			BREAK_ON_FAIL( hr );
+		}
+
+		// If a call to IMFMediaSession::Close is pending, it means the 
+		// application is waiting on the mCloseEvent event and
+		// the application's message loop is blocked.
+		if( mState != Closing ) {
+			// Leave a reference count on the event.
+			pEvent->AddRef();
+
+			// Post a private window message to the application.
+			::PostMessage( mWnd, WM_APP_PLAYER_EVENT, (WPARAM) pEvent, (LPARAM) eventType );
+		}
+	} while( false );
+
+	SafeRelease( pEvent );
+
+	return hr;
+}
+
+//
+
+LRESULT MFPlayer::HandleEvent( WPARAM wParam )
+{
+	HRESULT hr = S_OK;
+	IMFMediaEvent *pEvent = (IMFMediaEvent*) wParam;
+
+	do {
+		BREAK_ON_NULL( pEvent, E_POINTER );
+
+		// Get the event type.
+		MediaEventType eventType = MEUnknown;
+		hr = pEvent->GetType( &eventType );
+		BREAK_ON_FAIL( hr );
+
+		// Get the event status. If the operation that triggered the event 
+		// did not succeed, the status is a failure code.
+		HRESULT eventStatus = S_OK;
+		hr = pEvent->GetStatus( &eventStatus );
+		BREAK_ON_FAIL( hr );
+
+		// Check if the async operation succeeded.
+		BREAK_ON_FAIL( hr = eventStatus );
+
+		// Handle event.
+		switch( eventType ) {
+			case MESessionTopologyStatus:
+				hr = OnTopologyStatus( pEvent );
+				break;
+
+			case MEEndOfPresentation:
+				hr = OnPresentationEnded( pEvent );
+				break;
+
+			case MENewPresentation:
+				hr = OnNewPresentation( pEvent );
+				break;
+
+			case MESessionTopologySet:
+			{
+				ScopedComPtr<IMFTopology> pTopology;
+				GetEventObject<IMFTopology>( pEvent, &pTopology );
+				if( pTopology ) {
+					WORD nodeCount = 0;
+					pTopology->GetNodeCount( &nodeCount );
+				}
+			}
+			break;
+
+			case MESessionStarted:
+				break;
+
+			default:
+				hr = OnSessionEvent( pEvent, eventType );
+				break;
+		}
+	} while( false );
+
+	SafeRelease( pEvent );
+
+	return 0;
 }
 
 void MFPlayer::CreateWnd()
@@ -68,7 +400,7 @@ void MFPlayer::CreateWnd()
 								 ::GetModuleHandle( NULL ),
 								 reinterpret_cast<LPVOID>( this ) );
 		if( !mWnd )
-			return;
+			throw Exception( "MFPlayer error: failed to create window." );
 
 		::ShowWindow( mWnd, SW_SHOW );
 		::SetWindowLongA( mWnd, GWL_EXSTYLE, ::GetWindowLongA( mWnd, GWL_EXSTYLE ) & ~WS_DLGFRAME & ~WS_CAPTION & ~WS_BORDER & WS_POPUP );
@@ -81,10 +413,6 @@ void MFPlayer::DestroyWnd()
 {
 	if( mWnd )
 		::DestroyWindow( mWnd );
-}
-
-void MFPlayer::Shutdown()
-{
 }
 
 void MFPlayer::RegisterWindowClass()
@@ -113,98 +441,277 @@ void MFPlayer::RegisterWindowClass()
 	}
 
 	sRegistered = true;
-}
-
-// IUnknown methods
-
-HRESULT MFPlayer::QueryInterface( REFIID riid, void** ppv )
-{
-	static const QITAB qit[] =
-	{
-		QITABENT( MFPlayer, IMFAsyncCallback ),
-		{ 0 }
-	};
-	return QISearch( this, qit, riid, ppv );
-}
-
-ULONG MFPlayer::AddRef()
-{
-	return InterlockedIncrement( &mRefCount );
-}
-
-ULONG MFPlayer::Release()
-{
-	ULONG uCount = InterlockedDecrement( &mRefCount );
-	if( uCount == 0 ) {
-		delete this;
-	}
-	return uCount;
-}
-
-HRESULT MFPlayer::Invoke( IMFAsyncResult *pResult )
-{
-	return S_OK;
-}
-
-LRESULT MFPlayer::HandleEvent( WPARAM wParam )
+}//  Create a media source from a URL.
+HRESULT MFPlayer::CreateMediaSource( LPCWSTR pUrl, IMFMediaSource **ppSource )
 {
 	HRESULT hr = S_OK;
-	IMFMediaEvent *pEvent = (IMFMediaEvent*) wParam;
 
 	do {
-		BREAK_ON_NULL( pEvent, E_POINTER );
-
-		// Get the event type.
-		MediaEventType meType = MEUnknown;
-		hr = pEvent->GetType( &meType );
+		// Create the source resolver.
+		ScopedComPtr<IMFSourceResolver> pSourceResolver;
+		hr = MFCreateSourceResolver( &pSourceResolver );
 		BREAK_ON_FAIL( hr );
 
-		// Get the event status. If the operation that triggered the event 
-		// did not succeed, the status is a failure code.
-		HRESULT hrStatus = S_OK;
-		hr = pEvent->GetStatus( &hrStatus );
+		// Use the source resolver to create the media source.
+
+		// Note: For simplicity this sample uses the synchronous method to create 
+		// the media source. However, creating a media source can take a noticeable
+		// amount of time, especially for a network source. For a more responsive 
+		// UI, use the asynchronous BeginCreateObjectFromURL method.
+
+		const DWORD dwFlags = MF_RESOLUTION_MEDIASOURCE | MF_RESOLUTION_CONTENT_DOES_NOT_HAVE_TO_MATCH_EXTENSION_OR_MIME_TYPE;
+		MF_OBJECT_TYPE objectType = MF_OBJECT_INVALID;
+		ScopedComPtr<IUnknown> pSource;
+		hr = pSourceResolver->CreateObjectFromURL( pUrl, dwFlags, NULL, &objectType, &pSource );
 		BREAK_ON_FAIL( hr );
 
-		// Check if the async operation succeeded.
-		BREAK_ON_FAIL( hr = hrStatus );
-
-		/*//
-		switch( meType ) {
-			case MESessionTopologyStatus:
-				hr = OnTopologyStatus( pEvent );
-				break;
-
-			case MEEndOfPresentation:
-				hr = OnPresentationEnded( pEvent );
-				break;
-
-			case MENewPresentation:
-				hr = OnNewPresentation( pEvent );
-				break;
-
-			case MESessionTopologySet:
-				IMFTopology * topology;
-				GetEventObject<IMFTopology>( pEvent, &topology );
-				WORD nodeCount;
-				topology->GetNodeCount( &nodeCount );
-				cout << "Topo set and we have " << nodeCount << " nodes" << endl;
-				SafeRelease( &topology );
-				break;
-
-			case MESessionStarted:
-
-				break;
-
-			default:
-				hr = OnSessionEvent( pEvent, meType );
-				break;
-		}
-		//*/
+		// Get the IMFMediaSource interface from the media source.
+		hr = pSource.QueryInterface( __uuidof( **ppSource ), (void**) ppSource );
 	} while( false );
 
-	SafeRelease( pEvent );
+	return hr;
+}
 
-	return 0;
+//  Create a playback topology from a media source.
+HRESULT MFPlayer::CreatePlaybackTopology( IMFMediaSource *pSource, IMFPresentationDescriptor *pPD, HWND hVideoWnd, IMFTopology **ppTopology, IMFVideoPresenter *pVideoPresenter )
+{
+	HRESULT hr = S_OK;
+
+	do {
+		// Create a new topology.
+		ScopedComPtr<IMFTopology> pTopology;
+		hr = MFCreateTopology( &pTopology );
+		BREAK_ON_FAIL( hr );
+
+		// Get the number of streams in the media source.
+		DWORD dwSourceStreams = 0;
+		hr = pPD->GetStreamDescriptorCount( &dwSourceStreams );
+		BREAK_ON_FAIL( hr );
+
+		// For each stream, create the topology nodes and add them to the topology.
+		for( DWORD i = 0; i < dwSourceStreams; i++ ) {
+			hr = AddBranchToPartialTopology( pTopology, pSource, pPD, i, hVideoWnd, pVideoPresenter );
+			BREAK_ON_FAIL( hr );
+		}
+		BREAK_ON_FAIL( hr );
+
+		// Return the IMFTopology pointer to the caller.
+		*ppTopology = pTopology;
+		( *ppTopology )->AddRef();
+	} while( false );
+
+	return hr;
+}
+
+//  Create an activation object for a renderer, based on the stream media type.
+HRESULT MFPlayer::CreateMediaSinkActivate( IMFStreamDescriptor *pSourceSD, HWND hVideoWindow, IMFActivate **ppActivate, IMFVideoPresenter *pVideoPresenter, IMFMediaSink **ppMediaSink )
+{
+	HRESULT hr = S_OK;
+
+	do {
+		// Get the media type handler for the stream.
+		ScopedComPtr<IMFMediaTypeHandler> pHandler;
+		hr = pSourceSD->GetMediaTypeHandler( &pHandler );
+		BREAK_ON_FAIL( hr );
+
+		// Get the major media type.
+		GUID guidMajorType;
+		hr = pHandler->GetMajorType( &guidMajorType );
+		BREAK_ON_FAIL( hr );
+
+		// Create an IMFActivate object for the renderer, based on the media type.
+		if( MFMediaType_Audio == guidMajorType ) {
+			// Create the audio renderer.
+			ScopedComPtr<IMFActivate> pActivate;
+			hr = MFCreateAudioRendererActivate( &pActivate );
+			BREAK_ON_FAIL( hr );
+
+			// Return IMFActivate pointer to caller.
+			*ppActivate = pActivate;
+			( *ppActivate )->AddRef();
+		}
+		else if( MFMediaType_Video == guidMajorType ) {
+			// Create the video renderer.
+			ScopedComPtr<IMFMediaSink> pSink;
+			hr = MFCreateVideoRenderer( __uuidof( IMFMediaSink ), (void**) &pSink );
+			BREAK_ON_FAIL( hr );
+
+			ScopedComPtr<IMFVideoRenderer> pVideoRenderer;
+			hr = pSink.QueryInterface( __uuidof( IMFVideoRenderer ), (void**) &pVideoRenderer );
+			BREAK_ON_FAIL( hr );
+
+			hr = pVideoRenderer->InitializeRenderer( NULL, pVideoPresenter );
+			BREAK_ON_FAIL( hr );
+
+			// Return IMFMediaSink pointer to caller.
+			*ppMediaSink = pSink;
+			( *ppMediaSink )->AddRef();
+		}
+		else {
+			// Unknown stream type.
+			hr = E_FAIL;
+			// Optionally, you could deselect this stream instead of failing.
+		}
+	} while( false );
+
+	return hr;
+}
+
+// Add a source node to a topology.
+HRESULT MFPlayer::AddSourceNode( IMFTopology *pTopology, IMFMediaSource *pSource, IMFPresentationDescriptor *pPD, IMFStreamDescriptor *pSD, IMFTopologyNode **ppNode )
+{
+	HRESULT hr = S_OK;
+
+	do {
+		// Create the node.
+		ScopedComPtr<IMFTopologyNode> pNode;
+		hr = MFCreateTopologyNode( MF_TOPOLOGY_SOURCESTREAM_NODE, &pNode );
+		BREAK_ON_FAIL( hr );
+
+		// Set the attributes.
+		hr = pNode->SetUnknown( MF_TOPONODE_SOURCE, pSource );
+		BREAK_ON_FAIL( hr );
+
+		hr = pNode->SetUnknown( MF_TOPONODE_PRESENTATION_DESCRIPTOR, pPD );
+		BREAK_ON_FAIL( hr );
+
+		hr = pNode->SetUnknown( MF_TOPONODE_STREAM_DESCRIPTOR, pSD );
+		BREAK_ON_FAIL( hr );
+
+		// Add the node to the topology.
+		hr = pTopology->AddNode( pNode );
+		BREAK_ON_FAIL( hr );
+
+		// Return the pointer to the caller.
+		*ppNode = pNode;
+		( *ppNode )->AddRef();
+	} while( false );
+
+	return hr;
+}
+
+HRESULT MFPlayer::AddOutputNode( IMFTopology *pTopology, IMFStreamSink *pStreamSink, IMFTopologyNode **ppNode )
+{
+	HRESULT hr = S_OK;
+
+	do {
+		// Create the node.
+		ScopedComPtr<IMFTopologyNode> pNode;
+		hr = MFCreateTopologyNode( MF_TOPOLOGY_OUTPUT_NODE, &pNode );
+		BREAK_ON_FAIL( hr );
+
+		// Set the object pointer.
+		hr = pNode->SetObject( pStreamSink );
+		BREAK_ON_FAIL( hr );
+
+		// Add the node to the topology.
+		hr = pTopology->AddNode( pNode );
+		BREAK_ON_FAIL( hr );
+
+		hr = pNode->SetUINT32( MF_TOPONODE_NOSHUTDOWN_ON_REMOVE, TRUE );
+		BREAK_ON_FAIL( hr );
+
+		// Return the pointer to the caller.
+		*ppNode = pNode;
+		( *ppNode )->AddRef();
+	} while( false );
+
+	return hr;
+}
+
+// Add an output node to a topology.
+HRESULT MFPlayer::AddOutputNode( IMFTopology *pTopology, IMFActivate *pActivate, DWORD dwId, IMFTopologyNode **ppNode )
+{
+	HRESULT hr = S_OK;
+
+	do {
+		ScopedComPtr<IMFTopologyNode> pNode;
+
+		// Create the node.
+		hr = MFCreateTopologyNode( MF_TOPOLOGY_OUTPUT_NODE, &pNode );
+		BREAK_ON_FAIL( hr );
+
+		// Set the object pointer.
+		hr = pNode->SetObject( pActivate );
+		BREAK_ON_FAIL( hr );
+
+		// Set the stream sink ID attribute.
+		hr = pNode->SetUINT32( MF_TOPONODE_STREAMID, dwId );
+		BREAK_ON_FAIL( hr );
+
+		hr = pNode->SetUINT32( MF_TOPONODE_NOSHUTDOWN_ON_REMOVE, FALSE );
+		BREAK_ON_FAIL( hr );
+
+		// Add the node to the topology.
+		hr = pTopology->AddNode( pNode );
+		BREAK_ON_FAIL( hr );
+
+		// Return the pointer to the caller.
+		*ppNode = pNode;
+		( *ppNode )->AddRef();
+	} while( false );
+
+	return hr;
+}
+
+//  Add a topology branch for one stream.
+//
+//  For each stream, this function does the following:
+//
+//    1. Creates a source node associated with the stream. 
+//    2. Creates an output node for the renderer. 
+//    3. Connects the two nodes.
+//
+//  The media session will add any decoders that are needed.
+
+HRESULT MFPlayer::AddBranchToPartialTopology( IMFTopology *pTopology, IMFMediaSource *pSource, IMFPresentationDescriptor *pPD, DWORD iStream, HWND hVideoWnd, IMFVideoPresenter *pVideoPresenter )
+{
+	HRESULT hr = S_OK;
+
+	do {
+		BREAK_ON_NULL( pPD, E_POINTER );
+
+		BOOL fSelected = FALSE;
+
+		ScopedComPtr<IMFStreamDescriptor> pSD;
+		hr = pPD->GetStreamDescriptorByIndex( iStream, &fSelected, &pSD );
+		BREAK_ON_FAIL( hr );
+
+		if( fSelected ) {
+			// Create the media sink activation object.
+			ScopedComPtr<IMFActivate> pSinkActivate;
+			ScopedComPtr<IMFMediaSink> pMediaSink;
+			hr = CreateMediaSinkActivate( pSD, hVideoWnd, &pSinkActivate, pVideoPresenter, &pMediaSink );
+			BREAK_ON_FAIL( hr );
+
+			// Add a source node for this stream.
+			ScopedComPtr<IMFTopologyNode> pSourceNode;
+			hr = AddSourceNode( pTopology, pSource, pPD, pSD, &pSourceNode );
+			BREAK_ON_FAIL( hr );
+
+			// Create the output node for the renderer.
+			ScopedComPtr<IMFTopologyNode> pOutputNode;
+			if( pSinkActivate ) {
+				hr = AddOutputNode( pTopology, pSinkActivate, 0, &pOutputNode );
+			}
+			else if( pMediaSink ) {
+				IMFStreamSink* pStreamSink = NULL;
+				DWORD streamCount;
+
+				pMediaSink->GetStreamSinkCount( &streamCount );
+				pMediaSink->GetStreamSinkByIndex( 0, &pStreamSink );
+
+				hr = AddOutputNode( pTopology, pStreamSink, &pOutputNode );
+			}
+			BREAK_ON_FAIL( hr );
+
+			// Connect the source node to the output node.
+			hr = pSourceNode->ConnectOutput( 0, pOutputNode, 0 );
+			BREAK_ON_FAIL( hr );
+		}
+	} while( false );
+
+	return hr;
 }
 
 }

@@ -1,3 +1,7 @@
+#include "vld.h"
+
+#pragma comment(lib, "vld.lib")
+
 #include "cinder/app/App.h"
 #include "cinder/app/RendererGl.h"
 #include "cinder/gl/gl.h"
@@ -21,9 +25,15 @@ private:
 
 void VideoTestApp::setup()
 {
-	mVideo = gl::VideoTexture::create( getAssetPath( "test.mp4" ) );
-	//mVideo->play();
+	try {
+		mVideo = gl::VideoTexture::create( getAssetPath( "test.mp4" ) );
+		mVideo->play();
+	}
+	catch( const std::exception &exc ) {
+		console() << exc.what() << std::endl;
+	}
 
+	// Memory leak test.
 	mVideo.reset();
 }
 
@@ -38,7 +48,9 @@ void VideoTestApp::update()
 void VideoTestApp::draw()
 {
 	gl::clear( Color( 0, 0, 0 ) );
-	//gl::draw( mVideo->getTexture() );
+
+	if( mVideo )
+		gl::draw( mVideo->getTexture() );
 }
 
 CINDER_APP( VideoTestApp, RendererGl )

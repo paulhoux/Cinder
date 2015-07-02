@@ -2,7 +2,6 @@
 
 #pragma once
 
-#include "cinder/app/msw/AppImplMsw.h"
 #include "cinder/gl/Texture.h"
 #include "cinder/video/Video.h"
 
@@ -10,9 +9,8 @@
 #include "cinder/msw/MediaFoundation.h"
 #endif
 
-namespace cinder { namespace gl {
-
-#if defined(CINDER_MSW)
+namespace cinder {
+namespace gl {
 
 typedef std::shared_ptr<class VideoTexture> VideoTextureRef;
 
@@ -20,12 +18,12 @@ typedef std::shared_ptr<class VideoTexture> VideoTextureRef;
 class VideoTexture : public video::VideoBase {
 public:
 	VideoTexture();
-	VideoTexture( const fs::path &path ) : VideoTexture() {}
-	~VideoTexture() {}
+	VideoTexture( const fs::path &path );
+	~VideoTexture();
 
 	static std::shared_ptr<VideoTexture> create( const fs::path &path )
 	{
-		return std::make_shared<VideoTexture>( path ); 
+		return std::make_shared<VideoTexture>( path );
 	}
 
 	//! Begins video playback.
@@ -36,10 +34,10 @@ public:
 	const Texture2dRef getTexture() const;
 
 private:
-	msw::MFPlayerRef  mPlayer;
+#if defined(CINDER_MSW)
+	msw::MFPlayer  *mPlayerPtr;
+#endif
 };
 
-#else
-#endif
-
-} }
+}
+}

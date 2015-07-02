@@ -1676,6 +1676,9 @@
     <ClInclude Include="..\include\cinder\msw\MediaFoundation.h">
       <Filter>Header Files\msw</Filter>
     </ClInclude>
+    <ClInclude Include="..\include\cinder\msw\MediaFoundationFramework.h">
+      <Filter>Header Files\msw</Filter>
+    </ClInclude>
     <ClInclude Include="..\include\tinyexr\tinyexr.h">
       <Filter>Header Files\tinyexr</Filter>
     </ClInclude>
