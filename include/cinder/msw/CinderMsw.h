@@ -33,6 +33,15 @@
 #undef min
 #undef max
 
+#define LOWORD(_dw)     ((WORD)(((DWORD_PTR)(_dw)) & 0xffff))
+#define HIWORD(_dw)     ((WORD)((((DWORD_PTR)(_dw)) >> 16) & 0xffff))
+#define LODWORD(_qw)    ((DWORD)(_qw))
+#define HIDWORD(_qw)    ((DWORD)(((_qw) >> 32) & 0xffffffff))
+
+#define BREAK_ON_FAIL(value)          if( FAILED( value ) ) break;
+#define BREAK_ON_NULL(value, result)  if( value == NULL ) { hr = result; break; }
+#define BREAK_IF_FALSE(test, result)  if( !(test) ) { hr = result; break; }
+
 namespace cinder { namespace msw {
 
 /** Converts a Win32 HBITMAP to a cinder::Surface8u
@@ -49,6 +58,24 @@ std::string toUtf8String( const std::wstring &wideString );
 inline vec2 toVec2( const ::POINTFX &p )
 { return vec2( ( (p.x.value << 16) | p.x.fract ) / 65535.0f, ( (p.y.value << 16) | p.y.fract ) / 65535.0f ); }
 #endif
+
+//! Releases a COM pointer if the pointer is not NULL, and sets the pointer to NULL.
+template <class T> inline void SafeRelease( T*& p )
+{
+	if( p ) {
+		p->Release();
+		p = NULL;
+	}
+}
+
+//! Deletes a pointer allocated with new.
+template <class T> inline void SafeDelete( T*& p )
+{
+	if( p ) {
+		delete p;
+		p = NULL;
+	}
+}
 
 //! A free function designed to interact with makeComShared, calls Release() on a com-managed object
 void ComDelete( void *p );

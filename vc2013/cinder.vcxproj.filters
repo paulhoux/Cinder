@@ -148,6 +148,12 @@
     <Filter Include="Header Files\jsoncpp">
       <UniqueIdentifier>{1f0d2d7b-fc30-443d-a52d-dd3867811355}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Header Files\video">
+      <UniqueIdentifier>{a1e2b547-d50a-4a69-bd15-5e129fe46c73}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\video">
+      <UniqueIdentifier>{ad30ec1b-e1fd-486d-87d8-a83ea829d55a}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Source Files\tinyexr">
       <UniqueIdentifier>{9fb9c4db-7e15-4606-a469-e540c1a38f74}</UniqueIdentifier>
     </Filter>
@@ -785,6 +791,12 @@
     </ClCompile>
     <ClCompile Include="..\src\cinder\gl\ConstantConversions.cpp">
       <Filter>Source Files\gl</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\cinder\video\VideoTexture.cpp">
+      <Filter>Source Files\video</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\cinder\msw\MediaFoundation.cpp">
+      <Filter>Source Files\msw</Filter>
     </ClCompile>
     <ClCompile Include="..\src\tinyexr\tinyexr.cc">
       <Filter>Source Files\tinyexr</Filter>
@@ -1654,6 +1666,15 @@
     </ClInclude>
     <ClInclude Include="..\include\cinder\gl\Ssbo.h">
       <Filter>Header Files\gl</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\cinder\video\Video.h">
+      <Filter>Header Files\video</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\cinder\video\VideoTexture.h">
+      <Filter>Header Files\video</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\cinder\msw\MediaFoundation.h">
+      <Filter>Header Files\msw</Filter>
     </ClInclude>
     <ClInclude Include="..\include\tinyexr\tinyexr.h">
       <Filter>Header Files\tinyexr</Filter>
