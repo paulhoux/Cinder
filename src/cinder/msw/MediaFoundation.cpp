@@ -1,5 +1,6 @@
 
 #include "cinder/msw/CinderMsw.h"
+#include "cinder/msw/EVRCustomPresenter.h"
 #include "cinder/msw/MediaFoundation.h"
 
 #include <string>
@@ -18,8 +19,8 @@ LRESULT CALLBACK MFWndProc( HWND wnd, UINT uMsg, WPARAM wParam, LPARAM lParam )
 
 	// If the message is WM_NCCREATE we need to hide 'this' in the window long.
 	if( uMsg == WM_NCCREATE ) {
-		impl = reinterpret_cast<MFPlayer*>( ( (LPCREATESTRUCT) lParam )->lpCreateParams );
-		::SetWindowLongPtr( wnd, GWLP_USERDATA, (__int3264) (LONG_PTR) impl );
+		impl = reinterpret_cast<MFPlayer*>( ( (LPCREATESTRUCT)lParam )->lpCreateParams );
+		::SetWindowLongPtr( wnd, GWLP_USERDATA, (__int3264)(LONG_PTR)impl );
 	}
 	else
 		impl = reinterpret_cast<MFPlayer*>( ::GetWindowLongPtr( wnd, GWLP_USERDATA ) );
@@ -42,21 +43,28 @@ LRESULT CALLBACK MFWndProc( HWND wnd, UINT uMsg, WPARAM wParam, LPARAM lParam )
 // ----------------------------------------------------------------------------
 
 MFPlayer::MFPlayer()
-	: mRefCount( 1 ), mState( Closed ), mWnd( NULL ), mWidth( 0 ), mHeight( 0 )
+	: mRefCount( 1 ), mState( Closed ), mWnd( NULL )
+	, mPlayWhenReady( FALSE ), mIsLooping( FALSE ), mWidth( 0 ), mHeight( 0 )
 	, mSessionPtr( NULL ), mSourcePtr( NULL ), mPresenterPtr( NULL )
 {
 	mCloseEvent = ::CreateEventA( NULL, FALSE, FALSE, NULL );
 	if( mCloseEvent == NULL )
-		throw Exception( "MFPlayer error: failed to create Close event." );
+		throw Exception( "MFPlayer: failed to create Close event." );
 
 	CreateWnd();
 
-	// TODO: create EVR custom presenter.
+	// Create custom EVR presenter.
+	mPresenterPtr = new EVRCustomPresenter();
+
+	HRESULT hr = static_cast<EVRCustomPresenter*>( mPresenterPtr )->SetVideoWindow( mWnd );
+	if( FAILED( hr ) )
+		throw Exception( "MFPlayer: failed to set video window." );
 }
 
 MFPlayer::~MFPlayer()
 {
-	// TODO: destroy EVR custom presenter.
+	// Destroy EVR custom presenter.
+	SafeRelease( mPresenterPtr );
 
 	DestroyWnd();
 
@@ -102,6 +110,126 @@ HRESULT MFPlayer::OpenURL( const WCHAR *url, const WCHAR *audioDeviceId )
 		// If SetTopology succeeds, the media session will queue an MESessionTopologySet event.
 		mState = OpenPending;
 
+	} while( false );
+
+	return hr;
+}
+
+HRESULT MFPlayer::Play()
+{
+	if( mState == OpenPending ) {
+		mPlayWhenReady = TRUE;
+		return S_OK;
+	}
+	else if( mState != Paused && mState != Stopped )
+		return MF_E_INVALIDREQUEST;
+
+	if( mSessionPtr == NULL || mSourcePtr == NULL )
+		return E_POINTER;
+
+	PROPVARIANT varStart;
+	PropVariantInit( &varStart );
+
+	// Note: Start is an asynchronous operation. However, we
+	// can treat our state as being already started. If Start
+	// fails later, we'll get an MESessionStarted event with
+	// an error code, and we will update our state then.
+
+	HRESULT hr = mSessionPtr->Start( &GUID_NULL, &varStart );
+	if( SUCCEEDED( hr ) )
+		mState = Started;
+
+	PropVariantClear( &varStart );
+	return hr;
+}
+
+HRESULT MFPlayer::Pause()
+{
+	if( mState != Started )
+		return MF_E_INVALIDREQUEST;
+
+	if( mSessionPtr == NULL || mSourcePtr == NULL )
+		return E_POINTER;
+
+	HRESULT hr = mSessionPtr->Pause();
+	if( SUCCEEDED( hr ) )
+		mState = Paused;
+
+	return hr;
+}
+
+HRESULT MFPlayer::SetPosition( MFTIME position )
+{
+	if( !mSessionPtr )
+		return E_POINTER;
+
+	if( mState == OpenPending )
+		return MF_E_INVALIDREQUEST;
+
+	BOOL bWasPlaying = ( mState == Started );
+	Pause();
+
+	PROPVARIANT varStart;
+	PropVariantInit( &varStart );
+	varStart.vt = VT_I8;
+	varStart.hVal.QuadPart = position;
+
+	HRESULT hr = mSessionPtr->Start( &GUID_NULL, &varStart );
+	if( SUCCEEDED( hr ) ) {
+		mState = Started;
+
+		if( !bWasPlaying )
+			Pause();
+	}
+
+	PropVariantClear( &varStart );
+
+	return hr;
+}
+
+HRESULT MFPlayer::OnTopologyStatus( IMFMediaEvent *pEvent )
+{
+	UINT32 status;
+
+	HRESULT hr = pEvent->GetUINT32( MF_EVENT_TOPOLOGY_STATUS, &status );
+	if( SUCCEEDED( hr ) && ( status == MF_TOPOSTATUS_READY ) ) {
+		hr = Play();
+		hr = Pause();
+	}
+	return hr;
+}
+
+HRESULT MFPlayer::OnPresentationEnded( IMFMediaEvent *pEvent )
+{
+	HRESULT hr = S_OK;
+
+	if( mIsLooping ) {
+		// Seek to the beginning.
+		hr = SetPosition( 0 );
+	}
+	else {
+		// Pause instead of Stop, so we can easily restart the video later.
+		hr = Pause();
+	}
+
+	return hr;
+}
+
+HRESULT MFPlayer::OnNewPresentation( IMFMediaEvent *pEvent )
+{
+	HRESULT hr = S_OK;
+
+	do {
+		// Get the presentation descriptor from the event.
+		ScopedComPtr<IMFPresentationDescriptor> pPD;
+		hr = GetEventObject( pEvent, &pPD );
+		BREAK_ON_FAIL( hr );
+
+		// Create a partial topology.
+		hr = CreatePartialTopology( pPD );
+		BREAK_ON_FAIL( hr );
+
+		mState = OpenPending;
 	} while( false );
 
 	return hr;
@@ -164,12 +292,12 @@ HRESULT MFPlayer::CloseSession()
 	if( SUCCEEDED( hr ) ) {
 		// Shut down the media source. (Synchronous operation, no events.)
 		if( mSourcePtr ) {
-			(void) mSourcePtr->Shutdown();
+			(void)mSourcePtr->Shutdown();
 		}
 
 		// Shut down the media session. (Synchronous operation, no events.)
 		if( mSessionPtr ) {
-			(void) mSessionPtr->Shutdown();
+			(void)mSessionPtr->Shutdown();
 		}
 	}
 
@@ -251,11 +379,7 @@ HRESULT MFPlayer::SetMediaInfo( IMFPresentationDescriptor *pDescriptor )
 
 HRESULT MFPlayer::QueryInterface( REFIID riid, void** ppv )
 {
-	static const QITAB qit[] =
-	{
-		QITABENT( MFPlayer, IMFAsyncCallback ),
-		{ 0 }
-	};
+	static const QITAB qit[] = { QITABENT( MFPlayer, IMFAsyncCallback ), { 0 } };
 	return QISearch( this, qit, riid, ppv );
 }
 
@@ -311,7 +435,7 @@ HRESULT MFPlayer::Invoke( IMFAsyncResult *pResult )
 			pEvent->AddRef();
 
 			// Post a private window message to the application.
-			::PostMessage( mWnd, WM_APP_PLAYER_EVENT, (WPARAM) pEvent, (LPARAM) eventType );
+			::PostMessage( mWnd, WM_APP_PLAYER_EVENT, (WPARAM)pEvent, (LPARAM)eventType );
 		}
 	} while( false );
 
@@ -325,7 +449,7 @@ HRESULT MFPlayer::Invoke( IMFAsyncResult *pResult )
 LRESULT MFPlayer::HandleEvent( WPARAM wParam )
 {
 	HRESULT hr = S_OK;
-	IMFMediaEvent *pEvent = (IMFMediaEvent*) wParam;
+	IMFMediaEvent *pEvent = (IMFMediaEvent*)wParam;
 
 	do {
 		BREAK_ON_NULL( pEvent, E_POINTER );
@@ -359,15 +483,7 @@ LRESULT MFPlayer::HandleEvent( WPARAM wParam )
 				break;
 
 			case MESessionTopologySet:
-			{
-				ScopedComPtr<IMFTopology> pTopology;
-				GetEventObject<IMFTopology>( pEvent, &pTopology );
-				if( pTopology ) {
-					WORD nodeCount = 0;
-					pTopology->GetNodeCount( &nodeCount );
-				}
-			}
-			break;
+				break;
 
 			case MESessionStarted:
 				break;
@@ -390,17 +506,10 @@ void MFPlayer::CreateWnd()
 	if( !mWnd ) {
 		RegisterWindowClass();
 
-		mWnd = ::CreateWindowEx( WS_EX_APPWINDOW,
-								 MF_WINDOW_CLASS_NAME,
-								 unicodeTitle.c_str(),
-								 WS_OVERLAPPEDWINDOW,
-								 CW_USEDEFAULT, 0, CW_USEDEFAULT, 0,
-								 NULL,
-								 NULL,
-								 ::GetModuleHandle( NULL ),
-								 reinterpret_cast<LPVOID>( this ) );
+		mWnd = ::CreateWindowEx( WS_EX_APPWINDOW, MF_WINDOW_CLASS_NAME, unicodeTitle.c_str(), WS_OVERLAPPEDWINDOW,
+								 CW_USEDEFAULT, 0, CW_USEDEFAULT, 0, NULL, NULL, ::GetModuleHandle( NULL ), reinterpret_cast<LPVOID>( this ) );
 		if( !mWnd )
-			throw Exception( "MFPlayer error: failed to create window." );
+			throw Exception( "MFPlayer: failed to create window." );
 
 		::ShowWindow( mWnd, SW_SHOW );
 		::SetWindowLongA( mWnd, GWL_EXSTYLE, ::GetWindowLongA( mWnd, GWL_EXSTYLE ) & ~WS_DLGFRAME & ~WS_CAPTION & ~WS_BORDER & WS_POPUP );
@@ -431,7 +540,7 @@ void MFPlayer::RegisterWindowClass()
 	wc.hInstance = instance;
 	wc.hIcon = ::LoadIcon( NULL, IDI_WINLOGO );
 	wc.hCursor = ::LoadCursor( NULL, IDC_ARROW );
-	wc.hbrBackground = (HBRUSH) ( BLACK_BRUSH );
+	wc.hbrBackground = (HBRUSH)( BLACK_BRUSH );
 	wc.lpszMenuName = NULL;
 	wc.lpszClassName = MF_WINDOW_CLASS_NAME;
 
@@ -441,7 +550,9 @@ void MFPlayer::RegisterWindowClass()
 	}
 
 	sRegistered = true;
-}//  Create a media source from a URL.
+}
+
+//  Create a media source from a URL.
 HRESULT MFPlayer::CreateMediaSource( LPCWSTR pUrl, IMFMediaSource **ppSource )
 {
 	HRESULT hr = S_OK;
@@ -466,7 +577,7 @@ HRESULT MFPlayer::CreateMediaSource( LPCWSTR pUrl, IMFMediaSource **ppSource )
 		BREAK_ON_FAIL( hr );
 
 		// Get the IMFMediaSource interface from the media source.
-		hr = pSource.QueryInterface( __uuidof( **ppSource ), (void**) ppSource );
+		hr = pSource.QueryInterface( __uuidof( **ppSource ), (void**)ppSource );
 	} while( false );
 
 	return hr;
@@ -533,11 +644,11 @@ HRESULT MFPlayer::CreateMediaSinkActivate( IMFStreamDescriptor *pSourceSD, HWND 
 		else if( MFMediaType_Video == guidMajorType ) {
 			// Create the video renderer.
 			ScopedComPtr<IMFMediaSink> pSink;
-			hr = MFCreateVideoRenderer( __uuidof( IMFMediaSink ), (void**) &pSink );
+			hr = MFCreateVideoRenderer( __uuidof( IMFMediaSink ), (void**)&pSink );
 			BREAK_ON_FAIL( hr );
 
 			ScopedComPtr<IMFVideoRenderer> pVideoRenderer;
-			hr = pSink.QueryInterface( __uuidof( IMFVideoRenderer ), (void**) &pVideoRenderer );
+			hr = pSink.QueryInterface( __uuidof( IMFVideoRenderer ), (void**)&pVideoRenderer );
 			BREAK_ON_FAIL( hr );
 
 			hr = pVideoRenderer->InitializeRenderer( NULL, pVideoPresenter );

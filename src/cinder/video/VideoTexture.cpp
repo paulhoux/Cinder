@@ -34,10 +34,18 @@ VideoTexture::~VideoTexture()
 
 void VideoTexture::play()
 {
+#if defined(CINDER_MSW)
+	if( mPlayerPtr )
+		mPlayerPtr->Play();
+#endif
 }
 
 void VideoTexture::stop()
 {
+#if defined(CINDER_MSW)
+	if( mPlayerPtr )
+		mPlayerPtr->Pause();
+#endif
 }
 
 const Texture2dRef VideoTexture::getTexture() const

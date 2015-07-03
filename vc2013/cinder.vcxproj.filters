@@ -798,6 +798,12 @@
     <ClCompile Include="..\src\cinder\msw\MediaFoundation.cpp">
       <Filter>Source Files\msw</Filter>
     </ClCompile>
+    <ClCompile Include="..\src\cinder\msw\EVRCustomPresenter.cpp">
+      <Filter>Source Files\msw</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\cinder\msw\D3DPresentEngine9.cpp">
+      <Filter>Source Files\msw</Filter>
+    </ClCompile>
     <ClCompile Include="..\src\tinyexr\tinyexr.cc">
       <Filter>Source Files\tinyexr</Filter>
     </ClCompile>
@@ -1677,6 +1683,12 @@
       <Filter>Header Files\msw</Filter>
     </ClInclude>
     <ClInclude Include="..\include\cinder\msw\MediaFoundationFramework.h">
+      <Filter>Header Files\msw</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\cinder\msw\EVRCustomPresenter.h">
+      <Filter>Header Files\msw</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\cinder\msw\D3DPresentEngine9.h">
       <Filter>Header Files\msw</Filter>
     </ClInclude>
     <ClInclude Include="..\include\tinyexr\tinyexr.h">

@@ -34,7 +34,7 @@ void VideoTestApp::setup()
 	}
 
 	// Memory leak test.
-	mVideo.reset();
+	//mVideo.reset();
 }
 
 void VideoTestApp::mouseDown( MouseEvent event )
