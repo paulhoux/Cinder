@@ -35,11 +35,15 @@ POSSIBILITY OF SUCH DAMAGE.
 namespace cinder {
 namespace msw {
 
+inline float MFOffsetToFloat( const MFOffset& offset ) { return offset.value + ( float( offset.fract ) / 65536 ); }
+
+inline double MFTIMEToSeconds( MFTIME time ) { return time * 1.0e-8; }
+
+inline MFTIME SecondsToMFTIME( double seconds ) { return (MFTIME)( seconds * 1.0e8 ); }
+
 // Pointer to a Direct3D swap chain.
 static const GUID MFSamplePresenter_SampleSwapChain =
 { 0xad885bd1, 0x7def, 0x414a,{ 0xb5, 0xb0, 0xd3, 0xd2, 0x63, 0xd6, 0xe9, 0x6d } };
-
-inline float MFOffsetToFloat( const MFOffset& offset ) { return offset.value + ( float( offset.fract ) / 65536 ); }
 
 class D3DPresentEngine9 : public SchedulerCallback {
 public:

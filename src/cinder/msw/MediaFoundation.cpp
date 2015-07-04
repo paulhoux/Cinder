@@ -24,10 +24,18 @@ LRESULT CALLBACK MFWndProc( HWND wnd, UINT uMsg, WPARAM wParam, LPARAM lParam )
 	}
 	else
 		impl = reinterpret_cast<MFPlayer*>( ::GetWindowLongPtr( wnd, GWLP_USERDATA ) );
-
+	
 	switch( uMsg ) {
 		case WM_DESTROY:
 			PostQuitMessage( 0 );
+			break;
+		case WM_PAINT:
+			if( impl )
+				return impl->Repaint();
+			break;
+		case WM_SIZE:
+			if( impl )
+				return impl->ResizeVideo( LOWORD( lParam ), HIWORD( lParam ) );
 			break;
 		case WM_APP_PLAYER_EVENT:
 			if( impl )
@@ -45,7 +53,7 @@ LRESULT CALLBACK MFWndProc( HWND wnd, UINT uMsg, WPARAM wParam, LPARAM lParam )
 MFPlayer::MFPlayer()
 	: mRefCount( 1 ), mState( Closed ), mWnd( NULL )
 	, mPlayWhenReady( FALSE ), mIsLooping( FALSE ), mWidth( 0 ), mHeight( 0 )
-	, mSessionPtr( NULL ), mSourcePtr( NULL ), mPresenterPtr( NULL )
+	, mSessionPtr( NULL ), mSourcePtr( NULL ), mPresenterPtr( NULL ), mVideoDisplayPtr( NULL )
 {
 	mCloseEvent = ::CreateEventA( NULL, FALSE, FALSE, NULL );
 	if( mCloseEvent == NULL )
@@ -54,11 +62,11 @@ MFPlayer::MFPlayer()
 	CreateWnd();
 
 	// Create custom EVR presenter.
-	mPresenterPtr = new EVRCustomPresenter();
+	//mPresenterPtr = new EVRCustomPresenter();
 
-	HRESULT hr = static_cast<EVRCustomPresenter*>( mPresenterPtr )->SetVideoWindow( mWnd );
-	if( FAILED( hr ) )
-		throw Exception( "MFPlayer: failed to set video window." );
+	//HRESULT hr = static_cast<EVRCustomPresenter*>( mPresenterPtr )->SetVideoWindow( mWnd );
+	//if( FAILED( hr ) )
+	//	throw Exception( "MFPlayer: failed to set video window." );
 }
 
 MFPlayer::~MFPlayer()
@@ -193,8 +201,16 @@ HRESULT MFPlayer::OnTopologyStatus( IMFMediaEvent *pEvent )
 
 	HRESULT hr = pEvent->GetUINT32( MF_EVENT_TOPOLOGY_STATUS, &status );
 	if( SUCCEEDED( hr ) && ( status == MF_TOPOSTATUS_READY ) ) {
-		hr = Play();
-		hr = Pause();
+		SafeRelease( mVideoDisplayPtr );
+
+		// Get the IMFVideoDisplayControl interface from EVR. This call is
+		// expected to fail if the media file does not have a video stream.
+		(void) MFGetService( mSessionPtr, MR_VIDEO_RENDER_SERVICE, IID_PPV_ARGS( &mVideoDisplayPtr ) );
+
+		mState = Paused;
+
+		if( mPlayWhenReady )
+			hr = Play();
 	}
 	return hr;
 }
@@ -270,6 +286,8 @@ HRESULT MFPlayer::CloseSession()
 	//  
 	//  MESessionClosed is guaranteed to be the last event that the media session fires.
 
+	SafeRelease( mVideoDisplayPtr );
+
 	// First close the media session.
 	if( mSessionPtr ) {
 		DWORD dwWaitResult = 0;
@@ -307,6 +325,36 @@ HRESULT MFPlayer::CloseSession()
 	mState = Closed;
 
 	return hr;
+}
+
+HRESULT MFPlayer::Repaint()
+{
+	HRESULT hr = S_OK;
+
+	PAINTSTRUCT ps;
+	::BeginPaint( mWnd, &ps );
+
+	if( mVideoDisplayPtr ) 
+		hr = mVideoDisplayPtr->RepaintVideo();
+
+	::EndPaint( mWnd, &ps );
+	
+	return hr;
+}
+
+HRESULT MFPlayer::ResizeVideo( WORD width, WORD height )
+{
+	if( mVideoDisplayPtr ) {
+		// Set the destination rectangle.
+		// Leave the default source rectangle (0,0,1,1).
+
+		RECT rcDest = { 0, 0, width, height };
+
+		return mVideoDisplayPtr->SetVideoPosition( NULL, &rcDest );
+	}
+	else {
+		return S_OK;
+	}
 }
 
 HRESULT MFPlayer::CreatePartialTopology( IMFPresentationDescriptor *pDescriptor )
@@ -466,7 +514,8 @@ LRESULT MFPlayer::HandleEvent( WPARAM wParam )
 		BREAK_ON_FAIL( hr );
 
 		// Check if the async operation succeeded.
-		BREAK_ON_FAIL( hr = eventStatus );
+		hr = eventStatus;
+		BREAK_ON_FAIL( hr );
 
 		// Handle event.
 		switch( eventType ) {
@@ -512,9 +561,10 @@ void MFPlayer::CreateWnd()
 			throw Exception( "MFPlayer: failed to create window." );
 
 		::ShowWindow( mWnd, SW_SHOW );
-		::SetWindowLongA( mWnd, GWL_EXSTYLE, ::GetWindowLongA( mWnd, GWL_EXSTYLE ) & ~WS_DLGFRAME & ~WS_CAPTION & ~WS_BORDER & WS_POPUP );
-		::SetForegroundWindow( mWnd );
-		::SetFocus( mWnd );
+		::UpdateWindow( mWnd );
+		//::SetWindowLongA( mWnd, GWL_EXSTYLE, ::GetWindowLongA( mWnd, GWL_EXSTYLE ) & ~WS_DLGFRAME & ~WS_CAPTION & ~WS_BORDER & WS_POPUP );
+		//::SetForegroundWindow( mWnd );
+		//::SetFocus( mWnd );
 	}
 }
 
@@ -642,21 +692,32 @@ HRESULT MFPlayer::CreateMediaSinkActivate( IMFStreamDescriptor *pSourceSD, HWND 
 			( *ppActivate )->AddRef();
 		}
 		else if( MFMediaType_Video == guidMajorType ) {
-			// Create the video renderer.
-			ScopedComPtr<IMFMediaSink> pSink;
-			hr = MFCreateVideoRenderer( __uuidof( IMFMediaSink ), (void**)&pSink );
-			BREAK_ON_FAIL( hr );
+			if( pVideoPresenter != NULL ) {
+				// Create the video renderer.
+				ScopedComPtr<IMFMediaSink> pSink;
+				hr = MFCreateVideoRenderer( __uuidof( IMFMediaSink ), (void**)&pSink );
+				BREAK_ON_FAIL( hr );
 
-			ScopedComPtr<IMFVideoRenderer> pVideoRenderer;
-			hr = pSink.QueryInterface( __uuidof( IMFVideoRenderer ), (void**)&pVideoRenderer );
-			BREAK_ON_FAIL( hr );
+				ScopedComPtr<IMFVideoRenderer> pVideoRenderer;
+				hr = pSink.QueryInterface( __uuidof( IMFVideoRenderer ), (void**)&pVideoRenderer );
+				BREAK_ON_FAIL( hr );
 
-			hr = pVideoRenderer->InitializeRenderer( NULL, pVideoPresenter );
-			BREAK_ON_FAIL( hr );
+				hr = pVideoRenderer->InitializeRenderer( NULL, pVideoPresenter );
+				BREAK_ON_FAIL( hr );
 
-			// Return IMFMediaSink pointer to caller.
-			*ppMediaSink = pSink;
-			( *ppMediaSink )->AddRef();
+				// Return IMFMediaSink pointer to caller.
+				*ppMediaSink = pSink;
+				( *ppMediaSink )->AddRef();
+			}
+			else {
+				// Use default EVR.
+				ScopedComPtr<IMFActivate> pActivate;
+				hr = MFCreateVideoRendererActivate( hVideoWindow, &pActivate );
+
+				// Return IMFActivate pointer to caller.
+				*ppActivate = pActivate;
+				( *ppActivate )->AddRef();
+			}
 		}
 		else {
 			// Unknown stream type.

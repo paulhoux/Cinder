@@ -103,6 +103,9 @@ private:
 	HRESULT CreateSession();
 	HRESULT CloseSession();
 
+	HRESULT Repaint();
+	HRESULT ResizeVideo( WORD width, WORD height );
+
 	HRESULT CreatePartialTopology( IMFPresentationDescriptor *pDescriptor );
 	HRESULT SetMediaInfo( IMFPresentationDescriptor *pDescriptor );
 
@@ -139,6 +142,8 @@ private:
 	IMFMediaSession    *mSessionPtr;
 	IMFMediaSource     *mSourcePtr;
 	IMFVideoPresenter  *mPresenterPtr;
+
+	IMFVideoDisplayControl  *mVideoDisplayPtr;
 };
 
 }

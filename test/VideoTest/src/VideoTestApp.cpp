@@ -25,6 +25,10 @@ private:
 
 void VideoTestApp::setup()
 {
+	gl::enableVerticalSync( true );
+	
+	disableFrameRate();
+
 	try {
 		mVideo = gl::VideoTexture::create( getAssetPath( "test.mp4" ) );
 		mVideo->play();
