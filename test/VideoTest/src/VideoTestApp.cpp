@@ -31,6 +31,7 @@ void VideoTestApp::setup()
 
 	try {
 		mVideo = gl::VideoTexture::create( getAssetPath( "test.mp4" ) );
+		mVideo->setLoop( true );
 		mVideo->play();
 	}
 	catch( const std::exception &exc ) {

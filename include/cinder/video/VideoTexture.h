@@ -26,6 +26,9 @@ public:
 		return std::make_shared<VideoTexture>( path );
 	}
 
+	//! Enable or disable looping.
+	void setLoop( bool enabled = true ) override;
+
 	//! Begins video playback.
 	void play() override;
 	//! Stops video playback.

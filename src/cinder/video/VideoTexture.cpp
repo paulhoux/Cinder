@@ -32,6 +32,13 @@ VideoTexture::~VideoTexture()
 #endif
 }
 
+void VideoTexture::setLoop( bool enabled )
+{
+#if defined(CINDER_MSW)
+	mPlayerPtr->SetLoop( enabled );
+#endif
+}
+
 void VideoTexture::play()
 {
 #if defined(CINDER_MSW)

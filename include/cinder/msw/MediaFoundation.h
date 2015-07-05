@@ -72,6 +72,8 @@ public:
 	HRESULT Pause();
 	//! Seeks to \a position, which is expressed in 100-nano-second units.
 	HRESULT SetPosition( MFTIME position );
+	//!
+	HRESULT SetLoop( BOOL loop ) { mIsLooping = loop; return S_OK; }
 
 	//! Returns the current state.
 	State GetState() const { return mState; }
