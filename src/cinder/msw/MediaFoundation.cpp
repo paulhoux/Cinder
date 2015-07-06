@@ -28,7 +28,7 @@ LRESULT CALLBACK MFWndProc( HWND wnd, UINT uMsg, WPARAM wParam, LPARAM lParam )
 	switch( uMsg ) {
 		case WM_DESTROY:
 			PostQuitMessage( 0 );
-			break;
+			return S_OK;
 		case WM_PAINT:
 			if( impl )
 				return impl->Repaint();
@@ -41,11 +41,9 @@ LRESULT CALLBACK MFWndProc( HWND wnd, UINT uMsg, WPARAM wParam, LPARAM lParam )
 			if( impl )
 				return impl->HandleEvent( wParam );
 			break;
-		default:
-			return DefWindowProc( wnd, uMsg, wParam, lParam );
 	}
 
-	return 0;
+	return DefWindowProc( wnd, uMsg, wParam, lParam );
 }
 
 // ----------------------------------------------------------------------------

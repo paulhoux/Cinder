@@ -1802,10 +1802,11 @@ float EVRCustomPresenter::GetMaxRate( BOOL bThin )
 		MFRatio fps = { 0, 0 };
 		GetFrameRate( mMediaTypePtr, &fps );
 
-		UINT MonitorRateHz = mD3DPresentEnginePtr->RefreshRate();
-		if( fps.Denominator && fps.Numerator && MonitorRateHz ) {
+		DWORD monitorRateHz;
+		mD3DPresentEnginePtr->GetMonitorRefreshRate( &monitorRateHz );
+		if( fps.Denominator && fps.Numerator && monitorRateHz ) {
 			// Max Rate = Refresh Rate / Frame Rate
-			fMaxRate = (float)MulDiv( MonitorRateHz, fps.Denominator, fps.Numerator );
+			fMaxRate = (float)MulDiv( monitorRateHz, fps.Denominator, fps.Numerator );
 		}
 	}
 

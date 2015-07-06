@@ -6,6 +6,7 @@
 #include "cinder/app/RendererGl.h"
 #include "cinder/gl/gl.h"
 #include "cinder/video/VideoTexture.h"
+#include "cinder/Log.h"
 
 using namespace ci;
 using namespace ci::app;
@@ -20,17 +21,23 @@ public:
 	void mouseDown( MouseEvent event ) override;
 
 private:
-	gl::VideoTextureRef  mVideo;
+	gl::VideoTextureRef  mVideo, mVideo4k;
 };
 
 void VideoTestApp::setup()
 {
-	gl::enableVerticalSync( true );
-	
+#if _DEBUG
+	VLDEnable();
+#endif
+
+	gl::enableVerticalSync( true );	
 	disableFrameRate();
 
+	const char* video = "test.mp4";
+	const char* video4k = "test4k.mp4";
+
 	try {
-		mVideo = gl::VideoTexture::create( getAssetPath( "test.mp4" ) );
+		mVideo = gl::VideoTexture::create( getAssetPath( video ) );
 		mVideo->setLoop( true );
 		mVideo->play();
 	}
@@ -38,8 +45,14 @@ void VideoTestApp::setup()
 		console() << exc.what() << std::endl;
 	}
 
-	// Memory leak test.
-	//mVideo.reset();
+	try {
+		mVideo4k = gl::VideoTexture::create( getAssetPath( video4k ) );
+		mVideo4k->setLoop( true );
+		mVideo4k->play();
+	}
+	catch( const std::exception &exc ) {
+		console() << exc.what() << std::endl;
+	}
 }
 
 void VideoTestApp::mouseDown( MouseEvent event )

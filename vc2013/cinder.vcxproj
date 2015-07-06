@@ -771,6 +771,7 @@
     <ClInclude Include="..\include\cinder\msw\EVRCustomPresenter.h" />
     <ClInclude Include="..\include\cinder\msw\MediaFoundation.h" />
     <ClInclude Include="..\include\cinder\msw\MediaFoundationFramework.h" />
+    <ClInclude Include="..\include\cinder\msw\VideoPresenter.h" />
     <ClInclude Include="..\include\cinder\Plane.h" />
     <ClInclude Include="..\include\cinder\Function.h" />
     <ClInclude Include="..\include\cinder\qtime\MovieWriter.h" />

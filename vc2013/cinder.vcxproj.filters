@@ -1691,6 +1691,9 @@
     <ClInclude Include="..\include\cinder\msw\D3DPresentEngine9.h">
       <Filter>Header Files\msw</Filter>
     </ClInclude>
+    <ClInclude Include="..\include\cinder\msw\VideoPresenter.h">
+      <Filter>Header Files\msw</Filter>
+    </ClInclude>
     <ClInclude Include="..\include\tinyexr\tinyexr.h">
       <Filter>Header Files\tinyexr</Filter>
     </ClInclude>

@@ -71,6 +71,7 @@ public:
    // calls these methods.
 	HRESULT SetVideoWindow( HWND hwnd );
 	HWND    GetVideoWindow() const { return mWnd; }
+
 	HRESULT SetDestinationRect( const RECT& rcDest );
 	RECT    GetDestinationRect() const { return mDestRect; };
 
@@ -80,21 +81,18 @@ public:
 	HRESULT CheckDeviceState( DeviceState *pState );
 	HRESULT PresentSample( IMFSample* pSample, LONGLONG llTarget );
 
-	UINT    RefreshRate() const { return mDisplayMode.RefreshRate; }
+	HRESULT GetMonitorRefreshRate( DWORD* pdwMonitorRefreshRate ) { *pdwMonitorRefreshRate = mDisplayMode.RefreshRate; return S_OK; }
 
 	void    OnReleaseResources() {}
 
 private:
 	HRESULT InitializeD3D();
-	HRESULT GetSwapChainPresentParameters( IMFMediaType *pType, D3DPRESENT_PARAMETERS* pPP );
 	HRESULT CreateD3DDevice();
+	HRESULT GetSwapChainPresentParameters( IMFMediaType *pType, D3DPRESENT_PARAMETERS* pPP );
 	HRESULT CreateTexturePool( IDirect3DDevice9Ex *pDevice );
 	HRESULT CreateD3DSample( IDirect3DSwapChain9 *pSwapChain, IMFSample **ppVideoSample );
 	HRESULT UpdateDestRect();
-
-	// A derived class can override these handlers to allocate any additional D3D resources.
 	HRESULT OnCreateVideoSamples( D3DPRESENT_PARAMETERS& pp ) { return S_OK; }
-
 	HRESULT PresentSwapChain( IDirect3DSwapChain9* pSwapChain, IDirect3DSurface9* pSurface );
 	void    PaintFrameWithGDI();
 
