@@ -1,0 +1,37 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 14
+VisualStudioVersion = 14.0.22823.1
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ColorLUTTest", "ColorLUTTest.vcxproj", "{46225A9D-4929-4B43-BFC8-3E14C151BA45}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug_ANGLE|Win32 = Debug_ANGLE|Win32
+		Debug_ANGLE|x64 = Debug_ANGLE|x64
+		Debug|Win32 = Debug|Win32
+		Debug|x64 = Debug|x64
+		Release_ANGLE|Win32 = Release_ANGLE|Win32
+		Release_ANGLE|x64 = Release_ANGLE|x64
+		Release|Win32 = Release|Win32
+		Release|x64 = Release|x64
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{46225A9D-4929-4B43-BFC8-3E14C151BA45}.Debug_ANGLE|Win32.ActiveCfg = Debug_ANGLE|Win32
+		{46225A9D-4929-4B43-BFC8-3E14C151BA45}.Debug_ANGLE|Win32.Build.0 = Debug_ANGLE|Win32
+		{46225A9D-4929-4B43-BFC8-3E14C151BA45}.Debug_ANGLE|x64.ActiveCfg = Debug_ANGLE|Win32
+		{46225A9D-4929-4B43-BFC8-3E14C151BA45}.Debug|Win32.ActiveCfg = Debug|Win32
+		{46225A9D-4929-4B43-BFC8-3E14C151BA45}.Debug|Win32.Build.0 = Debug|Win32
+		{46225A9D-4929-4B43-BFC8-3E14C151BA45}.Debug|x64.ActiveCfg = Debug|x64
+		{46225A9D-4929-4B43-BFC8-3E14C151BA45}.Debug|x64.Build.0 = Debug|x64
+		{46225A9D-4929-4B43-BFC8-3E14C151BA45}.Release_ANGLE|Win32.ActiveCfg = Release_ANGLE|Win32
+		{46225A9D-4929-4B43-BFC8-3E14C151BA45}.Release_ANGLE|Win32.Build.0 = Release_ANGLE|Win32
+		{46225A9D-4929-4B43-BFC8-3E14C151BA45}.Release_ANGLE|x64.ActiveCfg = Release_ANGLE|Win32
+		{46225A9D-4929-4B43-BFC8-3E14C151BA45}.Release|Win32.ActiveCfg = Release|Win32
+		{46225A9D-4929-4B43-BFC8-3E14C151BA45}.Release|Win32.Build.0 = Release|Win32
+		{46225A9D-4929-4B43-BFC8-3E14C151BA45}.Release|x64.ActiveCfg = Release|x64
+		{46225A9D-4929-4B43-BFC8-3E14C151BA45}.Release|x64.Build.0 = Release|x64
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal
