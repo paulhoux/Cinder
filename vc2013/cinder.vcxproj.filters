@@ -792,6 +792,9 @@
     <ClCompile Include="..\src\cinder\ImageFileTinyExr.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\src\cinder\ip\ColorLUT.cpp">
+      <Filter>Source Files\ip</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\src\AntTweakBar\AntPerfTimer.h">
@@ -1660,6 +1663,9 @@
     </ClInclude>
     <ClInclude Include="..\include\tinyexr\tinyexr.h">
       <Filter>Header Files\tinyexr</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\cinder\ip\ColorLUT.h">
+      <Filter>Header Files\ip</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
