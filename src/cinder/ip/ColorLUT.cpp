@@ -44,13 +44,12 @@ Surface8u colorLUT( const uint8_t bitsPerChannel )
 	Surface8u result = Surface8u( width, height, false, SurfaceChannelOrder::RGB );
 	auto data = result.getData();
 
-	size_t idx = 0;
 	for( size_t b = 0; b < kSize; ++b ) {
 		for( size_t g = 0; g < kSize; ++g ) {
 			for( size_t r = 0; r < kSize; ++r ) {
-				data[idx++] = ( r << kBitShift ) | kBitOffset;
-				data[idx++] = ( g << kBitShift ) | kBitOffset;
-				data[idx++] = ( b << kBitShift ) | kBitOffset;
+				*data++ = ( r << kBitShift ) | kBitOffset;
+				*data++ = ( g << kBitShift ) | kBitOffset;
+				*data++ = ( b << kBitShift ) | kBitOffset;
 			}
 		}
 	}
