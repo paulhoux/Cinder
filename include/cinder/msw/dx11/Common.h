@@ -15,8 +15,8 @@
 #include <dcomp.h>
 #include <wmcodecdsp.h> // for MEDIASUBTYPE_V216
 #include "cinder/msw/dx11/DX11VideoRenderer.h"
-#include "cinder/msw/dx11/linklist.h"
-#include "cinder/msw/dx11/staticasynccallback.h"
+#include "cinder/msw/dx11/DoubleLinkedList.h"
+#include "cinder/msw/dx11/StaticAsyncCallback.h"
 
 DEFINE_GUID(CLSID_VideoProcessorMFT, 0x88753b26, 0x5b24, 0x49bd, 0xb2, 0xe7, 0xc, 0x44, 0x5c, 0x78, 0xc9, 0x82);
 

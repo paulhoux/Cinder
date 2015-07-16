@@ -1,7 +1,7 @@
 #pragma once
 
 #include "cinder/msw/dx11/Common.h"
-#include "cinder/msw/dx11/display.h"
+#include "cinder/msw/dx11/MonitorArray.h"
 #include "cinder/msw/dx11/MFAttributesImpl.h"
 #include "cinder/msw/dx11/Marker.h"
 #include "cinder/msw/dx11/Presenter.h"

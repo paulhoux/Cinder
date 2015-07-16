@@ -12,7 +12,7 @@
 \**************************************************************************/
 #include <windows.h>
 #include <unknwn.h>
-#include "display.h"
+#include "cinder/msw/dx11/MonitorArray.h"
 #include <strsafe.h>
 
 

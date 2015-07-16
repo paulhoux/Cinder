@@ -57,6 +57,8 @@ void VideoTestApp::setup()
 
 void VideoTestApp::mouseDown( MouseEvent event )
 {
+	mVideo.reset();
+	mVideo4k.reset();
 }
 
 void VideoTestApp::update()
@@ -65,7 +67,7 @@ void VideoTestApp::update()
 
 void VideoTestApp::draw()
 {
-	gl::clear( Color( 0, 0, 0 ) );
+	gl::clear();
 
 	if( mVideo )
 		gl::draw( mVideo->getTexture() );

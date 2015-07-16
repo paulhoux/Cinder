@@ -26,6 +26,10 @@ LRESULT CALLBACK MFWndProc( HWND wnd, UINT uMsg, WPARAM wParam, LPARAM lParam )
 		impl = reinterpret_cast<MFPlayer*>( ::GetWindowLongPtr( wnd, GWLP_USERDATA ) );
 	
 	switch( uMsg ) {
+		case WM_CLOSE:
+			if( impl )
+				return impl->Close();
+			break;
 		case WM_DESTROY:
 			PostQuitMessage( 0 );
 			return S_OK;
@@ -559,10 +563,7 @@ void MFPlayer::CreateWnd()
 			throw Exception( "MFPlayer: failed to create window." );
 
 		::ShowWindow( mWnd, SW_SHOW );
-		::UpdateWindow( mWnd );
-		//::SetWindowLongA( mWnd, GWL_EXSTYLE, ::GetWindowLongA( mWnd, GWL_EXSTYLE ) & ~WS_DLGFRAME & ~WS_CAPTION & ~WS_BORDER & WS_POPUP );
-		//::SetForegroundWindow( mWnd );
-		//::SetFocus( mWnd );
+		//::UpdateWindow( mWnd );
 	}
 }
 

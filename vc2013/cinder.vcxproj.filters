@@ -819,9 +819,6 @@
     <ClCompile Include="..\src\cinder\msw\dx11\ClassFactory.cpp">
       <Filter>Source Files\msw\dx11</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\cinder\msw\dx11\display.cpp">
-      <Filter>Source Files\msw\dx11</Filter>
-    </ClCompile>
     <ClCompile Include="..\src\cinder\msw\dx11\Marker.cpp">
       <Filter>Source Files\msw\dx11</Filter>
     </ClCompile>
@@ -832,6 +829,9 @@
       <Filter>Source Files\msw\dx11</Filter>
     </ClCompile>
     <ClCompile Include="..\src\cinder\msw\dx11\Scheduler.cpp">
+      <Filter>Source Files\msw\dx11</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\cinder\msw\dx11\MonitorArray.cpp">
       <Filter>Source Files\msw\dx11</Filter>
     </ClCompile>
     <ClCompile Include="..\src\tinyexr\tinyexr.cc">
@@ -1733,12 +1733,6 @@
     <ClInclude Include="..\include\cinder\msw\dx11\ClassFactory.h">
       <Filter>Header Files\msw\dx11</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\cinder\msw\dx11\display.h">
-      <Filter>Header Files\msw\dx11</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\cinder\msw\dx11\linklist.h">
-      <Filter>Header Files\msw\dx11</Filter>
-    </ClInclude>
     <ClInclude Include="..\include\cinder\msw\dx11\Marker.h">
       <Filter>Header Files\msw\dx11</Filter>
     </ClInclude>
@@ -1761,6 +1755,12 @@
       <Filter>Header Files\msw\dx11</Filter>
     </ClInclude>
     <ClInclude Include="..\include\cinder\msw\dx11\DX11VideoRenderer.h">
+      <Filter>Header Files\msw\dx11</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\cinder\msw\dx11\MonitorArray.h">
+      <Filter>Header Files\msw\dx11</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\cinder\msw\dx11\DoubleLinkedList.h">
       <Filter>Header Files\msw\dx11</Filter>
     </ClInclude>
     <ClInclude Include="..\include\tinyexr\tinyexr.h">
