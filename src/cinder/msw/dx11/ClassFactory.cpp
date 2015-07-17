@@ -3,6 +3,8 @@
 namespace cinder {
 namespace msw {
 
+volatile long CClassFactory::s_lLockCount = 0;
+
 BOOL CClassFactory::IsLocked(void)
 {
     return (s_lLockCount == 0) ? FALSE : TRUE;

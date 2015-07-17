@@ -1,7 +1,10 @@
 
-#include "cinder/msw/CinderMsw.h"
-#include "cinder/msw/EVRCustomPresenter.h"
+//#include "cinder/msw/CinderMsw.h"
+//#include "cinder/msw/EVRCustomPresenter.h"
 #include "cinder/msw/MediaFoundation.h"
+#include "cinder/msw/ScopedPtr.h"
+
+#include "cinder/msw/dx11/Activate.h"
 
 #include <string>
 #include <Shlwapi.h>
@@ -708,10 +711,21 @@ HRESULT MFPlayer::CreateMediaSinkActivate( IMFStreamDescriptor *pSourceSD, HWND 
 				*ppMediaSink = pSink;
 				( *ppMediaSink )->AddRef();
 			}
+			//else {
+			//	// Use default EVR.
+			//	ScopedComPtr<IMFActivate> pActivate;
+			//	hr = MFCreateVideoRendererActivate( hVideoWindow, &pActivate );
+			//	BREAK_ON_FAIL( hr );
+
+			//	// Return IMFActivate pointer to caller.
+			//	*ppActivate = pActivate;
+			//	( *ppActivate )->AddRef();
+			//}
 			else {
-				// Use default EVR.
+				// Use DirectX11 EVR.
 				ScopedComPtr<IMFActivate> pActivate;
-				hr = MFCreateVideoRendererActivate( hVideoWindow, &pActivate );
+				hr = CActivate::CreateInstance( hVideoWindow, &pActivate );
+				BREAK_ON_FAIL( hr );
 
 				// Return IMFActivate pointer to caller.
 				*ppActivate = pActivate;

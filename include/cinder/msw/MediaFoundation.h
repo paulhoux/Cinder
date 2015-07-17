@@ -26,7 +26,8 @@ POSSIBILITY OF SUCH DAMAGE.
 #include "cinder/Cinder.h"
 #include "cinder/Exception.h"
 
-#include "cinder/msw/MediaFoundationFramework.h"
+//#include "cinder/msw/MediaFoundationFramework.h"
+#include "cinder/msw/dx11/Common.h"
 
 namespace cinder {
 namespace msw {

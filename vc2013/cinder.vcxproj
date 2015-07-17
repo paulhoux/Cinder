@@ -828,6 +828,7 @@
     </ClInclude>
     <ClInclude Include="..\include\cinder\msw\MediaFoundation.h" />
     <ClInclude Include="..\include\cinder\msw\MediaFoundationFramework.h" />
+    <ClInclude Include="..\include\cinder\msw\ScopedPtr.h" />
     <ClInclude Include="..\include\cinder\msw\VideoPresenter.h">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug_ANGLE|Win32'">true</ExcludedFromBuild>

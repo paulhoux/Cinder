@@ -1,5 +1,6 @@
 
 #include "cinder/video/VideoTexture.h"
+#include "cinder/msw/CinderMsw.h"
 
 namespace cinder {
 namespace gl {

@@ -1763,6 +1763,9 @@
     <ClInclude Include="..\include\cinder\msw\dx11\DoubleLinkedList.h">
       <Filter>Header Files\msw\dx11</Filter>
     </ClInclude>
+    <ClInclude Include="..\include\cinder\msw\ScopedPtr.h">
+      <Filter>Header Files\msw</Filter>
+    </ClInclude>
     <ClInclude Include="..\include\tinyexr\tinyexr.h">
       <Filter>Header Files\tinyexr</Filter>
     </ClInclude>

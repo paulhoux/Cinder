@@ -66,7 +66,7 @@ namespace cinder { namespace msw
         HRESULT ProcessSample(IMFSample* pSample, LONG* plNextSleep);
         HRESULT Flush(void);
 
-        DWORD GetCount(void){ return m_ScheduledSamples.GetCount(); }
+        //DWORD GetCount(void){ return m_ScheduledSamples.GetCount(); }
 
     private:
 

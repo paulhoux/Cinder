@@ -19,7 +19,7 @@ GUID const* const CStreamSink::s_pVideoFormats[] =
     &MFVideoFormat_UYVY,
     &MFVideoFormat_YVYU,
     &MFVideoFormat_YVU9,
-    &MEDIASUBTYPE_V216,
+    //&MEDIASUBTYPE_V216,
     &MFVideoFormat_v410,
     &MFVideoFormat_I420,
     &MFVideoFormat_NV11,
@@ -817,11 +817,11 @@ HRESULT CStreamSink::SetCurrentMediaType(IMFMediaType* pMediaType)
             m_imageBytesPP.Denominator = 2;
         }
         else if ((guidSubtype == MFVideoFormat_YUY2)||
+            //(guidSubtype == MEDIASUBTYPE_V216)      ||
             (guidSubtype == MFVideoFormat_RGB555)   ||
             (guidSubtype == MFVideoFormat_RGB565)   ||
             (guidSubtype == MFVideoFormat_UYVY)     ||
-            (guidSubtype == MFVideoFormat_YVYU)     ||
-            (guidSubtype == MEDIASUBTYPE_V216))
+            (guidSubtype == MFVideoFormat_YVYU))
         {
             m_imageBytesPP.Numerator = 2;
             m_imageBytesPP.Denominator = 1;

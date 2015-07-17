@@ -14,9 +14,54 @@
 #include <dxgi1_2.h>
 #include <dcomp.h>
 #include <wmcodecdsp.h> // for MEDIASUBTYPE_V216
-#include "cinder/msw/dx11/DX11VideoRenderer.h"
+//#include "cinder/msw/dx11/DX11VideoRenderer.h"
 #include "cinder/msw/dx11/DoubleLinkedList.h"
 #include "cinder/msw/dx11/StaticAsyncCallback.h"
+
+// Include these libraries.
+#pragma comment(lib, "mf.lib")
+#pragma comment(lib, "mfplat.lib")
+#pragma comment(lib, "mfuuid.lib")
+#pragma comment(lib, "d3d11.lib")
+
+#pragma comment(lib, "winmm.lib") // for timeBeginPeriod and timeEndPeriod
+//#pragma comment(lib,"d3d9.lib")
+//#pragma comment(lib,"dxva2.lib")
+//#pragma comment (lib,"evr.lib")
+//#pragma comment (lib,"dcomp.lib")
+#pragma comment (lib,"uuid.lib")
+
+#ifndef LOWORD
+#define LOWORD(_dw)     ((WORD)(((DWORD_PTR)(_dw)) & 0xffff))
+#endif // !LOWORD
+
+#ifndef HIWORD
+#define HIWORD(_dw)     ((WORD)((((DWORD_PTR)(_dw)) >> 16) & 0xffff))
+#endif // !HIWORD
+
+#ifndef LODWORD
+#define LODWORD(_qw)    ((DWORD)(_qw))
+#endif // !LODWORD
+
+#ifndef HIDWORD
+#define HIDWORD(_qw)    ((DWORD)(((_qw) >> 32) & 0xffffffff))
+#endif // !HIDWORD
+
+#ifndef BREAK_ON_FAIL
+#define BREAK_ON_FAIL(value)          if( FAILED( value ) ) break;
+//#define BREAK_ON_FAIL(value) if( FAILED(value) ) { CI_LOG_E("Fail:" << value); break; }
+#endif // !BREAK_ON_FAIL
+
+#ifndef BREAK_ON_NULL
+#define BREAK_ON_NULL(value, result)  if( value == NULL ) { hr = result; break; }
+#endif // !BREAK_ON_NULL
+
+#ifndef BREAK_IF_FALSE
+#define BREAK_IF_FALSE(test, result)  if( !(test) ) { hr = result; break; }
+#endif // !BREAK_IF_FALSE
+
+#undef COMPILE_ASSERT
+#define COMPILE_ASSERT(expr, msg)     static_assert(expr, #msg)
 
 DEFINE_GUID(CLSID_VideoProcessorMFT, 0x88753b26, 0x5b24, 0x49bd, 0xb2, 0xe7, 0xc, 0x44, 0x5c, 0x78, 0xc9, 0x82);
 
@@ -132,6 +177,26 @@ namespace cinder { namespace msw
         area.Area.cy = height;
         return area;
     }
+
+	template <class Q>
+	HRESULT GetEventObject( IMFMediaEvent *pEvent, Q **ppObject )
+	{
+		*ppObject = NULL;
+
+		PROPVARIANT var;
+		HRESULT hr = pEvent->GetValue( &var );
+		if( SUCCEEDED( hr ) ) {
+			if( var.vt == VT_UNKNOWN ) {
+				hr = var.punkVal->QueryInterface( ppObject );
+			}
+			else {
+				hr = MF_E_INVALIDTYPE;
+			}
+			PropVariantClear( &var );
+		}
+
+		return hr;
+	}
 
     class CBase
     {

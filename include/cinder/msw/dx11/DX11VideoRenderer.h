@@ -7,5 +7,5 @@ DEFINE_GUID(CLSID_DX11VideoRenderer, 0x83a1fdbc, 0xab3a, 0x4376, 0xa5, 0x29, 0x8
 DEFINE_GUID(CLSID_DX11VideoRendererActivate, 0x743fa5c, 0xda9e, 0x4760, 0x81, 0x87, 0xcc, 0xac, 0x3d, 0xc1, 0x5d, 0x77);
 
 // creation methods exposed by the lib
-STDAPI CreateDX11VideoRenderer(REFIID riid, void** ppvObject);
-STDAPI CreateDX11VideoRendererActivate(HWND hwnd, IMFActivate** ppActivate);
+//STDAPI CreateDX11VideoRenderer(REFIID riid, void** ppvObject);
+//STDAPI CreateDX11VideoRendererActivate(HWND hwnd, IMFActivate** ppActivate);

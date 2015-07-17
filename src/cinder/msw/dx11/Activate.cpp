@@ -1,7 +1,10 @@
 #include "cinder/msw/dx11/Activate.h"
+#include "cinder/msw/dx11/DX11VideoRenderer.h"
 
 namespace cinder {
 namespace msw {
+
+volatile long CBase::s_lObjectCount = 0;
 
 HRESULT CActivate::CreateInstance(HWND hwnd, IMFActivate** ppActivate)
 {
@@ -197,8 +200,9 @@ HRESULT CActivate::GetClassID(__RPC__out CLSID* pClassID)
     {
         return E_POINTER;
     }
-    *pClassID = CLSID_DX11VideoRendererActivate;
-    return S_OK;
+    //*pClassID = CLSID_DX11VideoRendererActivate;
+    //return S_OK;
+	return E_FAIL;
 }
 
 // ctor
