@@ -1,3 +1,4 @@
+#include "cinder/msw/CinderMsw.h"
 #include "cinder/msw/dx11/Scheduler.h"
 
 namespace cinder {

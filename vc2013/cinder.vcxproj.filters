@@ -154,12 +154,6 @@
     <Filter Include="Source Files\video">
       <UniqueIdentifier>{ad30ec1b-e1fd-486d-87d8-a83ea829d55a}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Header Files\msw\dx11">
-      <UniqueIdentifier>{28c15480-2da2-42cd-9ae1-e359bb6c750b}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source Files\msw\dx11">
-      <UniqueIdentifier>{b00b5373-68b5-433f-b32d-7f664963898a}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Source Files\tinyexr">
       <UniqueIdentifier>{9fb9c4db-7e15-4606-a469-e540c1a38f74}</UniqueIdentifier>
     </Filter>
@@ -803,36 +797,6 @@
     </ClCompile>
     <ClCompile Include="..\src\cinder\msw\MediaFoundation.cpp">
       <Filter>Source Files\msw</Filter>
-    </ClCompile>
-    <ClCompile Include="..\src\cinder\msw\EVRCustomPresenter.cpp">
-      <Filter>Source Files\msw</Filter>
-    </ClCompile>
-    <ClCompile Include="..\src\cinder\msw\D3DPresentEngine9.cpp">
-      <Filter>Source Files\msw</Filter>
-    </ClCompile>
-    <ClCompile Include="..\src\cinder\msw\dx11\StreamSink.cpp">
-      <Filter>Source Files\msw\dx11</Filter>
-    </ClCompile>
-    <ClCompile Include="..\src\cinder\msw\dx11\Activate.cpp">
-      <Filter>Source Files\msw\dx11</Filter>
-    </ClCompile>
-    <ClCompile Include="..\src\cinder\msw\dx11\ClassFactory.cpp">
-      <Filter>Source Files\msw\dx11</Filter>
-    </ClCompile>
-    <ClCompile Include="..\src\cinder\msw\dx11\Marker.cpp">
-      <Filter>Source Files\msw\dx11</Filter>
-    </ClCompile>
-    <ClCompile Include="..\src\cinder\msw\dx11\MediaSink.cpp">
-      <Filter>Source Files\msw\dx11</Filter>
-    </ClCompile>
-    <ClCompile Include="..\src\cinder\msw\dx11\Presenter.cpp">
-      <Filter>Source Files\msw\dx11</Filter>
-    </ClCompile>
-    <ClCompile Include="..\src\cinder\msw\dx11\Scheduler.cpp">
-      <Filter>Source Files\msw\dx11</Filter>
-    </ClCompile>
-    <ClCompile Include="..\src\cinder\msw\dx11\MonitorArray.cpp">
-      <Filter>Source Files\msw\dx11</Filter>
     </ClCompile>
     <ClCompile Include="..\src\tinyexr\tinyexr.cc">
       <Filter>Source Files\tinyexr</Filter>
@@ -1711,57 +1675,6 @@
     </ClInclude>
     <ClInclude Include="..\include\cinder\msw\MediaFoundation.h">
       <Filter>Header Files\msw</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\cinder\msw\MediaFoundationFramework.h">
-      <Filter>Header Files\msw</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\cinder\msw\EVRCustomPresenter.h">
-      <Filter>Header Files\msw</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\cinder\msw\D3DPresentEngine9.h">
-      <Filter>Header Files\msw</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\cinder\msw\VideoPresenter.h">
-      <Filter>Header Files\msw</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\cinder\msw\dx11\StreamSink.h">
-      <Filter>Header Files\msw\dx11</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\cinder\msw\dx11\Activate.h">
-      <Filter>Header Files\msw\dx11</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\cinder\msw\dx11\ClassFactory.h">
-      <Filter>Header Files\msw\dx11</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\cinder\msw\dx11\Marker.h">
-      <Filter>Header Files\msw\dx11</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\cinder\msw\dx11\MediaSink.h">
-      <Filter>Header Files\msw\dx11</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\cinder\msw\dx11\Presenter.h">
-      <Filter>Header Files\msw\dx11</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\cinder\msw\dx11\Scheduler.h">
-      <Filter>Header Files\msw\dx11</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\cinder\msw\dx11\Common.h">
-      <Filter>Header Files\msw\dx11</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\cinder\msw\dx11\MFAttributesImpl.h">
-      <Filter>Header Files\msw\dx11</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\cinder\msw\dx11\StaticAsyncCallback.h">
-      <Filter>Header Files\msw\dx11</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\cinder\msw\dx11\DX11VideoRenderer.h">
-      <Filter>Header Files\msw\dx11</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\cinder\msw\dx11\MonitorArray.h">
-      <Filter>Header Files\msw\dx11</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\cinder\msw\dx11\DoubleLinkedList.h">
-      <Filter>Header Files\msw\dx11</Filter>
     </ClInclude>
     <ClInclude Include="..\include\cinder\msw\ScopedPtr.h">
       <Filter>Header Files\msw</Filter>

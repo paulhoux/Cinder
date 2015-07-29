@@ -1,5 +1,7 @@
 #pragma once
 
+#include <assert.h>
+
 template <class TBase=IMFAttributes>
 class CMFAttributesImpl : public TBase
 {

@@ -1,7 +1,39 @@
 #pragma once
 
+#include "cinder/msw/CinderMsw.h"
 #include "cinder/msw/dx11/Common.h"
 #include "cinder/msw/dx11/MonitorArray.h"
+
+// returns the greatest common divisor of A and B
+inline int gcd( int A, int B )
+{
+	int Temp;
+
+	if( A < B ) {
+		Temp = A;
+		A = B;
+		B = Temp;
+	}
+
+	while( B != 0 ) {
+		Temp = A % B;
+		A = B;
+		B = Temp;
+	}
+
+	return A;
+}
+
+DEFINE_GUID( CLSID_VideoProcessorMFT, 0x88753b26, 0x5b24, 0x49bd, 0xb2, 0xe7, 0xc, 0x44, 0x5c, 0x78, 0xc9, 0x82 );
+
+// MF_XVP_PLAYBACK_MODE
+// Data type: UINT32 (treat as BOOL)
+// If this attribute is TRUE, the XVP will run in playback mode where it will:
+//      1) Allow caller to allocate D3D output samples
+//      2) Not perform FRC
+//      3) Allow last frame regeneration (repaint)
+// This attribute should be set on the transform's attrbiute store prior to setting the input type.
+DEFINE_GUID( MF_XVP_PLAYBACK_MODE, 0x3c5d293f, 0xad67, 0x4e29, 0xaf, 0x12, 0xcf, 0x3e, 0x23, 0x8a, 0xcc, 0xe9 );
 
 namespace cinder { namespace msw
 {

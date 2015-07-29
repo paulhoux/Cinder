@@ -6,6 +6,7 @@
 #include "cinder/msw/dx11/Marker.h"
 #include "cinder/msw/dx11/Presenter.h"
 #include "cinder/msw/dx11/Scheduler.h"
+#include "cinder/msw/ThreadSafeQueue.h"
 
 namespace cinder { namespace msw
 {

@@ -1,5 +1,8 @@
 /*
-Copyright (c) 2015, The Cinder Project, All rights reserved.
+Copyright (c) 2015, The Barbarian Group
+All rights reserved.
+
+Copyright (c) Microsoft Open Technologies, Inc. All rights reserved.
 
 This code is intended for use with the Cinder C++ library: http://libcinder.org
 
@@ -26,8 +29,25 @@ POSSIBILITY OF SUCH DAMAGE.
 #include "cinder/Cinder.h"
 #include "cinder/Exception.h"
 
-//#include "cinder/msw/MediaFoundationFramework.h"
-#include "cinder/msw/dx11/Common.h"
+#include <windows.h>
+#include <mfapi.h>
+#include <mferror.h>
+#include <mfidl.h>
+#include <evr.h>
+
+// Include these libraries.
+#pragma comment(lib, "mf.lib")
+#pragma comment(lib, "mfplat.lib")
+#pragma comment(lib, "mfuuid.lib")
+
+#pragma comment(lib, "winmm.lib") // for timeBeginPeriod and timeEndPeriod
+#pragma comment (lib,"uuid.lib")
+
+//#pragma comment(lib,"d3d9.lib")
+//#pragma comment(lib, "d3d11.lib")
+//#pragma comment(lib,"dxva2.lib")
+//#pragma comment (lib,"evr.lib")
+//#pragma comment (lib,"dcomp.lib")
 
 namespace cinder {
 namespace msw {
@@ -45,6 +65,70 @@ struct ScopedMFInitializer {
 		::MFShutdown();
 	}
 };
+
+//------------------------------------------------------------------------------------
+
+//! Converts a fixed-point to a float.
+inline float MFOffsetToFloat( const MFOffset& offset )
+{
+	return (float)offset.value + ( (float)offset.value / 65536.0f );
+}
+
+inline RECT MFVideoAreaToRect( const MFVideoArea area )
+{
+	float left = MFOffsetToFloat( area.OffsetX );
+	float top = MFOffsetToFloat( area.OffsetY );
+
+	RECT rc =
+	{
+		int( left + 0.5f ),
+		int( top + 0.5f ),
+		int( left + area.Area.cx + 0.5f ),
+		int( top + area.Area.cy + 0.5f )
+	};
+
+	return rc;
+}
+
+inline MFOffset MakeOffset( float v )
+{
+	MFOffset offset;
+	offset.value = short( v );
+	offset.fract = WORD( 65536 * ( v - offset.value ) );
+	return offset;
+}
+
+inline MFVideoArea MakeArea( float x, float y, DWORD width, DWORD height )
+{
+	MFVideoArea area;
+	area.OffsetX = MakeOffset( x );
+	area.OffsetY = MakeOffset( y );
+	area.Area.cx = width;
+	area.Area.cy = height;
+	return area;
+}
+
+//------------------------------------------------------------------------------------
+
+template <class Q>
+HRESULT GetEventObject( IMFMediaEvent *pEvent, Q **ppObject )
+{
+	*ppObject = NULL;
+
+	PROPVARIANT var;
+	HRESULT hr = pEvent->GetValue( &var );
+	if( SUCCEEDED( hr ) ) {
+		if( var.vt == VT_UNKNOWN ) {
+			hr = var.punkVal->QueryInterface( ppObject );
+		}
+		else {
+			hr = MF_E_INVALIDTYPE;
+		}
+		PropVariantClear( &var );
+	}
+
+	return hr;
+}
 
 //------------------------------------------------------------------------------------
 
@@ -129,7 +213,7 @@ private:
 
 private:
 	//! Makes sure Media Foundation is initialized. 
-	msw::ScopedMFInitializer   mInitializer;
+	ScopedMFInitializer  mInitializer;
 
 	State   mState;
 

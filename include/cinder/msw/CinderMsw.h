@@ -35,6 +35,9 @@
 #undef min
 #undef max
 
+namespace cinder {
+namespace msw {
+
 #ifndef LOWORD
 #define LOWORD(_dw)     ((WORD)(((DWORD_PTR)(_dw)) & 0xffff))
 #endif // !LOWORD
@@ -52,8 +55,7 @@
 #endif // !HIDWORD
 
 #ifndef BREAK_ON_FAIL
-//#define BREAK_ON_FAIL(value)          if( FAILED( value ) ) break;
-#define BREAK_ON_FAIL(value) if( FAILED(value) ) { CI_LOG_E("Fail:" << value); break; }
+#define BREAK_ON_FAIL(value)          if( FAILED( value ) ) break;
 #endif // !BREAK_ON_FAIL
 
 #ifndef BREAK_ON_NULL
@@ -67,9 +69,6 @@
 #undef COMPILE_ASSERT
 #define COMPILE_ASSERT(expr, msg)     static_assert(expr, #msg)
 
-namespace cinder {
-namespace msw {
-
 /** Converts a Win32 HBITMAP to a cinder::Surface8u
 	\note Currently always copies the alpha channel **/
 Surface8uRef convertHBitmap( HBITMAP hbitmap );
@@ -82,26 +81,58 @@ std::string toUtf8String( const std::wstring &wideString );
 //! Converts a Win32 POINTFX fixed point point to a cinder::vec2
 #if !defined ( CINDER_WINRT )
 inline vec2 toVec2( const ::POINTFX &p )
-{ return vec2( ( ( p.x.value << 16 ) | p.x.fract ) / 65535.0f, ( ( p.y.value << 16 ) | p.y.fract ) / 65535.0f ); }
+{
+	return vec2( ( ( p.x.value << 16 ) | p.x.fract ) / 65535.0f, ( ( p.y.value << 16 ) | p.y.fract ) / 65535.0f );
+}
 #endif
 
-////! Releases a COM pointer if the pointer is not NULL, and sets the pointer to NULL.
-//template <class T> inline void SafeRelease( T*& p )
-//{
-//	if( p ) {
-//		p->Release();
-//		p = NULL;
-//	}
-//}
-//
-////! Deletes a pointer allocated with new.
-//template <class T> inline void SafeDelete( T*& p )
-//{
-//	if( p ) {
-//		delete p;
-//		p = NULL;
-//	}
-//}
+//! Closes a handle if not NULL, and sets the handle to NULL.
+inline void SafeCloseHandle( HANDLE& h )
+{
+	if( h != NULL ) {
+		CloseHandle( h );
+		h = NULL;
+	}
+}
+
+//! Deletes a pointer allocated with new.
+template <class T> inline void SafeDelete( T*& pT )
+{
+	if( pT != NULL ) {
+		delete pT;
+		pT = NULL;
+	}
+}
+
+//! Deletes a pointer to an array allocated with new[].
+template <class T> inline void SafeDeleteArray( T*& pT )
+{
+	if( pT != NULL ) {
+		delete[] pT;
+		pT = NULL;
+	}
+}
+
+//! Releases a COM pointer if the pointer is not NULL, and sets the pointer to NULL.
+template <class T> inline void SafeRelease( T*& pT )
+{
+	if( pT != NULL ) {
+		pT->Release();
+		pT = NULL;
+	}
+}
+
+//! Converts a value in ticks to a value in milliseconds. One tick is 100 nanoseconds.
+template <class T> inline double TicksToMilliseconds( const T& t )
+{
+	return t / 10000.0;
+}
+
+//! Converts a value in milliseconds to a value in ticks. One tick is 100 nanoseconds.
+template <class T> inline T MillisecondsToTicks( const T& t )
+{
+	return t * 10000;
+}
 
 //! A free function designed to interact with makeComShared, calls Release() on a com-managed object
 void ComDelete( void *p );
@@ -115,14 +146,14 @@ struct ComDeleter {
 template<typename T>
 using ManagedComRef = std::shared_ptr<T>;
 
-//! Creates a shared_ptr whose deleter will properly decrement the reference count of a COM object
+//! Creates a shared_ptr whose deleter will properly decrement the reference count of a COM object.
 template<typename T>
 ManagedComRef<T> makeComShared( T *p ) { return ManagedComRef<T>( p, &ComDelete ); }
 
 template<typename T>
 using ManagedComPtr = std::unique_ptr<T, ComDeleter>;
 
-//! Creates a unique_ptr whose deleter will properly decrement the reference count of a COM object
+//! Creates a unique_ptr whose deleter will properly decrement the reference count of a COM object.
 template<typename T>
 ManagedComPtr<T> makeComUnique( T *p ) { return ManagedComPtr<T>( p ); }
 
@@ -189,6 +220,7 @@ private:
 //! Initializes COM on this thread. Uses thread local storage to prevent multiple initializations per thread
 void initializeCom( DWORD params = COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE );
 
+//! Copies a COM pointer and takes care of proper reference counting.
 template <class T>
 void CopyComPtr( T*& dest, T* src )
 {
@@ -201,6 +233,7 @@ void CopyComPtr( T*& dest, T* src )
 	}
 }
 
+//! Compares two COM pointers and returns \c true if they are equal.
 template <class T1, class T2>
 bool AreComObjectsEqual( T1 *p1, T2 *p2 )
 {
@@ -215,8 +248,8 @@ bool AreComObjectsEqual( T1 *p1, T2 *p2 )
 	else {
 		// Both are not NULL. Compare IUnknowns.
 		ScopedComPtr<IUnknown> pUnk1, pUnk2;
-		if( SUCCEEDED( p1->QueryInterface( IID_IUnknown, (void**) &pUnk1 ) ) ) {
-			if( SUCCEEDED( p2->QueryInterface( IID_IUnknown, (void**) &pUnk2 ) ) ) {
+		if( SUCCEEDED( p1->QueryInterface( IID_IUnknown, (void**)&pUnk1 ) ) ) {
+			if( SUCCEEDED( p2->QueryInterface( IID_IUnknown, (void**)&pUnk2 ) ) ) {
 				return ( pUnk1 == pUnk2 );
 			}
 		}

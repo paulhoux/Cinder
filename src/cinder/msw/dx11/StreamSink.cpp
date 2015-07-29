@@ -1,5 +1,7 @@
 #include "cinder/msw/dx11/StreamSink.h"
 
+#include <assert.h>
+
 namespace cinder {
 namespace msw {
 
