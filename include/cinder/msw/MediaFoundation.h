@@ -90,7 +90,7 @@ inline RECT MFVideoAreaToRect( const MFVideoArea area )
 	return rc;
 }
 
-inline MFOffset MakeOffset( float v )
+inline MFOffset MFMakeOffset( float v )
 {
 	MFOffset offset;
 	offset.value = short( v );
@@ -98,11 +98,11 @@ inline MFOffset MakeOffset( float v )
 	return offset;
 }
 
-inline MFVideoArea MakeArea( float x, float y, DWORD width, DWORD height )
+inline MFVideoArea MFMakeArea( float x, float y, DWORD width, DWORD height )
 {
 	MFVideoArea area;
-	area.OffsetX = MakeOffset( x );
-	area.OffsetY = MakeOffset( y );
+	area.OffsetX = MFMakeOffset( x );
+	area.OffsetY = MFMakeOffset( y );
 	area.Area.cx = width;
 	area.Area.cy = height;
 	return area;
@@ -111,7 +111,7 @@ inline MFVideoArea MakeArea( float x, float y, DWORD width, DWORD height )
 //------------------------------------------------------------------------------------
 
 template <class Q>
-HRESULT GetEventObject( IMFMediaEvent *pEvent, Q **ppObject )
+HRESULT MFGetEventObject( IMFMediaEvent *pEvent, Q **ppObject )
 {
 	*ppObject = NULL;
 
@@ -134,7 +134,7 @@ HRESULT GetEventObject( IMFMediaEvent *pEvent, Q **ppObject )
 
 class MFPlayer : public IMFAsyncCallback {
 public:
-	typedef enum {
+	typedef enum State {
 		Closed = 0,     // No session.
 		Ready,          // Session was created, ready to open a file. 
 		OpenPending,    // Session is opening a file.
@@ -142,7 +142,7 @@ public:
 		Paused,         // Session is paused.
 		Stopped,        // Session is stopped (ready to play). 
 		Closing         // Application has closed the session, but is waiting for MESessionClosed.
-	} State;
+	};
 
 public:
 	MFPlayer();

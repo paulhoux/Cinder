@@ -265,7 +265,7 @@ HRESULT MFPlayer::OnNewPresentation( IMFMediaEvent *pEvent )
 	do {
 		// Get the presentation descriptor from the event.
 		ScopedComPtr<IMFPresentationDescriptor> pPD;
-		hr = GetEventObject( pEvent, &pPD );
+		hr = MFGetEventObject( pEvent, &pPD );
 		BREAK_ON_FAIL( hr );
 
 		// Create a partial topology.

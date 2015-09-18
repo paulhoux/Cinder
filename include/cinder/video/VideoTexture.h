@@ -34,6 +34,11 @@ public:
 	//! Stops video playback.
 	void stop() override;
 
+	//! Draws the video at full resolution.
+	void draw() override {}
+	//! Draws the video using the specified \a bounds.
+	void draw( const ci::Area &bounds ) override {}
+
 	const Texture2dRef getTexture() const;
 
 private:
