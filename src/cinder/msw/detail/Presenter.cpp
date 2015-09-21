@@ -1,11 +1,15 @@
-#include "cinder/msw/dx11/Presenter.h"
+#include "cinder/msw/MediaFoundation.h"
+#include "cinder/msw/detail/Presenter.h"
+
+#pragma comment(lib, "d3d11.lib")
 
 namespace cinder {
 namespace msw {
+namespace detail {
 
 /////////////////////////////////////////////////////////////////////////////////////////////
 //
-// CPresenter class. - Presents samples using DX11.
+// Presenter class. - Presents samples using DX11.
 //
 // Notes:
 // - Most public methods calls CheckShutdown. This method fails if the presenter was shut down.
@@ -13,73 +17,77 @@ namespace msw {
 /////////////////////////////////////////////////////////////////////////////////////////////
 
 //-------------------------------------------------------------------
-// CPresenter constructor.
+// Presenter constructor.
 //-------------------------------------------------------------------
 
-CPresenter::CPresenter( void ) :
-	m_nRefCount( 1 ),
-	m_critSec(), // default ctor
-	m_IsShutdown( FALSE ),
-	m_pDXGIFactory2( NULL ),
-	m_pD3D11Device( NULL ),
-	m_pD3DImmediateContext( NULL ),
-	m_pDXGIManager( NULL ),
-	m_pDXGIOutput1( NULL ),
-	m_pSampleAllocatorEx( NULL ),
-	//m_pDCompDevice(NULL),
-	//m_pHwndTarget(NULL),
-	//m_pRootVisual(NULL),
-	m_bSoftwareDXVADeviceInUse( FALSE ),
-	m_hwndVideo( NULL ),
-	m_pMonitors( NULL ),
-	m_lpCurrMon( NULL ),
-	m_DeviceResetToken( 0 ),
-	m_DXSWSwitch( 0 ),
-	m_useXVP( 1 ),
-	m_useDCompVisual( 0 ),
-	m_useDebugLayer( D3D11_CREATE_DEVICE_VIDEO_SUPPORT ),
-	m_pDX11VideoDevice( NULL ),
-	m_pVideoProcessorEnum( NULL ),
-	m_pVideoProcessor( NULL ),
-	m_pSwapChain1( NULL ),
-	m_bDeviceChanged( FALSE ),
-	m_bResize( TRUE ),
-	m_b3DVideo( FALSE ),
-	m_bStereoEnabled( FALSE ),
-	//m_vp3DOutput(MFVideo3DSampleFormat_BaseView),
-	m_bFullScreenState( FALSE ),
-	m_bCanProcessNextSample( TRUE ),
-	m_displayRect(), // default ctor
-	m_imageWidthInPixels( 0 ),
-	m_imageHeightInPixels( 0 ),
-	m_uiRealDisplayWidth( 0 ),
-	m_uiRealDisplayHeight( 0 ),
-	m_rcSrcApp(), // default ctor
-	m_rcDstApp(), // default ctor
-	m_pXVP( NULL )
-	//m_pXVPControl(NULL)
+Presenter::Presenter( void )
+	: m_nRefCount( 1 )
+	, m_critSec() // default ctor
+	, m_IsShutdown( FALSE )
+	, m_pDXGIFactory2( NULL )
+	, m_pDXGIManager( NULL )
+	, m_pDXGIOutput1( NULL )
+	, m_pSampleAllocatorEx( NULL )
+	//, m_pDCompDevice(NULL)
+	//, m_pHwndTarget(NULL)
+	//, m_pRootVisual(NULL)
+	, m_bSoftwareDXVADeviceInUse( FALSE )
+	, m_hwndVideo( NULL )
+	, m_pMonitors( NULL )
+	, m_lpCurrMon( NULL )
+	, m_DeviceResetToken( 0 )
+	, m_DXSWSwitch( 0 )
+	, m_useDCompVisual( 0 )
+	, m_useDebugLayer( D3D11_CREATE_DEVICE_VIDEO_SUPPORT )
+	, m_pD3DDevice( NULL )
+	, m_pVideoDevice( NULL )
+	, m_pD3DImmediateContext( NULL )
+	, m_pVideoProcessorEnum( NULL )
+	, m_pVideoProcessor( NULL )
+	, m_pSwapChain1( NULL )
+	, m_bDeviceChanged( FALSE )
+	, m_bResize( TRUE )
+	, m_b3DVideo( FALSE )
+	, m_bStereoEnabled( FALSE )
+	//, m_vp3DOutput(MFVideo3DSampleFormat_BaseView)
+	, m_bFullScreenState( FALSE )
+	, m_bCanProcessNextSample( TRUE )
+	, m_displayRect() // default ctor
+	, m_imageWidthInPixels( 0 )
+	, m_imageHeightInPixels( 0 )
+	, m_uiRealDisplayWidth( 0 )
+	, m_uiRealDisplayHeight( 0 )
+	, m_rcSrcApp() // default ctor
+	, m_rcDstApp() // default ctor
+	, m_pXVP( NULL )
+	//, m_pXVPControl(NULL)
+#if (WINVER >= _WIN32_WINNT_WIN8) 
+	, m_useXVP( TRUE )
+#else
+	, m_useXVP( FALSE )
+#endif
 {
 	ZeroMemory( &m_rcSrcApp, sizeof( m_rcSrcApp ) );
 	ZeroMemory( &m_rcDstApp, sizeof( m_rcDstApp ) );
 }
 
 //-------------------------------------------------------------------
-// CPresenter destructor.
+// Presenter destructor.
 //-------------------------------------------------------------------
 
-CPresenter::~CPresenter( void )
+Presenter::~Presenter( void )
 {
 	SafeDelete( m_pMonitors );
 }
 
 // IUnknown
-ULONG CPresenter::AddRef( void )
+ULONG Presenter::AddRef( void )
 {
 	return InterlockedIncrement( &m_nRefCount );
 }
 
 // IUnknown
-HRESULT CPresenter::QueryInterface( REFIID iid, __RPC__deref_out _Result_nullonfailure_ void** ppv )
+HRESULT Presenter::QueryInterface( REFIID iid, __RPC__deref_out _Result_nullonfailure_ void** ppv )
 {
 	if( !ppv ) {
 		return E_POINTER;
@@ -102,7 +110,7 @@ HRESULT CPresenter::QueryInterface( REFIID iid, __RPC__deref_out _Result_nullonf
 }
 
 // IUnknown
-ULONG  CPresenter::Release( void )
+ULONG  Presenter::Release( void )
 {
 	ULONG uCount = InterlockedDecrement( &m_nRefCount );
 	if( uCount == 0 ) {
@@ -113,9 +121,9 @@ ULONG  CPresenter::Release( void )
 }
 
 // IMFVideoDisplayControl
-HRESULT CPresenter::GetFullscreen( __RPC__out BOOL* pfFullscreen )
+HRESULT Presenter::GetFullscreen( __RPC__out BOOL* pfFullscreen )
 {
-	CAutoLock lock( &m_critSec );
+	ScopedCriticalSection lock( m_critSec );
 
 	HRESULT hr = CheckShutdown();
 	if( FAILED( hr ) ) {
@@ -132,16 +140,16 @@ HRESULT CPresenter::GetFullscreen( __RPC__out BOOL* pfFullscreen )
 }
 
 // IMFVideoDisplayControl
-HRESULT CPresenter::SetFullscreen( BOOL fFullscreen )
+HRESULT Presenter::SetFullscreen( BOOL fFullscreen )
 {
-	CAutoLock lock( &m_critSec );
+	ScopedCriticalSection lock( m_critSec );
 
 	HRESULT hr = CheckShutdown();
 
 	if( SUCCEEDED( hr ) ) {
 		m_bFullScreenState = fFullscreen;
 
-		SafeRelease( m_pDX11VideoDevice );
+		SafeRelease( m_pVideoDevice );
 		SafeRelease( m_pVideoProcessorEnum );
 		SafeRelease( m_pVideoProcessor );
 	}
@@ -150,11 +158,11 @@ HRESULT CPresenter::SetFullscreen( BOOL fFullscreen )
 }
 
 // IMFVideoDisplayControl
-HRESULT CPresenter::SetVideoWindow( __RPC__in HWND hwndVideo )
+HRESULT Presenter::SetVideoWindow( __RPC__in HWND hwndVideo )
 {
 	HRESULT hr = S_OK;
 
-	CAutoLock lock( &m_critSec );
+	ScopedCriticalSection lock( m_critSec );
 
 	do {
 		hr = CheckShutdown();
@@ -167,7 +175,7 @@ HRESULT CPresenter::SetVideoWindow( __RPC__in HWND hwndVideo )
 			break;
 		}
 
-		m_pMonitors = new CMonitorArray();
+		m_pMonitors = new MonitorArray();
 		if( !m_pMonitors ) {
 			hr = E_OUTOFMEMORY;
 			break;
@@ -203,7 +211,7 @@ HRESULT CPresenter::SetVideoWindow( __RPC__in HWND hwndVideo )
 // Description: IMFGetService
 //-------------------------------------------------------------------------
 
-HRESULT CPresenter::GetService( __RPC__in REFGUID guidService, __RPC__in REFIID riid, __RPC__deref_out_opt LPVOID* ppvObject )
+HRESULT Presenter::GetService( __RPC__in REFGUID guidService, __RPC__in REFIID riid, __RPC__deref_out_opt LPVOID* ppvObject )
 {
 	HRESULT hr = S_OK;
 
@@ -242,14 +250,14 @@ HRESULT CPresenter::GetService( __RPC__in REFGUID guidService, __RPC__in REFIID 
 	return hr;
 }
 
-BOOL CPresenter::CanProcessNextSample( void )
+BOOL Presenter::CanProcessNextSample( void )
 {
 	return m_bCanProcessNextSample;
 }
 
-HRESULT CPresenter::Flush( void )
+HRESULT Presenter::Flush( void )
 {
-	CAutoLock lock( &m_critSec );
+	ScopedCriticalSection lock( m_critSec );
 
 	HRESULT hr = CheckShutdown();
 
@@ -262,7 +270,7 @@ HRESULT CPresenter::Flush( void )
 	return hr;
 }
 
-HRESULT CPresenter::GetMonitorRefreshRate( DWORD* pdwRefreshRate )
+HRESULT Presenter::GetMonitorRefreshRate( DWORD* pdwRefreshRate )
 {
 	if( pdwRefreshRate == NULL ) {
 		return E_POINTER;
@@ -277,11 +285,9 @@ HRESULT CPresenter::GetMonitorRefreshRate( DWORD* pdwRefreshRate )
 	return S_OK;
 }
 
-HRESULT CPresenter::IsMediaTypeSupported( IMFMediaType* pMediaType, DXGI_FORMAT dxgiFormat )
+HRESULT Presenter::IsMediaTypeSupported( IMFMediaType* pMediaType, DXGI_FORMAT dxgiFormat )
 {
 	HRESULT hr = S_OK;
-	UINT32 uiNumerator = 30000, uiDenominator = 1001;
-	UINT32 uimageWidthInPixels, uimageHeightInPixels = 0;
 
 	do {
 		hr = CheckShutdown();
@@ -294,23 +300,24 @@ HRESULT CPresenter::IsMediaTypeSupported( IMFMediaType* pMediaType, DXGI_FORMAT 
 			break;
 		}
 
-		if( !m_pDX11VideoDevice ) {
-			hr = m_pD3D11Device->QueryInterface( __uuidof( ID3D11VideoDevice ), (void**)&m_pDX11VideoDevice );
+#if MF_PRESENTER_USE_DX11
+		if( !m_pVideoDevice ) {
+			hr = m_pD3DDevice->QueryInterface( __uuidof( ID3D11VideoDevice ), (void**)&m_pVideoDevice );
 			if( FAILED( hr ) ) {
 				break;
 			}
 		}
 
+		UINT32 uimageWidthInPixels, uimageHeightInPixels = 0;
 		hr = MFGetAttributeSize( pMediaType, MF_MT_FRAME_SIZE, &uimageWidthInPixels, &uimageHeightInPixels );
-
 		if( FAILED( hr ) ) {
 			break;
 		}
 
+		UINT32 uiNumerator = 30000, uiDenominator = 1001;
 		MFGetAttributeRatio( pMediaType, MF_MT_FRAME_RATE, &uiNumerator, &uiDenominator );
 
 		//Check if the format is supported
-
 		D3D11_VIDEO_PROCESSOR_CONTENT_DESC ContentDesc;
 		ZeroMemory( &ContentDesc, sizeof( ContentDesc ) );
 		ContentDesc.InputFrameFormat = D3D11_VIDEO_FRAME_FORMAT_INTERLACED_TOP_FIELD_FIRST;
@@ -325,7 +332,7 @@ HRESULT CPresenter::IsMediaTypeSupported( IMFMediaType* pMediaType, DXGI_FORMAT 
 		ContentDesc.Usage = D3D11_VIDEO_USAGE_PLAYBACK_NORMAL;
 
 		SafeRelease( m_pVideoProcessorEnum );
-		hr = m_pDX11VideoDevice->CreateVideoProcessorEnumerator( &ContentDesc, &m_pVideoProcessorEnum );
+		hr = m_pVideoDevice->CreateVideoProcessorEnumerator( &ContentDesc, &m_pVideoProcessorEnum );
 		if( FAILED( hr ) ) {
 			break;
 		}
@@ -343,6 +350,66 @@ HRESULT CPresenter::IsMediaTypeSupported( IMFMediaType* pMediaType, DXGI_FORMAT 
 				break;
 			}
 		}
+#else
+		// Reject compressed media types.
+		BOOL bCompressed = FALSE;
+		hr = pMediaType->IsCompressedFormat( &bCompressed );
+		if( FAILED( hr ) ) {
+			return hr;
+		}
+
+		if( bCompressed ) {
+			return MF_E_INVALIDMEDIATYPE;
+		}
+
+		// Validate the format.
+		GUID guidSubType = GUID_NULL;
+		hr = pMediaType->GetGUID( MF_MT_SUBTYPE, &guidSubType );
+		if( FAILED( hr ) ) {
+			return hr;
+		}
+
+		D3DFORMAT d3dFormat = ( D3DFORMAT) guidSubType.Data1;
+
+		// The D3DPresentEngine9 checks whether the format can be used as
+		// the back-buffer format for the swap chains.
+		hr = mD3DPresentEnginePtr->CheckFormat( d3dFormat );
+		if( FAILED( hr ) ) {
+			return hr;
+		}
+
+		// Reject interlaced formats.
+		MFVideoInterlaceMode    InterlaceMode = MFVideoInterlace_Unknown;
+		hr = pMediaType->GetUINT32( MF_MT_INTERLACE_MODE, (UINT32*) &InterlaceMode );
+		if( FAILED( hr ) ) {
+			return hr;
+		}
+
+		if( InterlaceMode != MFVideoInterlace_Progressive ) {
+			return MF_E_INVALIDMEDIATYPE;
+		}
+
+		// Retrieve width and height.
+		UINT32 width = 0, height = 0;
+		hr = MFGetAttributeSize( pMediaType, MF_MT_FRAME_SIZE, &width, &height );
+		if( FAILED( hr ) ) {
+			return hr;
+		}
+
+		//// Validate the various apertures (cropping regions) against the frame size.
+		//// Any of these apertures may be unspecified in the media type, in which case 
+		//// we ignore it. We just want to reject invalid apertures.
+		//MFVideoArea VideoCropArea;
+		//if( SUCCEEDED( pMediaType->GetBlob( MF_MT_PAN_SCAN_APERTURE, (UINT8*) &VideoCropArea, sizeof( MFVideoArea ), NULL ) ) ) {
+		//	hr = ValidateVideoArea( VideoCropArea, width, height );
+		//}
+		//if( SUCCEEDED( pMediaType->GetBlob( MF_MT_GEOMETRIC_APERTURE, (UINT8*) &VideoCropArea, sizeof( MFVideoArea ), NULL ) ) ) {
+		//	hr = ValidateVideoArea( VideoCropArea, width, height );
+		//}
+		//if( SUCCEEDED( pMediaType->GetBlob( MF_MT_MINIMUM_DISPLAY_APERTURE, (UINT8*) &VideoCropArea, sizeof( MFVideoArea ), NULL ) ) ) {
+		//	hr = ValidateVideoArea( VideoCropArea, width, height );
+		//}
+#endif
 	} while( FALSE );
 
 	return hr;
@@ -356,11 +423,11 @@ HRESULT CPresenter::IsMediaTypeSupported( IMFMediaType* pMediaType, DXGI_FORMAT 
 //
 //--------------------------------------------------------------------------
 
-HRESULT CPresenter::PresentFrame( void )
+HRESULT Presenter::PresentFrame( void )
 {
 	HRESULT hr = S_OK;
 
-	CAutoLock lock( &m_critSec );
+	ScopedCriticalSection lock( m_critSec );
 
 	do {
 		hr = CheckShutdown();
@@ -395,7 +462,7 @@ HRESULT CPresenter::PresentFrame( void )
 // Description: Present one media sample.
 //-------------------------------------------------------------------
 
-HRESULT CPresenter::ProcessFrame( IMFMediaType* pCurrentType, IMFSample* pSample, UINT32* punInterlaceMode, BOOL* pbDeviceChanged, BOOL* pbProcessAgain, IMFSample** ppOutputSample )
+HRESULT Presenter::ProcessFrame( IMFMediaType* pCurrentType, IMFSample* pSample, UINT32* punInterlaceMode, BOOL* pbDeviceChanged, BOOL* pbProcessAgain, IMFSample** ppOutputSample )
 {
 	HRESULT hr = S_OK;
 	BYTE* pData = NULL;
@@ -411,7 +478,7 @@ HRESULT CPresenter::ProcessFrame( IMFMediaType* pCurrentType, IMFSample* pSample
 	UINT dwViewIndex = 0;
 	UINT dwEVViewIndex = 0;
 
-	CAutoLock lock( &m_critSec );
+	ScopedCriticalSection lock( m_critSec );
 
 	do {
 		hr = CheckShutdown();
@@ -524,7 +591,7 @@ HRESULT CPresenter::ProcessFrame( IMFMediaType* pCurrentType, IMFSample* pSample
 		}
 
 		pTexture2D->GetDevice( &pDeviceInput );
-		if( ( NULL == pDeviceInput ) || ( pDeviceInput != m_pD3D11Device ) ) {
+		if( ( NULL == pDeviceInput ) || ( pDeviceInput != m_pD3DDevice ) ) {
 			break;
 		}
 
@@ -571,12 +638,12 @@ HRESULT CPresenter::ProcessFrame( IMFMediaType* pCurrentType, IMFSample* pSample
 	return hr;
 }
 
-HRESULT CPresenter::SetCurrentMediaType( IMFMediaType* pMediaType )
+HRESULT Presenter::SetCurrentMediaType( IMFMediaType* pMediaType )
 {
 	HRESULT hr = S_OK;
 	IMFAttributes* pAttributes = NULL;
 
-	CAutoLock lock( &m_critSec );
+	ScopedCriticalSection lock( m_critSec );
 
 	do {
 		hr = CheckShutdown();
@@ -650,9 +717,9 @@ HRESULT CPresenter::SetCurrentMediaType( IMFMediaType* pMediaType )
 // Description: Releases resources held by the presenter.
 //-------------------------------------------------------------------
 
-HRESULT CPresenter::Shutdown( void )
+HRESULT Presenter::Shutdown( void )
 {
-	CAutoLock lock( &m_critSec );
+	ScopedCriticalSection lock( m_critSec );
 
 	HRESULT hr = MF_E_SHUTDOWN;
 
@@ -660,16 +727,18 @@ HRESULT CPresenter::Shutdown( void )
 
 	SafeRelease( m_pDXGIManager );
 	SafeRelease( m_pDXGIFactory2 );
-	SafeRelease( m_pD3D11Device );
+	SafeRelease( m_pD3DDevice );
 	SafeRelease( m_pD3DImmediateContext );
 	SafeRelease( m_pDXGIOutput1 );
 	SafeRelease( m_pSampleAllocatorEx );
 	//SafeRelease(m_pDCompDevice);
 	//SafeRelease(m_pHwndTarget);
 	//SafeRelease(m_pRootVisual);
-	//SafeRelease(m_pXVPControl);
+#if (WINVER >= _WIN32_WINNT_WIN8) 
+	SafeRelease( m_pXVPControl );
+#endif
 	SafeRelease( m_pXVP );
-	SafeRelease( m_pDX11VideoDevice );
+	SafeRelease( m_pVideoDevice );
 	SafeRelease( m_pVideoProcessor );
 	SafeRelease( m_pVideoProcessorEnum );
 	SafeRelease( m_pSwapChain1 );
@@ -689,7 +758,7 @@ HRESULT CPresenter::Shutdown( void )
 //
 //--------------------------------------------------------------------------
 
-void CPresenter::AspectRatioCorrectSize(
+void Presenter::AspectRatioCorrectSize(
 	LPSIZE lpSizeImage,     // size to be aspect ratio corrected
 	const SIZE& sizeAr,     // aspect ratio of image
 	const SIZE& sizeOrig,   // original image size
@@ -712,7 +781,7 @@ void CPresenter::AspectRatioCorrectSize(
 	}
 }
 
-void CPresenter::CheckDecodeSwitchRegKey( void )
+void Presenter::CheckDecodeSwitchRegKey( void )
 {
 	const TCHAR* lpcszDXSW = TEXT( "DXSWSwitch" );
 	const TCHAR* lpcszInVP = TEXT( "XVP" );
@@ -755,7 +824,7 @@ void CPresenter::CheckDecodeSwitchRegKey( void )
 	return;
 }
 
-HRESULT CPresenter::CheckDeviceState( BOOL* pbDeviceChanged )
+HRESULT Presenter::CheckDeviceState( BOOL* pbDeviceChanged )
 {
 	if( pbDeviceChanged == NULL ) {
 		return E_POINTER;
@@ -769,7 +838,7 @@ HRESULT CPresenter::CheckDeviceState( BOOL* pbDeviceChanged )
 		return hr;
 	}
 
-	if( m_pD3D11Device != NULL ) {
+	if( m_pD3DDevice != NULL ) {
 		// Lost/hung device. Destroy the device and create a new one.
 		if( S_FALSE == hr || ( m_DXSWSwitch > 0 && deviceStateChecks == m_DXSWSwitch ) ) {
 			if( m_DXSWSwitch > 0 && deviceStateChecks == m_DXSWSwitch ) {
@@ -783,7 +852,7 @@ HRESULT CPresenter::CheckDeviceState( BOOL* pbDeviceChanged )
 
 			*pbDeviceChanged = TRUE;
 
-			SafeRelease( m_pDX11VideoDevice );
+			SafeRelease( m_pVideoDevice );
 			SafeRelease( m_pVideoProcessorEnum );
 			SafeRelease( m_pVideoProcessor );
 			SafeRelease( m_pSwapChain1 );
@@ -796,14 +865,14 @@ HRESULT CPresenter::CheckDeviceState( BOOL* pbDeviceChanged )
 	return hr;
 }
 
-BOOL CPresenter::CheckEmptyRect( RECT* pDst )
+BOOL Presenter::CheckEmptyRect( RECT* pDst )
 {
 	GetClientRect( m_hwndVideo, pDst );
 
 	return IsRectEmpty( pDst );
 }
 
-HRESULT CPresenter::CheckShutdown( void ) const
+HRESULT Presenter::CheckShutdown( void ) const
 {
 	if( m_IsShutdown ) {
 		return MF_E_SHUTDOWN;
@@ -813,13 +882,13 @@ HRESULT CPresenter::CheckShutdown( void ) const
 	}
 }
 
-HRESULT CPresenter::CreateDCompDeviceAndVisual( void )
+HRESULT Presenter::CreateDCompDeviceAndVisual( void )
 {
 	HRESULT hr = S_OK;
 	IDXGIDevice* pDXGIDevice = NULL;
 
 	do {
-		hr = m_pD3D11Device->QueryInterface( __uuidof( IDXGIDevice ), reinterpret_cast<void**>( &pDXGIDevice ) );
+		hr = m_pD3DDevice->QueryInterface( __uuidof( IDXGIDevice ), reinterpret_cast<void**>( &pDXGIDevice ) );
 		if( FAILED( hr ) ) {
 			break;
 		}
@@ -858,7 +927,7 @@ HRESULT CPresenter::CreateDCompDeviceAndVisual( void )
 //       IDX11VideoRenderer.
 //-------------------------------------------------------------------
 
-HRESULT CPresenter::CreateDXGIManagerAndDevice( D3D_DRIVER_TYPE DriverType )
+HRESULT Presenter::CreateDXGIManagerAndDevice( D3D_DRIVER_TYPE DriverType )
 {
 	HRESULT hr = S_OK;
 
@@ -868,20 +937,20 @@ HRESULT CPresenter::CreateDXGIManagerAndDevice( D3D_DRIVER_TYPE DriverType )
 	IDXGIAdapter1* pAdapter = NULL;
 	IDXGIOutput* pDXGIOutput = NULL;
 
-	D3D_FEATURE_LEVEL featureLevels[] = { D3D_FEATURE_LEVEL_11_1, D3D_FEATURE_LEVEL_11_0, D3D_FEATURE_LEVEL_10_1, D3D_FEATURE_LEVEL_10_0, D3D_FEATURE_LEVEL_9_3, D3D_FEATURE_LEVEL_9_2, D3D_FEATURE_LEVEL_9_1 };
+	D3D_FEATURE_LEVEL featureLevels[] = { /* D3D_FEATURE_LEVEL_11_1, D3D_FEATURE_LEVEL_11_0, D3D_FEATURE_LEVEL_10_1, D3D_FEATURE_LEVEL_10_0, */ D3D_FEATURE_LEVEL_9_3, D3D_FEATURE_LEVEL_9_2, D3D_FEATURE_LEVEL_9_1 };
 	D3D_FEATURE_LEVEL featureLevel;
 	UINT resetToken;
 
 	do {
-		SafeRelease( m_pD3D11Device );
+		SafeRelease( m_pD3DDevice );
 		if( D3D_DRIVER_TYPE_WARP == DriverType ) {
 			ID3D11Device* pD3D11Device = NULL;
 
 			hr = D3D11CreateDevice( NULL, D3D_DRIVER_TYPE_HARDWARE, NULL, m_useDebugLayer, featureLevels, ARRAYSIZE( featureLevels ), D3D11_SDK_VERSION, &pD3D11Device, &featureLevel, NULL );
 
 			if( SUCCEEDED( hr ) ) {
-				m_pD3D11Device = new CPrivate_ID3D11Device( pD3D11Device );
-				if( NULL == m_pD3D11Device ) {
+				m_pD3DDevice = new CPrivate_ID3D11Device( pD3D11Device );
+				if( NULL == m_pD3DDevice ) {
 					E_OUTOFMEMORY;
 				}
 			}
@@ -889,16 +958,16 @@ HRESULT CPresenter::CreateDXGIManagerAndDevice( D3D_DRIVER_TYPE DriverType )
 		}
 		else {
 			for( DWORD dwCount = 0; dwCount < ARRAYSIZE( featureLevels ); dwCount++ ) {
-				hr = D3D11CreateDevice( NULL, DriverType, NULL, m_useDebugLayer, &featureLevels[dwCount], 1, D3D11_SDK_VERSION, &m_pD3D11Device, &featureLevel, NULL );
+				hr = D3D11CreateDevice( NULL, DriverType, NULL, m_useDebugLayer, &featureLevels[dwCount], 1, D3D11_SDK_VERSION, &m_pD3DDevice, &featureLevel, NULL );
 				if( SUCCEEDED( hr ) ) {
 					ID3D11VideoDevice* pDX11VideoDevice = NULL;
-					hr = m_pD3D11Device->QueryInterface( __uuidof( ID3D11VideoDevice ), (void**)&pDX11VideoDevice );
+					hr = m_pD3DDevice->QueryInterface( __uuidof( ID3D11VideoDevice ), (void**)&pDX11VideoDevice );
 					SafeRelease( pDX11VideoDevice );
 
 					if( SUCCEEDED( hr ) ) {
 						break;
 					}
-					SafeRelease( m_pD3D11Device );
+					SafeRelease( m_pD3DDevice );
 				}
 			}
 		}
@@ -915,13 +984,13 @@ HRESULT CPresenter::CreateDXGIManagerAndDevice( D3D_DRIVER_TYPE DriverType )
 			m_DeviceResetToken = resetToken;
 		}
 
-		hr = m_pDXGIManager->ResetDevice( m_pD3D11Device, m_DeviceResetToken );
+		hr = m_pDXGIManager->ResetDevice( m_pD3DDevice, m_DeviceResetToken );
 		if( FAILED( hr ) ) {
 			break;
 		}
 
 		SafeRelease( m_pD3DImmediateContext );
-		m_pD3D11Device->GetImmediateContext( &m_pD3DImmediateContext );
+		m_pD3DDevice->GetImmediateContext( &m_pD3DImmediateContext );
 
 		// Need to explitly set the multithreaded mode for this device
 		hr = m_pD3DImmediateContext->QueryInterface( __uuidof( ID3D10Multithread ), (void**)&pMultiThread );
@@ -931,7 +1000,7 @@ HRESULT CPresenter::CreateDXGIManagerAndDevice( D3D_DRIVER_TYPE DriverType )
 
 		pMultiThread->SetMultithreadProtected( TRUE );
 
-		hr = m_pD3D11Device->QueryInterface( __uuidof( IDXGIDevice1 ), (LPVOID*)&pDXGIDev );
+		hr = m_pD3DDevice->QueryInterface( __uuidof( IDXGIDevice1 ), (LPVOID*)&pDXGIDev );
 		if( FAILED( hr ) ) {
 			break;
 		}
@@ -985,7 +1054,7 @@ HRESULT CPresenter::CreateDXGIManagerAndDevice( D3D_DRIVER_TYPE DriverType )
 // Description: Creates a new instance of the XVP MFT.
 //-------------------------------------------------------------------
 
-HRESULT CPresenter::CreateXVP( void )
+HRESULT Presenter::CreateXVP( void )
 {
 	HRESULT hr = S_OK;
 	IMFAttributes* pAttributes = NULL;
@@ -1012,7 +1081,11 @@ HRESULT CPresenter::CreateXVP( void )
 			break;
 		}
 
-		hr = E_NOTIMPL; // m_pXVP->QueryInterface( IID_PPV_ARGS( &m_pXVPControl ) );
+#if (WINVER >= _WIN32_WINNT_WIN8) 
+		hr = m_pXVP->QueryInterface( IID_PPV_ARGS( &m_pXVPControl ) );
+#else
+		hr = E_NOTIMPL;
+#endif
 		if( FAILED( hr ) ) {
 			break;
 		}
@@ -1033,7 +1106,7 @@ HRESULT CPresenter::CreateXVP( void )
 //
 //--------------------------------------------------------------------------
 
-HRESULT CPresenter::FindBOBProcessorIndex( DWORD* pIndex )
+HRESULT Presenter::FindBOBProcessorIndex( DWORD* pIndex )
 {
 	HRESULT hr = S_OK;
 	D3D11_VIDEO_PROCESSOR_CAPS caps = {};
@@ -1065,7 +1138,7 @@ HRESULT CPresenter::FindBOBProcessorIndex( DWORD* pIndex )
 // Description: get the display area from the media type.
 //-------------------------------------------------------------------
 
-HRESULT CPresenter::GetVideoDisplayArea( IMFMediaType* pType, MFVideoArea* pArea )
+HRESULT Presenter::GetVideoDisplayArea( IMFMediaType* pType, MFVideoArea* pArea )
 {
 	HRESULT hr = S_OK;
 	BOOL bPanScan = FALSE;
@@ -1125,7 +1198,7 @@ HRESULT CPresenter::GetVideoDisplayArea( IMFMediaType* pType, MFVideoArea* pArea
 		// Default: Use the entire video area.
 
 		if( hr == MF_E_ATTRIBUTENOTFOUND ) {
-			*pArea = MakeArea( 0.0, 0.0, m_imageWidthInPixels, m_imageHeightInPixels );
+			*pArea = MFMakeArea( 0.0, 0.0, m_imageWidthInPixels, m_imageHeightInPixels );
 			hr = S_OK;
 		}
 	}
@@ -1148,7 +1221,7 @@ HRESULT CPresenter::GetVideoDisplayArea( IMFMediaType* pType, MFVideoArea* pArea
 //
 //--------------------------------------------------------------------------
 
-void CPresenter::LetterBoxDstRect(
+void Presenter::LetterBoxDstRect(
 	LPRECT lprcLBDst,     // output letterboxed rectangle
 	const RECT& rcSrc,    // input source rectangle
 	const RECT& rcDst     // input destination rectangle
@@ -1205,7 +1278,7 @@ void CPresenter::LetterBoxDstRect(
 //
 //--------------------------------------------------------------------------
 
-void CPresenter::PixelAspectToPictureAspect(
+void Presenter::PixelAspectToPictureAspect(
 	int Width,
 	int Height,
 	int PixelAspectX,
@@ -1253,7 +1326,7 @@ void CPresenter::PixelAspectToPictureAspect(
 		);
 }
 
-HRESULT CPresenter::ProcessFrameUsingD3D11( ID3D11Texture2D* pLeftTexture2D, ID3D11Texture2D* pRightTexture2D, UINT dwLeftViewIndex, UINT dwRightViewIndex, RECT rcDest, UINT32 unInterlaceMode, IMFSample** ppVideoOutFrame )
+HRESULT Presenter::ProcessFrameUsingD3D11( ID3D11Texture2D* pLeftTexture2D, ID3D11Texture2D* pRightTexture2D, UINT dwLeftViewIndex, UINT dwRightViewIndex, RECT rcDest, UINT32 unInterlaceMode, IMFSample** ppVideoOutFrame )
 {
 	HRESULT hr = S_OK;
 	ID3D11VideoContext* pVideoContext = NULL;
@@ -1268,8 +1341,8 @@ HRESULT CPresenter::ProcessFrameUsingD3D11( ID3D11Texture2D* pLeftTexture2D, ID3
 	LARGE_INTEGER lpcStart, lpcEnd;
 
 	do {
-		if( !m_pDX11VideoDevice ) {
-			hr = m_pD3D11Device->QueryInterface( __uuidof( ID3D11VideoDevice ), (void**)&m_pDX11VideoDevice );
+		if( !m_pVideoDevice ) {
+			hr = m_pD3DDevice->QueryInterface( __uuidof( ID3D11VideoDevice ), (void**)&m_pVideoDevice );
 			if( FAILED( hr ) ) {
 				break;
 			}
@@ -1307,7 +1380,7 @@ HRESULT CPresenter::ProcessFrameUsingD3D11( ID3D11Texture2D* pLeftTexture2D, ID3
 			ContentDesc.OutputHeight = surfaceDesc.Height;
 			ContentDesc.Usage = D3D11_VIDEO_USAGE_PLAYBACK_NORMAL;
 
-			hr = m_pDX11VideoDevice->CreateVideoProcessorEnumerator( &ContentDesc, &m_pVideoProcessorEnum );
+			hr = m_pVideoDevice->CreateVideoProcessorEnumerator( &ContentDesc, &m_pVideoProcessorEnum );
 			if( FAILED( hr ) ) {
 				break;
 			}
@@ -1332,7 +1405,7 @@ HRESULT CPresenter::ProcessFrameUsingD3D11( ID3D11Texture2D* pLeftTexture2D, ID3
 				break;
 			}
 
-			hr = m_pDX11VideoDevice->CreateVideoProcessor( m_pVideoProcessorEnum, index, &m_pVideoProcessor );
+			hr = m_pVideoDevice->CreateVideoProcessor( m_pVideoProcessorEnum, index, &m_pVideoProcessor );
 			if( FAILED( hr ) ) {
 				break;
 			}
@@ -1355,7 +1428,7 @@ HRESULT CPresenter::ProcessFrameUsingD3D11( ID3D11Texture2D* pLeftTexture2D, ID3
 
 				DXGI_MODE_DESC1 matchedMode;
 				if( m_bFullScreenState ) {
-					hr = m_pDXGIOutput1->FindClosestMatchingMode1( &modeFilter, &matchedMode, m_pD3D11Device );
+					hr = m_pDXGIOutput1->FindClosestMatchingMode1( &modeFilter, &matchedMode, m_pD3DDevice );
 					if( FAILED( hr ) ) {
 						break;
 					}
@@ -1440,7 +1513,7 @@ HRESULT CPresenter::ProcessFrameUsingD3D11( ID3D11Texture2D* pLeftTexture2D, ID3
 
 		QueryPerformanceCounter( &lpcStart );
 
-		hr = m_pDX11VideoDevice->CreateVideoProcessorOutputView( pDXGIBackBuffer, m_pVideoProcessorEnum, &OutputViewDesc, &pOutputView );
+		hr = m_pVideoDevice->CreateVideoProcessorOutputView( pDXGIBackBuffer, m_pVideoProcessorEnum, &OutputViewDesc, &pOutputView );
 		if( FAILED( hr ) ) {
 			break;
 		}
@@ -1452,7 +1525,7 @@ HRESULT CPresenter::ProcessFrameUsingD3D11( ID3D11Texture2D* pLeftTexture2D, ID3
 		InputLeftViewDesc.Texture2D.MipSlice = 0;
 		InputLeftViewDesc.Texture2D.ArraySlice = dwLeftViewIndex;
 
-		hr = m_pDX11VideoDevice->CreateVideoProcessorInputView( pLeftTexture2D, m_pVideoProcessorEnum, &InputLeftViewDesc, &pLeftInputView );
+		hr = m_pVideoDevice->CreateVideoProcessorInputView( pLeftTexture2D, m_pVideoProcessorEnum, &InputLeftViewDesc, &pLeftInputView );
 		if( FAILED( hr ) ) {
 			break;
 		}
@@ -1465,7 +1538,7 @@ HRESULT CPresenter::ProcessFrameUsingD3D11( ID3D11Texture2D* pLeftTexture2D, ID3
 			InputRightViewDesc.Texture2D.MipSlice = 0;
 			InputRightViewDesc.Texture2D.ArraySlice = dwRightViewIndex;
 
-			hr = m_pDX11VideoDevice->CreateVideoProcessorInputView( pRightTexture2D, m_pVideoProcessorEnum, &InputRightViewDesc, &pRightInputView );
+			hr = m_pVideoDevice->CreateVideoProcessorInputView( pRightTexture2D, m_pVideoProcessorEnum, &InputRightViewDesc, &pRightInputView );
 			if( FAILED( hr ) ) {
 				break;
 			}
@@ -1536,7 +1609,7 @@ HRESULT CPresenter::ProcessFrameUsingD3D11( ID3D11Texture2D* pLeftTexture2D, ID3
 	return hr;
 }
 
-HRESULT CPresenter::ProcessFrameUsingXVP( IMFMediaType* pCurrentType, IMFSample* pVideoFrame, ID3D11Texture2D* pTexture2D, RECT rcDest, IMFSample** ppVideoOutFrame, BOOL* pbInputFrameUsed )
+HRESULT Presenter::ProcessFrameUsingXVP( IMFMediaType* pCurrentType, IMFSample* pVideoFrame, ID3D11Texture2D* pTexture2D, RECT rcDest, IMFSample** ppVideoOutFrame, BOOL* pbInputFrameUsed )
 {
 	HRESULT hr = S_OK;
 	ID3D11VideoContext* pVideoContext = NULL;
@@ -1546,9 +1619,16 @@ HRESULT CPresenter::ProcessFrameUsingXVP( IMFMediaType* pCurrentType, IMFSample*
 	IMFAttributes*  pAttributes = NULL;
 	D3D11_VIDEO_PROCESSOR_CAPS vpCaps = { 0 };
 
+#if (WINVER >= _WIN32_WINNT_WIN8) 
+	if( m_pXVPControl == NULL )
+		return E_POINTER;
+#else
+	return E_NOTIMPL;
+#endif
+
 	do {
-		if( !m_pDX11VideoDevice ) {
-			hr = m_pD3D11Device->QueryInterface( __uuidof( ID3D11VideoDevice ), (void**)&m_pDX11VideoDevice );
+		if( !m_pVideoDevice ) {
+			hr = m_pD3DDevice->QueryInterface( __uuidof( ID3D11VideoDevice ), (void**)&m_pVideoDevice );
 			if( FAILED( hr ) ) {
 				break;
 			}
@@ -1588,7 +1668,7 @@ HRESULT CPresenter::ProcessFrameUsingXVP( IMFMediaType* pCurrentType, IMFSample*
 			ContentDesc.OutputHeight = surfaceDesc.Height;
 			ContentDesc.Usage = D3D11_VIDEO_USAGE_PLAYBACK_NORMAL;
 
-			hr = m_pDX11VideoDevice->CreateVideoProcessorEnumerator( &ContentDesc, &m_pVideoProcessorEnum );
+			hr = m_pVideoDevice->CreateVideoProcessorEnumerator( &ContentDesc, &m_pVideoProcessorEnum );
 			if( FAILED( hr ) ) {
 				break;
 			}
@@ -1616,7 +1696,7 @@ HRESULT CPresenter::ProcessFrameUsingXVP( IMFMediaType* pCurrentType, IMFSample*
 
 				DXGI_MODE_DESC1 matchedMode;
 				if( m_bFullScreenState ) {
-					hr = m_pDXGIOutput1->FindClosestMatchingMode1( &modeFilter, &matchedMode, m_pD3D11Device );
+					hr = m_pDXGIOutput1->FindClosestMatchingMode1( &modeFilter, &matchedMode, m_pD3DDevice );
 					if( FAILED( hr ) ) {
 						break;
 					}
@@ -1664,19 +1744,24 @@ HRESULT CPresenter::ProcessFrameUsingXVP( IMFMediaType* pCurrentType, IMFSample*
 				}
 			}
 
+#if (WINVER >= _WIN32_WINNT_WIN8) 
 			if( fDestRectChanged ) {
-				hr = E_NOTIMPL; //m_pXVPControl->SetDestinationRectangle(&m_rcDstApp);
+				hr = m_pXVPControl->SetDestinationRectangle( &m_rcDstApp );
 				if( FAILED( hr ) ) {
 					break;
 				}
 			}
 
 			if( fSrcRectChanged ) {
-				hr = E_NOTIMPL; //m_pXVPControl->SetSourceRectangle(&SRect);
+				hr = m_pXVPControl->SetSourceRectangle( &SRect );
 				if( FAILED( hr ) ) {
 					break;
 				}
 			}
+#else
+			hr = E_NOTIMPL;
+			break;
+#endif
 
 			hr = m_pXVP->ProcessMessage( MFT_MESSAGE_NOTIFY_BEGIN_STREAMING, 0 );
 			if( FAILED( hr ) ) {
@@ -1768,7 +1853,7 @@ HRESULT CPresenter::ProcessFrameUsingXVP( IMFMediaType* pCurrentType, IMFSample*
 //
 //--------------------------------------------------------------------------
 
-void CPresenter::ReduceToLowestTerms(
+void Presenter::ReduceToLowestTerms(
 	int NumeratorIn,
 	int DenominatorIn,
 	int* pNumeratorOut,
@@ -1781,12 +1866,12 @@ void CPresenter::ReduceToLowestTerms(
 	*pDenominatorOut = DenominatorIn / GCD;
 }
 
-HRESULT CPresenter::SetMonitor( UINT adapterID )
+HRESULT Presenter::SetMonitor( UINT adapterID )
 {
 	HRESULT hr = S_OK;
 	DWORD dwMatchID = 0;
 
-	CAutoLock lock( &m_critSec );
+	ScopedCriticalSection lock( m_critSec );
 
 	do {
 		hr = m_pMonitors->MatchGUID( adapterID, &dwMatchID );
@@ -1814,7 +1899,7 @@ HRESULT CPresenter::SetMonitor( UINT adapterID )
 //
 //--------------------------------------------------------------------------
 
-void CPresenter::SetVideoContextParameters( ID3D11VideoContext* pVideoContext, const RECT* pSRect, const RECT* pTRect, UINT32 unInterlaceMode )
+void Presenter::SetVideoContextParameters( ID3D11VideoContext* pVideoContext, const RECT* pSRect, const RECT* pTRect, UINT32 unInterlaceMode )
 {
 	D3D11_VIDEO_FRAME_FORMAT FrameFormat = D3D11_VIDEO_FRAME_FORMAT_PROGRESSIVE;
 	if( MFVideoInterlace_FieldInterleavedUpperFirst == unInterlaceMode || MFVideoInterlace_FieldSingleUpper == unInterlaceMode || MFVideoInterlace_MixedInterlaceOrProgressive == unInterlaceMode ) {
@@ -1856,10 +1941,10 @@ void CPresenter::SetVideoContextParameters( ID3D11VideoContext* pVideoContext, c
 	pVideoContext->VideoProcessorSetOutputBackgroundColor( m_pVideoProcessor, FALSE, &backgroundColor );
 }
 
-HRESULT CPresenter::SetVideoMonitor( HWND hwndVideo )
+HRESULT Presenter::SetVideoMonitor( HWND hwndVideo )
 {
 	HRESULT hr = S_OK;
-	CAMDDrawMonitorInfo* pMonInfo = NULL;
+	AMDDrawMonitorInfo* pMonInfo = NULL;
 	HMONITOR hMon = NULL;
 
 	if( !m_pMonitors ) {
@@ -1902,7 +1987,7 @@ HRESULT CPresenter::SetVideoMonitor( HWND hwndVideo )
 // and where within the surface we should be writing.
 //-------------------------------------------------------------------
 
-HRESULT CPresenter::SetXVPOutputMediaType( IMFMediaType* pType, DXGI_FORMAT vpOutputFormat )
+HRESULT Presenter::SetXVPOutputMediaType( IMFMediaType* pType, DXGI_FORMAT vpOutputFormat )
 {
 	HRESULT hr = S_OK;
 	IMFVideoMediaType* pMTOutput = NULL;
@@ -1938,7 +2023,7 @@ HRESULT CPresenter::SetXVPOutputMediaType( IMFMediaType* pType, DXGI_FORMAT vpOu
 //--------------------------------------------------------------------------
 
 _Post_satisfies_( this->m_pSwapChain1 != NULL )
-HRESULT CPresenter::UpdateDXGISwapChain( void )
+HRESULT Presenter::UpdateDXGISwapChain( void )
 {
 	HRESULT hr = S_OK;
 
@@ -1973,7 +2058,7 @@ HRESULT CPresenter::UpdateDXGISwapChain( void )
 		}
 
 		if( !m_useDCompVisual ) {
-			hr = m_pDXGIFactory2->CreateSwapChainForHwnd( m_pD3D11Device, m_hwndVideo, &scd, NULL, NULL, &m_pSwapChain1 );
+			hr = m_pDXGIFactory2->CreateSwapChainForHwnd( m_pD3DDevice, m_hwndVideo, &scd, NULL, NULL, &m_pSwapChain1 );
 			if( FAILED( hr ) ) {
 				break;
 			}
@@ -1993,7 +2078,7 @@ HRESULT CPresenter::UpdateDXGISwapChain( void )
 		}
 		else {
 			// Create a swap chain for composition
-			hr = m_pDXGIFactory2->CreateSwapChainForComposition( m_pD3D11Device, &scd, NULL, &m_pSwapChain1 );
+			hr = m_pDXGIFactory2->CreateSwapChainForComposition( m_pD3DDevice, &scd, NULL, &m_pSwapChain1 );
 			if( FAILED( hr ) ) {
 				break;
 			}
@@ -2024,7 +2109,7 @@ HRESULT CPresenter::UpdateDXGISwapChain( void )
 //
 //--------------------------------------------------------------------------
 
-void CPresenter::UpdateRectangles( RECT* pDst, RECT* pSrc )
+void Presenter::UpdateRectangles( RECT* pDst, RECT* pSrc )
 {
 	// take the given src rect and reverse map it into the native video
 	// image rectange.  For example, consider a video with a buffer size of
@@ -2050,5 +2135,6 @@ void CPresenter::UpdateRectangles( RECT* pDst, RECT* pSrc )
 	LetterBoxDstRect( pDst, Src, m_rcDstApp );
 }
 
-}
-}
+} // namespace detail
+} // namespace msw
+} // namespace cinder

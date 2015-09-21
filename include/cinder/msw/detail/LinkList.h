@@ -13,7 +13,12 @@
 
 #pragma once
 
+#include <unknwn.h>
 #include <assert.h>
+
+namespace cinder {
+namespace msw {
+namespace detail {
 
 template <class T>
 class List {
@@ -652,3 +657,7 @@ public:
 		}
 	}
 };
+
+} // namespace detail
+} // namespace msw
+} // namespace cinder

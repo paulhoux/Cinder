@@ -1,11 +1,15 @@
-#include "cinder/msw/dx11/StreamSink.h"
+
+#include "cinder/msw/MediaFoundation.h"
+#include "cinder/msw/detail/StreamSink.h"
 
 #include <assert.h>
+#include <windows.h>
 
 namespace cinder {
 namespace msw {
+namespace detail {
 
-GUID const* const CStreamSink::s_pVideoFormats[] =
+GUID const* const StreamSink::s_pVideoFormats[] =
 {
     &MFVideoFormat_NV12,
     &MFVideoFormat_IYUV,
@@ -28,11 +32,11 @@ GUID const* const CStreamSink::s_pVideoFormats[] =
     &MFVideoFormat_420O
 };
 
-const DWORD CStreamSink::s_dwNumVideoFormats = sizeof(CStreamSink::s_pVideoFormats) / sizeof(CStreamSink::s_pVideoFormats[0]);
+const DWORD StreamSink::s_dwNumVideoFormats = sizeof(StreamSink::s_pVideoFormats) / sizeof(StreamSink::s_pVideoFormats[0]);
 
-const MFRatio CStreamSink::s_DefaultFrameRate = { 30, 1 };
+const MFRatio StreamSink::s_DefaultFrameRate = { 30, 1 };
 
-const CStreamSink::FormatEntry CStreamSink::s_DXGIFormatMapping[] =
+const StreamSink::FormatEntry StreamSink::s_DXGIFormatMapping[] =
 {
     { MFVideoFormat_RGB32,      DXGI_FORMAT_B8G8R8X8_UNORM },
     { MFVideoFormat_ARGB32,     DXGI_FORMAT_R8G8B8A8_UNORM },
@@ -62,7 +66,7 @@ const CStreamSink::FormatEntry CStreamSink::s_DXGIFormatMapping[] =
 
 /////////////////////////////////////////////////////////////////////////////////////////////
 //
-// CStreamSink class. - Implements the stream sink.
+// StreamSink class. - Implements the stream sink.
 //
 // Notes:
 // - Most of the real work gets done in this class.
@@ -74,8 +78,8 @@ const CStreamSink::FormatEntry CStreamSink::s_DXGIFormatMapping[] =
 //      3. Call QueueAsyncOperation. This puts the operation on the work queue.
 //      4. The workqueue calls OnDispatchWorkItem.
 // - Locking:
-//      To avoid deadlocks, do not hold the CStreamSink lock followed by the CMediaSink lock.
-//      The other order is OK (CMediaSink, then CStreamSink).
+//      To avoid deadlocks, do not hold the StreamSink lock followed by the CMediaSink lock.
+//      The other order is OK (CMediaSink, then StreamSink).
 //
 /////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -86,7 +90,7 @@ const CStreamSink::FormatEntry CStreamSink::s_DXGIFormatMapping[] =
 // If an entry is TRUE, the operation is valid from that state.
 //-------------------------------------------------------------------
 
-BOOL CStreamSink::ValidStateMatrix[CStreamSink::State_Count][CStreamSink::Op_Count] =
+BOOL StreamSink::ValidStateMatrix[StreamSink::State_Count][StreamSink::Op_Count] =
 {
     // States:    Operations:
     //            SetType   Start     Restart   Pause     Stop      Sample    Marker
@@ -107,20 +111,20 @@ BOOL CStreamSink::ValidStateMatrix[CStreamSink::State_Count][CStreamSink::Op_Cou
 };
 
 //-------------------------------------------------------------------
-// CStreamSink constructor
+// StreamSink constructor
 //-------------------------------------------------------------------
 
 #pragma warning( push )
 #pragma warning( disable : 4355 )  // 'this' used in base member initializer list
 
-CStreamSink::CStreamSink(DWORD dwStreamId, CCritSec& critSec, CScheduler* pScheduler) :
+StreamSink::StreamSink(DWORD dwStreamId, CriticalSection& critSec, Scheduler* pScheduler) :
     STREAM_ID(dwStreamId),
     m_nRefCount(1),
     m_critSec(critSec),
     m_state(State_TypeNotSet),
     m_IsShutdown(FALSE),
     m_WorkQueueId(0),
-    m_WorkQueueCB(this, &CStreamSink::OnDispatchWorkItem),
+    m_WorkQueueCB(this, &StreamSink::OnDispatchWorkItem),
     m_ConsumeData(ProcessFrames),
     m_StartTime(0),
     m_cbDataWritten(0),
@@ -145,21 +149,21 @@ CStreamSink::CStreamSink(DWORD dwStreamId, CCritSec& critSec, CScheduler* pSched
 #pragma warning( pop )
 
 //-------------------------------------------------------------------
-// CStreamSink destructor
+// StreamSink destructor
 //-------------------------------------------------------------------
 
-CStreamSink::~CStreamSink(void)
+StreamSink::~StreamSink(void)
 {
 }
 
 // IUnknown methods
 
-ULONG CStreamSink::AddRef(void)
+ULONG StreamSink::AddRef(void)
 {
     return InterlockedIncrement(&m_nRefCount);
 }
 
-HRESULT CStreamSink::QueryInterface(REFIID iid, __RPC__deref_out _Result_nullonfailure_ void** ppv)
+HRESULT StreamSink::QueryInterface(REFIID iid, __RPC__deref_out _Result_nullonfailure_ void** ppv)
 {
     if (!ppv)
     {
@@ -198,7 +202,7 @@ HRESULT CStreamSink::QueryInterface(REFIID iid, __RPC__deref_out _Result_nullonf
     return S_OK;
 }
 
-ULONG  CStreamSink::Release(void)
+ULONG  StreamSink::Release(void)
 {
     ULONG uCount = InterlockedDecrement(&m_nRefCount);
     if (uCount == 0)
@@ -216,9 +220,9 @@ ULONG  CStreamSink::Release(void)
 // Description: Discards all samples that were not processed yet.
 //-------------------------------------------------------------------
 
-HRESULT CStreamSink::Flush(void)
+HRESULT StreamSink::Flush(void)
 {
-    CAutoLock lock(&m_critSec);
+    ScopedCriticalSection lock(m_critSec);
 
     HRESULT hr = CheckShutdown();
 
@@ -248,9 +252,9 @@ HRESULT CStreamSink::Flush(void)
 // Description: Returns the stream identifier.
 //-------------------------------------------------------------------
 
-HRESULT CStreamSink::GetIdentifier(__RPC__out DWORD* pdwIdentifier)
+HRESULT StreamSink::GetIdentifier(__RPC__out DWORD* pdwIdentifier)
 {
-    CAutoLock lock(&m_critSec);
+    ScopedCriticalSection lock(m_critSec);
 
     if (pdwIdentifier == NULL)
     {
@@ -272,9 +276,9 @@ HRESULT CStreamSink::GetIdentifier(__RPC__out DWORD* pdwIdentifier)
 // Description: Returns the parent media sink.
 //-------------------------------------------------------------------
 
-HRESULT CStreamSink::GetMediaSink(__RPC__deref_out_opt IMFMediaSink** ppMediaSink)
+HRESULT StreamSink::GetMediaSink(__RPC__deref_out_opt IMFMediaSink** ppMediaSink)
 {
-    CAutoLock lock(&m_critSec);
+    ScopedCriticalSection lock(m_critSec);
 
     if (ppMediaSink == NULL)
     {
@@ -298,9 +302,9 @@ HRESULT CStreamSink::GetMediaSink(__RPC__deref_out_opt IMFMediaSink** ppMediaSin
 // Description: Returns a media type handler for this stream.
 //-------------------------------------------------------------------
 
-HRESULT CStreamSink::GetMediaTypeHandler(__RPC__deref_out_opt IMFMediaTypeHandler** ppHandler)
+HRESULT StreamSink::GetMediaTypeHandler(__RPC__deref_out_opt IMFMediaTypeHandler** ppHandler)
 {
-    CAutoLock lock(&m_critSec);
+    ScopedCriticalSection lock(m_critSec);
 
     if (ppHandler == NULL)
     {
@@ -331,10 +335,10 @@ HRESULT CStreamSink::GetMediaTypeHandler(__RPC__deref_out_opt IMFMediaTypeHandle
 //       types, although this sink does not.
 //-------------------------------------------------------------------
 
-HRESULT CStreamSink::PlaceMarker(MFSTREAMSINK_MARKER_TYPE eMarkerType, __RPC__in const PROPVARIANT* pvarMarkerValue, __RPC__in const PROPVARIANT* pvarContextValue)
+HRESULT StreamSink::PlaceMarker(MFSTREAMSINK_MARKER_TYPE eMarkerType, __RPC__in const PROPVARIANT* pvarMarkerValue, __RPC__in const PROPVARIANT* pvarContextValue)
 {
 
-    CAutoLock lock(&m_critSec);
+    ScopedCriticalSection lock(m_critSec);
 
     HRESULT hr = S_OK;
 
@@ -350,7 +354,7 @@ HRESULT CStreamSink::PlaceMarker(MFSTREAMSINK_MARKER_TYPE eMarkerType, __RPC__in
     // Create a marker object and put it on the sample queue.
     if (SUCCEEDED(hr))
     {
-        hr = CMarker::Create(
+        hr = Marker::Create(
             eMarkerType,
             pvarMarkerValue,
             pvarContextValue,
@@ -384,9 +388,9 @@ HRESULT CStreamSink::PlaceMarker(MFSTREAMSINK_MARKER_TYPE eMarkerType, __RPC__in
 //       MEStreamSinkRequestSample event.
 //-------------------------------------------------------------------
 
-HRESULT CStreamSink::ProcessSample(__RPC__in_opt IMFSample* pSample)
+HRESULT StreamSink::ProcessSample(__RPC__in_opt IMFSample* pSample)
 {
-    CAutoLock lock(&m_critSec);
+    ScopedCriticalSection lock(m_critSec);
 
     if (pSample == NULL)
     {
@@ -448,11 +452,11 @@ HRESULT CStreamSink::ProcessSample(__RPC__in_opt IMFSample* pSample)
 // IMFMediaEventGenerator methods.
 // Note: These methods call through to the event queue helper object.
 
-HRESULT CStreamSink::BeginGetEvent(IMFAsyncCallback* pCallback, IUnknown* punkState)
+HRESULT StreamSink::BeginGetEvent(IMFAsyncCallback* pCallback, IUnknown* punkState)
 {
     HRESULT hr = S_OK;
 
-    CAutoLock lock(&m_critSec);
+    ScopedCriticalSection lock(m_critSec);
     hr = CheckShutdown();
 
     if (SUCCEEDED(hr))
@@ -463,11 +467,11 @@ HRESULT CStreamSink::BeginGetEvent(IMFAsyncCallback* pCallback, IUnknown* punkSt
     return hr;
 }
 
-HRESULT CStreamSink::EndGetEvent(IMFAsyncResult* pResult, _Out_  IMFMediaEvent** ppEvent)
+HRESULT StreamSink::EndGetEvent(IMFAsyncResult* pResult, _Out_  IMFMediaEvent** ppEvent)
 {
     HRESULT hr = S_OK;
 
-    CAutoLock lock(&m_critSec);
+    ScopedCriticalSection lock(m_critSec);
     hr = CheckShutdown();
 
     if (SUCCEEDED(hr))
@@ -478,7 +482,7 @@ HRESULT CStreamSink::EndGetEvent(IMFAsyncResult* pResult, _Out_  IMFMediaEvent**
     return hr;
 }
 
-HRESULT CStreamSink::GetEvent(DWORD dwFlags, __RPC__deref_out_opt IMFMediaEvent** ppEvent)
+HRESULT StreamSink::GetEvent(DWORD dwFlags, __RPC__deref_out_opt IMFMediaEvent** ppEvent)
 {
     // NOTE:
     // GetEvent can block indefinitely, so we don't hold the lock.
@@ -490,7 +494,7 @@ HRESULT CStreamSink::GetEvent(DWORD dwFlags, __RPC__deref_out_opt IMFMediaEvent*
 
     { // scope for lock
 
-        CAutoLock lock(&m_critSec);
+        ScopedCriticalSection lock(m_critSec);
 
         // Check shutdown
         hr = CheckShutdown();
@@ -515,11 +519,11 @@ HRESULT CStreamSink::GetEvent(DWORD dwFlags, __RPC__deref_out_opt IMFMediaEvent*
     return hr;
 }
 
-HRESULT CStreamSink::QueueEvent(MediaEventType met, __RPC__in REFGUID guidExtendedType, HRESULT hrStatus, __RPC__in_opt const PROPVARIANT* pvValue)
+HRESULT StreamSink::QueueEvent(MediaEventType met, __RPC__in REFGUID guidExtendedType, HRESULT hrStatus, __RPC__in_opt const PROPVARIANT* pvValue)
 {
     HRESULT hr = S_OK;
 
-    CAutoLock lock(&m_critSec);
+    ScopedCriticalSection lock(m_critSec);
     hr = CheckShutdown();
 
     if (SUCCEEDED(hr))
@@ -537,9 +541,9 @@ HRESULT CStreamSink::QueueEvent(MediaEventType met, __RPC__in REFGUID guidExtend
 // Description: Return the current media type, if any.
 //-------------------------------------------------------------------
 
-HRESULT CStreamSink::GetCurrentMediaType(_Outptr_ IMFMediaType** ppMediaType)
+HRESULT StreamSink::GetCurrentMediaType(_Outptr_ IMFMediaType** ppMediaType)
 {
-    CAutoLock lock(&m_critSec);
+    ScopedCriticalSection lock(m_critSec);
 
     if (ppMediaType == NULL)
     {
@@ -570,7 +574,7 @@ HRESULT CStreamSink::GetCurrentMediaType(_Outptr_ IMFMediaType** ppMediaType)
 // Description: Return the major type GUID.
 //-------------------------------------------------------------------
 
-HRESULT CStreamSink::GetMajorType(__RPC__out GUID* pguidMajorType)
+HRESULT StreamSink::GetMajorType(__RPC__out GUID* pguidMajorType)
 {
     if (pguidMajorType == NULL)
     {
@@ -596,7 +600,7 @@ HRESULT CStreamSink::GetMajorType(__RPC__out GUID* pguidMajorType)
 // Description: Return a preferred media type by index.
 //-------------------------------------------------------------------
 
-HRESULT CStreamSink::GetMediaTypeByIndex(DWORD dwIndex, _Outptr_ IMFMediaType** ppType)
+HRESULT StreamSink::GetMediaTypeByIndex(DWORD dwIndex, _Outptr_ IMFMediaType** ppType)
 {
     HRESULT hr = S_OK;
 
@@ -664,7 +668,7 @@ HRESULT CStreamSink::GetMediaTypeByIndex(DWORD dwIndex, _Outptr_ IMFMediaType** 
 // Description: Return the number of preferred media types.
 //-------------------------------------------------------------------
 
-HRESULT CStreamSink::GetMediaTypeCount(__RPC__out DWORD* pdwTypeCount)
+HRESULT StreamSink::GetMediaTypeCount(__RPC__out DWORD* pdwTypeCount)
 {
     HRESULT hr = S_OK;
 
@@ -697,7 +701,7 @@ HRESULT CStreamSink::GetMediaTypeCount(__RPC__out DWORD* pdwTypeCount)
 // ppMediaType: Optionally, receives a "close match" media type.
 //-------------------------------------------------------------------
 
-HRESULT CStreamSink::IsMediaTypeSupported(IMFMediaType* pMediaType, _Outptr_opt_result_maybenull_ IMFMediaType** ppMediaType)
+HRESULT StreamSink::IsMediaTypeSupported(IMFMediaType* pMediaType, _Outptr_opt_result_maybenull_ IMFMediaType** ppMediaType)
 {
     HRESULT hr = S_OK;
     GUID subType = GUID_NULL;
@@ -770,7 +774,7 @@ HRESULT CStreamSink::IsMediaTypeSupported(IMFMediaType* pMediaType, _Outptr_opt_
 // Description: Set the current media type.
 //-------------------------------------------------------------------
 
-HRESULT CStreamSink::SetCurrentMediaType(IMFMediaType* pMediaType)
+HRESULT StreamSink::SetCurrentMediaType(IMFMediaType* pMediaType)
 {
     if (pMediaType == NULL)
     {
@@ -781,7 +785,7 @@ HRESULT CStreamSink::SetCurrentMediaType(IMFMediaType* pMediaType)
     MFRatio fps = { 0, 0 };
     GUID guidSubtype = GUID_NULL;
 
-    CAutoLock lock(&m_critSec);
+    ScopedCriticalSection lock(m_critSec);
 
     do
     {
@@ -919,7 +923,7 @@ HRESULT CStreamSink::SetCurrentMediaType(IMFMediaType* pMediaType)
 // Description: IMFGetService
 //-------------------------------------------------------------------------
 
-HRESULT CStreamSink::GetService(__RPC__in REFGUID guidService, __RPC__in REFIID riid, __RPC__deref_out_opt LPVOID* ppvObject)
+HRESULT StreamSink::GetService(__RPC__in REFGUID guidService, __RPC__in REFIID riid, __RPC__deref_out_opt LPVOID* ppvObject)
 {
     IMFGetService* pGetService = NULL;
     HRESULT hr = m_pSink->QueryInterface(IID_PPV_ARGS(&pGetService));
@@ -939,7 +943,7 @@ HRESULT CStreamSink::GetService(__RPC__in REFGUID guidService, __RPC__in REFIID 
 //
 //--------------------------------------------------------------------------
 
-HRESULT CStreamSink::PresentFrame(void)
+HRESULT StreamSink::PresentFrame(void)
 {
     HRESULT hr = S_OK;
 
@@ -948,7 +952,7 @@ HRESULT CStreamSink::PresentFrame(void)
         return hr;
     }
 
-    CAutoLock lock(&m_critSec);
+    ScopedCriticalSection lock(m_critSec);
 
     do
     {
@@ -984,7 +988,7 @@ HRESULT CStreamSink::PresentFrame(void)
     return hr;
 }
 
-HRESULT CStreamSink::GetMaxRate(BOOL fThin, float* pflRate)
+HRESULT StreamSink::GetMaxRate(BOOL fThin, float* pflRate)
 {
     HRESULT hr = S_OK;
     DWORD dwMonitorRefreshRate = 0;
@@ -1048,13 +1052,13 @@ HRESULT CStreamSink::GetMaxRate(BOOL fThin, float* pflRate)
 //       initialized.
 //-------------------------------------------------------------------
 
-HRESULT CStreamSink::Initialize(IMFMediaSink* pParent, CPresenter* pPresenter)
+HRESULT StreamSink::Initialize(IMFMediaSink* pParent, Presenter* pPresenter)
 {
     HRESULT hr = S_OK;
 
     if (SUCCEEDED(hr))
     {
-        hr = CMFAttributesImpl::Initialize();
+        hr = MFAttributesImpl::Initialize();
     }
 
     // Create the event queue helper.
@@ -1089,9 +1093,9 @@ HRESULT CStreamSink::Initialize(IMFMediaSink* pParent, CPresenter* pPresenter)
 // Description: Called when the presentation clock pauses.
 //-------------------------------------------------------------------
 
-HRESULT CStreamSink::Pause(void)
+HRESULT StreamSink::Pause(void)
 {
-    CAutoLock lock(&m_critSec);
+    ScopedCriticalSection lock(m_critSec);
 
     HRESULT hr = ValidateOperation(OpPause);
 
@@ -1104,11 +1108,11 @@ HRESULT CStreamSink::Pause(void)
     return hr;
 }
 
-HRESULT CStreamSink::Preroll(void)
+HRESULT StreamSink::Preroll(void)
 {
     HRESULT hr = S_OK;
 
-    CAutoLock lock(&m_critSec);
+    ScopedCriticalSection lock(m_critSec);
 
     hr = CheckShutdown();
 
@@ -1131,9 +1135,9 @@ HRESULT CStreamSink::Preroll(void)
 // Description: Called when the presentation clock restarts.
 //-------------------------------------------------------------------
 
-HRESULT CStreamSink::Restart(void)
+HRESULT StreamSink::Restart(void)
 {
-    CAutoLock lock(&m_critSec);
+    ScopedCriticalSection lock(m_critSec);
 
     HRESULT hr = ValidateOperation(OpRestart);
 
@@ -1151,9 +1155,9 @@ HRESULT CStreamSink::Restart(void)
 // Description: Shuts down the stream sink.
 //-------------------------------------------------------------------
 
-HRESULT CStreamSink::Shutdown(void)
+HRESULT StreamSink::Shutdown(void)
 {
-    CAutoLock lock(&m_critSec);
+    ScopedCriticalSection lock(m_critSec);
 
     m_IsShutdown = TRUE;
 
@@ -1182,9 +1186,9 @@ HRESULT CStreamSink::Shutdown(void)
 //       resume from the last current position.
 //-------------------------------------------------------------------
 
-HRESULT CStreamSink::Start(MFTIME start)
+HRESULT StreamSink::Start(MFTIME start)
 {
-    CAutoLock lock(&m_critSec);
+    ScopedCriticalSection lock(m_critSec);
 
     HRESULT hr = S_OK;
 
@@ -1217,9 +1221,9 @@ HRESULT CStreamSink::Start(MFTIME start)
 // Description: Called when the presentation clock stops.
 //-------------------------------------------------------------------
 
-HRESULT CStreamSink::Stop(void)
+HRESULT StreamSink::Stop(void)
 {
-    CAutoLock lock(&m_critSec);
+    ScopedCriticalSection lock(m_critSec);
 
     HRESULT hr = ValidateOperation(OpStop);
 
@@ -1239,7 +1243,7 @@ HRESULT CStreamSink::Stop(void)
 // Description: Complete a ProcessSample or PlaceMarker request.
 //-------------------------------------------------------------------
 
-HRESULT CStreamSink::DispatchProcessSample(CAsyncOperation* pOp)
+HRESULT StreamSink::DispatchProcessSample(CAsyncOperation* pOp)
 {
     HRESULT hr = S_OK;
     assert(pOp != NULL);
@@ -1273,7 +1277,7 @@ HRESULT CStreamSink::DispatchProcessSample(CAsyncOperation* pOp)
     return hr;
 }
 
-HRESULT CStreamSink::CheckShutdown(void) const
+HRESULT StreamSink::CheckShutdown(void) const
 {
     if (m_IsShutdown)
     {
@@ -1285,7 +1289,7 @@ HRESULT CStreamSink::CheckShutdown(void) const
     }
 }
 
-inline HRESULT CStreamSink::GetFrameRate(IMFMediaType* pType, MFRatio* pRatio)
+inline HRESULT StreamSink::GetFrameRate(IMFMediaType* pType, MFRatio* pRatio)
 {
     return MFGetAttributeRatio(pType, MF_MT_FRAME_RATE, (UINT32*)&pRatio->Numerator, (UINT32*)&pRatio->Denominator);
 }
@@ -1298,7 +1302,7 @@ inline HRESULT CStreamSink::GetFrameRate(IMFMediaType* pType, MFRatio* pRatio)
 //              (queued + requested) is less than the max allowed
 //
 //--------------------------------------------------------------------------
-BOOL CStreamSink::NeedMoreSamples(void)
+BOOL StreamSink::NeedMoreSamples(void)
 {
     const DWORD cSamplesInFlight = m_SamplesToProcess.GetCount() + m_cOutstandingSampleRequests;
 
@@ -1310,10 +1314,10 @@ BOOL CStreamSink::NeedMoreSamples(void)
 // Description: Callback for MFPutWorkItem.
 //-------------------------------------------------------------------
 
-HRESULT CStreamSink::OnDispatchWorkItem(IMFAsyncResult* pAsyncResult)
+HRESULT StreamSink::OnDispatchWorkItem(IMFAsyncResult* pAsyncResult)
 {
     // Called by work queue thread. Need to hold the critical section.
-    CAutoLock lock(&m_critSec);
+    ScopedCriticalSection lock(m_critSec);
 
     HRESULT hr = CheckShutdown();
     if (FAILED(hr))
@@ -1406,7 +1410,7 @@ HRESULT CStreamSink::OnDispatchWorkItem(IMFAsyncResult* pAsyncResult)
 // sample, or receive a marker.
 //-------------------------------------------------------------------
 
-HRESULT CStreamSink::ProcessSamplesFromQueue(ConsumeState bConsumeData)
+HRESULT StreamSink::ProcessSamplesFromQueue(ConsumeState bConsumeData)
 {
     HRESULT hr = S_OK;
     IUnknown* pUnk = NULL;
@@ -1496,7 +1500,7 @@ HRESULT CStreamSink::ProcessSamplesFromQueue(ConsumeState bConsumeData)
 // Name: QueueAsyncOperation
 // Description: Puts an async operation on the work queue.
 //-------------------------------------------------------------------
-HRESULT CStreamSink::QueueAsyncOperation(StreamOperation op)
+HRESULT StreamSink::QueueAsyncOperation(StreamOperation op)
 {
     HRESULT hr = S_OK;
     CAsyncOperation* pOp = new CAsyncOperation(op); // Created with ref count = 1
@@ -1522,7 +1526,7 @@ HRESULT CStreamSink::QueueAsyncOperation(StreamOperation op)
 //  Synopsis:   Issue more sample requests if necessary.
 //
 //--------------------------------------------------------------------------
-HRESULT CStreamSink::RequestSamples(void)
+HRESULT StreamSink::RequestSamples(void)
 {
     HRESULT hr = S_OK;
 
@@ -1550,7 +1554,7 @@ HRESULT CStreamSink::RequestSamples(void)
 //          the marker information.
 //-------------------------------------------------------------------
 
-HRESULT CStreamSink::SendMarkerEvent(IMarker* pMarker, ConsumeState ConsumeState)
+HRESULT StreamSink::SendMarkerEvent(IMarker* pMarker, ConsumeState ConsumeState)
 {
     HRESULT hr = S_OK;
     HRESULT hrStatus = S_OK;  // Status code for marker event.
@@ -1585,7 +1589,7 @@ HRESULT CStreamSink::SendMarkerEvent(IMarker* pMarker, ConsumeState ConsumeState
 // Description: Checks if an operation is valid in the current state.
 //-------------------------------------------------------------------
 
-HRESULT CStreamSink::ValidateOperation(StreamOperation op)
+HRESULT StreamSink::ValidateOperation(StreamOperation op)
 {
     HRESULT hr = S_OK;
 
@@ -1603,22 +1607,22 @@ HRESULT CStreamSink::ValidateOperation(StreamOperation op)
 
 /////////////////////////////////////////////////////////////////////////////////////////////
 //
-// CAsyncOperation class. - Private class used by CStreamSink class.
+// CAsyncOperation class. - Private class used by StreamSink class.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////
 
-CStreamSink::CAsyncOperation::CAsyncOperation(StreamOperation op) :
+StreamSink::CAsyncOperation::CAsyncOperation(StreamOperation op) :
     m_nRefCount(1),
     m_op(op)
 {
 }
 
-ULONG CStreamSink::CAsyncOperation::AddRef(void)
+ULONG StreamSink::CAsyncOperation::AddRef(void)
 {
     return InterlockedIncrement(&m_nRefCount);
 }
 
-HRESULT CStreamSink::CAsyncOperation::QueryInterface(REFIID iid, __RPC__deref_out _Result_nullonfailure_ void** ppv)
+HRESULT StreamSink::CAsyncOperation::QueryInterface(REFIID iid, __RPC__deref_out _Result_nullonfailure_ void** ppv)
 {
     if (!ppv)
     {
@@ -1637,7 +1641,7 @@ HRESULT CStreamSink::CAsyncOperation::QueryInterface(REFIID iid, __RPC__deref_ou
     return S_OK;
 }
 
-ULONG CStreamSink::CAsyncOperation::Release(void)
+ULONG StreamSink::CAsyncOperation::Release(void)
 {
     ULONG uCount = InterlockedDecrement(&m_nRefCount);
     if (uCount == 0)
@@ -1648,8 +1652,10 @@ ULONG CStreamSink::CAsyncOperation::Release(void)
     return uCount;
 }
 
-CStreamSink::CAsyncOperation::~CAsyncOperation(void)
+StreamSink::CAsyncOperation::~CAsyncOperation(void)
 {
 }
 
-}}
+} // namespace detail
+} // namespace msw
+} // namespace cinder

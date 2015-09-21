@@ -1,20 +1,18 @@
 #pragma once
 
-#include "cinder/msw/dx11/Common.h"
-#include "cinder/msw/dx11/StaticAsyncCallback.h"
-#include "cinder/msw/ThreadSafeQueue.h"
-
-#include <cstddef>
+#include "cinder/msw/MediaFoundation.h"
+#include "cinder/msw/detail/StaticAsyncCallback.h"
+#include "cinder/msw/detail/ThreadSafeQueue.h"
 
 namespace cinder {
 namespace msw {
+namespace detail {
 
 //-----------------------------------------------------------------------------
 // SchedulerCallback
 //
 // Defines the callback method to present samples.
 //-----------------------------------------------------------------------------
-
 struct SchedulerCallback {
 	virtual HRESULT PresentFrame( void ) = 0;
 };
@@ -37,23 +35,18 @@ struct SchedulerCallback {
 // for repaints).
 //-----------------------------------------------------------------------------
 
-class CScheduler :
-	public IUnknown,
-	private CBase {
+class Scheduler :
+	public IUnknown {
 public:
-
-	CScheduler( CCritSec& critSec );
-	virtual ~CScheduler( void );
+	Scheduler( CriticalSection& critSec );
+	virtual ~Scheduler( void );
 
 	// IUnknown
 	STDMETHODIMP_( ULONG ) AddRef();
 	STDMETHODIMP_( ULONG ) Release();
 	STDMETHODIMP QueryInterface( REFIID iid, __RPC__deref_out _Result_nullonfailure_ void** ppv );
 
-	void SetCallback( SchedulerCallback* pCB )
-	{
-		m_pCB = pCB;
-	}
+	void SetCallback( SchedulerCallback* pCB ) { m_pCB = pCB; }
 
 	void SetFrameRate( const MFRatio& fps );
 	void SetClockRate( float fRate ) { m_fRate = fRate; }
@@ -72,13 +65,12 @@ public:
 	//DWORD GetCount(void){ return m_ScheduledSamples.GetCount(); }
 
 private:
-
 	HRESULT StartProcessSample();
 	HRESULT OnTimer( __RPC__in_opt IMFAsyncResult* pResult );
-	METHODASYNCCALLBACKEX( OnTimer, CScheduler, 0, MFASYNC_CALLBACK_QUEUE_MULTITHREADED );
+	METHODASYNCCALLBACKEX( OnTimer, Scheduler, 0, MFASYNC_CALLBACK_QUEUE_MULTITHREADED );
 
 	long                        m_nRefCount;
-	CCritSec&                   m_critSec;          // critical section for thread safety
+	CriticalSection&            m_critSec;          // critical section for thread safety
 	SchedulerCallback*          m_pCB;              // Weak reference; do not delete.
 	ThreadSafeQueue<IMFSample>  m_ScheduledSamples; // Samples waiting to be presented.
 	IMFClock*                   m_pClock;           // Presentation clock. Can be NULL.
@@ -90,5 +82,6 @@ private:
 	MFWORKITEM_KEY              m_keyTimer;
 };
 
-}
-}
+} // namespace detail
+} // namespace msw
+} // namespace cinder

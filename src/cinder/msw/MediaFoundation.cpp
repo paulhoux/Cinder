@@ -28,8 +28,24 @@ POSSIBILITY OF SUCH DAMAGE.
 #include "cinder/msw/MediaFoundation.h"
 #include "cinder/msw/ScopedPtr.h"
 
+#include "cinder/msw/detail/Activate.h"
+
 #include <string>
 #include <Shlwapi.h>
+
+// Include these libraries.
+#pragma comment(lib, "mf.lib")
+#pragma comment(lib, "mfplat.lib")
+#pragma comment(lib, "mfuuid.lib")
+
+#pragma comment(lib, "winmm.lib") // for timeBeginPeriod and timeEndPeriod
+#pragma comment (lib,"uuid.lib")
+
+//#pragma comment(lib,"d3d9.lib")
+//#pragma comment(lib, "d3d11.lib")
+//#pragma comment(lib,"dxva2.lib")
+//#pragma comment (lib,"evr.lib")
+//#pragma comment (lib,"dcomp.lib")
 
 namespace cinder {
 namespace msw {
@@ -80,7 +96,7 @@ LRESULT CALLBACK MFWndProc( HWND wnd, UINT uMsg, WPARAM wParam, LPARAM lParam )
 MFPlayer::MFPlayer()
 	: mRefCount( 1 ), mState( Closed ), mWnd( NULL )
 	, mPlayWhenReady( FALSE ), mIsLooping( FALSE ), mWidth( 0 ), mHeight( 0 )
-	, mSessionPtr( NULL ), mSourcePtr( NULL ), mPresenterPtr( NULL ), mVideoDisplayPtr( NULL )
+	, mSessionPtr( NULL ), mSourcePtr( NULL ), mPresenterPtr( NULL ) /* mSinkPtr( NULL ) */, mVideoDisplayPtr( NULL )
 {
 	mCloseEvent = ::CreateEventA( NULL, FALSE, FALSE, NULL );
 	if( mCloseEvent == NULL )
@@ -89,11 +105,11 @@ MFPlayer::MFPlayer()
 	CreateWnd();
 
 	// Create custom EVR presenter.
-	//mPresenterPtr = new EVRCustomPresenter();
+	/*mPresenterPtr = new EVRCustomPresenter();
 
-	//HRESULT hr = static_cast<EVRCustomPresenter*>( mPresenterPtr )->SetVideoWindow( mWnd );
-	//if( FAILED( hr ) )
-	//	throw Exception( "MFPlayer: failed to set video window." );
+	HRESULT hr = static_cast<EVRCustomPresenter*>( mPresenterPtr )->SetVideoWindow( mWnd );
+	if( FAILED( hr ) )
+		throw Exception( "MFPlayer: failed to set video window." );*/
 }
 
 MFPlayer::~MFPlayer()
@@ -719,7 +735,7 @@ HRESULT MFPlayer::CreateMediaSinkActivate( IMFStreamDescriptor *pSourceSD, HWND 
 			if( pVideoPresenter != NULL ) {
 				// Create the video renderer.
 				ScopedComPtr<IMFMediaSink> pSink;
-				hr = MFCreateVideoRenderer( __uuidof( IMFMediaSink ), (void**)&pSink );
+				hr = ::MFCreateVideoRenderer( __uuidof( IMFMediaSink ), (void**)&pSink );
 				BREAK_ON_FAIL( hr );
 
 				ScopedComPtr<IMFVideoRenderer> pVideoRenderer;
@@ -733,26 +749,29 @@ HRESULT MFPlayer::CreateMediaSinkActivate( IMFStreamDescriptor *pSourceSD, HWND 
 				*ppMediaSink = pSink;
 				( *ppMediaSink )->AddRef();
 			}
+#if 1
 			else {
 				// Use default EVR.
 				ScopedComPtr<IMFActivate> pActivate;
-				hr = MFCreateVideoRendererActivate( hVideoWindow, &pActivate );
+				hr = ::MFCreateVideoRendererActivate( hVideoWindow, &pActivate );
 				BREAK_ON_FAIL( hr );
 
 				// Return IMFActivate pointer to caller.
 				*ppActivate = pActivate;
 				( *ppActivate )->AddRef();
 			}
-			//else {
-			//	// Use DirectX11 EVR.
-			//	ScopedComPtr<IMFActivate> pActivate;
-			//	hr = CActivate::CreateInstance( hVideoWindow, &pActivate );
-			//	BREAK_ON_FAIL( hr );
+#else
+			else {
+				// Use custom EVR.
+				ScopedComPtr<IMFActivate> pActivate;
+				hr = detail::Activate::CreateInstance( hVideoWindow, &pActivate );
+				BREAK_ON_FAIL( hr );
 
-			//	// Return IMFActivate pointer to caller.
-			//	*ppActivate = pActivate;
-			//	( *ppActivate )->AddRef();
-			//}
+				// Return IMFActivate pointer to caller.
+				*ppActivate = pActivate;
+				( *ppActivate )->AddRef();
+			}
+#endif
 		}
 		else {
 			// Unknown stream type.

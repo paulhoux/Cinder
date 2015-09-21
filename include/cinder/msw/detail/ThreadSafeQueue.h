@@ -12,13 +12,14 @@
 
 #pragma once
 
-#include "cinder/msw/dx11/DoubleLinkedList.h"
+#include "cinder/msw/detail/LinkList.h"
 
 // TODO: include Synchapi.h on Windows 10 instead
 #include <windows.h>
 
 namespace cinder {
 namespace msw {
+namespace detail {
 
 template <class T>
 class ThreadSafeQueue {
@@ -86,5 +87,6 @@ private:
 	ComPtrListEx<T>     m_list;
 };
 
-}
-} // namespace ci::msw
+} // namespace detail
+} // namespace msw
+} // namespace cinder

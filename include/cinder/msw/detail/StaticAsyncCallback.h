@@ -1,8 +1,9 @@
-#ifndef __STATICASYNCCALLBACK__
-#define __STATICASYNCCALLBACK__
+#pragma once
 
-////////////////////////////////////////////////////////
-//
+namespace cinder {
+namespace msw {
+namespace detail {
+
 #define STATICASYNCCALLBACK(Callback, Parent) \
 class Callback##AsyncCallback; \
 friend class Callback##AsyncCallback; \
@@ -36,13 +37,7 @@ public: \
     } \
 } m_x##Callback; 
 
-   
-////////////////////////////////////////////////////////
-//
-//
 // We need to support QI interface so that DCOM is happy when it tries to marshal the interface pointer
-//
-
 #define METHODASYNCCALLBACKEX(Callback, Parent, Flag, Queue) \
 class Callback##AsyncCallback; \
 friend class Callback##AsyncCallback; \
@@ -89,10 +84,10 @@ protected: \
 } m_x##Callback; 
 
 ////////////////////////////////////////////////////////
-//
+
 #define METHODFASTCALLBACK(Callback, Parent) \
     METHODASYNCCALLBACKEX(Callback, Parent, MFASYNC_FAST_IO_PROCESSING_CALLBACK, MFASYNC_CALLBACK_QUEUE_STANDARD)
-    
+
 #define METHODASYNCCALLBACK(Callback, Parent) \
     METHODASYNCCALLBACKEX(Callback, Parent, 0, MFASYNC_CALLBACK_QUEUE_STANDARD)
 
@@ -103,7 +98,7 @@ protected: \
     METHODASYNCCALLBACKEX(Callback, Parent, MFASYNC_FAST_IO_PROCESSING_CALLBACK, MFASYNC_CALLBACK_QUEUE_IO)
 
 ////////////////////////////////////////////////////////
-//
+
 #define METHODASYNCCALLBACKEX2(Callback, Parent, GetQueue ) \
     METHODASYNCCALLBACKEX(Callback, Parent, \
         0, \
@@ -113,4 +108,6 @@ protected: \
     METHODASYNCCALLBACKEX(Callback, Parent, \
         GetParent()->GetFlags(), GetParent()->GetQueue() )
 
-#endif
+} // namespace detail
+} // namespace msw
+} // namespace cinder
