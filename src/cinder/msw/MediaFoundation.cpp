@@ -749,7 +749,7 @@ HRESULT MFPlayer::CreateMediaSinkActivate( IMFStreamDescriptor *pSourceSD, HWND 
 				*ppMediaSink = pSink;
 				( *ppMediaSink )->AddRef();
 			}
-#if 1
+#if 0
 			else {
 				// Use default EVR.
 				ScopedComPtr<IMFActivate> pActivate;

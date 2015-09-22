@@ -10,7 +10,6 @@
 * Copyright (c) Microsoft Corporation
 \**************************************************************************/
 
-
 #include <windows.h>
 #include <unknwn.h>
 #include <strsafe.h>
@@ -103,14 +102,8 @@ BOOL MonitorArray::GetAMDDrawMonitorInfo( UINT uDevID, _Out_ AMDDrawMonitorInfo*
 	return FALSE;
 }
 
-
-BOOL MonitorArray::InitMonitor(
-	_In_ HMONITOR hMon,
-	BOOL fXclMode
-	)
+BOOL MonitorArray::InitMonitor(	_In_ HMONITOR hMon,	BOOL fXclMode	)
 {
-
-
 	if( GetAMDDrawMonitorInfo( m_dwNumMonitors, &m_DDMon[m_dwNumMonitors], hMon ) ) {
 		m_DDMon[m_dwNumMonitors].pDD = (IUnknown*)1; // make checks for pDD succeed.
 		m_dwNumMonitors++;
@@ -124,13 +117,7 @@ BOOL MonitorArray::InitMonitor(
 	return FALSE;
 }
 
-
-BOOL CALLBACK MonitorArray::MonitorEnumProc(
-	_In_ HMONITOR hMon,
-	_In_opt_ HDC hDC,
-	_In_ LPRECT pRect,
-	LPARAM dwData
-	)
+BOOL CALLBACK MonitorArray::MonitorEnumProc( _In_ HMONITOR hMon, _In_opt_ HDC hDC, _In_ LPRECT pRect, LPARAM dwData )
 {
 	MonitorEnumProcInfo* info = (MonitorEnumProcInfo*)dwData;
 
@@ -141,18 +128,7 @@ BOOL CALLBACK MonitorArray::MonitorEnumProc(
 	return info->pMonArray->InitMonitor( hMon, FALSE );
 }
 
-/*****************************Private*Routine******************************\
-* InitializeDisplaySystem
-*
-*
-*
-* History:
-* Mon 01/24/2000 - StEstrop - Created
-*
-\**************************************************************************/
-HRESULT MonitorArray::InitializeDisplaySystem(
-	_In_ HWND hwnd
-	)
+HRESULT MonitorArray::InitializeDisplaySystem( _In_ HWND hwnd )
 {
 	HRESULT hr = S_OK;
 
@@ -171,21 +147,8 @@ HRESULT MonitorArray::InitializeDisplaySystem(
 	return( hr );
 }
 
-/*****************************Private*Routine******************************\
-* FindMonitor
-*
-* find the current monitor
-*
-* History:
-* Fri 04/25/2000 - GlennE - Created
-*
-\**************************************************************************/
-AMDDrawMonitorInfo* MonitorArray::FindMonitor(
-	_In_ HMONITOR hMon
-	)
+AMDDrawMonitorInfo* MonitorArray::FindMonitor( _In_ HMONITOR hMon )
 {
-
-
 	for( DWORD i = 0; i < m_dwNumMonitors; i++ ) {
 		if( hMon == m_DDMon[i].hMon ) {
 			return &m_DDMon[i];
@@ -195,19 +158,7 @@ AMDDrawMonitorInfo* MonitorArray::FindMonitor(
 	return NULL;
 }
 
-/*****************************Private*Routine******************************\
-* MatchGUID
-*
-*
-*
-* History:
-* Fri 04/25/2000 - GlennE - Created
-*
-\**************************************************************************/
-HRESULT MonitorArray::MatchGUID(
-	UINT uDevID,
-	_Out_ DWORD* pdwMatchID
-	)
+HRESULT MonitorArray::MatchGUID( UINT uDevID, _Out_ DWORD* pdwMatchID )
 {
 	HRESULT hr = S_OK;
 
@@ -229,48 +180,22 @@ HRESULT MonitorArray::MatchGUID(
 	return( hr );
 }
 
-
-/*****************************Private*Routine******************************\
-* TerminateDisplaySystem
-*
-*
-*
-* History:
-* Mon 01/24/2000 - StEstrop - Created
-*
-\**************************************************************************/
 void MonitorArray::TerminateDisplaySystem()
 {
-
-
 	for( DWORD i = 0; i < m_dwNumMonitors; i++ ) {
 		TermDDrawMonitorInfo( &m_DDMon[i] );
 	}
 	m_dwNumMonitors = 0;
 }
 
-
-/******************************Public*Routine******************************\
-* Constructor and destructor
-*
-*
-*
-* History:
-* Fri 11/17/2001 - StEstrop - Created
-*
-\**************************************************************************/
 MonitorArray::MonitorArray()
 	: m_dwNumMonitors( 0 )
 {
-
-
 	ZeroMemory( m_DDMon, sizeof( m_DDMon ) );
 }
 
-
 MonitorArray::~MonitorArray()
 {
-
 	TerminateDisplaySystem();
 }
 

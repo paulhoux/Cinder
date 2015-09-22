@@ -1,6 +1,7 @@
 
 
 #include "cinder/msw/detail/MediaSink.h"
+#include "cinder/msw/ScopedPtr.h"
 
 namespace cinder {
 namespace msw {
@@ -503,9 +504,7 @@ STDMETHODIMP MediaSink::GetFastestRate(
 
 	do {
 		hr = CheckShutdown();
-		if( FAILED( hr ) ) {
-			break;
-		}
+		BREAK_ON_FAIL( hr );
 
 		if( NULL == pflRate ) {
 			hr = E_POINTER;
@@ -515,9 +514,7 @@ STDMETHODIMP MediaSink::GetFastestRate(
 		float rate;
 
 		hr = m_pStream->GetMaxRate( fThin, &rate );
-		if( FAILED( hr ) ) {
-			break;
-		}
+		BREAK_ON_FAIL( hr );
 
 		if( MFRATE_FORWARD == eDirection ) {
 			*pflRate = rate;
@@ -547,9 +544,7 @@ STDMETHODIMP MediaSink::GetSlowestRate(
 
 	do {
 		hr = CheckShutdown();
-		if( FAILED( hr ) ) {
-			break;
-		}
+		BREAK_ON_FAIL( hr );
 
 		if( NULL == pflRate ) {
 			hr = E_POINTER;
@@ -576,9 +571,7 @@ STDMETHODIMP MediaSink::IsRateSupported( BOOL fThin, float flRate, __RPC__inout_
 
 	do {
 		hr = CheckShutdown();
-		if( FAILED( hr ) ) {
-			break;
-		}
+		BREAK_ON_FAIL( hr );
 
 		//
 		// Only support rates up to the refresh rate of the monitor.
@@ -632,7 +625,7 @@ STDMETHODIMP MediaSink::NotifyPreroll( MFTIME hnsUpcomingStartTime )
 //-------------------------------------------------------------------
 
 MediaSink::MediaSink( void ) :
-	STREAM_ID( 1 ),
+	STREAM_ID( 0 ),
 	m_nRefCount( 1 ),
 	m_csMediaSink(), // default ctor
 	m_IsShutdown( FALSE ),
@@ -672,36 +665,23 @@ HRESULT MediaSink::CheckShutdown( void ) const
 HRESULT MediaSink::Initialize( void )
 {
 	HRESULT hr = S_OK;
-	IMFMediaSink* pSink = NULL;
 
 	do {
 		m_pScheduler = new Scheduler( s_csStreamSinkAndScheduler );
-		if( m_pScheduler == NULL ) {
-			hr = E_OUTOFMEMORY;
-			break;
-		}
+		BREAK_ON_NULL( m_pScheduler, E_OUTOFMEMORY );
 
 		m_pStream = new StreamSink( STREAM_ID, s_csStreamSinkAndScheduler, m_pScheduler );
-		if( m_pStream == NULL ) {
-			hr = E_OUTOFMEMORY;
-			break;
-		}
+		BREAK_ON_NULL( m_pStream, E_OUTOFMEMORY );
 
 		m_pPresenter = new Presenter(); // Created with ref count = 1.
-		if( m_pPresenter == NULL ) {
-			hr = E_OUTOFMEMORY;
-			break;
-		}
+		BREAK_ON_NULL( m_pPresenter, E_OUTOFMEMORY );
 
+		ScopedPtr<IMFMediaSink> pSink;
 		hr = QueryInterface( IID_PPV_ARGS( &pSink ) );
-		if( FAILED( hr ) ) {
-			break;
-		}
+		BREAK_ON_FAIL( hr );
 
 		hr = m_pStream->Initialize( pSink, m_pPresenter );
-		if( FAILED( hr ) ) {
-			break;
-		}
+		BREAK_ON_FAIL( hr );
 
 		m_pScheduler->SetCallback( static_cast<SchedulerCallback*>( m_pStream ) );
 	} while( FALSE );
@@ -709,9 +689,7 @@ HRESULT MediaSink::Initialize( void )
 	if( FAILED( hr ) ) {
 		Shutdown();
 	}
-
-	SafeRelease( pSink );
-
+	
 	return hr;
 }
 

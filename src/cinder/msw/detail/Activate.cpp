@@ -1,5 +1,5 @@
 #include "cinder/msw/detail/Activate.h"
-//#include "cinder/msw/dx11/DX11VideoRenderer.h"
+#include "cinder/msw/ScopedPtr.h"
 
 namespace cinder {
 namespace msw {
@@ -22,14 +22,10 @@ HRESULT Activate::CreateInstance( HWND hwnd, IMFActivate** ppActivate )
 
 	do {
 		hr = pActivate->Initialize();
-		if( FAILED( hr ) ) {
-			break;
-		}
+		BREAK_ON_FAIL( hr );
 
 		hr = pActivate->QueryInterface( IID_PPV_ARGS( ppActivate ) );
-		if( FAILED( hr ) ) {
-			break;
-		}
+		BREAK_ON_FAIL( hr );
 
 		pActivate->m_hwnd = hwnd;
 	} while( FALSE );
@@ -88,40 +84,27 @@ ULONG Activate::Release( void )
 HRESULT Activate::ActivateObject( __RPC__in REFIID riid, __RPC__deref_out_opt void** ppvObject )
 {
 	HRESULT hr = S_OK;
-	IMFGetService* pSinkGetService = NULL;
-	IMFVideoDisplayControl* pSinkVideoDisplayControl = NULL;
 
 	do {
 		if( m_pMediaSink == NULL ) {
 			hr = MediaSink::CreateInstance( IID_PPV_ARGS( &m_pMediaSink ) );
-			if( FAILED( hr ) ) {
-				break;
-			}
+			BREAK_ON_FAIL( hr );
 
+			ScopedPtr<IMFGetService> pSinkGetService;
 			hr = m_pMediaSink->QueryInterface( IID_PPV_ARGS( &pSinkGetService ) );
-			if( FAILED( hr ) ) {
-				break;
-			}
+			BREAK_ON_FAIL( hr );
 
+			ScopedPtr<IMFVideoDisplayControl> pSinkVideoDisplayControl;
 			hr = pSinkGetService->GetService( MR_VIDEO_RENDER_SERVICE, IID_PPV_ARGS( &pSinkVideoDisplayControl ) );
-			if( FAILED( hr ) ) {
-				break;
-			}
+			BREAK_ON_FAIL( hr );
 
 			hr = pSinkVideoDisplayControl->SetVideoWindow( m_hwnd );
-			if( FAILED( hr ) ) {
-				break;
-			}
+			BREAK_ON_FAIL( hr );
 		}
 
 		hr = m_pMediaSink->QueryInterface( riid, ppvObject );
-		if( FAILED( hr ) ) {
-			break;
-		}
+		BREAK_ON_FAIL( hr );
 	} while( FALSE );
-
-	SafeRelease( pSinkGetService );
-	SafeRelease( pSinkVideoDisplayControl );
 
 	return hr;
 }

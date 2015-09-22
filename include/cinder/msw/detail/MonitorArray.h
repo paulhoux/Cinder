@@ -42,13 +42,13 @@ public:
 	MonitorArray();
 	virtual ~MonitorArray();
 
-	virtual HRESULT         InitializeDisplaySystem( HWND hwnd );
+	virtual HRESULT         InitializeDisplaySystem( _In_ HWND hwnd );
 
 	virtual HRESULT         InitializeXclModeDisplaySystem( IUnknown* lpDD, UINT* pAdapterID ) { return E_NOTIMPL; }
 
 	virtual void            TerminateDisplaySystem();
-	AMDDrawMonitorInfo*    FindMonitor( HMONITOR hMon );
-	HRESULT                 MatchGUID( UINT uDevID, DWORD* pdwMatchID );
+	AMDDrawMonitorInfo*     FindMonitor( _In_ HMONITOR hMon );
+	HRESULT                 MatchGUID( UINT uDevID, _Out_ DWORD* pdwMatchID );
 
 
 	AMDDrawMonitorInfo&    operator[]( int i )
@@ -60,13 +60,13 @@ public:
 		return m_dwNumMonitors;
 	}
 
-	static BOOL CALLBACK    MonitorEnumProc( HMONITOR hMon, HDC hDC, LPRECT pRect, LPARAM dwData );
+	static BOOL CALLBACK    MonitorEnumProc( _In_ HMONITOR hMon, _In_opt_ HDC hDC, _In_ LPRECT pRect, LPARAM dwData );
 
-	virtual BOOL            InitMonitor( HMONITOR hMon, BOOL fXclMode );
+	virtual BOOL            InitMonitor( _In_ HMONITOR hMon, BOOL fXclMode );
 protected:
-	BOOL                    GetAMDDrawMonitorInfo( UINT uDevID, AMDDrawMonitorInfo* lpmi, HMONITOR hm );
+	BOOL                    GetAMDDrawMonitorInfo( UINT uDevID, _Out_ AMDDrawMonitorInfo* lpmi, _In_ HMONITOR hm );
 
-	virtual void            TermDDrawMonitorInfo( AMDDrawMonitorInfo* pmi );
+	virtual void            TermDDrawMonitorInfo( _Inout_ AMDDrawMonitorInfo* pmi );
 
 	DWORD                   m_dwNumMonitors;
 	AMDDrawMonitorInfo     m_DDMon[EVR_MAX_MONITORS];

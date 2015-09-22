@@ -166,9 +166,7 @@ HRESULT Presenter::SetVideoWindow( __RPC__in HWND hwndVideo )
 
 	do {
 		hr = CheckShutdown();
-		if( FAILED( hr ) ) {
-			break;
-		}
+		BREAK_ON_FAIL( hr );
 
 		if( !IsWindow( hwndVideo ) ) {
 			hr = E_INVALIDARG;
@@ -182,24 +180,18 @@ HRESULT Presenter::SetVideoWindow( __RPC__in HWND hwndVideo )
 		}
 
 		hr = SetVideoMonitor( hwndVideo );
-		if( FAILED( hr ) ) {
-			break;
-		}
+		BREAK_ON_FAIL( hr );
 
 		CheckDecodeSwitchRegKey();
 
 		m_hwndVideo = hwndVideo;
 
 		hr = CreateDXGIManagerAndDevice();
-		if( FAILED( hr ) ) {
-			break;
-		}
+		BREAK_ON_FAIL( hr );
 
 		if( m_useXVP ) {
 			hr = CreateXVP();
-			if( FAILED( hr ) ) {
-				break;
-			}
+			BREAK_ON_FAIL( hr );
 		}
 	} while( FALSE );
 
@@ -291,9 +283,7 @@ HRESULT Presenter::IsMediaTypeSupported( IMFMediaType* pMediaType, DXGI_FORMAT d
 
 	do {
 		hr = CheckShutdown();
-		if( FAILED( hr ) ) {
-			break;
-		}
+		BREAK_ON_FAIL( hr );
 
 		if( pMediaType == NULL ) {
 			hr = E_POINTER;
@@ -303,16 +293,12 @@ HRESULT Presenter::IsMediaTypeSupported( IMFMediaType* pMediaType, DXGI_FORMAT d
 #if MF_PRESENTER_USE_DX11
 		if( !m_pVideoDevice ) {
 			hr = m_pD3DDevice->QueryInterface( __uuidof( ID3D11VideoDevice ), (void**)&m_pVideoDevice );
-			if( FAILED( hr ) ) {
-				break;
-			}
+			BREAK_ON_FAIL( hr );
 		}
 
 		UINT32 uimageWidthInPixels, uimageHeightInPixels = 0;
 		hr = MFGetAttributeSize( pMediaType, MF_MT_FRAME_SIZE, &uimageWidthInPixels, &uimageHeightInPixels );
-		if( FAILED( hr ) ) {
-			break;
-		}
+		BREAK_ON_FAIL( hr );
 
 		UINT32 uiNumerator = 30000, uiDenominator = 1001;
 		MFGetAttributeRatio( pMediaType, MF_MT_FRAME_RATE, &uiNumerator, &uiDenominator );
@@ -333,9 +319,7 @@ HRESULT Presenter::IsMediaTypeSupported( IMFMediaType* pMediaType, DXGI_FORMAT d
 
 		SafeRelease( m_pVideoProcessorEnum );
 		hr = m_pVideoDevice->CreateVideoProcessorEnumerator( &ContentDesc, &m_pVideoProcessorEnum );
-		if( FAILED( hr ) ) {
-			break;
-		}
+		BREAK_ON_FAIL( hr );
 
 		UINT uiFlags;
 		hr = m_pVideoProcessorEnum->CheckVideoProcessorFormat( dxgiFormat, &uiFlags );
@@ -346,9 +330,7 @@ HRESULT Presenter::IsMediaTypeSupported( IMFMediaType* pMediaType, DXGI_FORMAT d
 
 		if( m_useXVP ) {
 			hr = m_pXVP->SetInputType( 0, pMediaType, MFT_SET_TYPE_TEST_ONLY );
-			if( FAILED( hr ) ) {
-				break;
-			}
+			BREAK_ON_FAIL( hr );
 		}
 #else
 		// Reject compressed media types.
@@ -369,7 +351,7 @@ HRESULT Presenter::IsMediaTypeSupported( IMFMediaType* pMediaType, DXGI_FORMAT d
 			return hr;
 		}
 
-		D3DFORMAT d3dFormat = ( D3DFORMAT) guidSubType.Data1;
+		D3DFORMAT d3dFormat = (D3DFORMAT)guidSubType.Data1;
 
 		// The D3DPresentEngine9 checks whether the format can be used as
 		// the back-buffer format for the swap chains.
@@ -380,7 +362,7 @@ HRESULT Presenter::IsMediaTypeSupported( IMFMediaType* pMediaType, DXGI_FORMAT d
 
 		// Reject interlaced formats.
 		MFVideoInterlaceMode    InterlaceMode = MFVideoInterlace_Unknown;
-		hr = pMediaType->GetUINT32( MF_MT_INTERLACE_MODE, (UINT32*) &InterlaceMode );
+		hr = pMediaType->GetUINT32( MF_MT_INTERLACE_MODE, (UINT32*)&InterlaceMode );
 		if( FAILED( hr ) ) {
 			return hr;
 		}
@@ -431,13 +413,9 @@ HRESULT Presenter::PresentFrame( void )
 
 	do {
 		hr = CheckShutdown();
-		if( FAILED( hr ) ) {
-			break;
-		}
+		BREAK_ON_FAIL( hr );
 
-		if( NULL == m_pSwapChain1 ) {
-			break;
-		}
+		BREAK_ON_NULL( m_pSwapChain1, E_POINTER );
 
 		RECT rcDest;
 		ZeroMemory( &rcDest, sizeof( rcDest ) );
@@ -447,9 +425,7 @@ HRESULT Presenter::PresentFrame( void )
 		}
 
 		hr = m_pSwapChain1->Present( 0, 0 );
-		if( FAILED( hr ) ) {
-			break;
-		}
+		BREAK_ON_FAIL( hr );
 
 		m_bCanProcessNextSample = TRUE;
 	} while( FALSE );
@@ -482,9 +458,7 @@ HRESULT Presenter::ProcessFrame( IMFMediaType* pCurrentType, IMFSample* pSample,
 
 	do {
 		hr = CheckShutdown();
-		if( FAILED( hr ) ) {
-			break;
-		}
+		BREAK_ON_FAIL( hr );
 
 		if( punInterlaceMode == NULL || pCurrentType == NULL || pSample == NULL || pbDeviceChanged == NULL || pbProcessAgain == NULL ) {
 			hr = E_POINTER;
@@ -495,18 +469,14 @@ HRESULT Presenter::ProcessFrame( IMFMediaType* pCurrentType, IMFSample* pSample,
 		*pbDeviceChanged = FALSE;
 
 		hr = pSample->GetBufferCount( &cBuffers );
-		if( FAILED( hr ) ) {
-			break;
-		}
+		BREAK_ON_FAIL( hr );
 
 		if( 1 == cBuffers ) {
 			hr = pSample->GetBufferByIndex( 0, &pBuffer );
 		}
 		else if( 2 == cBuffers && m_b3DVideo && FALSE /* 0 != m_vp3DOutput */ ) {
 			hr = pSample->GetBufferByIndex( 0, &pBuffer );
-			if( FAILED( hr ) ) {
-				break;
-			}
+			BREAK_ON_FAIL( hr );
 
 			hr = pSample->GetBufferByIndex( 1, &pEVBuffer );
 		}
@@ -514,14 +484,10 @@ HRESULT Presenter::ProcessFrame( IMFMediaType* pCurrentType, IMFSample* pSample,
 			hr = pSample->ConvertToContiguousBuffer( &pBuffer );
 		}
 
-		if( FAILED( hr ) ) {
-			break;
-		}
+		BREAK_ON_FAIL( hr );
 
 		hr = CheckDeviceState( pbDeviceChanged );
-		if( FAILED( hr ) ) {
-			break;
-		}
+		BREAK_ON_FAIL( hr );
 
 		RECT rcDest;
 		ZeroMemory( &rcDest, sizeof( rcDest ) );
@@ -553,40 +519,25 @@ HRESULT Presenter::ProcessFrame( IMFMediaType* pCurrentType, IMFSample* pSample,
 		}
 
 		hr = pBuffer->QueryInterface( __uuidof( IMFDXGIBuffer ), (LPVOID*)&pDXGIBuffer );
-		if( FAILED( hr ) ) {
-			break;
-		}
+		BREAK_ON_FAIL( hr );
 
 		hr = pDXGIBuffer->GetResource( __uuidof( ID3D11Texture2D ), (LPVOID*)&pTexture2D );
-		if( FAILED( hr ) ) {
-			break;
-		}
+		BREAK_ON_FAIL( hr );
 
 		hr = pDXGIBuffer->GetSubresourceIndex( &dwViewIndex );
-		if( FAILED( hr ) ) {
-			break;
-		}
+		BREAK_ON_FAIL( hr );
 
 		if( m_b3DVideo && FALSE /* 0 != m_vp3DOutput */ ) {/*
 			if (pEVBuffer && MFVideo3DSampleFormat_MultiView == m_vp3DOutput)
 			{
 				hr = pEVBuffer->QueryInterface(__uuidof(IMFDXGIBuffer), (LPVOID*)&pEVDXGIBuffer);
-				if (FAILED(hr))
-				{
-					break;
-				}
+				BREAK_ON_FAIL( hr );
 
 				hr = pEVDXGIBuffer->GetResource(__uuidof(ID3D11Texture2D), (LPVOID*)&pEVTexture2D);
-				if (FAILED(hr))
-				{
-					break;
-				}
+				BREAK_ON_FAIL( hr );
 
 				hr = pEVDXGIBuffer->GetSubresourceIndex(&dwEVViewIndex);
-				if (FAILED(hr))
-				{
-					break;
-				}
+				BREAK_ON_FAIL( hr );
 			}*/
 		}
 
@@ -647,21 +598,15 @@ HRESULT Presenter::SetCurrentMediaType( IMFMediaType* pMediaType )
 
 	do {
 		hr = CheckShutdown();
-		if( FAILED( hr ) ) {
-			break;
-		}
+		BREAK_ON_FAIL( hr );
 
 		hr = pMediaType->QueryInterface( IID_IMFAttributes, reinterpret_cast<void**>( &pAttributes ) );
-		if( FAILED( hr ) ) {
-			break;
-		}
+		BREAK_ON_FAIL( hr );
 
 		HRESULT hr1 = E_NOTIMPL; // pAttributes->GetUINT32( MF_MT_VIDEO_3D, (UINT32*)&m_b3DVideo );
 		if( SUCCEEDED( hr1 ) ) {
 			hr = E_NOTIMPL; // pAttributes->GetUINT32(MF_MT_VIDEO_3D_FORMAT, (UINT32*)&m_vp3DOutput);
-			if( FAILED( hr ) ) {
-				break;
-			}
+			BREAK_ON_FAIL( hr );
 		}
 
 		//Now Determine Correct Display Resolution
@@ -677,9 +622,7 @@ HRESULT Presenter::SetCurrentMediaType( IMFMediaType* pMediaType )
 			}
 
 			hr = GetVideoDisplayArea( pMediaType, &videoArea );
-			if( FAILED( hr ) ) {
-				break;
-			}
+			BREAK_ON_FAIL( hr );
 
 			m_displayRect = MFVideoAreaToRect( videoArea );
 
@@ -701,9 +644,7 @@ HRESULT Presenter::SetCurrentMediaType( IMFMediaType* pMediaType )
 		if( SUCCEEDED( hr ) && m_useXVP ) {
 			// set the input type on the XVP
 			hr = m_pXVP->SetInputType( 0, pMediaType, 0 );
-			if( FAILED( hr ) ) {
-				break;
-			}
+			BREAK_ON_FAIL( hr );
 		}
 	} while( FALSE );
 
@@ -889,29 +830,19 @@ HRESULT Presenter::CreateDCompDeviceAndVisual( void )
 
 	do {
 		hr = m_pD3DDevice->QueryInterface( __uuidof( IDXGIDevice ), reinterpret_cast<void**>( &pDXGIDevice ) );
-		if( FAILED( hr ) ) {
-			break;
-		}
+		BREAK_ON_FAIL( hr );
 
 		hr = E_NOTIMPL; // DCompositionCreateDevice(pDXGIDevice, __uuidof(IDCompositionDevice), reinterpret_cast<void**>(&m_pDCompDevice));
-		if( FAILED( hr ) ) {
-			break;
-		}
+		BREAK_ON_FAIL( hr );
 
 		hr = E_NOTIMPL; // m_pDCompDevice->CreateTargetForHwnd(m_hwndVideo, TRUE, &m_pHwndTarget);
-		if( FAILED( hr ) ) {
-			break;
-		}
+		BREAK_ON_FAIL( hr );
 
 		hr = E_NOTIMPL; // m_pDCompDevice->CreateVisual(reinterpret_cast<IDCompositionVisual**>(&m_pRootVisual));
-		if( FAILED( hr ) ) {
-			break;
-		}
+		BREAK_ON_FAIL( hr );
 
 		hr = E_NOTIMPL; // m_pHwndTarget->SetRoot(m_pRootVisual);
-		if( FAILED( hr ) ) {
-			break;
-		}
+		BREAK_ON_FAIL( hr );
 	} while( FALSE );
 
 	SafeRelease( pDXGIDevice );
@@ -972,71 +903,49 @@ HRESULT Presenter::CreateDXGIManagerAndDevice( D3D_DRIVER_TYPE DriverType )
 			}
 		}
 
-		if( FAILED( hr ) ) {
-			break;
-		}
+		BREAK_ON_FAIL( hr );
 
 		if( NULL == m_pDXGIManager ) {
 			hr = MFCreateDXGIDeviceManager( &resetToken, &m_pDXGIManager );
-			if( FAILED( hr ) ) {
-				break;
-			}
+			BREAK_ON_FAIL( hr );
 			m_DeviceResetToken = resetToken;
 		}
 
 		hr = m_pDXGIManager->ResetDevice( m_pD3DDevice, m_DeviceResetToken );
-		if( FAILED( hr ) ) {
-			break;
-		}
+		BREAK_ON_FAIL( hr );
 
 		SafeRelease( m_pD3DImmediateContext );
 		m_pD3DDevice->GetImmediateContext( &m_pD3DImmediateContext );
 
 		// Need to explitly set the multithreaded mode for this device
 		hr = m_pD3DImmediateContext->QueryInterface( __uuidof( ID3D10Multithread ), (void**)&pMultiThread );
-		if( FAILED( hr ) ) {
-			break;
-		}
+		BREAK_ON_FAIL( hr );
 
 		pMultiThread->SetMultithreadProtected( TRUE );
 
 		hr = m_pD3DDevice->QueryInterface( __uuidof( IDXGIDevice1 ), (LPVOID*)&pDXGIDev );
-		if( FAILED( hr ) ) {
-			break;
-		}
+		BREAK_ON_FAIL( hr );
 
 		hr = pDXGIDev->GetAdapter( &pTempAdapter );
-		if( FAILED( hr ) ) {
-			break;
-		}
+		BREAK_ON_FAIL( hr );
 
 		hr = pTempAdapter->QueryInterface( __uuidof( IDXGIAdapter1 ), (LPVOID*)&pAdapter );
-		if( FAILED( hr ) ) {
-			break;
-		}
+		BREAK_ON_FAIL( hr );
 
 		SafeRelease( m_pDXGIFactory2 );
 		hr = pAdapter->GetParent( __uuidof( IDXGIFactory2 ), (LPVOID*)&m_pDXGIFactory2 );
-		if( FAILED( hr ) ) {
-			break;
-		}
+		BREAK_ON_FAIL( hr );
 
 		hr = pAdapter->EnumOutputs( 0, &pDXGIOutput );
-		if( FAILED( hr ) ) {
-			break;
-		}
+		BREAK_ON_FAIL( hr );
 
 		SafeRelease( m_pDXGIOutput1 );
 		hr = pDXGIOutput->QueryInterface( __uuidof( IDXGIOutput1 ), (LPVOID*)&m_pDXGIOutput1 );
-		if( FAILED( hr ) ) {
-			break;
-		}
+		BREAK_ON_FAIL( hr );
 
 		if( m_useDCompVisual ) {
 			hr = CreateDCompDeviceAndVisual();
-			if( FAILED( hr ) ) {
-				break;
-			}
+			BREAK_ON_FAIL( hr );
 		}
 	} while( FALSE );
 
@@ -1061,34 +970,24 @@ HRESULT Presenter::CreateXVP( void )
 
 	do {
 		hr = CoCreateInstance( CLSID_VideoProcessorMFT, nullptr, CLSCTX_INPROC_SERVER, IID_IMFTransform, (void**)&m_pXVP );
-		if( FAILED( hr ) ) {
-			break;
-		}
+		BREAK_ON_FAIL( hr );
 
 		hr = m_pXVP->ProcessMessage( MFT_MESSAGE_SET_D3D_MANAGER, ULONG_PTR( m_pDXGIManager ) );
-		if( FAILED( hr ) ) {
-			break;
-		}
+		BREAK_ON_FAIL( hr );
 
 		// Tell the XVP that we are the swapchain allocator
 		hr = m_pXVP->GetAttributes( &pAttributes );
-		if( FAILED( hr ) ) {
-			break;
-		}
+		BREAK_ON_FAIL( hr );
 
 		hr = pAttributes->SetUINT32( MF_XVP_PLAYBACK_MODE, TRUE );
-		if( FAILED( hr ) ) {
-			break;
-		}
+		BREAK_ON_FAIL( hr );
 
 #if (WINVER >= _WIN32_WINNT_WIN8) 
 		hr = m_pXVP->QueryInterface( IID_PPV_ARGS( &m_pXVPControl ) );
 #else
 		hr = E_NOTIMPL;
 #endif
-		if( FAILED( hr ) ) {
-			break;
-		}
+		BREAK_ON_FAIL( hr );
 	} while( FALSE );
 
 	SafeRelease( pAttributes );
@@ -1343,15 +1242,11 @@ HRESULT Presenter::ProcessFrameUsingD3D11( ID3D11Texture2D* pLeftTexture2D, ID3D
 	do {
 		if( !m_pVideoDevice ) {
 			hr = m_pD3DDevice->QueryInterface( __uuidof( ID3D11VideoDevice ), (void**)&m_pVideoDevice );
-			if( FAILED( hr ) ) {
-				break;
-			}
+			BREAK_ON_FAIL( hr );
 		}
 
 		hr = m_pD3DImmediateContext->QueryInterface( __uuidof( ID3D11VideoContext ), (void**)&pVideoContext );
-		if( FAILED( hr ) ) {
-			break;
-		}
+		BREAK_ON_FAIL( hr );
 
 		// remember the original rectangles
 		RECT TRectOld = m_rcDstApp;
@@ -1381,9 +1276,7 @@ HRESULT Presenter::ProcessFrameUsingD3D11( ID3D11Texture2D* pLeftTexture2D, ID3D
 			ContentDesc.Usage = D3D11_VIDEO_USAGE_PLAYBACK_NORMAL;
 
 			hr = m_pVideoDevice->CreateVideoProcessorEnumerator( &ContentDesc, &m_pVideoProcessorEnum );
-			if( FAILED( hr ) ) {
-				break;
-			}
+			BREAK_ON_FAIL( hr );
 
 			UINT uiFlags;
 			DXGI_FORMAT VP_Output_Format = DXGI_FORMAT_B8G8R8A8_UNORM;
@@ -1401,20 +1294,14 @@ HRESULT Presenter::ProcessFrameUsingD3D11( ID3D11Texture2D* pLeftTexture2D, ID3D
 
 			DWORD index;
 			hr = FindBOBProcessorIndex( &index );
-			if( FAILED( hr ) ) {
-				break;
-			}
+			BREAK_ON_FAIL( hr );
 
 			hr = m_pVideoDevice->CreateVideoProcessor( m_pVideoProcessorEnum, index, &m_pVideoProcessor );
-			if( FAILED( hr ) ) {
-				break;
-			}
+			BREAK_ON_FAIL( hr );
 
 			if( m_b3DVideo ) {
 				hr = m_pVideoProcessorEnum->GetVideoProcessorCaps( &vpCaps );
-				if( FAILED( hr ) ) {
-					break;
-				}
+				BREAK_ON_FAIL( hr );
 
 				if( vpCaps.FeatureCaps & D3D11_VIDEO_PROCESSOR_FEATURE_CAPS_STEREO ) {
 					m_bStereoEnabled = TRUE;
@@ -1429,9 +1316,7 @@ HRESULT Presenter::ProcessFrameUsingD3D11( ID3D11Texture2D* pLeftTexture2D, ID3D
 				DXGI_MODE_DESC1 matchedMode;
 				if( m_bFullScreenState ) {
 					hr = m_pDXGIOutput1->FindClosestMatchingMode1( &modeFilter, &matchedMode, m_pD3DDevice );
-					if( FAILED( hr ) ) {
-						break;
-					}
+					BREAK_ON_FAIL( hr );
 				}
 			}
 		}
@@ -1446,47 +1331,33 @@ HRESULT Presenter::ProcessFrameUsingD3D11( ID3D11Texture2D* pLeftTexture2D, ID3D
 
 		if( !m_pSwapChain1 || fDestRectChanged ) {
 			hr = UpdateDXGISwapChain();
-			if( FAILED( hr ) ) {
-				break;
-			}
+			BREAK_ON_FAIL( hr );
 		}
 
 		m_bCanProcessNextSample = FALSE;
 
 		// Get Backbuffer
 		hr = m_pSwapChain1->GetBuffer( 0, __uuidof( ID3D11Texture2D ), (void**)&pDXGIBackBuffer );
-		if( FAILED( hr ) ) {
-			break;
-		}
+		BREAK_ON_FAIL( hr );
 
 		// create the output media sample
 		hr = MFCreateSample( &pRTSample );
-		if( FAILED( hr ) ) {
-			break;
-		}
+		BREAK_ON_FAIL( hr );
 
 		hr = MFCreateDXGISurfaceBuffer( __uuidof( ID3D11Texture2D ), pDXGIBackBuffer, 0, FALSE, &pBuffer );
-		if( FAILED( hr ) ) {
-			break;
-		}
+		BREAK_ON_FAIL( hr );
 
 		hr = pRTSample->AddBuffer( pBuffer );
-		if( FAILED( hr ) ) {
-			break;
-		}
+		BREAK_ON_FAIL( hr );
 
 		if( m_b3DVideo && FALSE /* 0 != m_vp3DOutput */ ) {
 			SafeRelease( pBuffer );
 
 			hr = MFCreateDXGISurfaceBuffer( __uuidof( ID3D11Texture2D ), pDXGIBackBuffer, 1, FALSE, &pBuffer );
-			if( FAILED( hr ) ) {
-				break;
-			}
+			BREAK_ON_FAIL( hr );
 
 			hr = pRTSample->AddBuffer( pBuffer );
-			if( FAILED( hr ) ) {
-				break;
-			}
+			BREAK_ON_FAIL( hr );
 		}
 
 		QueryPerformanceCounter( &lpcStart );
@@ -1514,9 +1385,7 @@ HRESULT Presenter::ProcessFrameUsingD3D11( ID3D11Texture2D* pLeftTexture2D, ID3D
 		QueryPerformanceCounter( &lpcStart );
 
 		hr = m_pVideoDevice->CreateVideoProcessorOutputView( pDXGIBackBuffer, m_pVideoProcessorEnum, &OutputViewDesc, &pOutputView );
-		if( FAILED( hr ) ) {
-			break;
-		}
+		BREAK_ON_FAIL( hr );
 
 		D3D11_VIDEO_PROCESSOR_INPUT_VIEW_DESC InputLeftViewDesc;
 		ZeroMemory( &InputLeftViewDesc, sizeof( InputLeftViewDesc ) );
@@ -1526,9 +1395,7 @@ HRESULT Presenter::ProcessFrameUsingD3D11( ID3D11Texture2D* pLeftTexture2D, ID3D
 		InputLeftViewDesc.Texture2D.ArraySlice = dwLeftViewIndex;
 
 		hr = m_pVideoDevice->CreateVideoProcessorInputView( pLeftTexture2D, m_pVideoProcessorEnum, &InputLeftViewDesc, &pLeftInputView );
-		if( FAILED( hr ) ) {
-			break;
-		}
+		BREAK_ON_FAIL( hr );
 
 		if( m_b3DVideo && FALSE /* MFVideo3DSampleFormat_MultiView == m_vp3DOutput */ && pRightTexture2D ) {
 			D3D11_VIDEO_PROCESSOR_INPUT_VIEW_DESC InputRightViewDesc;
@@ -1539,9 +1406,7 @@ HRESULT Presenter::ProcessFrameUsingD3D11( ID3D11Texture2D* pLeftTexture2D, ID3D
 			InputRightViewDesc.Texture2D.ArraySlice = dwRightViewIndex;
 
 			hr = m_pVideoDevice->CreateVideoProcessorInputView( pRightTexture2D, m_pVideoProcessorEnum, &InputRightViewDesc, &pRightInputView );
-			if( FAILED( hr ) ) {
-				break;
-			}
+			BREAK_ON_FAIL( hr );
 		}
 		QueryPerformanceCounter( &lpcEnd );
 
@@ -1587,9 +1452,8 @@ HRESULT Presenter::ProcessFrameUsingD3D11( ID3D11Texture2D* pLeftTexture2D, ID3D
 		}
 
 		hr = pVideoContext->VideoProcessorBlt( m_pVideoProcessor, pOutputView, 0, 1, &StreamData );
-		if( FAILED( hr ) ) {
-			break;
-		}
+		BREAK_ON_FAIL( hr );
+
 		QueryPerformanceCounter( &lpcEnd );
 
 		if( ppVideoOutFrame != NULL ) {
@@ -1629,15 +1493,11 @@ HRESULT Presenter::ProcessFrameUsingXVP( IMFMediaType* pCurrentType, IMFSample* 
 	do {
 		if( !m_pVideoDevice ) {
 			hr = m_pD3DDevice->QueryInterface( __uuidof( ID3D11VideoDevice ), (void**)&m_pVideoDevice );
-			if( FAILED( hr ) ) {
-				break;
-			}
+			BREAK_ON_FAIL( hr );
 		}
 
 		hr = m_pD3DImmediateContext->QueryInterface( __uuidof( ID3D11VideoContext ), (void**)&pVideoContext );
-		if( FAILED( hr ) ) {
-			break;
-		}
+		BREAK_ON_FAIL( hr );
 
 		// remember the original rectangles
 		RECT TRectOld = m_rcDstApp;
@@ -1669,9 +1529,7 @@ HRESULT Presenter::ProcessFrameUsingXVP( IMFMediaType* pCurrentType, IMFSample* 
 			ContentDesc.Usage = D3D11_VIDEO_USAGE_PLAYBACK_NORMAL;
 
 			hr = m_pVideoDevice->CreateVideoProcessorEnumerator( &ContentDesc, &m_pVideoProcessorEnum );
-			if( FAILED( hr ) ) {
-				break;
-			}
+			BREAK_ON_FAIL( hr );
 
 			m_rcSrcApp.left = 0;
 			m_rcSrcApp.top = 0;
@@ -1680,9 +1538,7 @@ HRESULT Presenter::ProcessFrameUsingXVP( IMFMediaType* pCurrentType, IMFSample* 
 
 			if( m_b3DVideo ) {
 				hr = m_pVideoProcessorEnum->GetVideoProcessorCaps( &vpCaps );
-				if( FAILED( hr ) ) {
-					break;
-				}
+				BREAK_ON_FAIL( hr );
 
 				if( vpCaps.FeatureCaps & D3D11_VIDEO_PROCESSOR_FEATURE_CAPS_STEREO ) {
 					m_bStereoEnabled = TRUE;
@@ -1697,20 +1553,14 @@ HRESULT Presenter::ProcessFrameUsingXVP( IMFMediaType* pCurrentType, IMFSample* 
 				DXGI_MODE_DESC1 matchedMode;
 				if( m_bFullScreenState ) {
 					hr = m_pDXGIOutput1->FindClosestMatchingMode1( &modeFilter, &matchedMode, m_pD3DDevice );
-					if( FAILED( hr ) ) {
-						break;
-					}
+					BREAK_ON_FAIL( hr );
 				}
 
 				hr = m_pXVP->GetAttributes( &pAttributes );
-				if( FAILED( hr ) ) {
-					break;
-				}
+				BREAK_ON_FAIL( hr );
 
 				hr = E_NOTIMPL; //pAttributes->SetUINT32(MF_ENABLE_3DVIDEO_OUTPUT, (0 != m_vp3DOutput) ? MF3DVideoOutputType_Stereo : MF3DVideoOutputType_BaseView);
-				if( FAILED( hr ) ) {
-					break;
-				}
+				BREAK_ON_FAIL( hr );
 			}
 		}
 
@@ -1725,9 +1575,7 @@ HRESULT Presenter::ProcessFrameUsingXVP( IMFMediaType* pCurrentType, IMFSample* 
 
 		if( !m_pSwapChain1 || fDestRectChanged ) {
 			hr = UpdateDXGISwapChain();
-			if( FAILED( hr ) ) {
-				break;
-			}
+			BREAK_ON_FAIL( hr );
 		}
 
 		if( fTypeChanged || fSrcRectChanged || fDestRectChanged ) {
@@ -1739,72 +1587,52 @@ HRESULT Presenter::ProcessFrameUsingXVP( IMFMediaType* pCurrentType, IMFSample* 
 
 			if( fTypeChanged ) {
 				hr = SetXVPOutputMediaType( pCurrentType, DXGI_FORMAT_B8G8R8A8_UNORM );
-				if( FAILED( hr ) ) {
-					break;
-				}
+				BREAK_ON_FAIL( hr );
 			}
 
 #if (WINVER >= _WIN32_WINNT_WIN8) 
 			if( fDestRectChanged ) {
 				hr = m_pXVPControl->SetDestinationRectangle( &m_rcDstApp );
-				if( FAILED( hr ) ) {
-					break;
-				}
+				BREAK_ON_FAIL( hr );
 			}
 
 			if( fSrcRectChanged ) {
 				hr = m_pXVPControl->SetSourceRectangle( &SRect );
-				if( FAILED( hr ) ) {
-					break;
-				}
+				BREAK_ON_FAIL( hr );
 			}
 #else
 			hr = E_NOTIMPL;
-			break;
+			BREAK_ON_FAIL( hr );
 #endif
 
 			hr = m_pXVP->ProcessMessage( MFT_MESSAGE_NOTIFY_BEGIN_STREAMING, 0 );
-			if( FAILED( hr ) ) {
-				break;
-			}
+			BREAK_ON_FAIL( hr );
 		}
 
 		m_bCanProcessNextSample = FALSE;
 
 		// Get Backbuffer
 		hr = m_pSwapChain1->GetBuffer( 0, __uuidof( ID3D11Texture2D ), (void**)&pDXGIBackBuffer );
-		if( FAILED( hr ) ) {
-			break;
-		}
+		BREAK_ON_FAIL( hr );
 
 		// create the output media sample
 		hr = MFCreateSample( &pRTSample );
-		if( FAILED( hr ) ) {
-			break;
-		}
+		BREAK_ON_FAIL( hr );
 
 		hr = MFCreateDXGISurfaceBuffer( __uuidof( ID3D11Texture2D ), pDXGIBackBuffer, 0, FALSE, &pBuffer );
-		if( FAILED( hr ) ) {
-			break;
-		}
+		BREAK_ON_FAIL( hr );
 
 		hr = pRTSample->AddBuffer( pBuffer );
-		if( FAILED( hr ) ) {
-			break;
-		}
+		BREAK_ON_FAIL( hr );
 
 		if( m_b3DVideo && FALSE /* 0 != m_vp3DOutput */ ) {
 			SafeRelease( pBuffer );
 
 			hr = MFCreateDXGISurfaceBuffer( __uuidof( ID3D11Texture2D ), pDXGIBackBuffer, 1, FALSE, &pBuffer );
-			if( FAILED( hr ) ) {
-				break;
-			}
+			BREAK_ON_FAIL( hr );
 
 			hr = pRTSample->AddBuffer( pBuffer );
-			if( FAILED( hr ) ) {
-				break;
-			}
+			BREAK_ON_FAIL( hr );
 		}
 
 		DWORD dwStatus = 0;
@@ -1815,16 +1643,12 @@ HRESULT Presenter::ProcessFrameUsingXVP( IMFMediaType* pCurrentType, IMFSample* 
 			//call process input on the MFT to deliver the YUV video sample
 			// and the call process output to extract of newly processed frame
 			hr = m_pXVP->ProcessInput( 0, pVideoFrame, 0 );
-			if( FAILED( hr ) ) {
-				break;
-			}
+			BREAK_ON_FAIL( hr );
 
 			*pbInputFrameUsed = TRUE;
 
 			hr = m_pXVP->ProcessOutput( 0, 1, &outputDataBuffer, &dwStatus );
-			if( FAILED( hr ) ) {
-				break;
-			}
+			BREAK_ON_FAIL( hr );
 		}
 		else {
 			*pbInputFrameUsed = FALSE;
@@ -1875,9 +1699,7 @@ HRESULT Presenter::SetMonitor( UINT adapterID )
 
 	do {
 		hr = m_pMonitors->MatchGUID( adapterID, &dwMatchID );
-		if( FAILED( hr ) ) {
-			break;
-		}
+		BREAK_ON_FAIL( hr );
 
 		if( hr == S_FALSE ) {
 			hr = E_INVALIDARG;
@@ -1959,22 +1781,19 @@ HRESULT Presenter::SetVideoMonitor( HWND hwndVideo )
 			m_lpCurrMon = NULL;
 
 			hr = m_pMonitors->InitializeDisplaySystem( hwndVideo );
-			if( FAILED( hr ) ) {
-				break;
-			}
+			BREAK_ON_FAIL( hr );
 
 			pMonInfo = m_pMonitors->FindMonitor( hMon );
 			if( NULL != pMonInfo && pMonInfo->uDevID != m_ConnectionGUID ) {
 				hr = SetMonitor( pMonInfo->uDevID );
-				if( FAILED( hr ) ) {
-					break;
-				}
+				BREAK_ON_FAIL( hr );
+
 				hr = S_FALSE;
 			}
 		}
 		else {
 			hr = E_POINTER;
-			break;
+			BREAK_ON_FAIL( hr );
 		}
 	} while( FALSE );
 
@@ -2059,39 +1878,27 @@ HRESULT Presenter::UpdateDXGISwapChain( void )
 
 		if( !m_useDCompVisual ) {
 			hr = m_pDXGIFactory2->CreateSwapChainForHwnd( m_pD3DDevice, m_hwndVideo, &scd, NULL, NULL, &m_pSwapChain1 );
-			if( FAILED( hr ) ) {
-				break;
-			}
+			BREAK_ON_FAIL( hr );
 
 			if( m_bFullScreenState ) {
 				hr = m_pSwapChain1->SetFullscreenState( TRUE, NULL );
-				if( FAILED( hr ) ) {
-					break;
-				}
+				BREAK_ON_FAIL( hr );
 			}
 			else {
 				hr = m_pSwapChain1->SetFullscreenState( FALSE, NULL );
-				if( FAILED( hr ) ) {
-					break;
-				}
+				BREAK_ON_FAIL( hr );
 			}
 		}
 		else {
 			// Create a swap chain for composition
 			hr = m_pDXGIFactory2->CreateSwapChainForComposition( m_pD3DDevice, &scd, NULL, &m_pSwapChain1 );
-			if( FAILED( hr ) ) {
-				break;
-			}
+			BREAK_ON_FAIL( hr );
 
 			hr = E_NOTIMPL; // m_pRootVisual->SetContent(m_pSwapChain1);
-			if( FAILED( hr ) ) {
-				break;
-			}
+			BREAK_ON_FAIL( hr );
 
 			hr = E_NOTIMPL; // m_pDCompDevice->Commit();
-			if( FAILED( hr ) ) {
-				break;
-			}
+			BREAK_ON_FAIL( hr );
 		}
 	} while( FALSE );
 
