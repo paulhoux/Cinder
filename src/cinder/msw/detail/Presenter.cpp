@@ -1,4 +1,5 @@
 #include "cinder/msw/MediaFoundation.h"
+#include "cinder/msw/ScopedPtr.h"
 #include "cinder/msw/detail/Presenter.h"
 
 #pragma comment(lib, "d3d11.lib")
@@ -861,14 +862,8 @@ HRESULT Presenter::CreateDCompDeviceAndVisual( void )
 HRESULT Presenter::CreateDXGIManagerAndDevice( D3D_DRIVER_TYPE DriverType )
 {
 	HRESULT hr = S_OK;
-
-	IDXGIAdapter* pTempAdapter = NULL;
-	ID3D10Multithread* pMultiThread = NULL;
-	IDXGIDevice1* pDXGIDev = NULL;
-	IDXGIAdapter1* pAdapter = NULL;
-	IDXGIOutput* pDXGIOutput = NULL;
-
-	D3D_FEATURE_LEVEL featureLevels[] = { /* D3D_FEATURE_LEVEL_11_1, D3D_FEATURE_LEVEL_11_0, D3D_FEATURE_LEVEL_10_1, D3D_FEATURE_LEVEL_10_0, */ D3D_FEATURE_LEVEL_9_3, D3D_FEATURE_LEVEL_9_2, D3D_FEATURE_LEVEL_9_1 };
+	
+	D3D_FEATURE_LEVEL featureLevels[] = { D3D_FEATURE_LEVEL_11_1, D3D_FEATURE_LEVEL_11_0, D3D_FEATURE_LEVEL_10_1, D3D_FEATURE_LEVEL_10_0, D3D_FEATURE_LEVEL_9_3, D3D_FEATURE_LEVEL_9_2, D3D_FEATURE_LEVEL_9_1 };
 	D3D_FEATURE_LEVEL featureLevel;
 	UINT resetToken;
 
@@ -918,17 +913,21 @@ HRESULT Presenter::CreateDXGIManagerAndDevice( D3D_DRIVER_TYPE DriverType )
 		m_pD3DDevice->GetImmediateContext( &m_pD3DImmediateContext );
 
 		// Need to explitly set the multithreaded mode for this device
+		ScopedPtr<ID3D10Multithread> pMultiThread;
 		hr = m_pD3DImmediateContext->QueryInterface( __uuidof( ID3D10Multithread ), (void**)&pMultiThread );
 		BREAK_ON_FAIL( hr );
 
 		pMultiThread->SetMultithreadProtected( TRUE );
 
+		ScopedPtr<IDXGIDevice1> pDXGIDev;
 		hr = m_pD3DDevice->QueryInterface( __uuidof( IDXGIDevice1 ), (LPVOID*)&pDXGIDev );
 		BREAK_ON_FAIL( hr );
 
+		ScopedPtr<IDXGIAdapter> pTempAdapter;
 		hr = pDXGIDev->GetAdapter( &pTempAdapter );
 		BREAK_ON_FAIL( hr );
 
+		ScopedPtr<IDXGIAdapter1> pAdapter;
 		hr = pTempAdapter->QueryInterface( __uuidof( IDXGIAdapter1 ), (LPVOID*)&pAdapter );
 		BREAK_ON_FAIL( hr );
 
@@ -936,6 +935,7 @@ HRESULT Presenter::CreateDXGIManagerAndDevice( D3D_DRIVER_TYPE DriverType )
 		hr = pAdapter->GetParent( __uuidof( IDXGIFactory2 ), (LPVOID*)&m_pDXGIFactory2 );
 		BREAK_ON_FAIL( hr );
 
+		IDXGIOutput* pDXGIOutput = NULL;
 		hr = pAdapter->EnumOutputs( 0, &pDXGIOutput );
 		BREAK_ON_FAIL( hr );
 
@@ -948,12 +948,6 @@ HRESULT Presenter::CreateDXGIManagerAndDevice( D3D_DRIVER_TYPE DriverType )
 			BREAK_ON_FAIL( hr );
 		}
 	} while( FALSE );
-
-	SafeRelease( pTempAdapter );
-	SafeRelease( pMultiThread );
-	SafeRelease( pDXGIDev );
-	SafeRelease( pAdapter );
-	SafeRelease( pDXGIOutput );
 
 	return hr;
 }
