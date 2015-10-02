@@ -19,9 +19,13 @@ public:
 	void draw() override;
 
 	void mouseDown( MouseEvent event ) override;
+	void fileDrop( FileDropEvent event ) override;
+
+	void resize() override;
 
 private:
-	gl::VideoTextureRef  mVideo, mVideo4k;
+	Rectf                             mClearRegion;
+	std::vector<gl::VideoTextureRef>  mVideos;
 };
 
 void VideoTestApp::setup()
@@ -32,38 +36,6 @@ void VideoTestApp::setup()
 
 	gl::enableVerticalSync( true );
 	disableFrameRate();
-
-	const char* video4k = "test4k.mp4";
-
-	/*try {
-		mVideo4k = gl::VideoTexture::create( getAssetPath( video4k ) );
-		mVideo4k->setLoop( true );
-		mVideo4k->play();
-	}
-	catch( const std::exception &exc ) {
-		console() << exc.what() << std::endl;
-	}*/
-}
-
-void VideoTestApp::mouseDown( MouseEvent event )
-{
-	const char* video = "test.mp4";
-
-	if( mVideo ) {
-		mVideo.reset();
-	}
-	else {
-		try {
-			mVideo = gl::VideoTexture::create( getAssetPath( video ) );
-			mVideo->setLoop( true );
-			mVideo->play();
-		}
-		catch( const std::exception &exc ) {
-			console() << exc.what() << std::endl;
-		}
-	}
-
-	//mVideo4k.reset();
 }
 
 void VideoTestApp::update()
@@ -74,8 +46,37 @@ void VideoTestApp::draw()
 {
 	gl::clear();
 
-	if( mVideo )
-		gl::draw( mVideo->getTexture() );
+	gl::ScopedColor color( 1, 0, 0 );
+	gl::drawSolidRoundedRect( mClearRegion, 10.0f );
+}
+
+void VideoTestApp::mouseDown( MouseEvent event )
+{
+	if( mClearRegion.contains( event.getPos() ) )
+		mVideos.clear();
+}
+
+void VideoTestApp::fileDrop( FileDropEvent event )
+{
+	size_t count = event.getNumFiles();
+	for( size_t i = 0; i < count; ++i ) {
+		try {
+			auto video = gl::VideoTexture::create( event.getFile( i ) );
+
+			video->setLoop( true );
+			video->play();
+
+			mVideos.push_back( video );
+		}
+		catch( const std::exception &exc ) {
+			console() << exc.what() << std::endl;
+		}
+	}
+}
+
+void VideoTestApp::resize()
+{
+	mClearRegion = Rectf( getWindowBounds() ).inflated( vec2( -128 ) );
 }
 
 CINDER_APP( VideoTestApp, RendererGl )

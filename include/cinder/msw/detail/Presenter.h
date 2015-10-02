@@ -1,18 +1,17 @@
 #pragma once
 
-#define MF_PRESENTER_USE_DX11 1
-
 #include "cinder/msw/CinderMsw.h"
+#include "cinder/msw/ScopedPtr.h"
 #include "cinder/msw/detail/MonitorArray.h"
 
 #include <d3dcommon.h>
+#include <d3d11.h>
 #include <dxgi1_2.h>
+#include <dcomp.h> // for IDCompositionDevice et.al. (Windows 8+ only)
 #include <mfidl.h> // for IMFVideoProcessorControl
 
-#if MF_PRESENTER_USE_DX11
-#include <d3d11.h>
-#else
-#include <d3d9.h>
+#if (WINVER >= _WIN32_WINNT_WIN8)
+#pragma message("WARNING! Uses experimental Windows 8+ code that has not been tested for OpenGL compatibility!")
 #endif
 
 //! Returns the greatest common divisor of A and B.
@@ -41,6 +40,13 @@ DEFINE_GUID( CLSID_VideoProcessorMFT, 0x88753b26, 0x5b24, 0x49bd, 0xb2, 0xe7, 0x
 //      3) Allow last frame regeneration (repaint)
 // This attribute should be set on the transform's attrbiute store prior to setting the input type.
 DEFINE_GUID( MF_XVP_PLAYBACK_MODE, 0x3c5d293f, 0xad67, 0x4e29, 0xaf, 0x12, 0xcf, 0x3e, 0x23, 0x8a, 0xcc, 0xe9 );
+
+// MF_MT_VIDEO_3D is only defined for Windows 8+, but we need it to check if a video is 3D.
+#if (WINVER < _WIN32_WINNT_WIN8)
+// {CB5E88CF-7B5B-476b-85AA-1CA5AE187555}        MF_MT_VIDEO_3D                 {UINT32 (BOOL)}
+DEFINE_GUID( MF_MT_VIDEO_3D,
+			 0xcb5e88cf, 0x7b5b, 0x476b, 0x85, 0xaa, 0x1c, 0xa5, 0xae, 0x18, 0x75, 0x55 );
+#endif
 
 namespace cinder {
 namespace msw {
@@ -102,7 +108,9 @@ private:
 	HRESULT CheckShutdown( void ) const;
 	HRESULT CreateDCompDeviceAndVisual( void );
 	HRESULT CreateDXGIManagerAndDevice( D3D_DRIVER_TYPE DriverType = D3D_DRIVER_TYPE_HARDWARE );
+#if (WINVER >= _WIN32_WINNT_WIN8)
 	HRESULT CreateXVP( void );
+#endif
 	HRESULT FindBOBProcessorIndex( DWORD* pIndex );
 	HRESULT GetVideoDisplayArea( IMFMediaType* pType, MFVideoArea* pArea );
 
@@ -121,10 +129,9 @@ private:
 		int* pPictureAspectY
 		);
 	
-#if MF_PRESENTER_USE_DX11
 	HRESULT ProcessFrameUsingD3D11( ID3D11Texture2D* pLeftTexture2D, ID3D11Texture2D* pRightTexture2D, UINT dwLeftViewIndex, UINT dwRightViewIndex, RECT rcDest, UINT32 unInterlaceMode, IMFSample** ppVideoOutFrame );
+#if (WINVER >= _WIN32_WINNT_WIN8)
 	HRESULT ProcessFrameUsingXVP( IMFMediaType* pCurrentType, IMFSample* pVideoFrame, ID3D11Texture2D* pTexture2D, RECT rcDest, IMFSample** ppVideoOutFrame, BOOL* pbInputFrameUsed );
-#else
 #endif
 
 	void    ReduceToLowestTerms(
@@ -136,13 +143,12 @@ private:
 
 	HRESULT SetMonitor( UINT adapterID );
 
-#if MF_PRESENTER_USE_DX11
 	void    SetVideoContextParameters( ID3D11VideoContext* pVideoContext, const RECT* pSRect, const RECT* pTRect, UINT32 unInterlaceMode );
-#else
-#endif
 
 	HRESULT SetVideoMonitor( HWND hwndVideo );
+#if (WINVER >=_WIN32_WINNT_WIN8)
 	HRESULT SetXVPOutputMediaType( IMFMediaType* pType, DXGI_FORMAT vpOutputFormat );
+#endif
 	_Post_satisfies_( this->m_pSwapChain1 != NULL )
 		HRESULT UpdateDXGISwapChain( void );
 	void    UpdateRectangles( RECT* pDst, RECT* pSrc );
@@ -154,9 +160,11 @@ private:
 	IMFDXGIDeviceManager*           m_pDXGIManager;
 	IDXGIOutput1*                   m_pDXGIOutput1;
 	IMFVideoSampleAllocatorEx*      m_pSampleAllocatorEx;
-	//IDCompositionDevice*            m_pDCompDevice; // Windows 8+ only
-	//IDCompositionTarget*            m_pHwndTarget; // Windows 8+ only
-	//IDCompositionVisual*            m_pRootVisual; // Windows 8+ only
+#if (WINVER >= _WIN32_WINNT_WIN8)
+	IDCompositionDevice*            m_pDCompDevice;
+	IDCompositionTarget*            m_pHwndTarget;
+	IDCompositionVisual*            m_pRootVisual;
+#endif
 	BOOL                            m_bSoftwareDXVADeviceInUse;
 	HWND                            m_hwndVideo;
 	MonitorArray*                   m_pMonitors;
@@ -172,7 +180,9 @@ private:
 	BOOL                            m_bResize;
 	BOOL                            m_b3DVideo;
 	BOOL                            m_bStereoEnabled;
-	//MFVideo3DFormat                 m_vp3DOutput; // Windows 8+ only
+#if (WINVER >= _WIN32_WINNT_WIN8)
+	MFVideo3DFormat                 m_vp3DOutput;
+#endif
 	BOOL                            m_bFullScreenState;
 	BOOL                            m_bCanProcessNextSample;
 	RECT                            m_displayRect;
@@ -183,25 +193,17 @@ private:
 	RECT                            m_rcSrcApp;
 	RECT                            m_rcDstApp;
 
-#if MF_PRESENTER_USE_DX11
 	ID3D11Device*                   m_pD3DDevice;
 	ID3D11DeviceContext*            m_pD3DImmediateContext;
 	ID3D11VideoDevice*              m_pVideoDevice;
 	ID3D11VideoProcessorEnumerator* m_pVideoProcessorEnum;
 	ID3D11VideoProcessor*           m_pVideoProcessor;
-#else
-	IDirect3DDevice9*               m_pD3DDevice;
-	void*                           m_pD3DImmediateContext;
-	void*                           m_pVideoDevice;
-	void*                           m_pVideoProcessorEnum;
-	void*                           m_pVideoProcessor;
-#endif
 
+#if (WINVER >= _WIN32_WINNT_WIN8)
 	IMFTransform*                   m_pXVP;
-	//IMFVideoProcessorControl*       m_pXVPControl; // Windows 8+ only
+	IMFVideoProcessorControl*       m_pXVPControl;
+#endif
 };
-
-#if MF_PRESENTER_USE_DX11
 
 /////////////////////////////////////////////////////////////////////////////////////////////
 // Wrapper class for D3D11 Device and D3D11 Video device used for DXVA to Software decode switch
@@ -397,17 +399,19 @@ public:
 		m_cRef( 1 ),
 		m_pVideoDevice( NULL )
 	{
-		ID3D11VideoDevice* pDevice;
+		assert( pReal != NULL );
+
+		m_pReal->AddRef();
+
+		ScopedPtr<ID3D11VideoDevice> pDevice;
 		m_pReal->QueryInterface( __uuidof( ID3D11VideoDevice ), (void**)&pDevice );
 		m_pVideoDevice = new CPrivate_ID3D11VideoDevice( pDevice );
-		if( pDevice != NULL ) {
-			pDevice->Release();
-		}
 	}
 
 	virtual ~CPrivate_ID3D11Device( void )
 	{
 		SafeDelete( m_pVideoDevice );
+		SafeRelease( m_pReal );
 	}
 
 	STDMETHODIMP QueryInterface(
@@ -754,10 +758,6 @@ public:
 		return m_pReal->GetExceptionMode();
 	}
 };
-
-#else // !MF_PRESENTER_USE_DX11
-
-#endif // #if MF_PRESENTER_USE_DX11
 
 } // namespace detail
 } // namespace msw

@@ -1,5 +1,4 @@
 #include "cinder/msw/MediaFoundation.h"
-#include "cinder/msw/ScopedPtr.h"
 #include "cinder/msw/detail/Presenter.h"
 
 #pragma comment(lib, "d3d11.lib")
@@ -29,9 +28,11 @@ Presenter::Presenter( void )
 	, m_pDXGIManager( NULL )
 	, m_pDXGIOutput1( NULL )
 	, m_pSampleAllocatorEx( NULL )
-	//, m_pDCompDevice(NULL)
-	//, m_pHwndTarget(NULL)
-	//, m_pRootVisual(NULL)
+#if ( WINVER >= _WIN32_WINNT_WIN8 )
+	, m_pDCompDevice( NULL )
+	, m_pHwndTarget( NULL )
+	, m_pRootVisual( NULL )
+#endif
 	, m_bSoftwareDXVADeviceInUse( FALSE )
 	, m_hwndVideo( NULL )
 	, m_pMonitors( NULL )
@@ -39,7 +40,7 @@ Presenter::Presenter( void )
 	, m_DeviceResetToken( 0 )
 	, m_DXSWSwitch( 0 )
 	, m_useDCompVisual( 0 )
-	, m_useDebugLayer( D3D11_CREATE_DEVICE_VIDEO_SUPPORT )
+	, m_useDebugLayer( D3D11_CREATE_DEVICE_VIDEO_SUPPORT | D3D11_CREATE_DEVICE_DEBUG )
 	, m_pD3DDevice( NULL )
 	, m_pVideoDevice( NULL )
 	, m_pD3DImmediateContext( NULL )
@@ -50,7 +51,9 @@ Presenter::Presenter( void )
 	, m_bResize( TRUE )
 	, m_b3DVideo( FALSE )
 	, m_bStereoEnabled( FALSE )
-	//, m_vp3DOutput(MFVideo3DSampleFormat_BaseView)
+#if (WINVER >= _WIN32_WINNT_WIN8)
+	, m_vp3DOutput( MFVideo3DSampleFormat_BaseView )
+#endif
 	, m_bFullScreenState( FALSE )
 	, m_bCanProcessNextSample( TRUE )
 	, m_displayRect() // default ctor
@@ -60,9 +63,9 @@ Presenter::Presenter( void )
 	, m_uiRealDisplayHeight( 0 )
 	, m_rcSrcApp() // default ctor
 	, m_rcDstApp() // default ctor
-	, m_pXVP( NULL )
-	//, m_pXVPControl(NULL)
 #if (WINVER >= _WIN32_WINNT_WIN8) 
+	, m_pXVP( NULL )
+	, m_pXVPControl( NULL )
 	, m_useXVP( TRUE )
 #else
 	, m_useXVP( FALSE )
@@ -190,10 +193,12 @@ HRESULT Presenter::SetVideoWindow( __RPC__in HWND hwndVideo )
 		hr = CreateDXGIManagerAndDevice();
 		BREAK_ON_FAIL( hr );
 
+#if (WINVER >= _WIN32_WINNT_WIN8)
 		if( m_useXVP ) {
 			hr = CreateXVP();
 			BREAK_ON_FAIL( hr );
 		}
+#endif
 	} while( FALSE );
 
 	return hr;
@@ -254,9 +259,11 @@ HRESULT Presenter::Flush( void )
 
 	HRESULT hr = CheckShutdown();
 
+#if (WINVER >= _WIN32_WINNT_WIN8)
 	if( SUCCEEDED( hr ) && m_useXVP ) {
 		hr = m_pXVP->ProcessMessage( MFT_MESSAGE_COMMAND_FLUSH, 0 );
 	}
+#endif
 
 	m_bCanProcessNextSample = TRUE;
 
@@ -291,7 +298,6 @@ HRESULT Presenter::IsMediaTypeSupported( IMFMediaType* pMediaType, DXGI_FORMAT d
 			break;
 		}
 
-#if MF_PRESENTER_USE_DX11
 		if( !m_pVideoDevice ) {
 			hr = m_pD3DDevice->QueryInterface( __uuidof( ID3D11VideoDevice ), (void**)&m_pVideoDevice );
 			BREAK_ON_FAIL( hr );
@@ -329,69 +335,11 @@ HRESULT Presenter::IsMediaTypeSupported( IMFMediaType* pMediaType, DXGI_FORMAT d
 			break;
 		}
 
+#if (WINVER >= _WIN32_WINNT_WIN8)
 		if( m_useXVP ) {
 			hr = m_pXVP->SetInputType( 0, pMediaType, MFT_SET_TYPE_TEST_ONLY );
 			BREAK_ON_FAIL( hr );
 		}
-#else
-		// Reject compressed media types.
-		BOOL bCompressed = FALSE;
-		hr = pMediaType->IsCompressedFormat( &bCompressed );
-		if( FAILED( hr ) ) {
-			return hr;
-		}
-
-		if( bCompressed ) {
-			return MF_E_INVALIDMEDIATYPE;
-		}
-
-		// Validate the format.
-		GUID guidSubType = GUID_NULL;
-		hr = pMediaType->GetGUID( MF_MT_SUBTYPE, &guidSubType );
-		if( FAILED( hr ) ) {
-			return hr;
-		}
-
-		D3DFORMAT d3dFormat = (D3DFORMAT)guidSubType.Data1;
-
-		// The D3DPresentEngine9 checks whether the format can be used as
-		// the back-buffer format for the swap chains.
-		hr = mD3DPresentEnginePtr->CheckFormat( d3dFormat );
-		if( FAILED( hr ) ) {
-			return hr;
-		}
-
-		// Reject interlaced formats.
-		MFVideoInterlaceMode    InterlaceMode = MFVideoInterlace_Unknown;
-		hr = pMediaType->GetUINT32( MF_MT_INTERLACE_MODE, (UINT32*)&InterlaceMode );
-		if( FAILED( hr ) ) {
-			return hr;
-		}
-
-		if( InterlaceMode != MFVideoInterlace_Progressive ) {
-			return MF_E_INVALIDMEDIATYPE;
-		}
-
-		// Retrieve width and height.
-		UINT32 width = 0, height = 0;
-		hr = MFGetAttributeSize( pMediaType, MF_MT_FRAME_SIZE, &width, &height );
-		if( FAILED( hr ) ) {
-			return hr;
-		}
-
-		//// Validate the various apertures (cropping regions) against the frame size.
-		//// Any of these apertures may be unspecified in the media type, in which case 
-		//// we ignore it. We just want to reject invalid apertures.
-		//MFVideoArea VideoCropArea;
-		//if( SUCCEEDED( pMediaType->GetBlob( MF_MT_PAN_SCAN_APERTURE, (UINT8*) &VideoCropArea, sizeof( MFVideoArea ), NULL ) ) ) {
-		//	hr = ValidateVideoArea( VideoCropArea, width, height );
-		//}
-		//if( SUCCEEDED( pMediaType->GetBlob( MF_MT_GEOMETRIC_APERTURE, (UINT8*) &VideoCropArea, sizeof( MFVideoArea ), NULL ) ) ) {
-		//	hr = ValidateVideoArea( VideoCropArea, width, height );
-		//}
-		//if( SUCCEEDED( pMediaType->GetBlob( MF_MT_MINIMUM_DISPLAY_APERTURE, (UINT8*) &VideoCropArea, sizeof( MFVideoArea ), NULL ) ) ) {
-		//	hr = ValidateVideoArea( VideoCropArea, width, height );
-		//}
 #endif
 	} while( FALSE );
 
@@ -528,25 +476,27 @@ HRESULT Presenter::ProcessFrame( IMFMediaType* pCurrentType, IMFSample* pSample,
 		hr = pDXGIBuffer->GetSubresourceIndex( &dwViewIndex );
 		BREAK_ON_FAIL( hr );
 
-		if( m_b3DVideo && FALSE /* 0 != m_vp3DOutput */ ) {/*
-			if (pEVBuffer && MFVideo3DSampleFormat_MultiView == m_vp3DOutput)
-			{
-				hr = pEVBuffer->QueryInterface(__uuidof(IMFDXGIBuffer), (LPVOID*)&pEVDXGIBuffer);
+#if (WINVER >= _WIN32_WINNT_WIN8)
+		if( m_b3DVideo && 0 != m_vp3DOutput ) {
+			if( pEVBuffer && MFVideo3DSampleFormat_MultiView == m_vp3DOutput ) {
+				hr = pEVBuffer->QueryInterface( __uuidof( IMFDXGIBuffer ), (LPVOID*)&pEVDXGIBuffer );
 				BREAK_ON_FAIL( hr );
 
-				hr = pEVDXGIBuffer->GetResource(__uuidof(ID3D11Texture2D), (LPVOID*)&pEVTexture2D);
+				hr = pEVDXGIBuffer->GetResource( __uuidof( ID3D11Texture2D ), (LPVOID*)&pEVTexture2D );
 				BREAK_ON_FAIL( hr );
 
-				hr = pEVDXGIBuffer->GetSubresourceIndex(&dwEVViewIndex);
+				hr = pEVDXGIBuffer->GetSubresourceIndex( &dwEVViewIndex );
 				BREAK_ON_FAIL( hr );
-			}*/
+			}
 		}
+#endif
 
 		pTexture2D->GetDevice( &pDeviceInput );
 		if( ( NULL == pDeviceInput ) || ( pDeviceInput != m_pD3DDevice ) ) {
 			break;
 		}
 
+#if (WINVER >= _WIN32_WINNT_WIN8)
 		if( m_useXVP ) {
 			BOOL bInputFrameUsed = FALSE;
 
@@ -556,7 +506,9 @@ HRESULT Presenter::ProcessFrame( IMFMediaType* pCurrentType, IMFSample* pSample,
 				*pbProcessAgain = TRUE;
 			}
 		}
-		else {
+		else
+#endif
+		{
 			hr = ProcessFrameUsingD3D11( pTexture2D, pEVTexture2D, dwViewIndex, dwEVViewIndex, rcDest, *punInterlaceMode, ppOutputSample );
 
 			LONGLONG hnsDuration = 0;
@@ -604,11 +556,20 @@ HRESULT Presenter::SetCurrentMediaType( IMFMediaType* pMediaType )
 		hr = pMediaType->QueryInterface( IID_IMFAttributes, reinterpret_cast<void**>( &pAttributes ) );
 		BREAK_ON_FAIL( hr );
 
-		HRESULT hr1 = E_NOTIMPL; // pAttributes->GetUINT32( MF_MT_VIDEO_3D, (UINT32*)&m_b3DVideo );
+		HRESULT hr1 = pAttributes->GetUINT32( MF_MT_VIDEO_3D, (UINT32*)&m_b3DVideo );
 		if( SUCCEEDED( hr1 ) ) {
-			hr = E_NOTIMPL; // pAttributes->GetUINT32(MF_MT_VIDEO_3D_FORMAT, (UINT32*)&m_vp3DOutput);
+#if (WINVER >=_WIN32_WINNT_WIN8)
+			hr = pAttributes->GetUINT32( MF_MT_VIDEO_3D_FORMAT, (UINT32*)&m_vp3DOutput );
 			BREAK_ON_FAIL( hr );
+#else
+			// This is a 3D video and we only support it on Windows 8+.
+			BREAK_IF_FALSE( !m_b3DVideo, E_NOTIMPL );
+#endif
 		}
+
+		// (phoux) I want to know if a video is considered '3D'
+		if( m_b3DVideo )
+			__debugbreak();
 
 		//Now Determine Correct Display Resolution
 		if( SUCCEEDED( hr ) ) {
@@ -642,11 +603,13 @@ HRESULT Presenter::SetCurrentMediaType( IMFMediaType* pMediaType )
 			m_uiRealDisplayHeight = szVideo.cy;
 		}
 
+#if (WINVER >=_WIN32_WINNT_WIN8)
 		if( SUCCEEDED( hr ) && m_useXVP ) {
 			// set the input type on the XVP
 			hr = m_pXVP->SetInputType( 0, pMediaType, 0 );
 			BREAK_ON_FAIL( hr );
 		}
+#endif
 	} while( FALSE );
 
 	SafeRelease( pAttributes );
@@ -673,13 +636,13 @@ HRESULT Presenter::Shutdown( void )
 	SafeRelease( m_pD3DImmediateContext );
 	SafeRelease( m_pDXGIOutput1 );
 	SafeRelease( m_pSampleAllocatorEx );
-	//SafeRelease(m_pDCompDevice);
-	//SafeRelease(m_pHwndTarget);
-	//SafeRelease(m_pRootVisual);
 #if (WINVER >= _WIN32_WINNT_WIN8) 
+	SafeRelease( m_pDCompDevice );
+	SafeRelease( m_pHwndTarget );
+	SafeRelease( m_pRootVisual );
 	SafeRelease( m_pXVPControl );
-#endif
 	SafeRelease( m_pXVP );
+#endif
 	SafeRelease( m_pVideoDevice );
 	SafeRelease( m_pVideoProcessor );
 	SafeRelease( m_pVideoProcessorEnum );
@@ -745,13 +708,13 @@ void Presenter::CheckDecodeSwitchRegKey( void )
 		if( 0 == RegQueryValueEx( hk, lpcszInVP, 0, &cbType, (LPBYTE)&dwData, &cbData ) ) {
 			m_useXVP = dwData;
 		}
-
+#if 0 // Disabled support for IDComposition for now
 		dwData = 0;
 		cbData = sizeof( DWORD );
 		if( 0 == RegQueryValueEx( hk, lpcszDComp, 0, &cbType, (LPBYTE)&dwData, &cbData ) ) {
 			m_useDCompVisual = dwData;
 		}
-
+#endif
 		dwData = 0;
 		cbData = sizeof( DWORD );
 		if( 0 == RegQueryValueEx( hk, lpcszDebugLayer, 0, &cbType, (LPBYTE)&dwData, &cbData ) ) {
@@ -862,16 +825,16 @@ HRESULT Presenter::CreateDCompDeviceAndVisual( void )
 HRESULT Presenter::CreateDXGIManagerAndDevice( D3D_DRIVER_TYPE DriverType )
 {
 	HRESULT hr = S_OK;
-	
+
 	D3D_FEATURE_LEVEL featureLevels[] = { D3D_FEATURE_LEVEL_11_1, D3D_FEATURE_LEVEL_11_0, D3D_FEATURE_LEVEL_10_1, D3D_FEATURE_LEVEL_10_0, D3D_FEATURE_LEVEL_9_3, D3D_FEATURE_LEVEL_9_2, D3D_FEATURE_LEVEL_9_1 };
 	D3D_FEATURE_LEVEL featureLevel;
-	UINT resetToken;
 
 	do {
 		SafeRelease( m_pD3DDevice );
-		if( D3D_DRIVER_TYPE_WARP == DriverType ) {
-			ID3D11Device* pD3D11Device = NULL;
 
+		if( D3D_DRIVER_TYPE_WARP == DriverType ) {
+			// (phoux) I changed the reference counting on pD3D11Device from the original implementation (see also CPrivate_ID3D11Device). Please check for memory leaks.
+			ScopedPtr<ID3D11Device> pD3D11Device;
 			hr = D3D11CreateDevice( NULL, D3D_DRIVER_TYPE_HARDWARE, NULL, m_useDebugLayer, featureLevels, ARRAYSIZE( featureLevels ), D3D11_SDK_VERSION, &pD3D11Device, &featureLevel, NULL );
 
 			if( SUCCEEDED( hr ) ) {
@@ -880,19 +843,21 @@ HRESULT Presenter::CreateDXGIManagerAndDevice( D3D_DRIVER_TYPE DriverType )
 					E_OUTOFMEMORY;
 				}
 			}
-			// SafeRelease(pD3D11Device);
 		}
 		else {
+			// Find and create D3DDevice with highest compatible feature level.
 			for( DWORD dwCount = 0; dwCount < ARRAYSIZE( featureLevels ); dwCount++ ) {
 				hr = D3D11CreateDevice( NULL, DriverType, NULL, m_useDebugLayer, &featureLevels[dwCount], 1, D3D11_SDK_VERSION, &m_pD3DDevice, &featureLevel, NULL );
 				if( SUCCEEDED( hr ) ) {
-					ID3D11VideoDevice* pDX11VideoDevice = NULL;
+					// Check if it supports a D3D11VideoDevice.
+					ScopedPtr<ID3D11VideoDevice> pDX11VideoDevice;
 					hr = m_pD3DDevice->QueryInterface( __uuidof( ID3D11VideoDevice ), (void**)&pDX11VideoDevice );
-					SafeRelease( pDX11VideoDevice );
 
 					if( SUCCEEDED( hr ) ) {
 						break;
 					}
+
+					// If not, try next device.
 					SafeRelease( m_pD3DDevice );
 				}
 			}
@@ -901,6 +866,7 @@ HRESULT Presenter::CreateDXGIManagerAndDevice( D3D_DRIVER_TYPE DriverType )
 		BREAK_ON_FAIL( hr );
 
 		if( NULL == m_pDXGIManager ) {
+			UINT resetToken;
 			hr = MFCreateDXGIDeviceManager( &resetToken, &m_pDXGIManager );
 			BREAK_ON_FAIL( hr );
 			m_DeviceResetToken = resetToken;
@@ -935,7 +901,7 @@ HRESULT Presenter::CreateDXGIManagerAndDevice( D3D_DRIVER_TYPE DriverType )
 		hr = pAdapter->GetParent( __uuidof( IDXGIFactory2 ), (LPVOID*)&m_pDXGIFactory2 );
 		BREAK_ON_FAIL( hr );
 
-		IDXGIOutput* pDXGIOutput = NULL;
+		ScopedPtr<IDXGIOutput> pDXGIOutput;
 		hr = pAdapter->EnumOutputs( 0, &pDXGIOutput );
 		BREAK_ON_FAIL( hr );
 
@@ -957,10 +923,10 @@ HRESULT Presenter::CreateDXGIManagerAndDevice( D3D_DRIVER_TYPE DriverType )
 // Description: Creates a new instance of the XVP MFT.
 //-------------------------------------------------------------------
 
+#if (WINVER >= _WIN32_WINNT_WIN8) 
 HRESULT Presenter::CreateXVP( void )
 {
 	HRESULT hr = S_OK;
-	IMFAttributes* pAttributes = NULL;
 
 	do {
 		hr = CoCreateInstance( CLSID_VideoProcessorMFT, nullptr, CLSCTX_INPROC_SERVER, IID_IMFTransform, (void**)&m_pXVP );
@@ -970,24 +936,20 @@ HRESULT Presenter::CreateXVP( void )
 		BREAK_ON_FAIL( hr );
 
 		// Tell the XVP that we are the swapchain allocator
+		ScopedPtr<IMFAttributes> pAttributes;
 		hr = m_pXVP->GetAttributes( &pAttributes );
 		BREAK_ON_FAIL( hr );
 
 		hr = pAttributes->SetUINT32( MF_XVP_PLAYBACK_MODE, TRUE );
 		BREAK_ON_FAIL( hr );
 
-#if (WINVER >= _WIN32_WINNT_WIN8) 
 		hr = m_pXVP->QueryInterface( IID_PPV_ARGS( &m_pXVPControl ) );
-#else
-		hr = E_NOTIMPL;
-#endif
 		BREAK_ON_FAIL( hr );
 	} while( FALSE );
 
-	SafeRelease( pAttributes );
-
 	return hr;
 }
+#endif
 
 //+-------------------------------------------------------------------------
 //
@@ -1408,21 +1370,23 @@ HRESULT Presenter::ProcessFrameUsingD3D11( ID3D11Texture2D* pLeftTexture2D, ID3D
 
 		SetVideoContextParameters( pVideoContext, &SRect, &TRect, unInterlaceMode );
 
+#if (WINVER >= _WIN32_WINNT_WIN8)
 		// Enable/Disable Stereo
 		if( m_b3DVideo ) {
 			pVideoContext->VideoProcessorSetOutputStereoMode( m_pVideoProcessor, m_bStereoEnabled );
 
 			D3D11_VIDEO_PROCESSOR_STEREO_FORMAT vpStereoFormat = D3D11_VIDEO_PROCESSOR_STEREO_FORMAT_SEPARATE;
-			if( FALSE /* MFVideo3DSampleFormat_Packed_LeftRight == m_vp3DOutput */ ) {
+			if( MFVideo3DSampleFormat_Packed_LeftRight == m_vp3DOutput ) {
 				vpStereoFormat = D3D11_VIDEO_PROCESSOR_STEREO_FORMAT_HORIZONTAL;
 			}
-			else if( FALSE /* MFVideo3DSampleFormat_Packed_TopBottom == m_vp3DOutput */ ) {
+			else if( MFVideo3DSampleFormat_Packed_TopBottom == m_vp3DOutput ) {
 				vpStereoFormat = D3D11_VIDEO_PROCESSOR_STEREO_FORMAT_VERTICAL;
 			}
 
 			pVideoContext->VideoProcessorSetStreamStereoFormat( m_pVideoProcessor,
 																0, m_bStereoEnabled, vpStereoFormat, TRUE, TRUE, D3D11_VIDEO_PROCESSOR_STEREO_FLIP_NONE, 0 );
 		}
+#endif
 
 		QueryPerformanceCounter( &lpcEnd );
 
@@ -1441,9 +1405,11 @@ HRESULT Presenter::ProcessFrameUsingD3D11( ID3D11Texture2D* pLeftTexture2D, ID3D
 		StreamData.ppPastSurfacesRight = NULL;
 		StreamData.ppFutureSurfacesRight = NULL;
 
-		if( m_b3DVideo && FALSE /* MFVideo3DSampleFormat_MultiView == m_vp3DOutput */  && pRightTexture2D ) {
+#if (WINVER >= _WIN32_WINNT_WIN8)
+		if( m_b3DVideo && MFVideo3DSampleFormat_MultiView == m_vp3DOutput && pRightTexture2D ) {
 			StreamData.pInputSurfaceRight = pRightInputView;
 		}
+#endif
 
 		hr = pVideoContext->VideoProcessorBlt( m_pVideoProcessor, pOutputView, 0, 1, &StreamData );
 		BREAK_ON_FAIL( hr );
@@ -1467,6 +1433,7 @@ HRESULT Presenter::ProcessFrameUsingD3D11( ID3D11Texture2D* pLeftTexture2D, ID3D
 	return hr;
 }
 
+#if (WINVER >= _WIN32_WINNT_WIN8)
 HRESULT Presenter::ProcessFrameUsingXVP( IMFMediaType* pCurrentType, IMFSample* pVideoFrame, ID3D11Texture2D* pTexture2D, RECT rcDest, IMFSample** ppVideoOutFrame, BOOL* pbInputFrameUsed )
 {
 	HRESULT hr = S_OK;
@@ -1477,12 +1444,8 @@ HRESULT Presenter::ProcessFrameUsingXVP( IMFMediaType* pCurrentType, IMFSample* 
 	IMFAttributes*  pAttributes = NULL;
 	D3D11_VIDEO_PROCESSOR_CAPS vpCaps = { 0 };
 
-#if (WINVER >= _WIN32_WINNT_WIN8) 
 	if( m_pXVPControl == NULL )
 		return E_POINTER;
-#else
-	return E_NOTIMPL;
-#endif
 
 	do {
 		if( !m_pVideoDevice ) {
@@ -1553,7 +1516,7 @@ HRESULT Presenter::ProcessFrameUsingXVP( IMFMediaType* pCurrentType, IMFSample* 
 				hr = m_pXVP->GetAttributes( &pAttributes );
 				BREAK_ON_FAIL( hr );
 
-				hr = E_NOTIMPL; //pAttributes->SetUINT32(MF_ENABLE_3DVIDEO_OUTPUT, (0 != m_vp3DOutput) ? MF3DVideoOutputType_Stereo : MF3DVideoOutputType_BaseView);
+				hr = pAttributes->SetUINT32( MF_ENABLE_3DVIDEO_OUTPUT, ( 0 != m_vp3DOutput ) ? MF3DVideoOutputType_Stereo : MF3DVideoOutputType_BaseView );
 				BREAK_ON_FAIL( hr );
 			}
 		}
@@ -1584,7 +1547,6 @@ HRESULT Presenter::ProcessFrameUsingXVP( IMFMediaType* pCurrentType, IMFSample* 
 				BREAK_ON_FAIL( hr );
 			}
 
-#if (WINVER >= _WIN32_WINNT_WIN8) 
 			if( fDestRectChanged ) {
 				hr = m_pXVPControl->SetDestinationRectangle( &m_rcDstApp );
 				BREAK_ON_FAIL( hr );
@@ -1594,10 +1556,6 @@ HRESULT Presenter::ProcessFrameUsingXVP( IMFMediaType* pCurrentType, IMFSample* 
 				hr = m_pXVPControl->SetSourceRectangle( &SRect );
 				BREAK_ON_FAIL( hr );
 			}
-#else
-			hr = E_NOTIMPL;
-			BREAK_ON_FAIL( hr );
-#endif
 
 			hr = m_pXVP->ProcessMessage( MFT_MESSAGE_NOTIFY_BEGIN_STREAMING, 0 );
 			BREAK_ON_FAIL( hr );
@@ -1619,7 +1577,7 @@ HRESULT Presenter::ProcessFrameUsingXVP( IMFMediaType* pCurrentType, IMFSample* 
 		hr = pRTSample->AddBuffer( pBuffer );
 		BREAK_ON_FAIL( hr );
 
-		if( m_b3DVideo && FALSE /* 0 != m_vp3DOutput */ ) {
+		if( m_b3DVideo && 0 != m_vp3DOutput ) {
 			SafeRelease( pBuffer );
 
 			hr = MFCreateDXGISurfaceBuffer( __uuidof( ID3D11Texture2D ), pDXGIBackBuffer, 1, FALSE, &pBuffer );
@@ -1662,6 +1620,7 @@ HRESULT Presenter::ProcessFrameUsingXVP( IMFMediaType* pCurrentType, IMFSample* 
 
 	return hr;
 }
+#endif
 
 //+-------------------------------------------------------------------------
 //
@@ -1800,6 +1759,7 @@ HRESULT Presenter::SetVideoMonitor( HWND hwndVideo )
 // and where within the surface we should be writing.
 //-------------------------------------------------------------------
 
+#if (WINVER >=_WIN32_WINNT_WIN8)
 HRESULT Presenter::SetXVPOutputMediaType( IMFMediaType* pType, DXGI_FORMAT vpOutputFormat )
 {
 	HRESULT hr = S_OK;
@@ -1826,6 +1786,7 @@ HRESULT Presenter::SetXVPOutputMediaType( IMFMediaType* pType, DXGI_FORMAT vpOut
 
 	return hr;
 }
+#endif
 
 //+-------------------------------------------------------------------------
 //
@@ -1884,15 +1845,21 @@ HRESULT Presenter::UpdateDXGISwapChain( void )
 			}
 		}
 		else {
+#if (WINVER >=_WIN32_WINNT_WIN8)
 			// Create a swap chain for composition
 			hr = m_pDXGIFactory2->CreateSwapChainForComposition( m_pD3DDevice, &scd, NULL, &m_pSwapChain1 );
 			BREAK_ON_FAIL( hr );
 
-			hr = E_NOTIMPL; // m_pRootVisual->SetContent(m_pSwapChain1);
+			hr = m_pRootVisual->SetContent( m_pSwapChain1 );
 			BREAK_ON_FAIL( hr );
 
-			hr = E_NOTIMPL; // m_pDCompDevice->Commit();
+			hr = m_pDCompDevice->Commit();
 			BREAK_ON_FAIL( hr );
+#else
+			// This should never happen, as we only support composition on Windows 8+.
+			hr = E_NOTIMPL;
+			BREAK_ON_FAIL( hr );
+#endif
 		}
 	} while( FALSE );
 
