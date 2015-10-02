@@ -23,9 +23,7 @@ namespace detail {
 //-------------------------------------------------------------------
 
 PresenterDX11::PresenterDX11( void )
-	: m_nRefCount( 1 )
-	, m_critSec() // default ctor
-	, m_IsShutdown( FALSE )
+	: m_IsShutdown( FALSE )
 	, m_pDXGIFactory2( NULL )
 	, m_pDXGIManager( NULL )
 	, m_pDXGIOutput1( NULL )
@@ -36,9 +34,6 @@ PresenterDX11::PresenterDX11( void )
 	, m_pRootVisual( NULL )
 #endif
 	, m_bSoftwareDXVADeviceInUse( FALSE )
-	, m_hwndVideo( NULL )
-	, m_pMonitors( NULL )
-	, m_lpCurrMon( NULL )
 	, m_DeviceResetToken( 0 )
 	, m_DXSWSwitch( 0 )
 	, m_useDCompVisual( 0 )
@@ -85,19 +80,11 @@ PresenterDX11::PresenterDX11( void )
 
 PresenterDX11::~PresenterDX11( void )
 {
-	SafeDelete( m_pMonitors );
-
 	// Unload D3D11.
 	if( m_D3D11Module ) {
 		FreeLibrary( m_D3D11Module );
 		m_D3D11Module = NULL;
 	}
-}
-
-// IUnknown
-ULONG PresenterDX11::AddRef( void )
-{
-	return InterlockedIncrement( &m_nRefCount );
 }
 
 // IUnknown
@@ -121,17 +108,6 @@ HRESULT PresenterDX11::QueryInterface( REFIID iid, __RPC__deref_out _Result_null
 	}
 	AddRef();
 	return S_OK;
-}
-
-// IUnknown
-ULONG  PresenterDX11::Release( void )
-{
-	ULONG uCount = InterlockedDecrement( &m_nRefCount );
-	if( uCount == 0 ) {
-		delete this;
-	}
-	// For thread safety, return a temporary variable.
-	return uCount;
 }
 
 // IMFVideoDisplayControl
@@ -1675,29 +1651,6 @@ void PresenterDX11::ReduceToLowestTerms(
 	*pDenominatorOut = DenominatorIn / GCD;
 }
 
-HRESULT PresenterDX11::SetMonitor( UINT adapterID )
-{
-	HRESULT hr = S_OK;
-	DWORD dwMatchID = 0;
-
-	ScopedCriticalSection lock( m_critSec );
-
-	do {
-		hr = m_pMonitors->MatchGUID( adapterID, &dwMatchID );
-		BREAK_ON_FAIL( hr );
-
-		if( hr == S_FALSE ) {
-			hr = E_INVALIDARG;
-			break;
-		}
-
-		m_lpCurrMon = &( *m_pMonitors )[dwMatchID];
-		m_ConnectionGUID = adapterID;
-	} while( FALSE );
-
-	return hr;
-}
-
 //+-------------------------------------------------------------------------
 //
 //  Member:     SetVideoContextParameters
@@ -1746,43 +1699,6 @@ void PresenterDX11::SetVideoContextParameters( ID3D11VideoContext* pVideoContext
 	backgroundColor.RGBA.B = 1.0F * static_cast<float>( GetBValue( 0 ) ) / 255.0F;
 
 	pVideoContext->VideoProcessorSetOutputBackgroundColor( m_pVideoProcessor, FALSE, &backgroundColor );
-}
-
-HRESULT PresenterDX11::SetVideoMonitor( HWND hwndVideo )
-{
-	HRESULT hr = S_OK;
-	AMDDrawMonitorInfo* pMonInfo = NULL;
-	HMONITOR hMon = NULL;
-
-	if( !m_pMonitors ) {
-		return E_UNEXPECTED;
-	}
-
-	hMon = MonitorFromWindow( hwndVideo, MONITOR_DEFAULTTONULL );
-
-	do {
-		if( NULL != hMon ) {
-			m_pMonitors->TerminateDisplaySystem();
-			m_lpCurrMon = NULL;
-
-			hr = m_pMonitors->InitializeDisplaySystem( hwndVideo );
-			BREAK_ON_FAIL( hr );
-
-			pMonInfo = m_pMonitors->FindMonitor( hMon );
-			if( NULL != pMonInfo && pMonInfo->uDevID != m_ConnectionGUID ) {
-				hr = SetMonitor( pMonInfo->uDevID );
-				BREAK_ON_FAIL( hr );
-
-				hr = S_FALSE;
-			}
-		}
-		else {
-			hr = E_POINTER;
-			BREAK_ON_FAIL( hr );
-		}
-	} while( FALSE );
-
-	return hr;
 }
 
 //-------------------------------------------------------------------

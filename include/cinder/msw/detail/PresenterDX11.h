@@ -1,6 +1,5 @@
 #pragma once
 
-#include "cinder/msw/detail/MonitorArray.h"
 #include "cinder/msw/detail/Presenter.h"
 
 #include <d3d11.h>
@@ -39,9 +38,7 @@ public:
 	virtual ~PresenterDX11( void );
 
 	// IUnknown
-	STDMETHODIMP_( ULONG ) AddRef( void );
 	STDMETHODIMP QueryInterface( REFIID iid, __RPC__deref_out _Result_nullonfailure_ void** ppv );
-	STDMETHODIMP_( ULONG ) Release( void );
 
 	// IMFVideoDisplayControl
 	STDMETHODIMP GetAspectRatioMode( __RPC__out DWORD* pdwAspectRatioMode ) { return E_NOTIMPL; }
@@ -122,11 +119,9 @@ private:
 		int* pDenominatorOut
 		);
 
-	HRESULT SetMonitor( UINT adapterID );
 
 	void    SetVideoContextParameters( ID3D11VideoContext* pVideoContext, const RECT* pSRect, const RECT* pTRect, UINT32 unInterlaceMode );
 
-	HRESULT SetVideoMonitor( HWND hwndVideo );
 #if (WINVER >=_WIN32_WINNT_WIN8)
 	HRESULT SetXVPOutputMediaType( IMFMediaType* pType, DXGI_FORMAT vpOutputFormat );
 #endif
@@ -134,8 +129,6 @@ private:
 		HRESULT UpdateDXGISwapChain( void );
 	void    UpdateRectangles( RECT* pDst, RECT* pSrc );
 
-	long                            m_nRefCount;                // reference count
-	CriticalSection                 m_critSec;                  // critical section for thread safety
 	BOOL                            m_IsShutdown;               // Flag to indicate if Shutdown() method was called.
 	IDXGIFactory2*                  m_pDXGIFactory2;
 	IMFDXGIDeviceManager*           m_pDXGIManager;
@@ -147,11 +140,7 @@ private:
 	IDCompositionVisual*            m_pRootVisual;
 #endif
 	BOOL                            m_bSoftwareDXVADeviceInUse;
-	HWND                            m_hwndVideo;
-	MonitorArray*                   m_pMonitors;
-	AMDDrawMonitorInfo*             m_lpCurrMon;
 	UINT                            m_DeviceResetToken;
-	UINT                            m_ConnectionGUID;
 	UINT                            m_DXSWSwitch;
 	UINT                            m_useXVP;
 	UINT                            m_useDCompVisual;

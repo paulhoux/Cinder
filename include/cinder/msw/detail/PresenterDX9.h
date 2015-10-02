@@ -1,6 +1,5 @@
 #pragma once
 
-#include "cinder/msw/detail/MonitorArray.h"
 #include "cinder/msw/detail/Presenter.h"
 
 #include <d3d9.h>
@@ -18,9 +17,7 @@ public:
 	virtual ~PresenterDX9( void );
 
 	// IUnknown
-	STDMETHODIMP_( ULONG ) AddRef( void );
 	STDMETHODIMP QueryInterface( REFIID iid, __RPC__deref_out _Result_nullonfailure_ void** ppv );
-	STDMETHODIMP_( ULONG ) Release( void );
 
 	// IMFVideoDisplayControl
 	STDMETHODIMP GetAspectRatioMode( __RPC__out DWORD* pdwAspectRatioMode ) { return E_NOTIMPL; }
@@ -58,19 +55,10 @@ private:
 	HRESULT CheckShutdown( void ) const;
 	HRESULT CreateDXVA2ManagerAndDevice( D3D_DRIVER_TYPE DriverType = D3D_DRIVER_TYPE_HARDWARE );
 
-	HRESULT SetMonitor( UINT adapterID );
-	HRESULT SetVideoMonitor( HWND hwndVideo );
 
-
-	long                            m_nRefCount;                // reference count
-	CriticalSection                 m_critSec;                  // critical section for thread safety
 	BOOL                            m_IsShutdown;               // Flag to indicate if Shutdown() method was called.
 
-	HWND                            m_hwndVideo;
-	MonitorArray*                   m_pMonitors;
-	AMDDrawMonitorInfo*             m_lpCurrMon;
 	UINT                            m_DeviceResetToken;
-	UINT                            m_ConnectionGUID;
 	D3DDISPLAYMODE                  m_DisplayMode;              // Adapter's display mode.
 
 	IDirect3D9Ex*                   m_pD3D9;

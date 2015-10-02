@@ -8,12 +8,7 @@ namespace msw {
 namespace detail {
 
 PresenterDX9::PresenterDX9( void )
-	: m_nRefCount( 1 )
-	, m_critSec() // default ctor
-	, m_IsShutdown( FALSE )
-	, m_hwndVideo( NULL )
-	, m_pMonitors( NULL )
-	, m_lpCurrMon( NULL )
+	: m_IsShutdown( FALSE )
 	, m_DeviceResetToken( 0 )
 	, m_pD3D9( NULL )
 	, m_pD3DDevice( NULL )
@@ -25,19 +20,11 @@ PresenterDX9::PresenterDX9( void )
 
 PresenterDX9::~PresenterDX9( void )
 {
-	SafeDelete( m_pMonitors );
-
 	// Unload D3D9.
 	if( m_D3D9Module ) {
 		FreeLibrary( m_D3D9Module );
 		m_D3D9Module = NULL;
 	}
-}
-
-// IUnknown
-ULONG PresenterDX9::AddRef( void )
-{
-	return InterlockedIncrement( &m_nRefCount );
 }
 
 // IUnknown
@@ -61,17 +48,6 @@ HRESULT PresenterDX9::QueryInterface( REFIID iid, __RPC__deref_out _Result_nullo
 	}
 	AddRef();
 	return S_OK;
-}
-
-// IUnknown
-ULONG  PresenterDX9::Release( void )
-{
-	ULONG uCount = InterlockedDecrement( &m_nRefCount );
-	if( uCount == 0 ) {
-		delete this;
-	}
-	// For thread safety, return a temporary variable.
-	return uCount;
 }
 
 // IMFVideoDisplayControl
@@ -204,66 +180,6 @@ HRESULT PresenterDX9::CreateDXVA2ManagerAndDevice( D3D_DRIVER_TYPE DriverType )
 		hr = m_pDeviceManager->ResetDevice( pDevice, m_DeviceResetToken );
 		BREAK_ON_FAIL( hr );
 	} while( false );
-
-	return hr;
-}
-
-HRESULT PresenterDX9::SetMonitor( UINT adapterID )
-{
-	HRESULT hr = S_OK;
-	DWORD dwMatchID = 0;
-
-	ScopedCriticalSection lock( m_critSec );
-
-	do {
-		hr = m_pMonitors->MatchGUID( adapterID, &dwMatchID );
-		BREAK_ON_FAIL( hr );
-
-		if( hr == S_FALSE ) {
-			hr = E_INVALIDARG;
-			break;
-		}
-
-		m_lpCurrMon = &( *m_pMonitors )[dwMatchID];
-		m_ConnectionGUID = adapterID;
-	} while( FALSE );
-
-	return hr;
-}
-
-HRESULT PresenterDX9::SetVideoMonitor( HWND hwndVideo )
-{
-	HRESULT hr = S_OK;
-	AMDDrawMonitorInfo* pMonInfo = NULL;
-	HMONITOR hMon = NULL;
-
-	if( !m_pMonitors ) {
-		return E_UNEXPECTED;
-	}
-
-	hMon = MonitorFromWindow( hwndVideo, MONITOR_DEFAULTTONULL );
-
-	do {
-		if( NULL != hMon ) {
-			m_pMonitors->TerminateDisplaySystem();
-			m_lpCurrMon = NULL;
-
-			hr = m_pMonitors->InitializeDisplaySystem( hwndVideo );
-			BREAK_ON_FAIL( hr );
-
-			pMonInfo = m_pMonitors->FindMonitor( hMon );
-			if( NULL != pMonInfo && pMonInfo->uDevID != m_ConnectionGUID ) {
-				hr = SetMonitor( pMonInfo->uDevID );
-				BREAK_ON_FAIL( hr );
-
-				hr = S_FALSE;
-			}
-		}
-		else {
-			hr = E_POINTER;
-			BREAK_ON_FAIL( hr );
-		}
-	} while( FALSE );
 
 	return hr;
 }
