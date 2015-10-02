@@ -203,6 +203,11 @@ private:
 	IMFTransform*                   m_pXVP;
 	IMFVideoProcessorControl*       m_pXVPControl;
 #endif
+
+	// Dynamically link to DirectX.
+	HMODULE                         m_D3D11Module;
+
+	PFN_D3D11_CREATE_DEVICE         _D3D11CreateDevice;
 };
 
 /////////////////////////////////////////////////////////////////////////////////////////////

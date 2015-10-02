@@ -52,8 +52,10 @@ void VideoTestApp::draw()
 
 void VideoTestApp::mouseDown( MouseEvent event )
 {
-	if( mClearRegion.contains( event.getPos() ) )
-		mVideos.clear();
+	if( mClearRegion.contains( event.getPos() ) ) {
+		if( !mVideos.empty() )
+			mVideos.pop_back();
+	}
 }
 
 void VideoTestApp::fileDrop( FileDropEvent event )

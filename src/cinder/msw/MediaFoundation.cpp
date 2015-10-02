@@ -41,8 +41,6 @@ POSSIBILITY OF SUCH DAMAGE.
 #pragma comment(lib, "winmm.lib") // for timeBeginPeriod and timeEndPeriod
 #pragma comment (lib,"uuid.lib")
 
-//#pragma comment(lib,"d3d9.lib")
-//#pragma comment(lib, "d3d11.lib")
 //#pragma comment(lib,"dxva2.lib")
 //#pragma comment (lib,"evr.lib")
 //#pragma comment (lib,"dcomp.lib")
