@@ -4,10 +4,6 @@
 #include "cinder/msw/ScopedPtr.h"
 
 #include <d3dcommon.h>
-#include <d3d9.h>
-#include <d3d11.h>
-#include <dxgi1_2.h>
-#include <dcomp.h> // for IDCompositionDevice et.al. (Windows 8+ only)
 #include <evr.h> // IMFVideoDisplayControl
 #include <mfidl.h> // for IMFVideoProcessorControl
 

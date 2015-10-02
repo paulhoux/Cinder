@@ -182,10 +182,7 @@ HRESULT PresenterDX11::SetVideoWindow( __RPC__in HWND hwndVideo )
 		hr = CheckShutdown();
 		BREAK_ON_FAIL( hr );
 
-		if( !IsWindow( hwndVideo ) ) {
-			hr = E_INVALIDARG;
-			break;
-		}
+		BREAK_IF_FALSE( IsWindow( hwndVideo ), E_INVALIDARG );
 
 		m_pMonitors = new MonitorArray();
 		if( !m_pMonitors ) {
@@ -870,7 +867,7 @@ HRESULT PresenterDX11::CreateDXGIManagerAndDevice( D3D_DRIVER_TYPE DriverType )
 		if( D3D_DRIVER_TYPE_WARP == DriverType ) {
 			// (phoux) I changed the reference counting on pD3D11Device from the original implementation (see also CPrivate_ID3D11Device). Please check for memory leaks.
 			ScopedPtr<ID3D11Device> pD3D11Device;
-			hr = _D3D11CreateDevice( NULL, D3D_DRIVER_TYPE_HARDWARE, NULL, m_useDebugLayer, featureLevels, ARRAYSIZE( featureLevels ), D3D11_SDK_VERSION, &pD3D11Device, &featureLevel, NULL );
+			hr = (_D3D11CreateDevice)( NULL, D3D_DRIVER_TYPE_HARDWARE, NULL, m_useDebugLayer, featureLevels, ARRAYSIZE( featureLevels ), D3D11_SDK_VERSION, &pD3D11Device, &featureLevel, NULL );
 
 			if( SUCCEEDED( hr ) ) {
 				m_pD3DDevice = new CPrivate_ID3D11Device( pD3D11Device );
@@ -882,7 +879,7 @@ HRESULT PresenterDX11::CreateDXGIManagerAndDevice( D3D_DRIVER_TYPE DriverType )
 		else {
 			// Find and create D3DDevice with highest compatible feature level.
 			for( DWORD dwCount = 0; dwCount < ARRAYSIZE( featureLevels ); dwCount++ ) {
-				hr = _D3D11CreateDevice( NULL, DriverType, NULL, m_useDebugLayer, &featureLevels[dwCount], 1, D3D11_SDK_VERSION, &m_pD3DDevice, &featureLevel, NULL );
+				hr = (_D3D11CreateDevice)( NULL, DriverType, NULL, m_useDebugLayer, &featureLevels[dwCount], 1, D3D11_SDK_VERSION, &m_pD3DDevice, &featureLevel, NULL );
 				if( SUCCEEDED( hr ) ) {
 					// Check if it supports a D3D11VideoDevice.
 					ScopedPtr<ID3D11VideoDevice> pDX11VideoDevice;

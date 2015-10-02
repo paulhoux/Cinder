@@ -3,6 +3,9 @@
 #include "cinder/msw/detail/MonitorArray.h"
 #include "cinder/msw/detail/Presenter.h"
 
+#include <d3d9.h>
+#include <dxva2api.h>
+
 DEFINE_GUID( CLSID_VideoProcessorMFT, 0x88753b26, 0x5b24, 0x49bd, 0xb2, 0xe7, 0xc, 0x44, 0x5c, 0x78, 0xc9, 0x82 );
 
 namespace cinder {
@@ -35,7 +38,7 @@ public:
 	STDMETHODIMP SetFullscreen( BOOL fFullscreen ) { return E_NOTIMPL; /* TODO */ }
 	STDMETHODIMP SetRenderingPrefs( DWORD dwRenderingPrefs ) { return E_NOTIMPL; }
 	STDMETHODIMP SetVideoPosition( __RPC__in_opt const MFVideoNormalizedRect* pnrcSource, __RPC__in_opt const LPRECT prcDest ) { return E_NOTIMPL; }
-	STDMETHODIMP SetVideoWindow( __RPC__in HWND hwndVideo ) { return E_NOTIMPL; /* TODO */ }
+	STDMETHODIMP SetVideoWindow( __RPC__in HWND hwndVideo );
 
 	// IMFGetService
 	STDMETHODIMP GetService( __RPC__in REFGUID guidService, __RPC__in REFIID riid, __RPC__deref_out_opt LPVOID* ppvObject ) { return E_NOTIMPL; /* TODO */ }
@@ -52,15 +55,33 @@ public:
 	STDMETHODIMP Shutdown( void );
 
 private:
+	HRESULT CheckShutdown( void ) const;
+	HRESULT CreateDXVA2ManagerAndDevice( D3D_DRIVER_TYPE DriverType = D3D_DRIVER_TYPE_HARDWARE );
+
+	HRESULT SetMonitor( UINT adapterID );
+	HRESULT SetVideoMonitor( HWND hwndVideo );
+
+
 	long                            m_nRefCount;                // reference count
 	CriticalSection                 m_critSec;                  // critical section for thread safety
 	BOOL                            m_IsShutdown;               // Flag to indicate if Shutdown() method was called.
+
+	HWND                            m_hwndVideo;
+	MonitorArray*                   m_pMonitors;
+	AMDDrawMonitorInfo*             m_lpCurrMon;
+	UINT                            m_DeviceResetToken;
+	UINT                            m_ConnectionGUID;
+	D3DDISPLAYMODE                  m_DisplayMode;              // Adapter's display mode.
+
+	IDirect3D9Ex*                   m_pD3D9;
+	IDirect3DDevice9Ex*             m_pD3DDevice;
+	IDirect3DDeviceManager9*        m_pDeviceManager;
 
 	// Dynamically link to DirectX.
 	HMODULE                         m_D3D9Module;
 
 	// Define a function pointer to the Direct3DCreate9Ex function.
-	typedef HRESULT( WINAPI *LPDIRECT3DCREATE9EX )( UINT, void ** );
+	typedef HRESULT( WINAPI *LPDIRECT3DCREATE9EX )( UINT, IDirect3D9Ex ** );
 
 	LPDIRECT3DCREATE9EX             _Direct3DCreate9Ex;
 };

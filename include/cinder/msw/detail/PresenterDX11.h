@@ -3,6 +3,10 @@
 #include "cinder/msw/detail/MonitorArray.h"
 #include "cinder/msw/detail/Presenter.h"
 
+#include <d3d11.h>
+#include <dxgi1_2.h>
+#include <dcomp.h> // for IDCompositionDevice et.al. (Windows 8+ only)
+
 #if (WINVER >= _WIN32_WINNT_WIN8)
 #pragma message("WARNING! Uses experimental Windows 8+ code that has not been tested for OpenGL compatibility!")
 #endif
