@@ -1,7 +1,12 @@
 
 
-#include "cinder/msw/detail/MediaSink.h"
 #include "cinder/msw/ScopedPtr.h"
+#include "cinder/msw/detail/MediaSink.h"
+#include "cinder/msw/detail/PresenterDX11.h"
+
+#if (WINVER < _WIN32_WINNT_WIN7)
+#error "The minimum system required to compile this file is Windows 7."
+#endif
 
 namespace cinder {
 namespace msw {
@@ -673,7 +678,7 @@ HRESULT MediaSink::Initialize( void )
 		m_pStream = new StreamSink( STREAM_ID, s_csStreamSinkAndScheduler, m_pScheduler );
 		BREAK_ON_NULL( m_pStream, E_OUTOFMEMORY );
 
-		m_pPresenter = new Presenter(); // Created with ref count = 1.
+		m_pPresenter = new PresenterDX11(); // Created with ref count = 1.
 		BREAK_ON_NULL( m_pPresenter, E_OUTOFMEMORY );
 
 		ScopedPtr<IMFMediaSink> pSink;

@@ -26,6 +26,9 @@ POSSIBILITY OF SUCH DAMAGE.
 
 #pragma once
 
+#include <assert.h>
+#include <windows.h>
+
 namespace cinder {
 namespace msw {
 

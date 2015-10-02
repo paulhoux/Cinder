@@ -5,6 +5,10 @@
 #include <assert.h>
 #include <windows.h>
 
+#if (WINVER < _WIN32_WINNT_WIN7)
+#error "The minimum system required to compile this file is Windows 7."
+#endif
+
 namespace cinder {
 namespace msw {
 namespace detail {

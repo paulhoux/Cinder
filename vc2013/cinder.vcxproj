@@ -534,7 +534,7 @@
     <ClCompile Include="..\src\cinder\msw\detail\Marker.cpp" />
     <ClCompile Include="..\src\cinder\msw\detail\MediaSink.cpp" />
     <ClCompile Include="..\src\cinder\msw\detail\MonitorArray.cpp" />
-    <ClCompile Include="..\src\cinder\msw\detail\Presenter.cpp" />
+    <ClCompile Include="..\src\cinder\msw\detail\PresenterDX11.cpp" />
     <ClCompile Include="..\src\cinder\msw\detail\Scheduler.cpp" />
     <ClCompile Include="..\src\cinder\msw\detail\StreamSink.cpp" />
     <ClCompile Include="..\src\cinder\msw\MediaFoundation.cpp" />
@@ -780,6 +780,7 @@
     <ClInclude Include="..\include\cinder\msw\detail\MFAttributesImpl.h" />
     <ClInclude Include="..\include\cinder\msw\detail\MonitorArray.h" />
     <ClInclude Include="..\include\cinder\msw\detail\Presenter.h" />
+    <ClInclude Include="..\include\cinder\msw\detail\PresenterDX11.h" />
     <ClInclude Include="..\include\cinder\msw\detail\Scheduler.h" />
     <ClInclude Include="..\include\cinder\msw\detail\StaticAsyncCallback.h" />
     <ClInclude Include="..\include\cinder\msw\detail\StreamSink.h" />

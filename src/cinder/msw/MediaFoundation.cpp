@@ -33,6 +33,10 @@ POSSIBILITY OF SUCH DAMAGE.
 #include <string>
 #include <Shlwapi.h>
 
+#if (WINVER < _WIN32_WINNT_WIN7)
+#error "The minimum system required to compile this file is Windows 7."
+#endif
+
 // Include these libraries.
 #pragma comment(lib, "mf.lib")
 #pragma comment(lib, "mfplat.lib")

@@ -1,5 +1,9 @@
 #include "cinder/msw/MediaFoundation.h"
-#include "cinder/msw/detail/Presenter.h"
+#include "cinder/msw/detail/PresenterDX11.h"
+
+#if (WINVER < _WIN32_WINNT_WIN7)
+#error "The minimum system required to compile this file is Windows 7."
+#endif
 
 namespace cinder {
 namespace msw {
@@ -7,7 +11,7 @@ namespace detail {
 
 /////////////////////////////////////////////////////////////////////////////////////////////
 //
-// Presenter class. - Presents samples using DX11.
+// PresenterDX11 class. - Presents samples using DX11.
 //
 // Notes:
 // - Most public methods calls CheckShutdown. This method fails if the presenter was shut down.
@@ -15,10 +19,10 @@ namespace detail {
 /////////////////////////////////////////////////////////////////////////////////////////////
 
 //-------------------------------------------------------------------
-// Presenter constructor.
+// PresenterDX11 constructor.
 //-------------------------------------------------------------------
 
-Presenter::Presenter( void )
+PresenterDX11::PresenterDX11( void )
 	: m_nRefCount( 1 )
 	, m_critSec() // default ctor
 	, m_IsShutdown( FALSE )
@@ -83,10 +87,10 @@ Presenter::Presenter( void )
 }
 
 //-------------------------------------------------------------------
-// Presenter destructor.
+// PresenterDX11 destructor.
 //-------------------------------------------------------------------
 
-Presenter::~Presenter( void )
+PresenterDX11::~PresenterDX11( void )
 {
 	SafeDelete( m_pMonitors );
 
@@ -95,13 +99,13 @@ Presenter::~Presenter( void )
 }
 
 // IUnknown
-ULONG Presenter::AddRef( void )
+ULONG PresenterDX11::AddRef( void )
 {
 	return InterlockedIncrement( &m_nRefCount );
 }
 
 // IUnknown
-HRESULT Presenter::QueryInterface( REFIID iid, __RPC__deref_out _Result_nullonfailure_ void** ppv )
+HRESULT PresenterDX11::QueryInterface( REFIID iid, __RPC__deref_out _Result_nullonfailure_ void** ppv )
 {
 	if( !ppv ) {
 		return E_POINTER;
@@ -124,7 +128,7 @@ HRESULT Presenter::QueryInterface( REFIID iid, __RPC__deref_out _Result_nullonfa
 }
 
 // IUnknown
-ULONG  Presenter::Release( void )
+ULONG  PresenterDX11::Release( void )
 {
 	ULONG uCount = InterlockedDecrement( &m_nRefCount );
 	if( uCount == 0 ) {
@@ -135,7 +139,7 @@ ULONG  Presenter::Release( void )
 }
 
 // IMFVideoDisplayControl
-HRESULT Presenter::GetFullscreen( __RPC__out BOOL* pfFullscreen )
+HRESULT PresenterDX11::GetFullscreen( __RPC__out BOOL* pfFullscreen )
 {
 	ScopedCriticalSection lock( m_critSec );
 
@@ -154,7 +158,7 @@ HRESULT Presenter::GetFullscreen( __RPC__out BOOL* pfFullscreen )
 }
 
 // IMFVideoDisplayControl
-HRESULT Presenter::SetFullscreen( BOOL fFullscreen )
+HRESULT PresenterDX11::SetFullscreen( BOOL fFullscreen )
 {
 	ScopedCriticalSection lock( m_critSec );
 
@@ -172,7 +176,7 @@ HRESULT Presenter::SetFullscreen( BOOL fFullscreen )
 }
 
 // IMFVideoDisplayControl
-HRESULT Presenter::SetVideoWindow( __RPC__in HWND hwndVideo )
+HRESULT PresenterDX11::SetVideoWindow( __RPC__in HWND hwndVideo )
 {
 	HRESULT hr = S_OK;
 
@@ -219,7 +223,7 @@ return hr;
 // Description: IMFGetService
 //-------------------------------------------------------------------------
 
-HRESULT Presenter::GetService( __RPC__in REFGUID guidService, __RPC__in REFIID riid, __RPC__deref_out_opt LPVOID* ppvObject )
+HRESULT PresenterDX11::GetService( __RPC__in REFGUID guidService, __RPC__in REFIID riid, __RPC__deref_out_opt LPVOID* ppvObject )
 {
 	HRESULT hr = S_OK;
 
@@ -258,12 +262,12 @@ HRESULT Presenter::GetService( __RPC__in REFGUID guidService, __RPC__in REFIID r
 	return hr;
 }
 
-BOOL Presenter::CanProcessNextSample( void )
+BOOL PresenterDX11::CanProcessNextSample( void )
 {
 	return m_bCanProcessNextSample;
 }
 
-HRESULT Presenter::Flush( void )
+HRESULT PresenterDX11::Flush( void )
 {
 	ScopedCriticalSection lock( m_critSec );
 
@@ -280,7 +284,7 @@ HRESULT Presenter::Flush( void )
 	return hr;
 }
 
-HRESULT Presenter::GetMonitorRefreshRate( DWORD* pdwRefreshRate )
+HRESULT PresenterDX11::GetMonitorRefreshRate( DWORD* pdwRefreshRate )
 {
 	if( pdwRefreshRate == NULL ) {
 		return E_POINTER;
@@ -295,7 +299,7 @@ HRESULT Presenter::GetMonitorRefreshRate( DWORD* pdwRefreshRate )
 	return S_OK;
 }
 
-HRESULT Presenter::IsMediaTypeSupported( IMFMediaType* pMediaType, DXGI_FORMAT dxgiFormat )
+HRESULT PresenterDX11::IsMediaTypeSupported( IMFMediaType* pMediaType, DXGI_FORMAT dxgiFormat )
 {
 	HRESULT hr = S_OK;
 
@@ -364,7 +368,7 @@ return hr;
 //
 //--------------------------------------------------------------------------
 
-HRESULT Presenter::PresentFrame( void )
+HRESULT PresenterDX11::PresentFrame( void )
 {
 	HRESULT hr = S_OK;
 
@@ -397,7 +401,7 @@ HRESULT Presenter::PresentFrame( void )
 // Description: Present one media sample.
 //-------------------------------------------------------------------
 
-HRESULT Presenter::ProcessFrame( IMFMediaType* pCurrentType, IMFSample* pSample, UINT32* punInterlaceMode, BOOL* pbDeviceChanged, BOOL* pbProcessAgain, IMFSample** ppOutputSample )
+HRESULT PresenterDX11::ProcessFrame( IMFMediaType* pCurrentType, IMFSample* pSample, UINT32* punInterlaceMode, BOOL* pbDeviceChanged, BOOL* pbProcessAgain, IMFSample** ppOutputSample )
 {
 	HRESULT hr = S_OK;
 	BYTE* pData = NULL;
@@ -552,7 +556,7 @@ SafeRelease( pEVBuffer );
 return hr;
 }
 
-HRESULT Presenter::SetCurrentMediaType( IMFMediaType* pMediaType )
+HRESULT PresenterDX11::SetCurrentMediaType( IMFMediaType* pMediaType )
 {
 	HRESULT hr = S_OK;
 	IMFAttributes* pAttributes = NULL;
@@ -632,7 +636,7 @@ HRESULT Presenter::SetCurrentMediaType( IMFMediaType* pMediaType )
 // Description: Releases resources held by the presenter.
 //-------------------------------------------------------------------
 
-HRESULT Presenter::Shutdown( void )
+HRESULT PresenterDX11::Shutdown( void )
 {
 	ScopedCriticalSection lock( m_critSec );
 
@@ -673,7 +677,7 @@ HRESULT Presenter::Shutdown( void )
 //
 //--------------------------------------------------------------------------
 
-void Presenter::AspectRatioCorrectSize(
+void PresenterDX11::AspectRatioCorrectSize(
 	LPSIZE lpSizeImage,     // size to be aspect ratio corrected
 	const SIZE& sizeAr,     // aspect ratio of image
 	const SIZE& sizeOrig,   // original image size
@@ -696,7 +700,7 @@ void Presenter::AspectRatioCorrectSize(
 	}
 }
 
-void Presenter::CheckDecodeSwitchRegKey( void )
+void PresenterDX11::CheckDecodeSwitchRegKey( void )
 {
 	const TCHAR* lpcszDXSW = TEXT( "DXSWSwitch" );
 	const TCHAR* lpcszInVP = TEXT( "XVP" );
@@ -739,7 +743,7 @@ void Presenter::CheckDecodeSwitchRegKey( void )
 	return;
 }
 
-HRESULT Presenter::CheckDeviceState( BOOL* pbDeviceChanged )
+HRESULT PresenterDX11::CheckDeviceState( BOOL* pbDeviceChanged )
 {
 	if( pbDeviceChanged == NULL ) {
 		return E_POINTER;
@@ -780,14 +784,14 @@ HRESULT Presenter::CheckDeviceState( BOOL* pbDeviceChanged )
 	return hr;
 }
 
-BOOL Presenter::CheckEmptyRect( RECT* pDst )
+BOOL PresenterDX11::CheckEmptyRect( RECT* pDst )
 {
 	GetClientRect( m_hwndVideo, pDst );
 
 	return IsRectEmpty( pDst );
 }
 
-HRESULT Presenter::CheckShutdown( void ) const
+HRESULT PresenterDX11::CheckShutdown( void ) const
 {
 	if( m_IsShutdown ) {
 		return MF_E_SHUTDOWN;
@@ -797,7 +801,7 @@ HRESULT Presenter::CheckShutdown( void ) const
 	}
 }
 
-HRESULT Presenter::CreateDCompDeviceAndVisual( void )
+HRESULT PresenterDX11::CreateDCompDeviceAndVisual( void )
 {
 	HRESULT hr = S_OK;
 	IDXGIDevice* pDXGIDevice = NULL;
@@ -832,7 +836,7 @@ HRESULT Presenter::CreateDCompDeviceAndVisual( void )
 //       IDX11VideoRenderer.
 //-------------------------------------------------------------------
 
-HRESULT Presenter::CreateDXGIManagerAndDevice( D3D_DRIVER_TYPE DriverType )
+HRESULT PresenterDX11::CreateDXGIManagerAndDevice( D3D_DRIVER_TYPE DriverType )
 {
 	HRESULT hr = S_OK;
 
@@ -934,7 +938,7 @@ HRESULT Presenter::CreateDXGIManagerAndDevice( D3D_DRIVER_TYPE DriverType )
 //-------------------------------------------------------------------
 
 #if (WINVER >= _WIN32_WINNT_WIN8) 
-HRESULT Presenter::CreateXVP( void )
+HRESULT PresenterDX11::CreateXVP( void )
 {
 	HRESULT hr = S_OK;
 
@@ -971,7 +975,7 @@ HRESULT Presenter::CreateXVP( void )
 //
 //--------------------------------------------------------------------------
 
-HRESULT Presenter::FindBOBProcessorIndex( DWORD* pIndex )
+HRESULT PresenterDX11::FindBOBProcessorIndex( DWORD* pIndex )
 {
 	HRESULT hr = S_OK;
 	D3D11_VIDEO_PROCESSOR_CAPS caps = {};
@@ -1003,7 +1007,7 @@ HRESULT Presenter::FindBOBProcessorIndex( DWORD* pIndex )
 // Description: get the display area from the media type.
 //-------------------------------------------------------------------
 
-HRESULT Presenter::GetVideoDisplayArea( IMFMediaType* pType, MFVideoArea* pArea )
+HRESULT PresenterDX11::GetVideoDisplayArea( IMFMediaType* pType, MFVideoArea* pArea )
 {
 	HRESULT hr = S_OK;
 	BOOL bPanScan = FALSE;
@@ -1086,7 +1090,7 @@ HRESULT Presenter::GetVideoDisplayArea( IMFMediaType* pType, MFVideoArea* pArea 
 //
 //--------------------------------------------------------------------------
 
-void Presenter::LetterBoxDstRect(
+void PresenterDX11::LetterBoxDstRect(
 	LPRECT lprcLBDst,     // output letterboxed rectangle
 	const RECT& rcSrc,    // input source rectangle
 	const RECT& rcDst     // input destination rectangle
@@ -1143,7 +1147,7 @@ void Presenter::LetterBoxDstRect(
 //
 //--------------------------------------------------------------------------
 
-void Presenter::PixelAspectToPictureAspect(
+void PresenterDX11::PixelAspectToPictureAspect(
 	int Width,
 	int Height,
 	int PixelAspectX,
@@ -1191,7 +1195,7 @@ void Presenter::PixelAspectToPictureAspect(
 		);
 }
 
-HRESULT Presenter::ProcessFrameUsingD3D11( ID3D11Texture2D* pLeftTexture2D, ID3D11Texture2D* pRightTexture2D, UINT dwLeftViewIndex, UINT dwRightViewIndex, RECT rcDest, UINT32 unInterlaceMode, IMFSample** ppVideoOutFrame )
+HRESULT PresenterDX11::ProcessFrameUsingD3D11( ID3D11Texture2D* pLeftTexture2D, ID3D11Texture2D* pRightTexture2D, UINT dwLeftViewIndex, UINT dwRightViewIndex, RECT rcDest, UINT32 unInterlaceMode, IMFSample** ppVideoOutFrame )
 {
 	HRESULT hr = S_OK;
 	ID3D11VideoContext* pVideoContext = NULL;
@@ -1444,7 +1448,7 @@ HRESULT Presenter::ProcessFrameUsingD3D11( ID3D11Texture2D* pLeftTexture2D, ID3D
 }
 
 #if (WINVER >= _WIN32_WINNT_WIN8)
-HRESULT Presenter::ProcessFrameUsingXVP( IMFMediaType* pCurrentType, IMFSample* pVideoFrame, ID3D11Texture2D* pTexture2D, RECT rcDest, IMFSample** ppVideoOutFrame, BOOL* pbInputFrameUsed )
+HRESULT PresenterDX11::ProcessFrameUsingXVP( IMFMediaType* pCurrentType, IMFSample* pVideoFrame, ID3D11Texture2D* pTexture2D, RECT rcDest, IMFSample** ppVideoOutFrame, BOOL* pbInputFrameUsed )
 {
 	HRESULT hr = S_OK;
 	ID3D11VideoContext* pVideoContext = NULL;
@@ -1640,7 +1644,7 @@ HRESULT Presenter::ProcessFrameUsingXVP( IMFMediaType* pCurrentType, IMFSample* 
 //
 //--------------------------------------------------------------------------
 
-void Presenter::ReduceToLowestTerms(
+void PresenterDX11::ReduceToLowestTerms(
 	int NumeratorIn,
 	int DenominatorIn,
 	int* pNumeratorOut,
@@ -1653,7 +1657,7 @@ void Presenter::ReduceToLowestTerms(
 	*pDenominatorOut = DenominatorIn / GCD;
 }
 
-HRESULT Presenter::SetMonitor( UINT adapterID )
+HRESULT PresenterDX11::SetMonitor( UINT adapterID )
 {
 	HRESULT hr = S_OK;
 	DWORD dwMatchID = 0;
@@ -1684,7 +1688,7 @@ HRESULT Presenter::SetMonitor( UINT adapterID )
 //
 //--------------------------------------------------------------------------
 
-void Presenter::SetVideoContextParameters( ID3D11VideoContext* pVideoContext, const RECT* pSRect, const RECT* pTRect, UINT32 unInterlaceMode )
+void PresenterDX11::SetVideoContextParameters( ID3D11VideoContext* pVideoContext, const RECT* pSRect, const RECT* pTRect, UINT32 unInterlaceMode )
 {
 	D3D11_VIDEO_FRAME_FORMAT FrameFormat = D3D11_VIDEO_FRAME_FORMAT_PROGRESSIVE;
 	if( MFVideoInterlace_FieldInterleavedUpperFirst == unInterlaceMode || MFVideoInterlace_FieldSingleUpper == unInterlaceMode || MFVideoInterlace_MixedInterlaceOrProgressive == unInterlaceMode ) {
@@ -1726,7 +1730,7 @@ void Presenter::SetVideoContextParameters( ID3D11VideoContext* pVideoContext, co
 	pVideoContext->VideoProcessorSetOutputBackgroundColor( m_pVideoProcessor, FALSE, &backgroundColor );
 }
 
-HRESULT Presenter::SetVideoMonitor( HWND hwndVideo )
+HRESULT PresenterDX11::SetVideoMonitor( HWND hwndVideo )
 {
 	HRESULT hr = S_OK;
 	AMDDrawMonitorInfo* pMonInfo = NULL;
@@ -1770,7 +1774,7 @@ HRESULT Presenter::SetVideoMonitor( HWND hwndVideo )
 //-------------------------------------------------------------------
 
 #if (WINVER >=_WIN32_WINNT_WIN8)
-HRESULT Presenter::SetXVPOutputMediaType( IMFMediaType* pType, DXGI_FORMAT vpOutputFormat )
+HRESULT PresenterDX11::SetXVPOutputMediaType( IMFMediaType* pType, DXGI_FORMAT vpOutputFormat )
 {
 	HRESULT hr = S_OK;
 	IMFVideoMediaType* pMTOutput = NULL;
@@ -1807,7 +1811,7 @@ HRESULT Presenter::SetXVPOutputMediaType( IMFMediaType* pType, DXGI_FORMAT vpOut
 //--------------------------------------------------------------------------
 
 _Post_satisfies_( this->m_pSwapChain1 != NULL )
-HRESULT Presenter::UpdateDXGISwapChain( void )
+HRESULT PresenterDX11::UpdateDXGISwapChain( void )
 {
 	HRESULT hr = S_OK;
 
@@ -1887,7 +1891,7 @@ return hr;
 //
 //--------------------------------------------------------------------------
 
-void Presenter::UpdateRectangles( RECT* pDst, RECT* pSrc )
+void PresenterDX11::UpdateRectangles( RECT* pDst, RECT* pSrc )
 {
 	// take the given src rect and reverse map it into the native video
 	// image rectange.  For example, consider a video with a buffer size of
