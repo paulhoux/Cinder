@@ -77,13 +77,6 @@ PresenterDX11::PresenterDX11( void )
 {
 	ZeroMemory( &m_rcSrcApp, sizeof( m_rcSrcApp ) );
 	ZeroMemory( &m_rcDstApp, sizeof( m_rcDstApp ) );
-
-	// Dynamically load D3D11 functions (to avoid static linkage with d3d11.lib)
-	m_D3D11Module = LoadLibrary( TEXT( "d3d11.dll" ) );
-	if( !m_D3D11Module )
-		throw;
-
-	_D3D11CreateDevice = reinterpret_cast<PFN_D3D11_CREATE_DEVICE>( GetProcAddress( m_D3D11Module, "D3D11CreateDevice" ) );
 }
 
 //-------------------------------------------------------------------
@@ -95,7 +88,10 @@ PresenterDX11::~PresenterDX11( void )
 	SafeDelete( m_pMonitors );
 
 	// Unload D3D11.
-	BOOL success = FreeLibrary( m_D3D11Module );
+	if( m_D3D11Module ) {
+		FreeLibrary( m_D3D11Module );
+		m_D3D11Module = NULL;
+	}
 }
 
 // IUnknown
@@ -211,18 +207,14 @@ HRESULT PresenterDX11::SetVideoWindow( __RPC__in HWND hwndVideo )
 		if( m_useXVP ) {
 			hr = CreateXVP();
 			BREAK_ON_FAIL( hr );
-	}
+		}
 #endif
-} while( FALSE );
+	} while( FALSE );
 
-return hr;
+	return hr;
 }
 
-//-------------------------------------------------------------------------
-// Name: GetService
-// Description: IMFGetService
-//-------------------------------------------------------------------------
-
+// IMFGetService
 HRESULT PresenterDX11::GetService( __RPC__in REFGUID guidService, __RPC__in REFIID riid, __RPC__deref_out_opt LPVOID* ppvObject )
 {
 	HRESULT hr = S_OK;
@@ -262,11 +254,34 @@ HRESULT PresenterDX11::GetService( __RPC__in REFGUID guidService, __RPC__in REFI
 	return hr;
 }
 
+// Presenter
+HRESULT PresenterDX11::Initialize( void )
+{
+	// TEMP: force D3D9
+	return E_FAIL;
+
+	if( !m_D3D11Module ) {
+		// Dynamically load D3D11 functions (to avoid static linkage with d3d11.lib)
+		m_D3D11Module = LoadLibrary( TEXT( "d3d11.dll" ) );
+
+		if( !m_D3D11Module )
+			return E_FAIL;
+
+		_D3D11CreateDevice = reinterpret_cast<PFN_D3D11_CREATE_DEVICE>( GetProcAddress( m_D3D11Module, "D3D11CreateDevice" ) );
+		if( !_D3D11CreateDevice )
+			return E_FAIL;
+	}
+
+	return S_OK;
+}
+
+// Presenter
 BOOL PresenterDX11::CanProcessNextSample( void )
 {
 	return m_bCanProcessNextSample;
 }
 
+// Presenter
 HRESULT PresenterDX11::Flush( void )
 {
 	ScopedCriticalSection lock( m_critSec );
@@ -276,7 +291,7 @@ HRESULT PresenterDX11::Flush( void )
 #if (WINVER >= _WIN32_WINNT_WIN8)
 	if( SUCCEEDED( hr ) && m_useXVP ) {
 		hr = m_pXVP->ProcessMessage( MFT_MESSAGE_COMMAND_FLUSH, 0 );
-}
+	}
 #endif
 
 	m_bCanProcessNextSample = TRUE;
@@ -284,6 +299,7 @@ HRESULT PresenterDX11::Flush( void )
 	return hr;
 }
 
+// Presenter
 HRESULT PresenterDX11::GetMonitorRefreshRate( DWORD* pdwRefreshRate )
 {
 	if( pdwRefreshRate == NULL ) {
@@ -299,6 +315,7 @@ HRESULT PresenterDX11::GetMonitorRefreshRate( DWORD* pdwRefreshRate )
 	return S_OK;
 }
 
+// Presenter
 HRESULT PresenterDX11::IsMediaTypeSupported( IMFMediaType* pMediaType, DXGI_FORMAT dxgiFormat )
 {
 	HRESULT hr = S_OK;
@@ -353,11 +370,11 @@ HRESULT PresenterDX11::IsMediaTypeSupported( IMFMediaType* pMediaType, DXGI_FORM
 		if( m_useXVP ) {
 			hr = m_pXVP->SetInputType( 0, pMediaType, MFT_SET_TYPE_TEST_ONLY );
 			BREAK_ON_FAIL( hr );
-	}
+		}
 #endif
-} while( FALSE );
+	} while( FALSE );
 
-return hr;
+	return hr;
 }
 
 //+-------------------------------------------------------------------------
@@ -368,6 +385,7 @@ return hr;
 //
 //--------------------------------------------------------------------------
 
+// Presenter
 HRESULT PresenterDX11::PresentFrame( void )
 {
 	HRESULT hr = S_OK;
@@ -401,6 +419,7 @@ HRESULT PresenterDX11::PresentFrame( void )
 // Description: Present one media sample.
 //-------------------------------------------------------------------
 
+// Presenter
 HRESULT PresenterDX11::ProcessFrame( IMFMediaType* pCurrentType, IMFSample* pSample, UINT32* punInterlaceMode, BOOL* pbDeviceChanged, BOOL* pbProcessAgain, IMFSample** ppOutputSample )
 {
 	HRESULT hr = S_OK;
@@ -502,7 +521,7 @@ HRESULT PresenterDX11::ProcessFrame( IMFMediaType* pCurrentType, IMFSample* pSam
 				hr = pEVDXGIBuffer->GetSubresourceIndex( &dwEVViewIndex );
 				BREAK_ON_FAIL( hr );
 			}
-	}
+		}
 #endif
 
 		pTexture2D->GetDevice( &pDeviceInput );
@@ -543,19 +562,20 @@ HRESULT PresenterDX11::ProcessFrame( IMFMediaType* pCurrentType, IMFSample* pSam
 				}
 			}
 		}
-} while( FALSE );
+	} while( FALSE );
 
-SafeRelease( pTexture2D );
-SafeRelease( pDXGIBuffer );
-SafeRelease( pEVTexture2D );
-SafeRelease( pEVDXGIBuffer );
-SafeRelease( pDeviceInput );
-SafeRelease( pBuffer );
-SafeRelease( pEVBuffer );
+	SafeRelease( pTexture2D );
+	SafeRelease( pDXGIBuffer );
+	SafeRelease( pEVTexture2D );
+	SafeRelease( pEVDXGIBuffer );
+	SafeRelease( pDeviceInput );
+	SafeRelease( pBuffer );
+	SafeRelease( pEVBuffer );
 
-return hr;
+	return hr;
 }
 
+// Presenter
 HRESULT PresenterDX11::SetCurrentMediaType( IMFMediaType* pMediaType )
 {
 	HRESULT hr = S_OK;
@@ -579,7 +599,7 @@ HRESULT PresenterDX11::SetCurrentMediaType( IMFMediaType* pMediaType )
 			// This is a 3D video and we only support it on Windows 8+.
 			BREAK_IF_FALSE( !m_b3DVideo, E_NOTIMPL );
 #endif
-	}
+		}
 
 		// (phoux) I want to know if a video is considered '3D'
 		if( m_b3DVideo )
@@ -622,7 +642,7 @@ HRESULT PresenterDX11::SetCurrentMediaType( IMFMediaType* pMediaType )
 			// set the input type on the XVP
 			hr = m_pXVP->SetInputType( 0, pMediaType, 0 );
 			BREAK_ON_FAIL( hr );
-}
+		}
 #endif
 	} while( FALSE );
 
@@ -636,6 +656,7 @@ HRESULT PresenterDX11::SetCurrentMediaType( IMFMediaType* pMediaType )
 // Description: Releases resources held by the presenter.
 //-------------------------------------------------------------------
 
+// Presenter
 HRESULT PresenterDX11::Shutdown( void )
 {
 	ScopedCriticalSection lock( m_critSec );
@@ -1399,7 +1420,7 @@ HRESULT PresenterDX11::ProcessFrameUsingD3D11( ID3D11Texture2D* pLeftTexture2D, 
 
 			pVideoContext->VideoProcessorSetStreamStereoFormat( m_pVideoProcessor,
 																0, m_bStereoEnabled, vpStereoFormat, TRUE, TRUE, D3D11_VIDEO_PROCESSOR_STEREO_FLIP_NONE, 0 );
-	}
+		}
 #endif
 
 		QueryPerformanceCounter( &lpcEnd );
@@ -1422,7 +1443,7 @@ HRESULT PresenterDX11::ProcessFrameUsingD3D11( ID3D11Texture2D* pLeftTexture2D, 
 #if (WINVER >= _WIN32_WINNT_WIN8)
 		if( m_b3DVideo && MFVideo3DSampleFormat_MultiView == m_vp3DOutput && pRightTexture2D ) {
 			StreamData.pInputSurfaceRight = pRightInputView;
-}
+		}
 #endif
 
 		hr = pVideoContext->VideoProcessorBlt( m_pVideoProcessor, pOutputView, 0, 1, &StreamData );
@@ -1874,10 +1895,10 @@ HRESULT PresenterDX11::UpdateDXGISwapChain( void )
 			hr = E_NOTIMPL;
 			BREAK_ON_FAIL( hr );
 #endif
-	}
-} while( FALSE );
+		}
+	} while( FALSE );
 
-return hr;
+	return hr;
 }
 
 //+-------------------------------------------------------------------------

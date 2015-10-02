@@ -831,6 +831,9 @@
     <ClCompile Include="..\src\cinder\msw\detail\Scheduler.cpp">
       <Filter>Source Files\msw\detail</Filter>
     </ClCompile>
+    <ClCompile Include="..\src\cinder\msw\detail\PresenterDX9.cpp">
+      <Filter>Source Files\msw\detail</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\src\AntTweakBar\AntPerfTimer.h">
@@ -1749,6 +1752,9 @@
       <Filter>Header Files\msw\detail</Filter>
     </ClInclude>
     <ClInclude Include="..\include\cinder\msw\detail\Presenter.h">
+      <Filter>Header Files\msw\detail</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\cinder\msw\detail\PresenterDX9.h">
       <Filter>Header Files\msw\detail</Filter>
     </ClInclude>
   </ItemGroup>

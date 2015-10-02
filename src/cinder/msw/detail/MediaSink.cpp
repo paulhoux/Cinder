@@ -1,12 +1,10 @@
 
-
 #include "cinder/msw/ScopedPtr.h"
 #include "cinder/msw/detail/MediaSink.h"
+#include "cinder/msw/detail/PresenterDX9.h"
 #include "cinder/msw/detail/PresenterDX11.h"
 
-#if (WINVER < _WIN32_WINNT_WIN7)
-#error "The minimum system required to compile this file is Windows 7."
-#endif
+#include <VersionHelpers.h>
 
 namespace cinder {
 namespace msw {
@@ -678,8 +676,24 @@ HRESULT MediaSink::Initialize( void )
 		m_pStream = new StreamSink( STREAM_ID, s_csStreamSinkAndScheduler, m_pScheduler );
 		BREAK_ON_NULL( m_pStream, E_OUTOFMEMORY );
 
+		// Try initializing the DirectX11 pipeline.
 		m_pPresenter = new PresenterDX11(); // Created with ref count = 1.
 		BREAK_ON_NULL( m_pPresenter, E_OUTOFMEMORY );
+
+		hr = m_pPresenter->Initialize();
+		if( FAILED( hr ) ) {
+			SafeRelease( m_pPresenter );
+
+			// Try initializing the DirectX9 pipeline.
+			m_pPresenter = new PresenterDX9(); // Created with ref count = 1.
+			BREAK_ON_NULL( m_pPresenter, E_OUTOFMEMORY );
+
+			hr = m_pPresenter->Initialize();
+			if( FAILED( hr ) )
+				SafeRelease( m_pPresenter );
+
+			BREAK_ON_FAIL( hr );
+		}
 
 		ScopedPtr<IMFMediaSink> pSink;
 		hr = QueryInterface( IID_PPV_ARGS( &pSink ) );
@@ -694,7 +708,7 @@ HRESULT MediaSink::Initialize( void )
 	if( FAILED( hr ) ) {
 		Shutdown();
 	}
-	
+
 	return hr;
 }
 

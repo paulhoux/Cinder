@@ -7,22 +7,6 @@
 #pragma message("WARNING! Uses experimental Windows 8+ code that has not been tested for OpenGL compatibility!")
 #endif
 
-//! Returns the greatest common divisor of A and B.
-inline int gcd( int a, int b )
-{
-	if( a < b )
-		std::swap( a, b );
-
-	int temp;
-	while( b != 0 ) {
-		temp = a % b;
-		a = b;
-		b = temp;
-	}
-
-	return a;
-}
-
 DEFINE_GUID( CLSID_VideoProcessorMFT, 0x88753b26, 0x5b24, 0x49bd, 0xb2, 0xe7, 0xc, 0x44, 0x5c, 0x78, 0xc9, 0x82 );
 
 // MF_XVP_PLAYBACK_MODE
@@ -77,14 +61,15 @@ public:
 	STDMETHODIMP GetService( __RPC__in REFGUID guidService, __RPC__in REFIID riid, __RPC__deref_out_opt LPVOID* ppvObject );
 
 	// Presenter
-	BOOL    CanProcessNextSample( void );
-	HRESULT Flush( void );
-	HRESULT GetMonitorRefreshRate( DWORD* pdwMonitorRefreshRate );
-	HRESULT IsMediaTypeSupported( IMFMediaType* pMediaType, DXGI_FORMAT dxgiFormat = DXGI_FORMAT_UNKNOWN );
-	HRESULT PresentFrame( void );
-	HRESULT ProcessFrame( IMFMediaType* pCurrentType, IMFSample* pSample, UINT32* punInterlaceMode, BOOL* pbDeviceChanged, BOOL* pbProcessAgain, IMFSample** ppOutputSample = NULL );
-	HRESULT SetCurrentMediaType( IMFMediaType* pMediaType );
-	HRESULT Shutdown( void );
+	STDMETHODIMP Initialize( void );
+	BOOL         CanProcessNextSample( void );
+	STDMETHODIMP Flush( void );
+	STDMETHODIMP GetMonitorRefreshRate( DWORD* pdwMonitorRefreshRate );
+	STDMETHODIMP IsMediaTypeSupported( IMFMediaType* pMediaType, DXGI_FORMAT dxgiFormat = DXGI_FORMAT_UNKNOWN );
+	STDMETHODIMP PresentFrame( void );
+	STDMETHODIMP ProcessFrame( IMFMediaType* pCurrentType, IMFSample* pSample, UINT32* punInterlaceMode, BOOL* pbDeviceChanged, BOOL* pbProcessAgain, IMFSample** ppOutputSample = NULL );
+	STDMETHODIMP SetCurrentMediaType( IMFMediaType* pMediaType );
+	STDMETHODIMP Shutdown( void );
 
 private:
 	void    AspectRatioCorrectSize(

@@ -70,7 +70,7 @@ private:
 	BOOL                    m_IsShutdown;   // Flag to indicate if Shutdown() method was called.
 	StreamSink*             m_pStream;      // Byte stream
 	IMFPresentationClock*   m_pClock;       // Presentation clock.
-	Scheduler*              m_pScheduler;    // Manages scheduling of samples.
+	Scheduler*              m_pScheduler;   // Manages scheduling of samples.
 	Presenter*              m_pPresenter;
 };
 
