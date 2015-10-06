@@ -132,10 +132,6 @@ private:
 	static GUID const* const s_pVideoFormats[];
 	static const DWORD s_dwNumVideoFormats;
 	static const MFRatio s_DefaultFrameRate;
-	static const struct FormatEntry {
-		GUID            Subtype;
-		DXGI_FORMAT     DXGIFormat;
-	} s_DXGIFormatMapping[];
 	static BOOL ValidStateMatrix[State_Count][Op_Count]; // Defines a look-up table that says which operations are valid from which states.
 
 	HRESULT DispatchProcessSample( CAsyncOperation* pOp );
@@ -174,7 +170,6 @@ private:
 		DWORD Numerator;
 		DWORD Denominator;
 	}                            m_imageBytesPP;
-	DXGI_FORMAT                  m_dxgiFormat;
 };
 
 } // namespace detail

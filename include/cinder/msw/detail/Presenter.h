@@ -71,7 +71,7 @@ public:
 	//!
 	virtual STDMETHODIMP GetMonitorRefreshRate( DWORD* pdwMonitorRefreshRate ) = 0;
 	//!
-	virtual STDMETHODIMP IsMediaTypeSupported( IMFMediaType* pMediaType, DXGI_FORMAT dxgiFormat = DXGI_FORMAT_UNKNOWN ) = 0;
+	virtual STDMETHODIMP IsMediaTypeSupported( IMFMediaType* pMediaType ) = 0;
 	//!
 	virtual STDMETHODIMP PresentFrame( void ) = 0;
 	//!

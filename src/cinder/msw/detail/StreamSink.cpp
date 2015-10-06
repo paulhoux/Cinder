@@ -40,24 +40,6 @@ const DWORD StreamSink::s_dwNumVideoFormats = sizeof( StreamSink::s_pVideoFormat
 
 const MFRatio StreamSink::s_DefaultFrameRate = { 30, 1 };
 
-const StreamSink::FormatEntry StreamSink::s_DXGIFormatMapping[] =
-{
-	{ MFVideoFormat_RGB32,      DXGI_FORMAT_B8G8R8X8_UNORM },
-	{ MFVideoFormat_ARGB32,     DXGI_FORMAT_R8G8B8A8_UNORM },
-	{ MFVideoFormat_AYUV,      DXGI_FORMAT_AYUV            },
-	{ MFVideoFormat_YUY2,      DXGI_FORMAT_YUY2            },
-	{ MFVideoFormat_NV12,      DXGI_FORMAT_NV12            },
-	{ MFVideoFormat_NV11,      DXGI_FORMAT_NV11            },
-	{ MFVideoFormat_AI44,      DXGI_FORMAT_AI44            },
-	{ MFVideoFormat_P010,      DXGI_FORMAT_P010            },
-	{ MFVideoFormat_P016,      DXGI_FORMAT_P016            },
-	{ MFVideoFormat_Y210,      DXGI_FORMAT_Y210            },
-	{ MFVideoFormat_Y216,      DXGI_FORMAT_Y216            },
-	{ MFVideoFormat_Y410,      DXGI_FORMAT_Y410            },
-	{ MFVideoFormat_Y416,      DXGI_FORMAT_Y416            },
-	{ MFVideoFormat_420O,      DXGI_FORMAT_420_OPAQUE      }
-};
-
 // Control how we batch work from the decoder.
 // On receiving a sample we request another one if the number on the queue is
 // less than the hi water threshold.
@@ -121,30 +103,29 @@ BOOL StreamSink::ValidStateMatrix[StreamSink::State_Count][StreamSink::Op_Count]
 #pragma warning( push )
 #pragma warning( disable : 4355 )  // 'this' used in base member initializer list
 
-StreamSink::StreamSink( DWORD dwStreamId, CriticalSection& critSec, Scheduler* pScheduler ) :
-	STREAM_ID( dwStreamId ),
-	m_nRefCount( 1 ),
-	m_critSec( critSec ),
-	m_state( State_TypeNotSet ),
-	m_IsShutdown( FALSE ),
-	m_WorkQueueId( 0 ),
-	m_WorkQueueCB( this, &StreamSink::OnDispatchWorkItem ),
-	m_ConsumeData( ProcessFrames ),
-	m_StartTime( 0 ),
-	m_cbDataWritten( 0 ),
-	m_cOutstandingSampleRequests( 0 ),
-	m_pSink( NULL ),
-	m_pEventQueue( NULL ),
-	m_pByteStream( NULL ),
-	m_pPresenter( NULL ),
-	m_pScheduler( pScheduler ),
-	m_pCurrentType( NULL ),
-	m_fPrerolling( FALSE ),
-	m_fWaitingForOnClockStart( FALSE ),
-	m_SamplesToProcess(), // default ctor
-	m_unInterlaceMode( MFVideoInterlace_Progressive ),
-	m_imageBytesPP(), // default ctor
-	m_dxgiFormat( DXGI_FORMAT_UNKNOWN )
+StreamSink::StreamSink( DWORD dwStreamId, CriticalSection& critSec, Scheduler* pScheduler )
+	: STREAM_ID( dwStreamId )
+	, m_nRefCount( 1 )
+	, m_critSec( critSec )
+	, m_state( State_TypeNotSet )
+	, m_IsShutdown( FALSE )
+	, m_WorkQueueId( 0 )
+	, m_WorkQueueCB( this, &StreamSink::OnDispatchWorkItem )
+	, m_ConsumeData( ProcessFrames )
+	, m_StartTime( 0 )
+	, m_cbDataWritten( 0 )
+	, m_cOutstandingSampleRequests( 0 )
+	, m_pSink( NULL )
+	, m_pEventQueue( NULL )
+	, m_pByteStream( NULL )
+	, m_pPresenter( NULL )
+	, m_pScheduler( pScheduler )
+	, m_pCurrentType( NULL )
+	, m_fPrerolling( FALSE )
+	, m_fWaitingForOnClockStart( FALSE )
+	, m_SamplesToProcess() // default ctor
+	, m_unInterlaceMode( MFVideoInterlace_Progressive )
+	, m_imageBytesPP() // default ctor
 {
 	m_imageBytesPP.Numerator = 1;
 	m_imageBytesPP.Denominator = 1;
@@ -649,23 +630,19 @@ HRESULT StreamSink::GetMediaTypeCount( __RPC__out DWORD* pdwTypeCount )
 HRESULT StreamSink::IsMediaTypeSupported( IMFMediaType* pMediaType, _Outptr_opt_result_maybenull_ IMFMediaType** ppMediaType )
 {
 	HRESULT hr = S_OK;
-	GUID subType = GUID_NULL;
 
 	do {
 		hr = CheckShutdown();
-		if( FAILED( hr ) ) {
-			break;
-		}
+		BREAK_ON_FAIL( hr );
 
-		if( pMediaType == NULL ) {
-			hr = E_POINTER;
-			break;
-		}
+		BREAK_ON_NULL( pMediaType, E_POINTER );
 
+		GUID majorType;
+		hr = pMediaType->GetMajorType( &majorType );
+
+		GUID subType = GUID_NULL;
 		hr = pMediaType->GetGUID( MF_MT_SUBTYPE, &subType );
-		if( FAILED( hr ) ) {
-			break;
-		}
+		BREAK_ON_FAIL( hr );
 
 		hr = MF_E_INVALIDMEDIATYPE; // This will be set to OK if we find the subtype is accepted
 
@@ -676,22 +653,10 @@ HRESULT StreamSink::IsMediaTypeSupported( IMFMediaType* pMediaType, _Outptr_opt_
 			}
 		}
 
-		if( FAILED( hr ) ) {
-			break;
-		}
+		BREAK_ON_FAIL( hr );
 
-		for( DWORD i = 0; i < ARRAYSIZE( s_DXGIFormatMapping ); i++ ) {
-			const FormatEntry& e = s_DXGIFormatMapping[i];
-			if( e.Subtype == subType ) {
-				m_dxgiFormat = e.DXGIFormat;
-				break;
-			}
-		}
-
-		hr = m_pPresenter->IsMediaTypeSupported( pMediaType, m_dxgiFormat );
-		if( FAILED( hr ) ) {
-			break;
-		}
+		hr = m_pPresenter->IsMediaTypeSupported( pMediaType );
+		BREAK_ON_FAIL( hr );
 	} while( FALSE );
 
 	// We don't return any "close match" types.
@@ -714,32 +679,26 @@ HRESULT StreamSink::SetCurrentMediaType( IMFMediaType* pMediaType )
 	}
 
 	HRESULT hr = S_OK;
-	MFRatio fps = { 0, 0 };
-	GUID guidSubtype = GUID_NULL;
 
 	ScopedCriticalSection lock( m_critSec );
 
 	do {
 		hr = CheckShutdown();
-		if( FAILED( hr ) ) {
-			break;
-		}
+		BREAK_ON_FAIL( hr );
 
 		hr = ValidateOperation( OpSetMediaType );
-		if( FAILED( hr ) ) {
-			break;
-		}
+		BREAK_ON_FAIL( hr );
 
 		hr = IsMediaTypeSupported( pMediaType, NULL );
-		if( FAILED( hr ) ) {
-			break;
-		}
+		BREAK_ON_FAIL( hr );
 
 		SafeRelease( m_pCurrentType );
 		m_pCurrentType = pMediaType;
 		m_pCurrentType->AddRef();
 
-		pMediaType->GetGUID( MF_MT_SUBTYPE, &guidSubtype );
+		GUID guidSubtype = GUID_NULL;
+		hr = pMediaType->GetGUID( MF_MT_SUBTYPE, &guidSubtype );
+		BREAK_ON_FAIL( hr );
 
 		if( ( guidSubtype == MFVideoFormat_NV12 ) ||
 			( guidSubtype == MFVideoFormat_YV12 ) ||
@@ -783,6 +742,7 @@ HRESULT StreamSink::SetCurrentMediaType( IMFMediaType* pMediaType )
 		pMediaType->GetUINT32( MF_MT_INTERLACE_MODE, &m_unInterlaceMode );
 
 		// Set the frame rate on the scheduler.
+		MFRatio fps = { 0, 0 };
 		if( SUCCEEDED( GetFrameRate( pMediaType, &fps ) ) && ( fps.Numerator != 0 ) && ( fps.Denominator != 0 ) ) {
 			if( MFVideoInterlace_FieldInterleavedUpperFirst == m_unInterlaceMode ||
 				MFVideoInterlace_FieldInterleavedLowerFirst == m_unInterlaceMode ||
@@ -814,9 +774,7 @@ HRESULT StreamSink::SetCurrentMediaType( IMFMediaType* pMediaType )
 
 		if( SUCCEEDED( hr ) ) {
 			hr = m_pPresenter->SetCurrentMediaType( pMediaType );
-			if( FAILED( hr ) ) {
-				break;
-			}
+			BREAK_ON_FAIL( hr );
 		}
 
 		if( State_Started != m_state && State_Paused != m_state ) {
@@ -838,12 +796,11 @@ HRESULT StreamSink::SetCurrentMediaType( IMFMediaType* pMediaType )
 
 HRESULT StreamSink::GetService( __RPC__in REFGUID guidService, __RPC__in REFIID riid, __RPC__deref_out_opt LPVOID* ppvObject )
 {
-	IMFGetService* pGetService = NULL;
+	ScopedPtr<IMFGetService> pGetService;
 	HRESULT hr = m_pSink->QueryInterface( IID_PPV_ARGS( &pGetService ) );
 	if( SUCCEEDED( hr ) ) {
 		hr = pGetService->GetService( guidService, riid, ppvObject );
 	}
-	SafeRelease( pGetService );
 	return hr;
 }
 

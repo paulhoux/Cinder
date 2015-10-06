@@ -66,7 +66,7 @@ public:
 	BOOL         CanProcessNextSample( void );
 	STDMETHODIMP Flush( void );
 	STDMETHODIMP GetMonitorRefreshRate( DWORD* pdwMonitorRefreshRate );
-	STDMETHODIMP IsMediaTypeSupported( IMFMediaType* pMediaType, DXGI_FORMAT dxgiFormat = DXGI_FORMAT_UNKNOWN );
+	STDMETHODIMP IsMediaTypeSupported( IMFMediaType* pMediaType );
 	STDMETHODIMP PresentFrame( void );
 	STDMETHODIMP ProcessFrame( IMFMediaType* pCurrentType, IMFSample* pSample, UINT32* punInterlaceMode, BOOL* pbDeviceChanged, BOOL* pbProcessAgain, IMFSample** ppOutputSample = NULL );
 	STDMETHODIMP SetCurrentMediaType( IMFMediaType* pMediaType );
@@ -129,6 +129,11 @@ private:
 		HRESULT UpdateDXGISwapChain( void );
 	void    UpdateRectangles( RECT* pDst, RECT* pSrc );
 
+	static const struct FormatEntry {
+		GUID            Subtype;
+		DXGI_FORMAT     DXGIFormat;
+	} s_DXGIFormatMapping[];
+
 	BOOL                            m_IsShutdown;               // Flag to indicate if Shutdown() method was called.
 	IDXGIFactory2*                  m_pDXGIFactory2;
 	IMFDXGIDeviceManager*           m_pDXGIManager;
@@ -162,6 +167,8 @@ private:
 	UINT32                          m_uiRealDisplayHeight;
 	RECT                            m_rcSrcApp;
 	RECT                            m_rcDstApp;
+
+	DXGI_FORMAT                     m_dxgiFormat;
 
 	ID3D11Device*                   m_pD3DDevice;
 	ID3D11DeviceContext*            m_pD3DImmediateContext;

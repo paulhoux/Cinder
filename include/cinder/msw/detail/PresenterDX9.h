@@ -38,23 +38,25 @@ public:
 	STDMETHODIMP SetVideoWindow( __RPC__in HWND hwndVideo );
 
 	// IMFGetService
-	STDMETHODIMP GetService( __RPC__in REFGUID guidService, __RPC__in REFIID riid, __RPC__deref_out_opt LPVOID* ppvObject ) { return E_NOTIMPL; /* TODO */ }
+	STDMETHODIMP GetService( __RPC__in REFGUID guidService, __RPC__in REFIID riid, __RPC__deref_out_opt LPVOID* ppvObject );
 
 	// Presenter
 	STDMETHODIMP Initialize( void );
 	BOOL         CanProcessNextSample( void ) { return FALSE; /* TODO */ }
 	STDMETHODIMP Flush( void ) { return E_NOTIMPL; /* TODO */ }
 	STDMETHODIMP GetMonitorRefreshRate( DWORD* pdwMonitorRefreshRate ) { return E_NOTIMPL; /* TODO */ }
-	STDMETHODIMP IsMediaTypeSupported( IMFMediaType* pMediaType, DXGI_FORMAT dxgiFormat = DXGI_FORMAT_UNKNOWN ) { return E_NOTIMPL; /* TODO */ }
+	STDMETHODIMP IsMediaTypeSupported( IMFMediaType* pMediaType );
 	STDMETHODIMP PresentFrame( void ) { return E_NOTIMPL; /* TODO */ }
 	STDMETHODIMP ProcessFrame( IMFMediaType* pCurrentType, IMFSample* pSample, UINT32* punInterlaceMode, BOOL* pbDeviceChanged, BOOL* pbProcessAgain, IMFSample** ppOutputSample = NULL ) { return E_NOTIMPL; /* TODO */ }
-	STDMETHODIMP SetCurrentMediaType( IMFMediaType* pMediaType ) { return E_NOTIMPL; /* TODO */ }
+	STDMETHODIMP SetCurrentMediaType( IMFMediaType* pMediaType ) { return S_OK; /* TODO */ }
 	STDMETHODIMP Shutdown( void );
 
 private:
 	HRESULT CheckShutdown( void ) const;
 	HRESULT CreateDXVA2ManagerAndDevice( D3D_DRIVER_TYPE DriverType = D3D_DRIVER_TYPE_HARDWARE );
 
+	HRESULT ConvertToDXVAType( IMFMediaType* pMediaType, DXVA2_VideoDesc* pDesc );
+	HRESULT GetDXVA2ExtendedFormat( IMFMediaType* pMediaType, DXVA2_ExtendedFormat* pFormat );
 
 	BOOL                            m_IsShutdown;               // Flag to indicate if Shutdown() method was called.
 
@@ -64,6 +66,9 @@ private:
 	IDirect3D9Ex*                   m_pD3D9;
 	IDirect3DDevice9Ex*             m_pD3DDevice;
 	IDirect3DDeviceManager9*        m_pDeviceManager;
+	IDirectXVideoDecoderService*    m_pDecoderService;
+
+	GUID                            m_DecoderGUID;
 
 	// Dynamically link to DirectX.
 	HMODULE                         m_D3D9Module;

@@ -9,6 +9,24 @@ namespace cinder {
 namespace msw {
 namespace detail {
 
+const PresenterDX11::FormatEntry PresenterDX11::s_DXGIFormatMapping[] =
+{
+	{ MFVideoFormat_RGB32,      DXGI_FORMAT_B8G8R8X8_UNORM },
+	{ MFVideoFormat_ARGB32,     DXGI_FORMAT_R8G8B8A8_UNORM },
+	{ MFVideoFormat_AYUV,      DXGI_FORMAT_AYUV },
+	{ MFVideoFormat_YUY2,      DXGI_FORMAT_YUY2 },
+	{ MFVideoFormat_NV12,      DXGI_FORMAT_NV12 },
+	{ MFVideoFormat_NV11,      DXGI_FORMAT_NV11 },
+	{ MFVideoFormat_AI44,      DXGI_FORMAT_AI44 },
+	{ MFVideoFormat_P010,      DXGI_FORMAT_P010 },
+	{ MFVideoFormat_P016,      DXGI_FORMAT_P016 },
+	{ MFVideoFormat_Y210,      DXGI_FORMAT_Y210 },
+	{ MFVideoFormat_Y216,      DXGI_FORMAT_Y216 },
+	{ MFVideoFormat_Y410,      DXGI_FORMAT_Y410 },
+	{ MFVideoFormat_Y416,      DXGI_FORMAT_Y416 },
+	{ MFVideoFormat_420O,      DXGI_FORMAT_420_OPAQUE }
+};
+
 /////////////////////////////////////////////////////////////////////////////////////////////
 //
 // PresenterDX11 class. - Presents samples using DX11.
@@ -60,6 +78,7 @@ PresenterDX11::PresenterDX11( void )
 	, m_uiRealDisplayHeight( 0 )
 	, m_rcSrcApp() // default ctor
 	, m_rcDstApp() // default ctor
+	, m_dxgiFormat( DXGI_FORMAT_UNKNOWN )
 #if (WINVER >= _WIN32_WINNT_WIN8) 
 	, m_pXVP( NULL )
 	, m_pXVPControl( NULL )
@@ -289,7 +308,7 @@ HRESULT PresenterDX11::GetMonitorRefreshRate( DWORD* pdwRefreshRate )
 }
 
 // Presenter
-HRESULT PresenterDX11::IsMediaTypeSupported( IMFMediaType* pMediaType, DXGI_FORMAT dxgiFormat )
+HRESULT PresenterDX11::IsMediaTypeSupported( IMFMediaType* pMediaType )
 {
 	HRESULT hr = S_OK;
 
@@ -297,10 +316,7 @@ HRESULT PresenterDX11::IsMediaTypeSupported( IMFMediaType* pMediaType, DXGI_FORM
 		hr = CheckShutdown();
 		BREAK_ON_FAIL( hr );
 
-		if( pMediaType == NULL ) {
-			hr = E_POINTER;
-			break;
-		}
+		BREAK_ON_NULL( pMediaType, E_POINTER );
 
 		if( !m_pVideoDevice ) {
 			hr = m_pD3DDevice->QueryInterface( __uuidof( ID3D11VideoDevice ), (void**)&m_pVideoDevice );
@@ -314,7 +330,7 @@ HRESULT PresenterDX11::IsMediaTypeSupported( IMFMediaType* pMediaType, DXGI_FORM
 		UINT32 uiNumerator = 30000, uiDenominator = 1001;
 		MFGetAttributeRatio( pMediaType, MF_MT_FRAME_RATE, &uiNumerator, &uiDenominator );
 
-		//Check if the format is supported
+		// Check if the format is supported
 		D3D11_VIDEO_PROCESSOR_CONTENT_DESC ContentDesc;
 		ZeroMemory( &ContentDesc, sizeof( ContentDesc ) );
 		ContentDesc.InputFrameFormat = D3D11_VIDEO_FRAME_FORMAT_INTERLACED_TOP_FIELD_FIRST;
@@ -332,12 +348,27 @@ HRESULT PresenterDX11::IsMediaTypeSupported( IMFMediaType* pMediaType, DXGI_FORM
 		hr = m_pVideoDevice->CreateVideoProcessorEnumerator( &ContentDesc, &m_pVideoProcessorEnum );
 		BREAK_ON_FAIL( hr );
 
+		GUID subType = GUID_NULL;
+		hr = pMediaType->GetGUID( MF_MT_SUBTYPE, &subType );
+		BREAK_ON_FAIL( hr );
+
+		DXGI_FORMAT dxgiFormat = DXGI_FORMAT_UNKNOWN;
+		for( DWORD i = 0; i < ARRAYSIZE( s_DXGIFormatMapping ); i++ ) {
+			const FormatEntry& e = s_DXGIFormatMapping[i];
+			if( e.Subtype == subType ) {
+				dxgiFormat = e.DXGIFormat;
+				break;
+			}
+		}
+
 		UINT uiFlags;
 		hr = m_pVideoProcessorEnum->CheckVideoProcessorFormat( dxgiFormat, &uiFlags );
 		if( FAILED( hr ) || 0 == ( uiFlags & D3D11_VIDEO_PROCESSOR_FORMAT_SUPPORT_INPUT ) ) {
 			hr = MF_E_UNSUPPORTED_D3D_TYPE;
 			break;
 		}
+
+		m_dxgiFormat = dxgiFormat;
 
 #if (WINVER >= _WIN32_WINNT_WIN8)
 		if( m_useXVP ) {
@@ -493,7 +524,7 @@ HRESULT PresenterDX11::ProcessFrame( IMFMediaType* pCurrentType, IMFSample* pSam
 
 				hr = pEVDXGIBuffer->GetSubresourceIndex( &dwEVViewIndex );
 				BREAK_ON_FAIL( hr );
-			}
+	}
 		}
 #endif
 
@@ -511,7 +542,7 @@ HRESULT PresenterDX11::ProcessFrame( IMFMediaType* pCurrentType, IMFSample* pSam
 			if( SUCCEEDED( hr ) && !bInputFrameUsed ) {
 				*pbProcessAgain = TRUE;
 			}
-		}
+}
 		else
 #endif
 		{
@@ -535,17 +566,17 @@ HRESULT PresenterDX11::ProcessFrame( IMFMediaType* pCurrentType, IMFSample* pSam
 				}
 			}
 		}
-	} while( FALSE );
+} while( FALSE );
 
-	SafeRelease( pTexture2D );
-	SafeRelease( pDXGIBuffer );
-	SafeRelease( pEVTexture2D );
-	SafeRelease( pEVDXGIBuffer );
-	SafeRelease( pDeviceInput );
-	SafeRelease( pBuffer );
-	SafeRelease( pEVBuffer );
+SafeRelease( pTexture2D );
+SafeRelease( pDXGIBuffer );
+SafeRelease( pEVTexture2D );
+SafeRelease( pEVDXGIBuffer );
+SafeRelease( pDeviceInput );
+SafeRelease( pBuffer );
+SafeRelease( pEVBuffer );
 
-	return hr;
+return hr;
 }
 
 // Presenter
@@ -953,9 +984,9 @@ HRESULT PresenterDX11::CreateXVP( void )
 
 		hr = m_pXVP->QueryInterface( IID_PPV_ARGS( &m_pXVPControl ) );
 		BREAK_ON_FAIL( hr );
-	} while( FALSE );
+} while( FALSE );
 
-	return hr;
+return hr;
 }
 #endif
 
@@ -1386,14 +1417,14 @@ HRESULT PresenterDX11::ProcessFrameUsingD3D11( ID3D11Texture2D* pLeftTexture2D, 
 			D3D11_VIDEO_PROCESSOR_STEREO_FORMAT vpStereoFormat = D3D11_VIDEO_PROCESSOR_STEREO_FORMAT_SEPARATE;
 			if( MFVideo3DSampleFormat_Packed_LeftRight == m_vp3DOutput ) {
 				vpStereoFormat = D3D11_VIDEO_PROCESSOR_STEREO_FORMAT_HORIZONTAL;
-			}
+		}
 			else if( MFVideo3DSampleFormat_Packed_TopBottom == m_vp3DOutput ) {
 				vpStereoFormat = D3D11_VIDEO_PROCESSOR_STEREO_FORMAT_VERTICAL;
 			}
 
 			pVideoContext->VideoProcessorSetStreamStereoFormat( m_pVideoProcessor,
 																0, m_bStereoEnabled, vpStereoFormat, TRUE, TRUE, D3D11_VIDEO_PROCESSOR_STEREO_FLIP_NONE, 0 );
-		}
+	}
 #endif
 
 		QueryPerformanceCounter( &lpcEnd );
@@ -1428,17 +1459,17 @@ HRESULT PresenterDX11::ProcessFrameUsingD3D11( ID3D11Texture2D* pLeftTexture2D, 
 			*ppVideoOutFrame = pRTSample;
 			( *ppVideoOutFrame )->AddRef();
 		}
-	} while( FALSE );
+} while( FALSE );
 
-	SafeRelease( pBuffer );
-	SafeRelease( pRTSample );
-	SafeRelease( pDXGIBackBuffer );
-	SafeRelease( pOutputView );
-	SafeRelease( pLeftInputView );
-	SafeRelease( pRightInputView );
-	SafeRelease( pVideoContext );
+SafeRelease( pBuffer );
+SafeRelease( pRTSample );
+SafeRelease( pDXGIBackBuffer );
+SafeRelease( pOutputView );
+SafeRelease( pLeftInputView );
+SafeRelease( pRightInputView );
+SafeRelease( pVideoContext );
 
-	return hr;
+return hr;
 }
 
 #if (WINVER >= _WIN32_WINNT_WIN8)
@@ -1808,11 +1839,11 @@ HRESULT PresenterDX11::UpdateDXGISwapChain( void )
 			hr = E_NOTIMPL;
 			BREAK_ON_FAIL( hr );
 #endif
-		}
-	} while( FALSE );
+			}
+		} while( FALSE );
 
-	return hr;
-}
+		return hr;
+	}
 
 //+-------------------------------------------------------------------------
 //
