@@ -71,6 +71,8 @@ public:
 	STDMETHODIMP ProcessFrame( IMFMediaType* pCurrentType, IMFSample* pSample, UINT32* punInterlaceMode, BOOL* pbDeviceChanged, BOOL* pbProcessAgain, IMFSample** ppOutputSample = NULL );
 	STDMETHODIMP SetCurrentMediaType( IMFMediaType* pMediaType );
 	STDMETHODIMP Shutdown( void );
+	BOOL         IsDX9() const { return FALSE; }
+	BOOL         IsDX11() const { return TRUE; }
 
 private:
 	void    AspectRatioCorrectSize(
@@ -106,7 +108,7 @@ private:
 		int* pPictureAspectX,
 		int* pPictureAspectY
 		);
-	
+
 	HRESULT ProcessFrameUsingD3D11( ID3D11Texture2D* pLeftTexture2D, ID3D11Texture2D* pRightTexture2D, UINT dwLeftViewIndex, UINT dwRightViewIndex, RECT rcDest, UINT32 unInterlaceMode, IMFSample** ppVideoOutFrame );
 #if (WINVER >= _WIN32_WINNT_WIN8)
 	HRESULT ProcessFrameUsingXVP( IMFMediaType* pCurrentType, IMFSample* pVideoFrame, ID3D11Texture2D* pTexture2D, RECT rcDest, IMFSample** ppVideoOutFrame, BOOL* pbInputFrameUsed );

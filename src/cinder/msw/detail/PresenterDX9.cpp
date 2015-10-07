@@ -147,7 +147,6 @@ HRESULT PresenterDX9::IsMediaTypeSupported( IMFMediaType *pMediaType )
 		BREAK_ON_FAIL( hr );
 
 		BREAK_ON_NULL( pMediaType, E_POINTER );
-		BREAK_ON_NULL( m_pDecoderService, E_POINTER );
 
 		// Check device.
 		if( m_pD3DDevice ) {}
@@ -165,7 +164,10 @@ HRESULT PresenterDX9::IsMediaTypeSupported( IMFMediaType *pMediaType )
 		D3DFORMAT format = D3DFMT_UNKNOWN;
 		format = D3DFORMAT( subType.Data1 );
 
+#if MF_USE_DXVA2_DECODER
 		// Check if we can decode this format in hardware.
+		BREAK_ON_NULL( m_pDecoderService, E_POINTER );
+
 		DXVA2_VideoDesc desc;
 		hr = ConvertToDXVAType( pMediaType, &desc );
 		BREAK_ON_FAIL( hr );
@@ -188,13 +190,14 @@ HRESULT PresenterDX9::IsMediaTypeSupported( IMFMediaType *pMediaType )
 			if( SUCCEEDED( hr ) && pDecoder )
 				break;
 		}
-
-		/*D3DDISPLAYMODE mode;
+#else
+		D3DDISPLAYMODE mode;
 		hr = m_pD3D9->GetAdapterDisplayMode( m_ConnectionGUID, &mode );
 		BREAK_ON_FAIL( hr );
 
 		hr = m_pD3D9->CheckDeviceType( m_ConnectionGUID, D3DDEVTYPE_HAL, mode.Format, format, TRUE );
-		BREAK_ON_FAIL( hr );*/
+		BREAK_ON_FAIL( hr );
+#endif
 	} while( FALSE );
 
 	if( FAILED( hr ) )
@@ -203,6 +206,12 @@ HRESULT PresenterDX9::IsMediaTypeSupported( IMFMediaType *pMediaType )
 	CoTaskMemFree( configs );
 
 	return hr;
+}
+
+// Presenter
+HRESULT PresenterDX9::ProcessFrame( IMFMediaType* pCurrentType, IMFSample* pSample, UINT32* punInterlaceMode, BOOL* pbDeviceChanged, BOOL* pbProcessAgain, IMFSample** ppOutputSample )
+{
+	return E_NOTIMPL;
 }
 
 // Presenter
@@ -292,6 +301,7 @@ HRESULT PresenterDX9::CreateDXVA2ManagerAndDevice( D3D_DRIVER_TYPE DriverType )
 		hr = m_pDeviceManager->ResetDevice( m_pD3DDevice, m_DeviceResetToken );
 		BREAK_ON_FAIL( hr );
 
+#if MF_USE_DXVA2_DECODER
 		// Create the video decoder service.
 		HANDLE hDevice = NULL;
 		hr = m_pDeviceManager->OpenDeviceHandle( &hDevice );
@@ -316,6 +326,7 @@ HRESULT PresenterDX9::CreateDXVA2ManagerAndDevice( D3D_DRIVER_TYPE DriverType )
 		}
 
 		BREAK_IF_FALSE( bFound, E_FAIL );
+#endif
 	} while( false );
 
 	CoTaskMemFree( decoderDevices );
@@ -323,7 +334,7 @@ HRESULT PresenterDX9::CreateDXVA2ManagerAndDevice( D3D_DRIVER_TYPE DriverType )
 	return hr;
 }
 
-HRESULT PresenterDX9::ConvertToDXVAType( IMFMediaType* pMediaType, DXVA2_VideoDesc* pDesc )
+HRESULT PresenterDX9::ConvertToDXVAType( IMFMediaType* pMediaType, DXVA2_VideoDesc* pDesc ) const
 {
 	if( pDesc == NULL )
 		return E_POINTER;
@@ -367,7 +378,7 @@ HRESULT PresenterDX9::ConvertToDXVAType( IMFMediaType* pMediaType, DXVA2_VideoDe
 	return hr;
 }
 
-HRESULT PresenterDX9::GetDXVA2ExtendedFormat( IMFMediaType* pMediaType, DXVA2_ExtendedFormat* pFormat )
+HRESULT PresenterDX9::GetDXVA2ExtendedFormat( IMFMediaType* pMediaType, DXVA2_ExtendedFormat* pFormat ) const
 {
 	if( pFormat == NULL )
 		return E_POINTER;

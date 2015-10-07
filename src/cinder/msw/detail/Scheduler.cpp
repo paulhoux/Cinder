@@ -1,10 +1,12 @@
+
+#include "cinder/Cinder.h"
+#if ! defined( CINDER_WINRT ) && ( _WIN32_WINNT < _WIN32_WINNT_VISTA )
+#error "Media Foundation only available on Windows Vista or newer"
+#else
+
 #include "cinder/msw/CinderMsw.h"
 #include "cinder/msw/MediaFoundation.h"
 #include "cinder/msw/detail/Scheduler.h"
-
-#if (WINVER < _WIN32_WINNT_WIN7)
-#error "The minimum system required to compile this file is Windows 7."
-#endif
 
 namespace cinder {
 namespace msw {
@@ -376,3 +378,5 @@ HRESULT Scheduler::OnTimer( __RPC__in_opt IMFAsyncResult *pResult )
 } // namespace detail
 } // namespace msw
 } // namespace cinder
+
+#endif // ( _WIN32_WINNT >= _WIN32_WINNT_VISTA )

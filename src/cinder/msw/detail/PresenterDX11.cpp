@@ -1,9 +1,11 @@
+
+#include "cinder/Cinder.h"
+#if ! defined( CINDER_WINRT ) && ( _WIN32_WINNT < _WIN32_WINNT_VISTA )
+#error "Media Foundation only available on Windows Vista or newer"
+#else
+
 #include "cinder/msw/MediaFoundation.h"
 #include "cinder/msw/detail/PresenterDX11.h"
-
-#if (WINVER < _WIN32_WINNT_WIN7)
-#error "The minimum system required to compile this file is Windows 7."
-#endif
 
 namespace cinder {
 namespace msw {
@@ -1885,3 +1887,5 @@ void PresenterDX11::UpdateRectangles( RECT* pDst, RECT* pSrc )
 } // namespace detail
 } // namespace msw
 } // namespace cinder
+
+#endif // ( _WIN32_WINNT >= _WIN32_WINNT_VISTA )

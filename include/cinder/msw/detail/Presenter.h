@@ -80,6 +80,10 @@ public:
 	virtual STDMETHODIMP SetCurrentMediaType( IMFMediaType* pMediaType ) = 0;
 	//!
 	virtual STDMETHODIMP Shutdown( void ) = 0;
+	//!
+	virtual BOOL         IsDX9() const = 0;
+	//!
+	virtual BOOL         IsDX11() const = 0;
 
 protected:
 	HRESULT SetMonitor( UINT adapterID )

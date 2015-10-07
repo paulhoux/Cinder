@@ -1,26 +1,65 @@
 
+
+#include "cinder/Cinder.h"
+#if ! defined( CINDER_WINRT ) && ( _WIN32_WINNT < _WIN32_WINNT_VISTA )
+#error "Media Foundation only available on Windows Vista or newer"
+#else
+
 #include "cinder/msw/MediaFoundation.h"
 #include "cinder/msw/detail/StreamSink.h"
 
 #include <assert.h>
 #include <windows.h>
 
-#if (WINVER < _WIN32_WINNT_WIN7)
-#error "The minimum system required to compile this file is Windows 7."
-#endif
-
 namespace cinder {
 namespace msw {
 namespace detail {
 
-GUID const* const StreamSink::s_pVideoFormats[] =
+// Video formats supported by the DX9 backend.
+#if MF_USE_DXVA2_DECODER
+GUID const* const StreamSink::s_pVideoFormats9[] =
 {
 	&MFVideoFormat_NV12,
 	&MFVideoFormat_IYUV,
 	&MFVideoFormat_YUY2,
 	&MFVideoFormat_YV12,
 	&MFVideoFormat_RGB32,
+	&MFVideoFormat_ARGB32,
+	&MFVideoFormat_RGB24,
+	&MFVideoFormat_RGB555,
+	&MFVideoFormat_RGB565,
+	&MFVideoFormat_RGB8,
+	&MFVideoFormat_AYUV,
+	&MFVideoFormat_UYVY,
+	&MFVideoFormat_YVYU,
+	&MFVideoFormat_YVU9,
+	//&MEDIASUBTYPE_V216,
+	&MFVideoFormat_v410,
+	&MFVideoFormat_I420,
+	&MFVideoFormat_NV11,
+	&MFVideoFormat_420O
+};
+#else
+GUID const* const StreamSink::s_pVideoFormats9[] =
+{
+	&MFVideoFormat_RGB555,
+	&MFVideoFormat_RGB565,
+	&MFVideoFormat_ARGB32,
+	&MFVideoFormat_RGB8,
+	&MFVideoFormat_RGB24,
+	&MFVideoFormat_RGB32
+};
+#endif
+
+// Video formats supported by the DX11 backend.
+GUID const* const StreamSink::s_pVideoFormats11[] =
+{
+	&MFVideoFormat_NV12,
+	&MFVideoFormat_IYUV,
+	&MFVideoFormat_YUY2,
+	&MFVideoFormat_YV12,
 	&MFVideoFormat_RGB32,
+	&MFVideoFormat_ARGB32,
 	&MFVideoFormat_RGB24,
 	&MFVideoFormat_RGB555,
 	&MFVideoFormat_RGB565,
@@ -36,7 +75,8 @@ GUID const* const StreamSink::s_pVideoFormats[] =
 	&MFVideoFormat_420O
 };
 
-const DWORD StreamSink::s_dwNumVideoFormats = sizeof( StreamSink::s_pVideoFormats ) / sizeof( StreamSink::s_pVideoFormats[0] );
+const DWORD StreamSink::s_dwNumVideoFormats9 = sizeof( StreamSink::s_pVideoFormats9 ) / sizeof( StreamSink::s_pVideoFormats9[0] );
+const DWORD StreamSink::s_dwNumVideoFormats11 = sizeof( StreamSink::s_pVideoFormats11 ) / sizeof( StreamSink::s_pVideoFormats11[0] );
 
 const MFRatio StreamSink::s_DefaultFrameRate = { 30, 1 };
 
@@ -552,42 +592,44 @@ HRESULT StreamSink::GetMediaTypeByIndex( DWORD dwIndex, _Outptr_ IMFMediaType** 
 		}
 
 		hr = CheckShutdown();
-		if( FAILED( hr ) ) {
+		BREAK_ON_FAIL( hr );
+
+		if( m_pPresenter->IsDX9() && dwIndex >= s_dwNumVideoFormats9 ) {
+			hr = MF_E_NO_MORE_TYPES;
 			break;
 		}
-
-		if( dwIndex >= s_dwNumVideoFormats ) {
+		else if( m_pPresenter->IsDX11() && dwIndex >= s_dwNumVideoFormats11 ) {
 			hr = MF_E_NO_MORE_TYPES;
 			break;
 		}
 
-		IMFMediaType* pVideoMediaType = NULL;
+		ScopedPtr<IMFMediaType> pVideoMediaType;
 
 		do {
 			hr = MFCreateMediaType( &pVideoMediaType );
-			if( FAILED( hr ) ) {
-				break;
-			}
+			BREAK_ON_FAIL( hr );
 
 			hr = pVideoMediaType->SetGUID( MF_MT_MAJOR_TYPE, MFMediaType_Video );
-			if( FAILED( hr ) ) {
-				break;
-			}
+			BREAK_ON_FAIL( hr );
 
-			hr = pVideoMediaType->SetGUID( MF_MT_SUBTYPE, *( s_pVideoFormats[dwIndex] ) );
-			if( FAILED( hr ) ) {
-				break;
+			if( m_pPresenter->IsDX9() ) {
+				hr = pVideoMediaType->SetGUID( MF_MT_SUBTYPE, *( s_pVideoFormats9[dwIndex] ) );
+				BREAK_ON_FAIL( hr );
+			}
+			else if( m_pPresenter->IsDX11() ) {
+				hr = pVideoMediaType->SetGUID( MF_MT_SUBTYPE, *( s_pVideoFormats11[dwIndex] ) );
+				BREAK_ON_FAIL( hr );
+			}
+			else {
+				hr = E_NOTIMPL;
+				BREAK_ON_FAIL( hr );
 			}
 
 			pVideoMediaType->AddRef();
 			*ppType = pVideoMediaType;
 		} while( FALSE );
 
-		SafeRelease( pVideoMediaType );
-
-		if( FAILED( hr ) ) {
-			break;
-		}
+		BREAK_ON_FAIL( hr );
 	} while( FALSE );
 
 	return hr;
@@ -609,11 +651,14 @@ HRESULT StreamSink::GetMediaTypeCount( __RPC__out DWORD* pdwTypeCount )
 		}
 
 		hr = CheckShutdown();
-		if( FAILED( hr ) ) {
-			break;
-		}
+		BREAK_ON_FAIL( hr );
 
-		*pdwTypeCount = s_dwNumVideoFormats;
+		if( m_pPresenter->IsDX9() )
+			*pdwTypeCount = s_dwNumVideoFormats9;
+		else if( m_pPresenter->IsDX11() )
+			*pdwTypeCount = s_dwNumVideoFormats11;
+		else
+			hr = E_NOTIMPL;
 	} while( FALSE );
 
 	return hr;
@@ -637,19 +682,26 @@ HRESULT StreamSink::IsMediaTypeSupported( IMFMediaType* pMediaType, _Outptr_opt_
 
 		BREAK_ON_NULL( pMediaType, E_POINTER );
 
-		GUID majorType;
-		hr = pMediaType->GetMajorType( &majorType );
-
 		GUID subType = GUID_NULL;
 		hr = pMediaType->GetGUID( MF_MT_SUBTYPE, &subType );
 		BREAK_ON_FAIL( hr );
 
 		hr = MF_E_INVALIDMEDIATYPE; // This will be set to OK if we find the subtype is accepted
 
-		for( DWORD i = 0; i < s_dwNumVideoFormats; i++ ) {
-			if( subType == ( *s_pVideoFormats[i] ) ) {
-				hr = S_OK;
-				break;
+		if( m_pPresenter->IsDX9() ) {
+			for( DWORD i = 0; i < s_dwNumVideoFormats9; i++ ) {
+				if( subType == ( *s_pVideoFormats9[i] ) ) {
+					hr = S_OK;
+					break;
+				}
+			}
+		}
+		else if( m_pPresenter->IsDX11() ) {
+			for( DWORD i = 0; i < s_dwNumVideoFormats11; i++ ) {
+				if( subType == ( *s_pVideoFormats11[i] ) ) {
+					hr = S_OK;
+					break;
+				}
 			}
 		}
 
@@ -1459,3 +1511,5 @@ StreamSink::CAsyncOperation::~CAsyncOperation( void )
 } // namespace detail
 } // namespace msw
 } // namespace cinder
+
+#endif // ( _WIN32_WINNT >= _WIN32_WINNT_VISTA )

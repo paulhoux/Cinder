@@ -47,16 +47,18 @@ public:
 	STDMETHODIMP GetMonitorRefreshRate( DWORD* pdwMonitorRefreshRate ) { return E_NOTIMPL; /* TODO */ }
 	STDMETHODIMP IsMediaTypeSupported( IMFMediaType* pMediaType );
 	STDMETHODIMP PresentFrame( void ) { return E_NOTIMPL; /* TODO */ }
-	STDMETHODIMP ProcessFrame( IMFMediaType* pCurrentType, IMFSample* pSample, UINT32* punInterlaceMode, BOOL* pbDeviceChanged, BOOL* pbProcessAgain, IMFSample** ppOutputSample = NULL ) { return E_NOTIMPL; /* TODO */ }
+	STDMETHODIMP ProcessFrame( IMFMediaType* pCurrentType, IMFSample* pSample, UINT32* punInterlaceMode, BOOL* pbDeviceChanged, BOOL* pbProcessAgain, IMFSample** ppOutputSample = NULL );
 	STDMETHODIMP SetCurrentMediaType( IMFMediaType* pMediaType ) { return S_OK; /* TODO */ }
 	STDMETHODIMP Shutdown( void );
+	BOOL         IsDX9() const { return TRUE; }
+	BOOL         IsDX11() const { return FALSE; }
 
 private:
 	HRESULT CheckShutdown( void ) const;
 	HRESULT CreateDXVA2ManagerAndDevice( D3D_DRIVER_TYPE DriverType = D3D_DRIVER_TYPE_HARDWARE );
 
-	HRESULT ConvertToDXVAType( IMFMediaType* pMediaType, DXVA2_VideoDesc* pDesc );
-	HRESULT GetDXVA2ExtendedFormat( IMFMediaType* pMediaType, DXVA2_ExtendedFormat* pFormat );
+	HRESULT ConvertToDXVAType( IMFMediaType* pMediaType, DXVA2_VideoDesc* pDesc ) const;
+	HRESULT GetDXVA2ExtendedFormat( IMFMediaType* pMediaType, DXVA2_ExtendedFormat* pFormat ) const;
 
 	BOOL                            m_IsShutdown;               // Flag to indicate if Shutdown() method was called.
 
@@ -66,8 +68,8 @@ private:
 	IDirect3D9Ex*                   m_pD3D9;
 	IDirect3DDevice9Ex*             m_pD3DDevice;
 	IDirect3DDeviceManager9*        m_pDeviceManager;
-	IDirectXVideoDecoderService*    m_pDecoderService;
 
+	IDirectXVideoDecoderService*    m_pDecoderService;
 	GUID                            m_DecoderGUID;
 
 	// Dynamically link to DirectX.

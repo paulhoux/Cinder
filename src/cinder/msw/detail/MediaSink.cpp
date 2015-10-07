@@ -676,7 +676,7 @@ HRESULT MediaSink::Initialize( void )
 		m_pStream = new StreamSink( STREAM_ID, s_csStreamSinkAndScheduler, m_pScheduler );
 		BREAK_ON_NULL( m_pStream, E_OUTOFMEMORY );
 
-		// Try initializing the DirectX11 pipeline.
+		// Try initializing the DX11 pipeline.
 		m_pPresenter = new PresenterDX11(); // Created with ref count = 1.
 		BREAK_ON_NULL( m_pPresenter, E_OUTOFMEMORY );
 
@@ -684,7 +684,7 @@ HRESULT MediaSink::Initialize( void )
 		if( FAILED( hr ) ) {
 			SafeRelease( m_pPresenter );
 
-			// Try initializing the DirectX9 pipeline.
+			// Try initializing the DX9 pipeline.
 			m_pPresenter = new PresenterDX9(); // Created with ref count = 1.
 			BREAK_ON_NULL( m_pPresenter, E_OUTOFMEMORY );
 

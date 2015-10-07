@@ -35,6 +35,8 @@ POSSIBILITY OF SUCH DAMAGE.
 #include <mfidl.h>
 #include <evr.h>
 
+#define MF_USE_DXVA2_DECODER 1
+
 namespace cinder {
 namespace msw {
 

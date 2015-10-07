@@ -24,6 +24,11 @@ NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVE
 POSSIBILITY OF SUCH DAMAGE.
 */
 
+#include "cinder/Cinder.h"
+#if ! defined( CINDER_WINRT ) && ( _WIN32_WINNT < _WIN32_WINNT_VISTA )
+#error "Media Foundation only available on Windows Vista or newer"
+#else
+
 #include "cinder/msw/CinderMsw.h"
 #include "cinder/msw/MediaFoundation.h"
 #include "cinder/msw/ScopedPtr.h"
@@ -32,10 +37,6 @@ POSSIBILITY OF SUCH DAMAGE.
 
 #include <string>
 #include <Shlwapi.h>
-
-#if (WINVER < _WIN32_WINNT_WIN7)
-#error "The minimum system required to compile this file is Windows 7."
-#endif
 
 // Include these libraries.
 #pragma comment(lib, "mf.lib")
@@ -942,5 +943,7 @@ HRESULT MFPlayer::AddBranchToPartialTopology( IMFTopology *pTopology, IMFMediaSo
 	return hr;
 }
 
-}
-}
+} // namespace msw
+} // namespace cinder
+
+#endif // ( _WIN32_WINNT >= _WIN32_WINNT_VISTA )
