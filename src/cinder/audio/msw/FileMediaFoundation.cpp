@@ -21,6 +21,11 @@
  POSSIBILITY OF SUCH DAMAGE.
 */
 
+#include "cinder/Cinder.h"
+#if ! defined( CINDER_WINRT ) && ( _WIN32_WINNT < _WIN32_WINNT_VISTA )
+#error "Media Foundation only available on Windows Vista or newer"
+#else
+
 #include "cinder/audio/msw/FileMediaFoundation.h"
 #include "cinder/audio/dsp/Converter.h"
 #include "cinder/audio/Exception.h"
@@ -569,3 +574,5 @@ void MediaFoundationInitializer::shutdownMediaFoundation()
 }
 
 } } } // namespace cinder::audio::msw
+
+#endif // ( _WIN32_WINNT >= _WIN32_WINNT_VISTA )

@@ -21,6 +21,7 @@
  POSSIBILITY OF SUCH DAMAGE.
 */
 
+#include "cinder/Cinder.h"
 #if( _WIN32_WINNT >= _WIN32_WINNT_VISTA )
 
 #include "cinder/audio/msw/ContextWasapi.h"
