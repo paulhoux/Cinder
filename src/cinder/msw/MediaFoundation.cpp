@@ -68,7 +68,7 @@ LRESULT CALLBACK MFWndProc( HWND wnd, UINT uMsg, WPARAM wParam, LPARAM lParam )
 	}
 	else
 		impl = reinterpret_cast<MFPlayer*>( ::GetWindowLongPtr( wnd, GWLP_USERDATA ) );
-	
+
 	switch( uMsg ) {
 		case WM_CLOSE:
 			if( impl )
@@ -251,7 +251,7 @@ HRESULT MFPlayer::OnTopologyStatus( IMFMediaEvent *pEvent )
 
 		// Get the IMFVideoDisplayControl interface from EVR. This call is
 		// expected to fail if the media file does not have a video stream.
-		(void) MFGetService( mSessionPtr, MR_VIDEO_RENDER_SERVICE, IID_PPV_ARGS( &mVideoDisplayPtr ) );
+		(void)MFGetService( mSessionPtr, MR_VIDEO_RENDER_SERVICE, IID_PPV_ARGS( &mVideoDisplayPtr ) );
 
 		mState = Paused;
 
@@ -380,11 +380,11 @@ HRESULT MFPlayer::Repaint()
 	PAINTSTRUCT ps;
 	::BeginPaint( mWnd, &ps );
 
-	if( mVideoDisplayPtr ) 
+	if( mVideoDisplayPtr )
 		hr = mVideoDisplayPtr->RepaintVideo();
 
 	::EndPaint( mWnd, &ps );
-	
+
 	return hr;
 }
 
@@ -596,13 +596,22 @@ LRESULT MFPlayer::HandleEvent( WPARAM wParam )
 
 void MFPlayer::CreateWnd()
 {
-	const std::wstring unicodeTitle = L"";
-
 	if( !mWnd ) {
 		RegisterWindowClass();
 
+		RECT windowRect;
+		windowRect.left = 0;
+		windowRect.top = 0;
+		windowRect.right = mWindowFormat.getSize().x;
+		windowRect.bottom = mWindowFormat.getSize().y;
+
+		// Adjust Window To True Requested Size
+		::AdjustWindowRectEx( &windowRect, WS_OVERLAPPEDWINDOW, FALSE, WS_EX_APPWINDOW );
+
+		std::wstring unicodeTitle = ci::msw::toWideString( mWindowFormat.getTitle() );
 		mWnd = ::CreateWindowEx( WS_EX_APPWINDOW, MF_WINDOW_CLASS_NAME, unicodeTitle.c_str(), WS_OVERLAPPEDWINDOW,
-								 CW_USEDEFAULT, 0, CW_USEDEFAULT, 0, NULL, NULL, ::GetModuleHandle( NULL ), reinterpret_cast<LPVOID>( this ) );
+								 CW_USEDEFAULT, 0, windowRect.right - windowRect.left, windowRect.bottom - windowRect.top,
+								 NULL, NULL, ::GetModuleHandle( NULL ), reinterpret_cast<LPVOID>( this ) );
 		if( !mWnd )
 			throw Exception( "MFPlayer: failed to create window." );
 

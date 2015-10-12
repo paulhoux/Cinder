@@ -28,6 +28,7 @@ POSSIBILITY OF SUCH DAMAGE.
 
 #include "cinder/Cinder.h"
 #include "cinder/Exception.h"
+#include "cinder/app/Window.h" // ci::app::Window::Format
 
 #include <windows.h>
 #include <mfapi.h>
@@ -306,6 +307,9 @@ private:
 	//IMFMediaSink            *mSinkPtr;
 
 	IMFVideoDisplayControl  *mVideoDisplayPtr;
+
+	//! Allows control over the created window.
+	ci::app::Window::Format  mWindowFormat;
 };
 
 }
