@@ -55,7 +55,7 @@ namespace msw {
 #endif // !HIDWORD
 
 #ifndef BREAK_ON_FAIL
-#define BREAK_ON_FAIL(value)          if( FAILED( value ) ) break;
+#define BREAK_ON_FAIL(value)          if( FAILED( value ) ) { break; }
 #endif // !BREAK_ON_FAIL
 
 #ifndef BREAK_ON_NULL

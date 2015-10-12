@@ -251,7 +251,7 @@ HRESULT PresenterDX11::GetService( __RPC__in REFGUID guidService, __RPC__in REFI
 // Presenter
 HRESULT PresenterDX11::Initialize( void )
 {
-	// TEMP: force D3D9
+	// TEMP: Force DX9.
 	return E_FAIL;
 
 	if( !m_D3D11Module ) {
@@ -267,12 +267,6 @@ HRESULT PresenterDX11::Initialize( void )
 	}
 
 	return S_OK;
-}
-
-// Presenter
-BOOL PresenterDX11::CanProcessNextSample( void )
-{
-	return m_bCanProcessNextSample;
 }
 
 // Presenter
@@ -366,7 +360,7 @@ HRESULT PresenterDX11::IsMediaTypeSupported( IMFMediaType* pMediaType )
 		UINT uiFlags;
 		hr = m_pVideoProcessorEnum->CheckVideoProcessorFormat( dxgiFormat, &uiFlags );
 		if( FAILED( hr ) || 0 == ( uiFlags & D3D11_VIDEO_PROCESSOR_FORMAT_SUPPORT_INPUT ) ) {
-			hr = MF_E_UNSUPPORTED_D3D_TYPE;
+			hr = MF_E_INVALIDMEDIATYPE;
 			break;
 		}
 

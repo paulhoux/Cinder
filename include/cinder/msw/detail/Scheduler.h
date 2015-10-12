@@ -14,7 +14,7 @@ namespace detail {
 // Defines the callback method to present samples.
 //-----------------------------------------------------------------------------
 struct SchedulerCallback {
-	virtual HRESULT PresentFrame( void ) = 0;
+	virtual STDMETHODIMP PresentFrame( void ) = 0;
 };
 
 //-----------------------------------------------------------------------------

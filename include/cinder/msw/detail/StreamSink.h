@@ -52,20 +52,22 @@ public:
 	STDMETHODIMP GetService( __RPC__in REFGUID guidService, __RPC__in REFIID riid, __RPC__deref_out_opt LPVOID* ppvObject );
 
 	// SchedulerCallback
-	HRESULT PresentFrame( void );
+	STDMETHODIMP PresentFrame( void );
 
-	HRESULT GetMaxRate( BOOL fThin, float* pflRate );
-	HRESULT Initialize( IMFMediaSink* pParent, Presenter* pPresenter );
-	inline BOOL IsActive( void ) const // IsActive: The "active" state is started or paused.
+	// StreamSink
+	STDMETHODIMP GetMaxRate( BOOL fThin, float* pflRate );
+	STDMETHODIMP Initialize( IMFMediaSink* pParent, Presenter* pPresenter );
+	STDMETHODIMP_( BOOL ) IsActive( void ) const
 	{
+		// IsActive: The "active" state is started or paused.
 		return ( ( m_state == State_Started ) || ( m_state == State_Paused ) );
 	}
-	HRESULT Pause( void );
-	HRESULT Preroll( void );
-	HRESULT Restart( void );
-	HRESULT Shutdown( void );
-	HRESULT Start( MFTIME start );
-	HRESULT Stop( void );
+	STDMETHODIMP Pause( void );
+	STDMETHODIMP Preroll( void );
+	STDMETHODIMP Restart( void );
+	STDMETHODIMP Shutdown( void );
+	STDMETHODIMP Start( MFTIME start );
+	STDMETHODIMP Stop( void );
 
 private:
 

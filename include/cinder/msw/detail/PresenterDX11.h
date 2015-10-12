@@ -63,7 +63,8 @@ public:
 
 	// Presenter
 	STDMETHODIMP Initialize( void );
-	BOOL         CanProcessNextSample( void );
+	// Presenter
+	BOOL         CanProcessNextSample( void ) { return m_bCanProcessNextSample; }
 	STDMETHODIMP Flush( void );
 	STDMETHODIMP GetMonitorRefreshRate( DWORD* pdwMonitorRefreshRate );
 	STDMETHODIMP IsMediaTypeSupported( IMFMediaType* pMediaType );
