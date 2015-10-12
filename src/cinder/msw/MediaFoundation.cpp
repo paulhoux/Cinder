@@ -151,20 +151,15 @@ HRESULT MFPlayer::OpenURL( const WCHAR *url, const WCHAR *audioDeviceId )
 		BREAK_ON_FAIL( hr );
 
 		// Create a partial topology.
-		ScopedComPtr<IMFTopology> pTopology;
-		hr = CreatePlaybackTopology( mSourcePtr, pDescriptor, mWnd, &pTopology, mPresenterPtr );
-		BREAK_ON_FAIL( hr );
-
-		SetMediaInfo( pDescriptor );
-
-		// Set the topology on the media session.
-		hr = mSessionPtr->SetTopology( 0, pTopology );
+		hr = CreatePartialTopology( pDescriptor );
 		BREAK_ON_FAIL( hr );
 
 		// If SetTopology succeeds, the media session will queue an MESessionTopologySet event.
 		mState = OpenPending;
-
 	} while( false );
+
+	if( FAILED( hr ) )
+		CloseSession();
 
 	return hr;
 }
@@ -761,29 +756,23 @@ HRESULT MFPlayer::CreateMediaSinkActivate( IMFStreamDescriptor *pSourceSD, HWND 
 				*ppMediaSink = pSink;
 				( *ppMediaSink )->AddRef();
 			}
-#if 0
-			else {
-				// Use default EVR.
-				ScopedComPtr<IMFActivate> pActivate;
-				hr = ::MFCreateVideoRendererActivate( hVideoWindow, &pActivate );
-				BREAK_ON_FAIL( hr );
-
-				// Return IMFActivate pointer to caller.
-				*ppActivate = pActivate;
-				( *ppActivate )->AddRef();
-			}
-#else
 			else {
 				// Use custom EVR.
 				ScopedComPtr<IMFActivate> pActivate;
 				hr = detail::Activate::CreateInstance( hVideoWindow, &pActivate );
-				BREAK_ON_FAIL( hr );
+
+				if( FAILED( hr ) ) {
+					CI_LOG_E( "MFPlayer: failed to create custom EVR, falling back to default." );
+
+					// Use default EVR.
+					hr = MFCreateVideoRendererActivate( hVideoWindow, &pActivate );
+					BREAK_ON_FAIL( hr );
+				}
 
 				// Return IMFActivate pointer to caller.
 				*ppActivate = pActivate;
 				( *ppActivate )->AddRef();
 			}
-#endif
 		}
 		else {
 			// Unknown stream type.

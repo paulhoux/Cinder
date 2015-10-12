@@ -834,6 +834,9 @@
     <ClCompile Include="..\src\cinder\msw\detail\PresenterDX9.cpp">
       <Filter>Source Files\msw\detail</Filter>
     </ClCompile>
+    <ClCompile Include="..\src\cinder\msw\detail\Presenter.cpp">
+      <Filter>Source Files\msw\detail</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\src\AntTweakBar\AntPerfTimer.h">

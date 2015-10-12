@@ -534,6 +534,7 @@
     <ClCompile Include="..\src\cinder\msw\detail\Marker.cpp" />
     <ClCompile Include="..\src\cinder\msw\detail\MediaSink.cpp" />
     <ClCompile Include="..\src\cinder\msw\detail\MonitorArray.cpp" />
+    <ClCompile Include="..\src\cinder\msw\detail\Presenter.cpp" />
     <ClCompile Include="..\src\cinder\msw\detail\PresenterDX11.cpp" />
     <ClCompile Include="..\src\cinder\msw\detail\PresenterDX9.cpp" />
     <ClCompile Include="..\src\cinder\msw\detail\Scheduler.cpp" />

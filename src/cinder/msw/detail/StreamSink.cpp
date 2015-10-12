@@ -42,10 +42,8 @@ GUID const* const StreamSink::s_pVideoFormats9[] =
 #else
 GUID const* const StreamSink::s_pVideoFormats9[] =
 {
-	&MFVideoFormat_RGB555,
-	&MFVideoFormat_RGB565,
+	&MFVideoFormat_YUY2,
 	&MFVideoFormat_ARGB32,
-	&MFVideoFormat_RGB8,
 	&MFVideoFormat_RGB24,
 	&MFVideoFormat_RGB32
 };
@@ -682,31 +680,6 @@ HRESULT StreamSink::IsMediaTypeSupported( IMFMediaType* pMediaType, _Outptr_opt_
 
 		BREAK_ON_NULL( pMediaType, E_POINTER );
 
-		GUID subType = GUID_NULL;
-		hr = pMediaType->GetGUID( MF_MT_SUBTYPE, &subType );
-		BREAK_ON_FAIL( hr );
-
-		hr = MF_E_INVALIDMEDIATYPE; // This will be set to OK if we find the subtype is accepted
-
-		if( m_pPresenter->IsDX9() ) {
-			for( DWORD i = 0; i < s_dwNumVideoFormats9; i++ ) {
-				if( subType == ( *s_pVideoFormats9[i] ) ) {
-					hr = S_OK;
-					break;
-				}
-			}
-		}
-		else if( m_pPresenter->IsDX11() ) {
-			for( DWORD i = 0; i < s_dwNumVideoFormats11; i++ ) {
-				if( subType == ( *s_pVideoFormats11[i] ) ) {
-					hr = S_OK;
-					break;
-				}
-			}
-		}
-
-		BREAK_ON_FAIL( hr );
-
 		hr = m_pPresenter->IsMediaTypeSupported( pMediaType );
 		BREAK_ON_FAIL( hr );
 	} while( FALSE );
@@ -910,14 +883,9 @@ HRESULT StreamSink::GetMaxRate( BOOL fThin, float* pflRate )
 
 	do {
 		hr = m_pPresenter->GetMonitorRefreshRate( &dwMonitorRefreshRate );
-		if( FAILED( hr ) ) {
-			break;
-		}
+		BREAK_ON_FAIL( hr );
 
-		if( m_pCurrentType == NULL ) {
-			hr = MF_E_INVALIDREQUEST;
-			break;
-		}
+		BREAK_ON_NULL( m_pCurrentType, MF_E_INVALIDREQUEST );
 
 		if( fThin == TRUE ) {
 			*pflRate = FLT_MAX;

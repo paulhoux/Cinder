@@ -21,13 +21,6 @@ DEFINE_GUID( CLSID_VideoProcessorMFT, 0x88753b26, 0x5b24, 0x49bd, 0xb2, 0xe7, 0x
 // This attribute should be set on the transform's attrbiute store prior to setting the input type.
 DEFINE_GUID( MF_XVP_PLAYBACK_MODE, 0x3c5d293f, 0xad67, 0x4e29, 0xaf, 0x12, 0xcf, 0x3e, 0x23, 0x8a, 0xcc, 0xe9 );
 
-// MF_MT_VIDEO_3D is only defined for Windows 8+, but we need it to check if a video is 3D.
-#if (WINVER < _WIN32_WINNT_WIN8)
-// {CB5E88CF-7B5B-476b-85AA-1CA5AE187555}        MF_MT_VIDEO_3D                 {UINT32 (BOOL)}
-DEFINE_GUID( MF_MT_VIDEO_3D,
-			 0xcb5e88cf, 0x7b5b, 0x476b, 0x85, 0xaa, 0x1c, 0xa5, 0xae, 0x18, 0x75, 0x55 );
-#endif
-
 namespace cinder {
 namespace msw {
 namespace detail {
@@ -64,7 +57,7 @@ public:
 	// Presenter
 	STDMETHODIMP Initialize( void );
 	// Presenter
-	BOOL         CanProcessNextSample( void ) { return m_bCanProcessNextSample; }
+	STDMETHODIMP_( BOOL ) CanProcessNextSample( void ) { return m_bCanProcessNextSample; }
 	STDMETHODIMP Flush( void );
 	STDMETHODIMP GetMonitorRefreshRate( DWORD* pdwMonitorRefreshRate );
 	STDMETHODIMP IsMediaTypeSupported( IMFMediaType* pMediaType );
@@ -72,65 +65,31 @@ public:
 	STDMETHODIMP ProcessFrame( IMFMediaType* pCurrentType, IMFSample* pSample, UINT32* punInterlaceMode, BOOL* pbDeviceChanged, BOOL* pbProcessAgain, IMFSample** ppOutputSample = NULL );
 	STDMETHODIMP SetCurrentMediaType( IMFMediaType* pMediaType );
 	STDMETHODIMP Shutdown( void );
-	BOOL         IsDX9() const { return FALSE; }
-	BOOL         IsDX11() const { return TRUE; }
+	STDMETHODIMP_( BOOL ) IsDX9() const { return FALSE; }
+	STDMETHODIMP_( BOOL ) IsDX11() const { return TRUE; }
 
 private:
-	void    AspectRatioCorrectSize(
-		LPSIZE lpSizeImage,     // size to be aspect ratio corrected
-		const SIZE& sizeAr,     // aspect ratio of image
-		const SIZE& sizeOrig,   // original image size
-		BOOL ScaleXorY          // axis to correct in
-		);
+	STDMETHODIMP_( VOID ) CheckDecodeSwitchRegKey( void );
+	STDMETHODIMP CheckDeviceState( BOOL* pbDeviceChanged );
+	STDMETHODIMP_( BOOL ) CheckEmptyRect( RECT* pDst );
+	STDMETHODIMP CheckShutdown( void ) const;
+	STDMETHODIMP CreateDCompDeviceAndVisual( void );
+	STDMETHODIMP CreateDXGIManagerAndDevice( D3D_DRIVER_TYPE DriverType = D3D_DRIVER_TYPE_HARDWARE );
+	STDMETHODIMP FindBOBProcessorIndex( DWORD* pIndex );
+	STDMETHODIMP GetVideoDisplayArea( IMFMediaType* pType, MFVideoArea* pArea );
 
-	void    CheckDecodeSwitchRegKey( void );
-	HRESULT CheckDeviceState( BOOL* pbDeviceChanged );
-	BOOL    CheckEmptyRect( RECT* pDst );
-	HRESULT CheckShutdown( void ) const;
-	HRESULT CreateDCompDeviceAndVisual( void );
-	HRESULT CreateDXGIManagerAndDevice( D3D_DRIVER_TYPE DriverType = D3D_DRIVER_TYPE_HARDWARE );
-#if (WINVER >= _WIN32_WINNT_WIN8)
-	HRESULT CreateXVP( void );
-#endif
-	HRESULT FindBOBProcessorIndex( DWORD* pIndex );
-	HRESULT GetVideoDisplayArea( IMFMediaType* pType, MFVideoArea* pArea );
-
-	void    LetterBoxDstRect(
-		LPRECT lprcLBDst,   // output letterboxed rectangle
-		const RECT& rcSrc,  // input source rectangle
-		const RECT& rcDst   // input destination rectangle
-		);
-
-	void    PixelAspectToPictureAspect(
-		int Width,
-		int Height,
-		int PixelAspectX,
-		int PixelAspectY,
-		int* pPictureAspectX,
-		int* pPictureAspectY
-		);
-
-	HRESULT ProcessFrameUsingD3D11( ID3D11Texture2D* pLeftTexture2D, ID3D11Texture2D* pRightTexture2D, UINT dwLeftViewIndex, UINT dwRightViewIndex, RECT rcDest, UINT32 unInterlaceMode, IMFSample** ppVideoOutFrame );
-#if (WINVER >= _WIN32_WINNT_WIN8)
-	HRESULT ProcessFrameUsingXVP( IMFMediaType* pCurrentType, IMFSample* pVideoFrame, ID3D11Texture2D* pTexture2D, RECT rcDest, IMFSample** ppVideoOutFrame, BOOL* pbInputFrameUsed );
-#endif
-
-	void    ReduceToLowestTerms(
-		int NumeratorIn,
-		int DenominatorIn,
-		int* pNumeratorOut,
-		int* pDenominatorOut
-		);
-
-
-	void    SetVideoContextParameters( ID3D11VideoContext* pVideoContext, const RECT* pSRect, const RECT* pTRect, UINT32 unInterlaceMode );
+	STDMETHODIMP ProcessFrameUsingD3D11( ID3D11Texture2D* pLeftTexture2D, ID3D11Texture2D* pRightTexture2D, UINT dwLeftViewIndex, UINT dwRightViewIndex, RECT rcDest, UINT32 unInterlaceMode, IMFSample** ppVideoOutFrame );
+	STDMETHODIMP_( VOID ) SetVideoContextParameters( ID3D11VideoContext* pVideoContext, const RECT* pSRect, const RECT* pTRect, UINT32 unInterlaceMode );
 
 #if (WINVER >=_WIN32_WINNT_WIN8)
-	HRESULT SetXVPOutputMediaType( IMFMediaType* pType, DXGI_FORMAT vpOutputFormat );
+	STDMETHODIMP CreateXVP( void );
+	STDMETHODIMP ProcessFrameUsingXVP( IMFMediaType* pCurrentType, IMFSample* pVideoFrame, ID3D11Texture2D* pTexture2D, RECT rcDest, IMFSample** ppVideoOutFrame, BOOL* pbInputFrameUsed );
+	STDMETHODIMP SetXVPOutputMediaType( IMFMediaType* pType, DXGI_FORMAT vpOutputFormat );
 #endif
+
 	_Post_satisfies_( this->m_pSwapChain1 != NULL )
-		HRESULT UpdateDXGISwapChain( void );
-	void    UpdateRectangles( RECT* pDst, RECT* pSrc );
+		STDMETHODIMP UpdateDXGISwapChain( void );
+	STDMETHODIMP_( VOID ) UpdateRectangles( RECT* pDst, RECT* pSrc );
 
 	static const struct FormatEntry {
 		GUID            Subtype;
