@@ -252,7 +252,7 @@ HRESULT PresenterDX11::GetService( __RPC__in REFGUID guidService, __RPC__in REFI
 HRESULT PresenterDX11::Initialize( void )
 {
 	// TEMP: Force DX9.
-	return E_FAIL;
+	//return E_FAIL;
 
 	if( !m_D3D11Module ) {
 		// Dynamically load D3D11 functions (to avoid static linkage with d3d11.lib)

@@ -839,7 +839,7 @@ HRESULT StreamSink::GetService( __RPC__in REFGUID guidService, __RPC__in REFIID 
 
 HRESULT StreamSink::PresentFrame( void )
 {
-	HRESULT hr = S_OK;
+	HRESULT hr = E_NOTIMPL;
 
 	if( DropFrames == m_ConsumeData ) {
 		return hr;
@@ -1168,21 +1168,21 @@ BOOL StreamSink::NeedMoreSamples( void )
 
 HRESULT StreamSink::OnDispatchWorkItem( IMFAsyncResult* pAsyncResult )
 {
+	HRESULT hr = S_OK;
+
 	// Called by work queue thread. Need to hold the critical section.
 	ScopedCriticalSection lock( m_critSec );
 
-	HRESULT hr = CheckShutdown();
-	if( FAILED( hr ) ) {
-		return hr;
-	}
+	do {
+		hr = CheckShutdown();
+		BREAK_ON_FAIL( hr );
 
-	IUnknown* pState = NULL;
+		ScopedPtr<IUnknown> pState;
+		hr = pAsyncResult->GetState( &pState );
+		BREAK_ON_FAIL( hr );
 
-	hr = pAsyncResult->GetState( &pState );
-
-	if( SUCCEEDED( hr ) ) {
 		// The state object is a CAsncOperation object.
-		CAsyncOperation* pOp = (CAsyncOperation*)pState;
+		CAsyncOperation* pOp = (CAsyncOperation*)pState.get();
 
 		StreamOperation op = pOp->m_op;
 
@@ -1191,22 +1191,20 @@ HRESULT StreamSink::OnDispatchWorkItem( IMFAsyncResult* pAsyncResult )
 			case OpRestart:
 				// Send MEStreamSinkStarted.
 				hr = QueueEvent( MEStreamSinkStarted, GUID_NULL, hr, NULL );
+				BREAK_ON_FAIL( hr );
 
 				// Kick things off by requesting two samples...
-				if( SUCCEEDED( hr ) ) {
-					m_cOutstandingSampleRequests++;
-					hr = QueueEvent( MEStreamSinkRequestSample, GUID_NULL, hr, NULL );
-				}
+				m_cOutstandingSampleRequests++;
+				hr = QueueEvent( MEStreamSinkRequestSample, GUID_NULL, hr, NULL );
+				BREAK_ON_FAIL( hr );
 
 				// There might be samples queue from earlier (ie, while paused).
-				if( SUCCEEDED( hr ) ) {
-					hr = ProcessSamplesFromQueue( m_ConsumeData );
-				}
-
+				hr = ProcessSamplesFromQueue( m_ConsumeData );
+				BREAK_ON_FAIL( hr );
 				break;
 
 			case OpStop:
-
+				// Leave full screen.
 				m_pPresenter->SetFullscreen( FALSE );
 
 				// Drop samples from queue.
@@ -1216,7 +1214,6 @@ HRESULT StreamSink::OnDispatchWorkItem( IMFAsyncResult* pAsyncResult )
 
 				// Send the event even if the previous call failed.
 				hr = QueueEvent( MEStreamSinkStopped, GUID_NULL, hr, NULL );
-
 				break;
 
 			case OpPause:
@@ -1230,9 +1227,7 @@ HRESULT StreamSink::OnDispatchWorkItem( IMFAsyncResult* pAsyncResult )
 				}
 				break;
 		}
-	}
-
-	SafeRelease( pState );
+	} while( FALSE );
 
 	return hr;
 }

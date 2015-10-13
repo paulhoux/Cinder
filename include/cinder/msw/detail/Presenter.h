@@ -11,9 +11,10 @@
 // MF_MT_VIDEO_3D is only defined for Windows 8+, but we need it to check if a video is 3D.
 #if (WINVER < _WIN32_WINNT_WIN8)
 // {CB5E88CF-7B5B-476b-85AA-1CA5AE187555}        MF_MT_VIDEO_3D                 {UINT32 (BOOL)}
-DEFINE_GUID( MF_MT_VIDEO_3D,
-			 0xcb5e88cf, 0x7b5b, 0x476b, 0x85, 0xaa, 0x1c, 0xa5, 0xae, 0x18, 0x75, 0x55 );
+DEFINE_GUID( MF_MT_VIDEO_3D, 0xcb5e88cf, 0x7b5b, 0x476b, 0x85, 0xaa, 0x1c, 0xa5, 0xae, 0x18, 0x75, 0x55 );
 #endif
+
+DEFINE_GUID( CLSID_VideoProcessorMFT, 0x88753b26, 0x5b24, 0x49bd, 0xb2, 0xe7, 0xc, 0x44, 0x5c, 0x78, 0xc9, 0x82 );
 
 //! Returns the greatest common divisor of A and B.
 inline int gcd( int a, int b )

@@ -285,6 +285,10 @@ HRESULT PresenterDX9::IsMediaTypeSupported( IMFMediaType *pMediaType )
 // Presenter
 HRESULT PresenterDX9::ProcessFrame( IMFMediaType* pCurrentType, IMFSample* pSample, UINT32* punInterlaceMode, BOOL* pbDeviceChanged, BOOL* pbProcessAgain, IMFSample** ppOutputSample )
 {
+	// TEMP: very very temporary!
+	(*ppOutputSample) = pSample;
+	( *ppOutputSample )->AddRef();
+
 	return S_OK;
 
 	HRESULT hr = S_OK;

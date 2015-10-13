@@ -4,13 +4,11 @@
 
 #include <d3d11.h>
 #include <dxgi1_2.h>
-#include <dcomp.h> // for IDCompositionDevice et.al. (Windows 8+ only)
 
 #if (WINVER >= _WIN32_WINNT_WIN8)
+#include <dcomp.h> // for IDCompositionDevice et.al. (Windows 8+ only)
 #pragma message("WARNING! Uses experimental Windows 8+ code that has not been tested for OpenGL compatibility!")
 #endif
-
-DEFINE_GUID( CLSID_VideoProcessorMFT, 0x88753b26, 0x5b24, 0x49bd, 0xb2, 0xe7, 0xc, 0x44, 0x5c, 0x78, 0xc9, 0x82 );
 
 // MF_XVP_PLAYBACK_MODE
 // Data type: UINT32 (treat as BOOL)
@@ -101,11 +99,6 @@ private:
 	IMFDXGIDeviceManager*           m_pDXGIManager;
 	IDXGIOutput1*                   m_pDXGIOutput1;
 	IMFVideoSampleAllocatorEx*      m_pSampleAllocatorEx;
-#if (WINVER >= _WIN32_WINNT_WIN8)
-	IDCompositionDevice*            m_pDCompDevice;
-	IDCompositionTarget*            m_pHwndTarget;
-	IDCompositionVisual*            m_pRootVisual;
-#endif
 	BOOL                            m_bSoftwareDXVADeviceInUse;
 	UINT                            m_DeviceResetToken;
 	UINT                            m_DXSWSwitch;
@@ -117,9 +110,6 @@ private:
 	BOOL                            m_bResize;
 	BOOL                            m_b3DVideo;
 	BOOL                            m_bStereoEnabled;
-#if (WINVER >= _WIN32_WINNT_WIN8)
-	MFVideo3DFormat                 m_vp3DOutput;
-#endif
 	BOOL                            m_bFullScreenState;
 	BOOL                            m_bCanProcessNextSample;
 	RECT                            m_displayRect;
@@ -139,6 +129,10 @@ private:
 	ID3D11VideoProcessor*           m_pVideoProcessor;
 
 #if (WINVER >= _WIN32_WINNT_WIN8)
+	IDCompositionDevice*            m_pDCompDevice;
+	IDCompositionTarget*            m_pHwndTarget;
+	IDCompositionVisual*            m_pRootVisual;
+	MFVideo3DFormat                 m_vp3DOutput;
 	IMFTransform*                   m_pXVP;
 	IMFVideoProcessorControl*       m_pXVPControl;
 #endif
