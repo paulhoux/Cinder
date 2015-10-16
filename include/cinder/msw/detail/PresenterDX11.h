@@ -69,8 +69,6 @@ public:
 private:
 	STDMETHODIMP_( VOID ) CheckDecodeSwitchRegKey( void );
 	STDMETHODIMP CheckDeviceState( BOOL* pbDeviceChanged );
-	STDMETHODIMP_( BOOL ) CheckEmptyRect( RECT* pDst );
-	STDMETHODIMP CheckShutdown( void ) const;
 	STDMETHODIMP CreateDCompDeviceAndVisual( void );
 	STDMETHODIMP CreateDXGIManagerAndDevice( D3D_DRIVER_TYPE DriverType = D3D_DRIVER_TYPE_HARDWARE );
 	STDMETHODIMP FindBOBProcessorIndex( DWORD* pIndex );
@@ -87,14 +85,12 @@ private:
 
 	_Post_satisfies_( this->m_pSwapChain1 != NULL )
 		STDMETHODIMP UpdateDXGISwapChain( void );
-	STDMETHODIMP_( VOID ) UpdateRectangles( RECT* pDst, RECT* pSrc );
 
 	static const struct FormatEntry {
 		GUID            Subtype;
 		DXGI_FORMAT     DXGIFormat;
 	} s_DXGIFormatMapping[];
 
-	BOOL                            m_IsShutdown;               // Flag to indicate if Shutdown() method was called.
 	IDXGIFactory2*                  m_pDXGIFactory2;
 	IMFDXGIDeviceManager*           m_pDXGIManager;
 	IDXGIOutput1*                   m_pDXGIOutput1;
@@ -112,13 +108,6 @@ private:
 	BOOL                            m_bStereoEnabled;
 	BOOL                            m_bFullScreenState;
 	BOOL                            m_bCanProcessNextSample;
-	RECT                            m_displayRect;
-	UINT32                          m_imageWidthInPixels;
-	UINT32                          m_imageHeightInPixels;
-	UINT32                          m_uiRealDisplayWidth;
-	UINT32                          m_uiRealDisplayHeight;
-	RECT                            m_rcSrcApp;
-	RECT                            m_rcDstApp;
 
 	DXGI_FORMAT                     m_dxgiFormat;
 

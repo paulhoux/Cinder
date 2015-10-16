@@ -6,6 +6,23 @@ namespace cinder {
 namespace msw {
 namespace detail {
 
+BOOL Presenter::CheckEmptyRect( RECT* pDst )
+{
+	GetClientRect( m_hwndVideo, pDst );
+
+	return IsRectEmpty( pDst );
+}
+
+HRESULT Presenter::CheckShutdown( void ) const
+{
+	if( m_IsShutdown ) {
+		return MF_E_SHUTDOWN;
+	}
+	else {
+		return S_OK;
+	}
+}
+
 //+-------------------------------------------------------------------------
 //
 //  Function:   ReduceToLowestTerms
@@ -178,6 +195,43 @@ void Presenter::AspectRatioCorrectSize(
 		lpSizeImage->cx = cxOr;
 		lpSizeImage->cy = MulDiv( ( sy * cxOr ), cyAR, ( cxAR * cyOr ) );
 	}
+}
+
+//+-------------------------------------------------------------------------
+//
+//  Member:     UpdateRectangles
+//
+//  Synopsis:   Figures out the real source and destination rectangles
+//              to use when drawing the video frame into the clients
+//              destination location.  Takes into account pixel aspect
+//              ration correction, letterboxing and source rectangles.
+//
+//--------------------------------------------------------------------------
+
+void Presenter::UpdateRectangles( RECT* pDst, RECT* pSrc )
+{
+	// take the given src rect and reverse map it into the native video
+	// image rectange.  For example, consider a video with a buffer size of
+	// 720x480 and an active area of 704x480 - 8,0 with a picture aspect
+	// ratio of 4:3.  The user sees the native video size as 640x480.
+	//
+	// If the user gave us a src rectangle of (180, 135, 540, 405)
+	// then this gets reversed mapped to
+	//
+	// 8 + (180 * 704 / 640) = 206
+	// 0 + (135 * 480 / 480) = 135
+	// 8 + (540 * 704 / 640) = 602
+	// 0 + (405 * 480 / 480) = 405
+
+	RECT Src = *pSrc;
+
+	pSrc->left = m_displayRect.left + MulDiv( pSrc->left, ( m_displayRect.right - m_displayRect.left ), m_uiRealDisplayWidth );
+	pSrc->right = m_displayRect.left + MulDiv( pSrc->right, ( m_displayRect.right - m_displayRect.left ), m_uiRealDisplayWidth );
+
+	pSrc->top = m_displayRect.top + MulDiv( pSrc->top, ( m_displayRect.bottom - m_displayRect.top ), m_uiRealDisplayHeight );
+	pSrc->bottom = m_displayRect.top + MulDiv( pSrc->bottom, ( m_displayRect.bottom - m_displayRect.top ), m_uiRealDisplayHeight );
+
+	LetterBoxDstRect( pDst, Src, m_rcDstApp );
 }
 
 }

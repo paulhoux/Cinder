@@ -43,8 +43,7 @@ const PresenterDX11::FormatEntry PresenterDX11::s_DXGIFormatMapping[] =
 //-------------------------------------------------------------------
 
 PresenterDX11::PresenterDX11( void )
-	: m_IsShutdown( FALSE )
-	, m_pDXGIFactory2( NULL )
+	: m_pDXGIFactory2( NULL )
 	, m_pDXGIManager( NULL )
 	, m_pDXGIOutput1( NULL )
 	, m_pSampleAllocatorEx( NULL )
@@ -73,13 +72,6 @@ PresenterDX11::PresenterDX11( void )
 #endif
 	, m_bFullScreenState( FALSE )
 	, m_bCanProcessNextSample( TRUE )
-	, m_displayRect() // default ctor
-	, m_imageWidthInPixels( 0 )
-	, m_imageHeightInPixels( 0 )
-	, m_uiRealDisplayWidth( 0 )
-	, m_uiRealDisplayHeight( 0 )
-	, m_rcSrcApp() // default ctor
-	, m_rcDstApp() // default ctor
 	, m_dxgiFormat( DXGI_FORMAT_UNKNOWN )
 #if (WINVER >= _WIN32_WINNT_WIN8) 
 	, m_pXVP( NULL )
@@ -252,7 +244,7 @@ HRESULT PresenterDX11::GetService( __RPC__in REFGUID guidService, __RPC__in REFI
 HRESULT PresenterDX11::Initialize( void )
 {
 	// TEMP: Force DX9.
-	//return E_FAIL;
+	return E_FAIL;
 
 	if( !m_D3D11Module ) {
 		// Dynamically load D3D11 functions (to avoid static linkage with d3d11.lib)
@@ -520,7 +512,7 @@ HRESULT PresenterDX11::ProcessFrame( IMFMediaType* pCurrentType, IMFSample* pSam
 
 				hr = pEVDXGIBuffer->GetSubresourceIndex( &dwEVViewIndex );
 				BREAK_ON_FAIL( hr );
-	}
+			}
 		}
 #endif
 
@@ -538,7 +530,7 @@ HRESULT PresenterDX11::ProcessFrame( IMFMediaType* pCurrentType, IMFSample* pSam
 			if( SUCCEEDED( hr ) && !bInputFrameUsed ) {
 				*pbProcessAgain = TRUE;
 			}
-}
+		}
 		else
 #endif
 		{
@@ -562,17 +554,17 @@ HRESULT PresenterDX11::ProcessFrame( IMFMediaType* pCurrentType, IMFSample* pSam
 				}
 			}
 		}
-} while( FALSE );
+	} while( FALSE );
 
-SafeRelease( pTexture2D );
-SafeRelease( pDXGIBuffer );
-SafeRelease( pEVTexture2D );
-SafeRelease( pEVDXGIBuffer );
-SafeRelease( pDeviceInput );
-SafeRelease( pBuffer );
-SafeRelease( pEVBuffer );
+	SafeRelease( pTexture2D );
+	SafeRelease( pDXGIBuffer );
+	SafeRelease( pEVTexture2D );
+	SafeRelease( pEVDXGIBuffer );
+	SafeRelease( pDeviceInput );
+	SafeRelease( pBuffer );
+	SafeRelease( pEVBuffer );
 
-return hr;
+	return hr;
 }
 
 // Presenter
@@ -768,23 +760,6 @@ HRESULT PresenterDX11::CheckDeviceState( BOOL* pbDeviceChanged )
 	return hr;
 }
 
-BOOL PresenterDX11::CheckEmptyRect( RECT* pDst )
-{
-	GetClientRect( m_hwndVideo, pDst );
-
-	return IsRectEmpty( pDst );
-}
-
-HRESULT PresenterDX11::CheckShutdown( void ) const
-{
-	if( m_IsShutdown ) {
-		return MF_E_SHUTDOWN;
-	}
-	else {
-		return S_OK;
-	}
-}
-
 HRESULT PresenterDX11::CreateDCompDeviceAndVisual( void )
 {
 	HRESULT hr = S_OK;
@@ -943,9 +918,9 @@ HRESULT PresenterDX11::CreateXVP( void )
 
 		hr = m_pXVP->QueryInterface( IID_PPV_ARGS( &m_pXVPControl ) );
 		BREAK_ON_FAIL( hr );
-} while( FALSE );
+	} while( FALSE );
 
-return hr;
+	return hr;
 }
 #endif
 
@@ -1256,14 +1231,14 @@ HRESULT PresenterDX11::ProcessFrameUsingD3D11( ID3D11Texture2D* pLeftTexture2D, 
 			D3D11_VIDEO_PROCESSOR_STEREO_FORMAT vpStereoFormat = D3D11_VIDEO_PROCESSOR_STEREO_FORMAT_SEPARATE;
 			if( MFVideo3DSampleFormat_Packed_LeftRight == m_vp3DOutput ) {
 				vpStereoFormat = D3D11_VIDEO_PROCESSOR_STEREO_FORMAT_HORIZONTAL;
-		}
+			}
 			else if( MFVideo3DSampleFormat_Packed_TopBottom == m_vp3DOutput ) {
 				vpStereoFormat = D3D11_VIDEO_PROCESSOR_STEREO_FORMAT_VERTICAL;
 			}
 
 			pVideoContext->VideoProcessorSetStreamStereoFormat( m_pVideoProcessor,
 																0, m_bStereoEnabled, vpStereoFormat, TRUE, TRUE, D3D11_VIDEO_PROCESSOR_STEREO_FLIP_NONE, 0 );
-	}
+		}
 #endif
 
 		QueryPerformanceCounter( &lpcEnd );
@@ -1298,17 +1273,17 @@ HRESULT PresenterDX11::ProcessFrameUsingD3D11( ID3D11Texture2D* pLeftTexture2D, 
 			*ppVideoOutFrame = pRTSample;
 			( *ppVideoOutFrame )->AddRef();
 		}
-} while( FALSE );
+	} while( FALSE );
 
-SafeRelease( pBuffer );
-SafeRelease( pRTSample );
-SafeRelease( pDXGIBackBuffer );
-SafeRelease( pOutputView );
-SafeRelease( pLeftInputView );
-SafeRelease( pRightInputView );
-SafeRelease( pVideoContext );
+	SafeRelease( pBuffer );
+	SafeRelease( pRTSample );
+	SafeRelease( pDXGIBackBuffer );
+	SafeRelease( pOutputView );
+	SafeRelease( pLeftInputView );
+	SafeRelease( pRightInputView );
+	SafeRelease( pVideoContext );
 
-return hr;
+	return hr;
 }
 
 #if (WINVER >= _WIN32_WINNT_WIN8)
@@ -1657,48 +1632,13 @@ HRESULT PresenterDX11::UpdateDXGISwapChain( void )
 			hr = E_NOTIMPL;
 			BREAK_ON_FAIL( hr );
 #endif
-			}
-		} while( FALSE );
+		}
+	} while( FALSE );
 
-		return hr;
-	}
-
-//+-------------------------------------------------------------------------
-//
-//  Member:     UpodateRectangles
-//
-//  Synopsis:   Figures out the real source and destination rectangles
-//              to use when drawing the video frame into the clients
-//              destination location.  Takes into account pixel aspect
-//              ration correction, letterboxing and source rectangles.
-//
-//--------------------------------------------------------------------------
-
-void PresenterDX11::UpdateRectangles( RECT* pDst, RECT* pSrc )
-{
-	// take the given src rect and reverse map it into the native video
-	// image rectange.  For example, consider a video with a buffer size of
-	// 720x480 and an active area of 704x480 - 8,0 with a picture aspect
-	// ratio of 4:3.  The user sees the native video size as 640x480.
-	//
-	// If the user gave us a src rectangle of (180, 135, 540, 405)
-	// then this gets reversed mapped to
-	//
-	// 8 + (180 * 704 / 640) = 206
-	// 0 + (135 * 480 / 480) = 135
-	// 8 + (540 * 704 / 640) = 602
-	// 0 + (405 * 480 / 480) = 405
-
-	RECT Src = *pSrc;
-
-	pSrc->left = m_displayRect.left + MulDiv( pSrc->left, ( m_displayRect.right - m_displayRect.left ), m_uiRealDisplayWidth );
-	pSrc->right = m_displayRect.left + MulDiv( pSrc->right, ( m_displayRect.right - m_displayRect.left ), m_uiRealDisplayWidth );
-
-	pSrc->top = m_displayRect.top + MulDiv( pSrc->top, ( m_displayRect.bottom - m_displayRect.top ), m_uiRealDisplayHeight );
-	pSrc->bottom = m_displayRect.top + MulDiv( pSrc->bottom, ( m_displayRect.bottom - m_displayRect.top ), m_uiRealDisplayHeight );
-
-	LetterBoxDstRect( pDst, Src, m_rcDstApp );
+	return hr;
 }
+
+
 
 } // namespace detail
 } // namespace msw

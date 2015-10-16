@@ -16,9 +16,104 @@ namespace cinder {
 namespace msw {
 namespace detail {
 
+/*//
+IMFSamplePool::IMFSamplePool( IDirectXVideoDecoderService* pDecoder, IMFMediaType* pMediaType )
+	: m_nRefCount( 1 )
+	, m_pDecoderService( pDecoder )
+	, m_Count( 0 )
+{
+	ZeroMemory( m_aSurfaces, sizeof( m_aSurfaces ) );
+	ZeroMemory( m_aSamples, sizeof( m_aSamples ) );
+
+	assert( m_pDecoderService != NULL );
+	assert( pMediaType != NULL );
+
+	HRESULT hr = ConvertToDXVAType( pMediaType, &m_Desc );
+	//BREAK_ON_FAIL( hr );
+
+	m_pDecoderService->AddRef();
+}
+
+IMFSamplePool::~IMFSamplePool()
+{
+	for( DWORD i = 0; i < 8; ++i ) {
+		SafeRelease( m_aSamples[i] );
+		SafeRelease( m_aSurfaces[i] );
+	}
+
+	SafeRelease( m_pDecoderService );
+}
+
+// IUnknown
+HRESULT IMFSamplePool::QueryInterface( REFIID iid, void ** ppv )
+{
+	if( !ppv ) {
+		return E_POINTER;
+	}
+	if( iid == IID_IUnknown ) {
+		*ppv = static_cast<IUnknown*>( this );
+	}
+	//else if( iid == __uuidof( IMFVideoDisplayControl ) ) {
+	//*ppv = static_cast<IMFVideoDisplayControl*>( this );
+	//}
+	//else if( iid == __uuidof( IMFGetService ) ) {
+	//*ppv = static_cast<IMFGetService*>( this );
+	//}
+	else {
+		*ppv = NULL;
+		return E_NOINTERFACE;
+	}
+	AddRef();
+	return S_OK;
+}
+
+HRESULT IMFSamplePool::SetMaxPoolSize( DWORD size )
+{
+	return E_NOTIMPL;
+}
+
+HRESULT IMFSamplePool::GetFreeSample( IMFSample **pSample )
+{
+	HRESULT hr = S_OK;
+
+	do {
+		// TODO: Check if we have a free sample available.
+
+
+		// If not, check if there is room for one more.
+		BREAK_IF_FALSE( m_Count < 8, E_FAIL );
+
+		// If maximum pool size has  not been reached, create new sample.
+		ScopedPtr<IDirect3DSurface9> pSurface;
+		hr = m_pDecoderService->CreateSurface(
+			m_Desc.SampleWidth, m_Desc.SampleHeight, 0, (D3DFORMAT)MAKEFOURCC( 'N', 'V', '1', '2' ),
+			D3DPOOL_DEFAULT, 0, DXVA2_VideoDecoderRenderTarget, &pSurface, NULL );
+		BREAK_ON_FAIL( hr );
+
+		ScopedPtr<IMFSample> pTemp;
+		hr = MFCreateVideoSampleFromSurface( pSurface, &pTemp );
+		BREAK_ON_FAIL( hr );
+
+		// Store surface and sample.
+		m_aSurfaces[0] = pSurface;
+		m_aSurfaces[0]->AddRef();
+
+		m_aSamples[0] = pTemp;
+		m_aSamples[0]->AddRef();
+
+		// TODO: Mark sample as 'in use' and set callback(?).
+
+		( *pSample ) = pTemp;
+		( *pSample )->AddRef();
+	} while( FALSE );
+
+	return hr;
+}//*/
+
+// ------------------------------------------------------------------------------
+
 PresenterDX9::PresenterDX9( void )
-	: m_IsShutdown( FALSE )
-	, m_bFullScreenState( FALSE )
+	: m_bFullScreenState( FALSE )
 	, m_DeviceResetToken( 0 )
 	, m_pD3D9( NULL )
 	, m_pD3DDevice( NULL )
@@ -285,12 +380,6 @@ HRESULT PresenterDX9::IsMediaTypeSupported( IMFMediaType *pMediaType )
 // Presenter
 HRESULT PresenterDX9::ProcessFrame( IMFMediaType* pCurrentType, IMFSample* pSample, UINT32* punInterlaceMode, BOOL* pbDeviceChanged, BOOL* pbProcessAgain, IMFSample** ppOutputSample )
 {
-	// TEMP: very very temporary!
-	(*ppOutputSample) = pSample;
-	( *ppOutputSample )->AddRef();
-
-	return S_OK;
-
 	HRESULT hr = S_OK;
 	//BYTE* pData = NULL;
 	//DWORD dwSampleSize = 0;
@@ -332,17 +421,6 @@ HRESULT PresenterDX9::ProcessFrame( IMFMediaType* pCurrentType, IMFSample* pSamp
 
 		BREAK_ON_FAIL( hr );
 
-#if MF_USE_DXVA2_DECODER
-		// Test if video decoder is still valid.
-		HANDLE hDevice = NULL;
-		hr = m_pDeviceManager->OpenDeviceHandle( &hDevice );
-		BREAK_ON_FAIL( hr );
-
-		hr = m_pDeviceManager->TestDevice( hDevice );
-		m_pDeviceManager->CloseDeviceHandle( hDevice );
-		BREAK_ON_FAIL( hr ); // TODO: renegotiate a video decoder.
-#endif
-
 		// Check if device is still valid.
 		hr = CheckDeviceState( pbDeviceChanged );
 		BREAK_ON_FAIL( hr );
@@ -350,10 +428,10 @@ HRESULT PresenterDX9::ProcessFrame( IMFMediaType* pCurrentType, IMFSample* pSamp
 		// Adjust output size.
 		RECT rcDest;
 		ZeroMemory( &rcDest, sizeof( rcDest ) );
-		/*if( CheckEmptyRect( &rcDest ) ) {
+		if( CheckEmptyRect( &rcDest ) ) {
 			hr = S_OK;
 			break;
-		}*/
+		}
 
 		MFVideoInterlaceMode unInterlaceMode = (MFVideoInterlaceMode)MFGetAttributeUINT32( pCurrentType, MF_MT_INTERLACE_MODE, MFVideoInterlace_Progressive );
 
@@ -375,9 +453,22 @@ HRESULT PresenterDX9::ProcessFrame( IMFMediaType* pCurrentType, IMFSample* pSamp
 			}
 		}
 
-		/*// Work in progress from here on...
-		hr = E_NOTIMPL;
+		//////////////
+
+		// Allocate uncompressed buffers.
+		DXVA2_VideoDesc desc;
+		hr = ConvertToDXVAType( pCurrentType, &desc );
 		BREAK_ON_FAIL( hr );
+
+		//ScopedPtr<IDirect3DSurface9> pSurface;
+		//hr = m_pDecoderService->CreateSurface(
+		//	desc.SampleWidth, desc.SampleHeight, 0, (D3DFORMAT)MAKEFOURCC( 'N', 'V', '1', '2' ),
+		//	D3DPOOL_DEFAULT, 0, DXVA2_VideoDecoderRenderTarget, &pSurface, NULL );
+		//BREAK_ON_FAIL( hr );
+
+		//ScopedPtr<IMFSample> pSample;
+		//hr = MFCreateVideoSampleFromSurface( pSurface, &pSample );
+		//BREAK_ON_FAIL( hr );
 
 		//
 		ScopedPtr<IDirect3DSurface9> pSurface;
@@ -385,17 +476,41 @@ HRESULT PresenterDX9::ProcessFrame( IMFMediaType* pCurrentType, IMFSample* pSamp
 		BREAK_ON_FAIL( hr );
 
 		// Get the swap chain from the surface.
-		ScopedPtr<IDirect3DSwapChain9> pSwapChain;
-		hr = pSurface->GetContainer( __uuidof( IDirect3DSwapChain9 ), (LPVOID*)&pSwapChain );
-		BREAK_ON_FAIL( hr );
-
+		//ScopedPtr<IDirect3DSwapChain9> pSwapChain;
+		//hr = pSurface->GetContainer( __uuidof( IDirect3DSwapChain9 ), (LPVOID*)&pSwapChain );
+		//BREAK_ON_FAIL( hr );
+		
 		// Present the swap chain.
 		ScopedPtr<IDirect3DSurface9> pBackBuffer;
-		pSwapChain->GetBackBuffer( 0, D3DBACKBUFFER_TYPE_MONO, &pBackBuffer );
+		//pSwapChain->GetBackBuffer( 0, D3DBACKBUFFER_TYPE_MONO, &pBackBuffer );
+		hr = m_pD3DDevice->GetBackBuffer( 0, 0, D3DBACKBUFFER_TYPE_MONO, &pBackBuffer );
+		BREAK_ON_FAIL( hr );
+
+		// TEMP!
+
+		// remember the original rectangles
+		RECT TRectOld = m_rcDstApp;
+		RECT SRectOld = m_rcSrcApp;
+		UpdateRectangles( &TRectOld, &SRectOld );
+
+		//Update destination rect with current client rect
+		m_rcDstApp = rcDest;
+
+		m_rcSrcApp.left = 0;
+		m_rcSrcApp.top = 0;
+		m_rcSrcApp.right = m_uiRealDisplayWidth;
+		m_rcSrcApp.bottom = m_uiRealDisplayHeight;
+
+		UpdateRectangles( &m_rcDstApp, &m_rcSrcApp );
+
+		// END TEMP!
+
+		//
 		hr = m_pD3DDevice->StretchRect( pSurface, NULL, pBackBuffer, NULL, D3DTEXF_NONE );
 		BREAK_ON_FAIL( hr );
 
-		hr = pSwapChain->Present( NULL, &rcDest, m_hwndVideo, NULL, 0 );
+		//hr = pSwapChain->Present( NULL, &rcDest, m_hwndVideo, NULL, 0 );
+		hr = m_pD3DDevice->Present( NULL, &m_rcDstApp, m_hwndVideo, NULL );
 		BREAK_ON_FAIL( hr );
 		//*/
 
@@ -494,6 +609,22 @@ HRESULT PresenterDX9::SetCurrentMediaType( IMFMediaType *pMediaType )
 		m_uiRealDisplayWidth = szVideo.cx;
 		m_uiRealDisplayHeight = szVideo.cy;
 
+#if MF_USE_DXVA2_DECODER
+		//// Allocate uncompressed buffers.
+		//DXVA2_VideoDesc desc;
+		//hr = ConvertToDXVAType( pMediaType, &desc );
+		//BREAK_ON_FAIL( hr );
+
+		//ScopedPtr<IDirect3DSurface9> pSurface;
+		//hr = m_pDecoderService->CreateSurface(
+		//	desc.SampleWidth, desc.SampleHeight, 0, (D3DFORMAT)MAKEFOURCC( 'N', 'V', '1', '2' ),
+		//	D3DPOOL_DEFAULT, 0, DXVA2_VideoDecoderRenderTarget, &pSurface, NULL );
+		//BREAK_ON_FAIL( hr );
+
+		//ScopedPtr<IMFSample> pSample;
+		//hr = MFCreateVideoSampleFromSurface( pSurface, &pSample );
+		//BREAK_ON_FAIL( hr );
+#endif
 	} while( FALSE );
 
 	SafeRelease( pAttributes );
@@ -523,69 +654,71 @@ HRESULT PresenterDX9::Shutdown( void )
 
 HRESULT PresenterDX9::CheckDeviceState( BOOL * pbDeviceChanged )
 {
-	if( pbDeviceChanged == NULL ) {
-		return E_POINTER;
-	}
-
 	static int deviceStateChecks = 0;
 	static D3D_DRIVER_TYPE driverType = D3D_DRIVER_TYPE_HARDWARE;
 
-	HRESULT hr = SetVideoMonitor( m_hwndVideo );
-	if( FAILED( hr ) ) {
-		return hr;
-	}
+	HRESULT hr = S_OK;
 
-	if( m_pD3DDevice != NULL ) {
-		// Lost/hung device. Destroy the device and create a new one.
-		if( S_FALSE == hr /*|| ( m_DXSWSwitch > 0 && deviceStateChecks == m_DXSWSwitch )*/ ) {
-			/*if( m_DXSWSwitch > 0 && deviceStateChecks == m_DXSWSwitch ) {
-				( driverType == D3D_DRIVER_TYPE_HARDWARE ) ? driverType = D3D_DRIVER_TYPE_WARP : driverType = D3D_DRIVER_TYPE_HARDWARE;
-			}*/
+	do {
+		BREAK_ON_NULL( pbDeviceChanged, E_POINTER );
 
-			hr = CreateDXVA2ManagerAndDevice( driverType );
-			if( FAILED( hr ) ) {
-				return hr;
+#if MF_USE_DXVA2_DECODER
+		// Test if video decoder is still valid.
+		if( m_pDeviceManager != NULL ) {
+			HANDLE hDevice = NULL;
+
+			hr = m_pDeviceManager->OpenDeviceHandle( &hDevice );
+			if( SUCCEEDED( hr ) ) {
+				hr = m_pDeviceManager->TestDevice( hDevice );
+				m_pDeviceManager->CloseDeviceHandle( hDevice );
+
+				if( hr == DXVA2_E_NEW_VIDEO_DEVICE ) {
+					*pbDeviceChanged = TRUE;
+
+					// Create a new video decoder.
+					hr = CreateDXVA2ManagerAndDevice();
+					BREAK_ON_FAIL( hr );
+				}
 			}
-
-			*pbDeviceChanged = TRUE;
-
-			// TODO:
-			/*SafeRelease( m_pVideoDevice );
-			SafeRelease( m_pVideoProcessorEnum );
-			SafeRelease( m_pVideoProcessor );
-			SafeRelease( m_pSwapChain1 );*/
-
-			deviceStateChecks = 0;
 		}
-		deviceStateChecks++;
-	}
+#endif
+
+		hr = SetVideoMonitor( m_hwndVideo );
+		BREAK_ON_FAIL( hr );
+
+		if( m_pD3DDevice != NULL ) {
+			// Lost/hung device. Destroy the device and create a new one.
+			if( S_FALSE == hr ) {
+				*pbDeviceChanged = TRUE;
+
+				hr = CreateDXVA2ManagerAndDevice( driverType );
+				BREAK_ON_FAIL( hr );
+
+				/*SafeRelease( m_pVideoDevice );
+				SafeRelease( m_pVideoProcessorEnum );
+				SafeRelease( m_pVideoProcessor );
+				SafeRelease( m_pSwapChain1 );*/
+
+				deviceStateChecks = 0;
+			}
+			deviceStateChecks++;
+		}
+
+	} while( FALSE );
 
 	return hr;
 }
 
-HRESULT PresenterDX9::CheckShutdown( void ) const
-{
-	if( m_IsShutdown ) {
-		return MF_E_SHUTDOWN;
-	}
-	else {
-		return S_OK;
-	}
-}
-
 HRESULT PresenterDX9::CreateDXVA2ManagerAndDevice( D3D_DRIVER_TYPE DriverType )
 {
-	GUID *decoderDevices = NULL;
-
 	HRESULT hr = S_OK;
 
-	assert( m_pD3D9 == NULL );
-	assert( m_pDeviceManager == NULL );
-
 	do {
-		// Create Direct3D
-		hr = (_Direct3DCreate9Ex)( D3D_SDK_VERSION, &m_pD3D9 );
-		BREAK_ON_FAIL( hr );
+		if( m_pD3D9 == NULL ) {
+			// Create Direct3D
+			hr = (_Direct3DCreate9Ex)( D3D_SDK_VERSION, &m_pD3D9 );
+			BREAK_ON_FAIL( hr );
+		}
 
 #if MF_USE_DXVA2_DECODER
 		// Ensure we can do the YCbCr->RGB conversion in StretchRect.
@@ -596,7 +729,11 @@ HRESULT PresenterDX9::CreateDXVA2ManagerAndDevice( D3D_DRIVER_TYPE DriverType )
 		BREAK_ON_FAIL( hr );
 #endif
 
-		// Create the device manager
+		// Close existing video decoder and device manager.
+		SafeRelease( m_pDecoderService );
+		SafeRelease( m_pDeviceManager );
+
+		// Create the device manager and initialize it.
 		hr = DXVA2CreateDirect3DDeviceManager9( &m_DeviceResetToken, &m_pDeviceManager );
 		BREAK_ON_FAIL( hr );
 
@@ -617,8 +754,8 @@ HRESULT PresenterDX9::CreateDXVA2ManagerAndDevice( D3D_DRIVER_TYPE DriverType )
 		D3DPRESENT_PARAMETERS pPresentParams;
 		ZeroMemory( &pPresentParams, sizeof( pPresentParams ) );
 
-		pPresentParams.BackBufferWidth = 1;
-		pPresentParams.BackBufferHeight = 1;
+		pPresentParams.BackBufferWidth = 0;
+		pPresentParams.BackBufferHeight = 0;
 		pPresentParams.BackBufferCount = 1;
 		pPresentParams.Windowed = TRUE;
 		pPresentParams.SwapEffect = D3DSWAPEFFECT_DISCARD; // D3DSWAPEFFECT_COPY;
@@ -650,108 +787,28 @@ HRESULT PresenterDX9::CreateDXVA2ManagerAndDevice( D3D_DRIVER_TYPE DriverType )
 		hr = m_pDeviceManager->GetVideoService( hDevice, __uuidof( IDirectXVideoDecoderService ), (LPVOID*)&m_pDecoderService );
 		m_pDeviceManager->CloseDeviceHandle( hDevice );
 		BREAK_ON_FAIL( hr );
-		BREAK_ON_NULL( m_pDecoderService, E_OUTOFMEMORY ); // Necessary?
 
+		// Find compatible decoder. At this moment we only support H264...
+		GUID *decoderDevices = NULL;
 		UINT deviceCount = 0;
 		hr = m_pDecoderService->GetDecoderDeviceGuids( &deviceCount, &decoderDevices );
 		BREAK_ON_FAIL( hr );
 
 		BOOL bFound = FALSE;
-		for( UINT i = 0; i < deviceCount; ++i ) {
-			if( decoderDevices[i] == DXVA2_ModeH264_E ||
-				decoderDevices[i] == DXVA2_Intel_ModeH264_E ) {
-				m_DecoderGUID = decoderDevices[i];
-				bFound = TRUE;
-				break;
+		if( SUCCEEDED( hr ) ) {
+			for( UINT i = 0; i < deviceCount; ++i ) {
+				if( decoderDevices[i] == DXVA2_ModeH264_E ||
+					decoderDevices[i] == DXVA2_Intel_ModeH264_E ) {
+					m_DecoderGUID = decoderDevices[i];
+					bFound = TRUE;
+					break;
+				}
 			}
 		}
-
+		CoTaskMemFree( decoderDevices );
 		BREAK_IF_FALSE( bFound, E_FAIL );
 #endif
 	} while( false );
-
-	CoTaskMemFree( decoderDevices );
-
-	return hr;
-}
-
-HRESULT PresenterDX9::ConvertToDXVAType( IMFMediaType* pMediaType, DXVA2_VideoDesc* pDesc ) const
-{
-	if( pDesc == NULL )
-		return E_POINTER;
-
-	if( pMediaType == NULL )
-		return E_POINTER;
-
-	HRESULT hr = S_OK;
-
-	ZeroMemory( pDesc, sizeof( *pDesc ) );
-
-	do {
-		GUID guidSubType = GUID_NULL;
-		hr = pMediaType->GetGUID( MF_MT_SUBTYPE, &guidSubType );
-		BREAK_ON_FAIL( hr );
-
-		UINT32 width = 0, height = 0;
-		hr = MFGetAttributeSize( pMediaType, MF_MT_FRAME_SIZE, &width, &height );
-		BREAK_ON_FAIL( hr );
-
-		UINT32 fpsNumerator = 0, fpsDenominator = 0;
-		hr = MFGetAttributeRatio( pMediaType, MF_MT_FRAME_RATE, &fpsNumerator, &fpsDenominator );
-		BREAK_ON_FAIL( hr );
-
-		pDesc->Format = (D3DFORMAT)guidSubType.Data1;
-		pDesc->SampleWidth = width;
-		pDesc->SampleHeight = height;
-		pDesc->InputSampleFreq.Numerator = fpsNumerator;
-		pDesc->InputSampleFreq.Denominator = fpsDenominator;
-
-		hr = GetDXVA2ExtendedFormat( pMediaType, &pDesc->SampleFormat );
-		BREAK_ON_FAIL( hr );
-
-		pDesc->OutputFrameFreq = pDesc->InputSampleFreq;
-		if( ( pDesc->SampleFormat.SampleFormat == DXVA2_SampleFieldInterleavedEvenFirst ) ||
-			( pDesc->SampleFormat.SampleFormat == DXVA2_SampleFieldInterleavedOddFirst ) ) {
-			pDesc->OutputFrameFreq.Numerator *= 2;
-		}
-	} while( FALSE );
-
-	return hr;
-}
-
-HRESULT PresenterDX9::GetDXVA2ExtendedFormat( IMFMediaType* pMediaType, DXVA2_ExtendedFormat* pFormat ) const
-{
-	if( pFormat == NULL )
-		return E_POINTER;
-
-	if( pMediaType == NULL )
-		return E_POINTER;
-
-	HRESULT hr = S_OK;
-
-	do {
-		MFVideoInterlaceMode interlace = (MFVideoInterlaceMode)MFGetAttributeUINT32( pMediaType, MF_MT_INTERLACE_MODE, MFVideoInterlace_Unknown );
-
-		if( interlace == MFVideoInterlace_MixedInterlaceOrProgressive ) {
-			pFormat->SampleFormat = DXVA2_SampleFieldInterleavedEvenFirst;
-		}
-		else {
-			pFormat->SampleFormat = (UINT)interlace;
-		}
-
-		pFormat->VideoChromaSubsampling =
-			MFGetAttributeUINT32( pMediaType, MF_MT_VIDEO_CHROMA_SITING, MFVideoChromaSubsampling_Unknown );
-		pFormat->NominalRange =
-			MFGetAttributeUINT32( pMediaType, MF_MT_VIDEO_NOMINAL_RANGE, MFNominalRange_Unknown );
-		pFormat->VideoTransferMatrix =
-			MFGetAttributeUINT32( pMediaType, MF_MT_YUV_MATRIX, MFVideoTransferMatrix_Unknown );
-		pFormat->VideoLighting =
-			MFGetAttributeUINT32( pMediaType, MF_MT_VIDEO_LIGHTING, MFVideoLighting_Unknown );
-		pFormat->VideoPrimaries =
-			MFGetAttributeUINT32( pMediaType, MF_MT_VIDEO_PRIMARIES, MFVideoPrimaries_Unknown );
-		pFormat->VideoTransferFunction =
-			MFGetAttributeUINT32( pMediaType, MF_MT_TRANSFER_FUNCTION, MFVideoTransFunc_Unknown );
-	} while( FALSE );
 
 	return hr;
 }
@@ -821,6 +878,259 @@ HRESULT PresenterDX9::GetVideoDisplayArea( IMFMediaType* pType, MFVideoArea* pAr
 		}
 	}
 
+	return hr;
+}
+
+HRESULT PresenterDX9::ProcessFrameUsingD3D9( IDirect3DTexture9* pLeftTexture2D, IDirect3DTexture9* pRightTexture2D, UINT dwLeftViewIndex, UINT dwRightViewIndex, RECT rcDest, UINT32 unInterlaceMode, IMFSample** ppVideoOutFrame )
+{
+	HRESULT hr = S_OK;
+	/*//
+	//ID3D11VideoContext* pVideoContext = NULL;
+	//ID3D11VideoProcessorInputView* pLeftInputView = NULL;
+	//ID3D11VideoProcessorInputView* pRightInputView = NULL;
+	//ID3D11VideoProcessorOutputView* pOutputView = NULL;
+	//ID3D11Texture2D* pDXGIBackBuffer = NULL;
+	//ID3D11RenderTargetView* pRTView = NULL;
+	IMFSample* pRTSample = NULL;
+	IMFMediaBuffer* pBuffer = NULL;
+	//D3D11_VIDEO_PROCESSOR_CAPS vpCaps = { 0 };
+	LARGE_INTEGER lpcStart, lpcEnd;
+
+	do {
+		//if( !m_pVideoDevice ) {
+		//	hr = m_pD3DDevice->QueryInterface( __uuidof( ID3D11VideoDevice ), (void**)&m_pVideoDevice );
+		//	BREAK_ON_FAIL( hr );
+		//}
+
+		//hr = m_pD3DImmediateContext->QueryInterface( __uuidof( ID3D11VideoContext ), (void**)&pVideoContext );
+		//BREAK_ON_FAIL( hr );
+
+		// remember the original rectangles
+		RECT TRectOld = m_rcDstApp;
+		RECT SRectOld = m_rcSrcApp;
+		UpdateRectangles( &TRectOld, &SRectOld );
+
+		//Update destination rect with current client rect
+		m_rcDstApp = rcDest;
+
+		//D3D11_TEXTURE2D_DESC surfaceDesc;
+		//pLeftTexture2D->GetDesc( &surfaceDesc );
+
+		//if( !m_pVideoProcessorEnum || !m_pVideoProcessor || m_imageWidthInPixels != surfaceDesc.Width || m_imageHeightInPixels != surfaceDesc.Height ) {
+		//	SafeRelease( m_pVideoProcessorEnum );
+		//	SafeRelease( m_pVideoProcessor );
+
+		//	m_imageWidthInPixels = surfaceDesc.Width;
+		//	m_imageHeightInPixels = surfaceDesc.Height;
+
+		//	D3D11_VIDEO_PROCESSOR_CONTENT_DESC ContentDesc;
+		//	ZeroMemory( &ContentDesc, sizeof( ContentDesc ) );
+		//	ContentDesc.InputFrameFormat = D3D11_VIDEO_FRAME_FORMAT_INTERLACED_TOP_FIELD_FIRST;
+		//	ContentDesc.InputWidth = surfaceDesc.Width;
+		//	ContentDesc.InputHeight = surfaceDesc.Height;
+		//	ContentDesc.OutputWidth = surfaceDesc.Width;
+		//	ContentDesc.OutputHeight = surfaceDesc.Height;
+		//	ContentDesc.Usage = D3D11_VIDEO_USAGE_PLAYBACK_NORMAL;
+
+		//	hr = m_pVideoDevice->CreateVideoProcessorEnumerator( &ContentDesc, &m_pVideoProcessorEnum );
+		//	BREAK_ON_FAIL( hr );
+
+		//	UINT uiFlags;
+		//	DXGI_FORMAT VP_Output_Format = DXGI_FORMAT_B8G8R8A8_UNORM;
+
+		//	hr = m_pVideoProcessorEnum->CheckVideoProcessorFormat( VP_Output_Format, &uiFlags );
+		//	if( FAILED( hr ) || 0 == ( uiFlags & D3D11_VIDEO_PROCESSOR_FORMAT_SUPPORT_OUTPUT ) ) {
+		//		hr = MF_E_UNSUPPORTED_D3D_TYPE;
+		//		break;
+		//	}
+
+		//	m_rcSrcApp.left = 0;
+		//	m_rcSrcApp.top = 0;
+		//	m_rcSrcApp.right = m_uiRealDisplayWidth;
+		//	m_rcSrcApp.bottom = m_uiRealDisplayHeight;
+
+		//	DWORD index;
+		//	hr = FindBOBProcessorIndex( &index );
+		//	BREAK_ON_FAIL( hr );
+
+		//	hr = m_pVideoDevice->CreateVideoProcessor( m_pVideoProcessorEnum, index, &m_pVideoProcessor );
+		//	BREAK_ON_FAIL( hr );
+
+		//	if( m_b3DVideo ) {
+		//		hr = m_pVideoProcessorEnum->GetVideoProcessorCaps( &vpCaps );
+		//		BREAK_ON_FAIL( hr );
+
+		//		if( vpCaps.FeatureCaps & D3D11_VIDEO_PROCESSOR_FEATURE_CAPS_STEREO ) {
+		//			m_bStereoEnabled = TRUE;
+		//		}
+
+		//		DXGI_MODE_DESC1 modeFilter = { 0 };
+		//		modeFilter.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
+		//		modeFilter.Width = surfaceDesc.Width;
+		//		modeFilter.Height = surfaceDesc.Height;
+		//		modeFilter.Stereo = m_bStereoEnabled;
+
+		//		DXGI_MODE_DESC1 matchedMode;
+		//		if( m_bFullScreenState ) {
+		//			hr = m_pDXGIOutput1->FindClosestMatchingMode1( &modeFilter, &matchedMode, m_pD3DDevice );
+		//			BREAK_ON_FAIL( hr );
+		//		}
+		//	}
+		//}
+
+		// now create the input and output media types - these need to reflect
+		// the src and destination rectangles that we have been given.
+		RECT TRect = m_rcDstApp;
+		RECT SRect = m_rcSrcApp;
+		UpdateRectangles( &TRect, &SRect );
+
+		const BOOL fDestRectChanged = !EqualRect( &TRect, &TRectOld );
+
+		if( !m_pSwapChain1 || fDestRectChanged ) {
+			hr = UpdateDXGISwapChain();
+			BREAK_ON_FAIL( hr );
+		}
+
+		m_bCanProcessNextSample = FALSE;
+
+		// Get Backbuffer
+		hr = m_pSwapChain1->GetBuffer( 0, __uuidof( ID3D11Texture2D ), (void**)&pDXGIBackBuffer );
+		BREAK_ON_FAIL( hr );
+
+		// create the output media sample
+		hr = MFCreateSample( &pRTSample );
+		BREAK_ON_FAIL( hr );
+
+		hr = MFCreateDXGISurfaceBuffer( __uuidof( ID3D11Texture2D ), pDXGIBackBuffer, 0, FALSE, &pBuffer );
+		BREAK_ON_FAIL( hr );
+
+		hr = pRTSample->AddBuffer( pBuffer );
+		BREAK_ON_FAIL( hr );
+
+		if( m_b3DVideo && FALSE  ) { // 0 != m_vp3DOutput 
+			SafeRelease( pBuffer );
+
+			hr = MFCreateDXGISurfaceBuffer( __uuidof( ID3D11Texture2D ), pDXGIBackBuffer, 1, FALSE, &pBuffer );
+			BREAK_ON_FAIL( hr );
+
+			hr = pRTSample->AddBuffer( pBuffer );
+			BREAK_ON_FAIL( hr );
+		}
+
+		QueryPerformanceCounter( &lpcStart );
+
+		QueryPerformanceCounter( &lpcEnd );
+
+		//
+		// Create Output View of Output Surfaces.
+		//
+		D3D11_VIDEO_PROCESSOR_OUTPUT_VIEW_DESC OutputViewDesc;
+		ZeroMemory( &OutputViewDesc, sizeof( OutputViewDesc ) );
+		if( m_b3DVideo && m_bStereoEnabled ) {
+			OutputViewDesc.ViewDimension = D3D11_VPOV_DIMENSION_TEXTURE2DARRAY;
+		}
+		else {
+			OutputViewDesc.ViewDimension = D3D11_VPOV_DIMENSION_TEXTURE2D;
+		}
+		OutputViewDesc.Texture2D.MipSlice = 0;
+		OutputViewDesc.Texture2DArray.MipSlice = 0;
+		OutputViewDesc.Texture2DArray.FirstArraySlice = 0;
+		if( m_b3DVideo && FALSE  ) { // 0 != m_vp3DOutput
+			OutputViewDesc.Texture2DArray.ArraySize = 2; // STEREO
+		}
+
+		QueryPerformanceCounter( &lpcStart );
+
+		hr = m_pVideoDevice->CreateVideoProcessorOutputView( pDXGIBackBuffer, m_pVideoProcessorEnum, &OutputViewDesc, &pOutputView );
+		BREAK_ON_FAIL( hr );
+
+		D3D11_VIDEO_PROCESSOR_INPUT_VIEW_DESC InputLeftViewDesc;
+		ZeroMemory( &InputLeftViewDesc, sizeof( InputLeftViewDesc ) );
+		InputLeftViewDesc.FourCC = 0;
+		InputLeftViewDesc.ViewDimension = D3D11_VPIV_DIMENSION_TEXTURE2D;
+		InputLeftViewDesc.Texture2D.MipSlice = 0;
+		InputLeftViewDesc.Texture2D.ArraySlice = dwLeftViewIndex;
+
+		hr = m_pVideoDevice->CreateVideoProcessorInputView( pLeftTexture2D, m_pVideoProcessorEnum, &InputLeftViewDesc, &pLeftInputView );
+		BREAK_ON_FAIL( hr );
+
+		if( m_b3DVideo && FALSE  && pRightTexture2D ) { // MFVideo3DSampleFormat_MultiView == m_vp3DOutput
+			D3D11_VIDEO_PROCESSOR_INPUT_VIEW_DESC InputRightViewDesc;
+			ZeroMemory( &InputRightViewDesc, sizeof( InputRightViewDesc ) );
+			InputRightViewDesc.FourCC = 0;
+			InputRightViewDesc.ViewDimension = D3D11_VPIV_DIMENSION_TEXTURE2D;
+			InputRightViewDesc.Texture2D.MipSlice = 0;
+			InputRightViewDesc.Texture2D.ArraySlice = dwRightViewIndex;
+
+			hr = m_pVideoDevice->CreateVideoProcessorInputView( pRightTexture2D, m_pVideoProcessorEnum, &InputRightViewDesc, &pRightInputView );
+			BREAK_ON_FAIL( hr );
+		}
+		QueryPerformanceCounter( &lpcEnd );
+
+		QueryPerformanceCounter( &lpcStart );
+
+		SetVideoContextParameters( pVideoContext, &SRect, &TRect, unInterlaceMode );
+
+#if (WINVER >= _WIN32_WINNT_WIN8)
+		// Enable/Disable Stereo
+		if( m_b3DVideo ) {
+			pVideoContext->VideoProcessorSetOutputStereoMode( m_pVideoProcessor, m_bStereoEnabled );
+
+			D3D11_VIDEO_PROCESSOR_STEREO_FORMAT vpStereoFormat = D3D11_VIDEO_PROCESSOR_STEREO_FORMAT_SEPARATE;
+			if( MFVideo3DSampleFormat_Packed_LeftRight == m_vp3DOutput ) {
+				vpStereoFormat = D3D11_VIDEO_PROCESSOR_STEREO_FORMAT_HORIZONTAL;
+			}
+			else if( MFVideo3DSampleFormat_Packed_TopBottom == m_vp3DOutput ) {
+				vpStereoFormat = D3D11_VIDEO_PROCESSOR_STEREO_FORMAT_VERTICAL;
+			}
+
+			pVideoContext->VideoProcessorSetStreamStereoFormat( m_pVideoProcessor,
+																0, m_bStereoEnabled, vpStereoFormat, TRUE, TRUE, D3D11_VIDEO_PROCESSOR_STEREO_FLIP_NONE, 0 );
+		}
+#endif
+
+		QueryPerformanceCounter( &lpcEnd );
+
+		QueryPerformanceCounter( &lpcStart );
+
+		D3D11_VIDEO_PROCESSOR_STREAM StreamData;
+		ZeroMemory( &StreamData, sizeof( StreamData ) );
+		StreamData.Enable = TRUE;
+		StreamData.OutputIndex = 0;
+		StreamData.InputFrameOrField = 0;
+		StreamData.PastFrames = 0;
+		StreamData.FutureFrames = 0;
+		StreamData.ppPastSurfaces = NULL;
+		StreamData.ppFutureSurfaces = NULL;
+		StreamData.pInputSurface = pLeftInputView;
+		StreamData.ppPastSurfacesRight = NULL;
+		StreamData.ppFutureSurfacesRight = NULL;
+
+#if (WINVER >= _WIN32_WINNT_WIN8)
+		if( m_b3DVideo && MFVideo3DSampleFormat_MultiView == m_vp3DOutput && pRightTexture2D ) {
+			StreamData.pInputSurfaceRight = pRightInputView;
+		}
+#endif
+
+		hr = pVideoContext->VideoProcessorBlt( m_pVideoProcessor, pOutputView, 0, 1, &StreamData );
+		BREAK_ON_FAIL( hr );
+
+		QueryPerformanceCounter( &lpcEnd );
+
+		if( ppVideoOutFrame != NULL ) {
+			*ppVideoOutFrame = pRTSample;
+			( *ppVideoOutFrame )->AddRef();
+		}
+	} while( FALSE );
+
+	SafeRelease( pBuffer );
+	SafeRelease( pRTSample );
+	SafeRelease( pDXGIBackBuffer );
+	SafeRelease( pOutputView );
+	SafeRelease( pLeftInputView );
+	SafeRelease( pRightInputView );
+	SafeRelease( pVideoContext );
+//*/
 	return hr;
 }
 

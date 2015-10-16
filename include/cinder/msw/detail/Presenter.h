@@ -2,11 +2,10 @@
 
 #include "cinder/msw/CinderMsw.h"
 #include "cinder/msw/ScopedPtr.h"
+#include "cinder/msw/MediaFoundation.h"
 #include "cinder/msw/detail/MonitorArray.h"
 
 #include <d3dcommon.h>
-#include <evr.h> // IMFVideoDisplayControl
-#include <mfidl.h> // for IMFVideoProcessorControl
 
 // MF_MT_VIDEO_3D is only defined for Windows 8+, but we need it to check if a video is 3D.
 #if (WINVER < _WIN32_WINNT_WIN8)
@@ -45,6 +44,14 @@ public:
 		, m_hwndVideo( NULL )
 		, m_pMonitors( NULL )
 		, m_lpCurrMon( NULL )
+		, m_displayRect() // default ctor
+		, m_imageWidthInPixels( 0 )
+		, m_imageHeightInPixels( 0 )
+		, m_uiRealDisplayWidth( 0 )
+		, m_uiRealDisplayHeight( 0 )
+		, m_rcSrcApp() // default ctor
+		, m_rcDstApp() // default ctor
+		, m_IsShutdown( FALSE )
 	{
 	}
 	virtual ~Presenter()
@@ -84,6 +91,9 @@ public:
 	virtual STDMETHODIMP_( BOOL ) IsDX11() const = 0;
 
 protected:
+	STDMETHODIMP_( BOOL )         CheckEmptyRect( RECT* pDst );
+	STDMETHODIMP                  CheckShutdown( void ) const;
+
 	STDMETHODIMP SetMonitor( UINT adapterID )
 	{
 		HRESULT hr = S_OK;
@@ -132,7 +142,7 @@ protected:
 					hr = SetMonitor( pMonInfo->uDevID );
 					BREAK_ON_FAIL( hr );
 
-					hr = S_FALSE;
+					hr = S_FALSE; // Signal lost device.
 				}
 			}
 			else {
@@ -148,6 +158,7 @@ protected:
 	STDMETHODIMP_( VOID ) LetterBoxDstRect( LPRECT lprcLBDst, const RECT & rcSrc, const RECT & rcDst );
 	STDMETHODIMP_( VOID ) PixelAspectToPictureAspect( int Width, int Height, int PixelAspectX, int PixelAspectY, int * pPictureAspectX, int * pPictureAspectY );
 	STDMETHODIMP_( VOID ) AspectRatioCorrectSize( LPSIZE lpSizeImage, const SIZE & sizeAr, const SIZE & sizeOrig, BOOL ScaleXorY );
+	STDMETHODIMP_( VOID ) UpdateRectangles( RECT* pDst, RECT* pSrc );
 
 protected:
 	CriticalSection                 m_critSec;                  // critical section for thread safety
@@ -156,6 +167,15 @@ protected:
 	MonitorArray*                   m_pMonitors;
 	AMDDrawMonitorInfo*             m_lpCurrMon;
 	UINT                            m_ConnectionGUID;
+	RECT                            m_displayRect;
+	UINT32                          m_imageWidthInPixels;
+	UINT32                          m_imageHeightInPixels;
+	UINT32                          m_uiRealDisplayWidth;
+	UINT32                          m_uiRealDisplayHeight;
+	RECT                            m_rcSrcApp;
+	RECT                            m_rcDstApp;
+
+	BOOL                            m_IsShutdown;               // Flag to indicate if Shutdown() method was called.
 
 private:
 	long                            m_nRefCount;                // reference count

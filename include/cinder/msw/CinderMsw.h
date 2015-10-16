@@ -55,11 +55,11 @@ namespace msw {
 #endif // !HIDWORD
 
 #ifndef BREAK_ON_FAIL
-#define BREAK_ON_FAIL(value)          if( FAILED( value ) ) { __debugbreak(); break; }
+#define BREAK_ON_FAIL(value)          if( FAILED( value ) ) { /*__debugbreak();*/ break; }
 #endif // !BREAK_ON_FAIL
 
 #ifndef BREAK_ON_NULL
-#define BREAK_ON_NULL(value, result)  if( value == NULL ) { hr = result; __debugbreak(); break; }
+#define BREAK_ON_NULL(value, result)  if( value == NULL ) { hr = result; /*__debugbreak();*/ break; }
 #endif // !BREAK_ON_NULL
 
 #ifndef BREAK_IF_TRUE

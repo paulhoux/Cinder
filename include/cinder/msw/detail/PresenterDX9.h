@@ -11,6 +11,47 @@ namespace cinder {
 namespace msw {
 namespace detail {
 
+/*//
+class IMFSamplePool : public IUnknown {
+public:
+	IMFSamplePool( IDirectXVideoDecoderService* pDecoder, IMFMediaType* pMediaType );
+	~IMFSamplePool();
+
+	// IUnknown
+	STDMETHODIMP QueryInterface( REFIID iid, __RPC__deref_out _Result_nullonfailure_ void** ppv );
+
+	STDMETHODIMP_( ULONG ) AddRef( void )
+	{
+		return InterlockedIncrement( &m_nRefCount );
+	}
+
+	STDMETHODIMP_( ULONG ) Release( void )
+	{
+		ULONG uCount = InterlockedDecrement( &m_nRefCount );
+		if( uCount == 0 ) {
+			delete this;
+		}
+		// For thread safety, return a temporary variable.
+		return uCount;
+	}
+
+	// IMFSamplePool
+	STDMETHODIMP SetMaxPoolSize( DWORD size );
+
+	STDMETHODIMP GetFreeSample( IMFSample **pSample );
+
+private:
+	long                          m_nRefCount;  // reference count
+
+	IDirectXVideoDecoderService*  m_pDecoderService;
+	DXVA2_VideoDesc               m_Desc;
+
+	IDirect3DSurface9*            m_aSurfaces[8];
+	IMFSample*                    m_aSamples[8];
+
+	DWORD                         m_Count;
+};//*/
+
 class PresenterDX9 : public Presenter {
 public:
 	PresenterDX9( void );
@@ -103,15 +144,10 @@ public:
 
 private:
 	STDMETHODIMP CheckDeviceState( BOOL* pbDeviceChanged );
-	STDMETHODIMP CheckShutdown( void ) const;
 	STDMETHODIMP CreateDXVA2ManagerAndDevice( D3D_DRIVER_TYPE DriverType = D3D_DRIVER_TYPE_HARDWARE );
 
-	STDMETHODIMP ConvertToDXVAType( IMFMediaType* pMediaType, DXVA2_VideoDesc* pDesc ) const;
-	STDMETHODIMP GetDXVA2ExtendedFormat( IMFMediaType* pMediaType, DXVA2_ExtendedFormat* pFormat ) const;
-
 	STDMETHODIMP GetVideoDisplayArea( IMFMediaType* pType, MFVideoArea* pArea );
-
-	BOOL                            m_IsShutdown;               // Flag to indicate if Shutdown() method was called.
+	STDMETHODIMP ProcessFrameUsingD3D9( IDirect3DTexture9* pLeftTexture2D, IDirect3DTexture9* pRightTexture2D, UINT dwLeftViewIndex, UINT dwRightViewIndex, RECT rcDest, UINT32 unInterlaceMode, IMFSample** ppVideoOutFrame );
 
 	UINT                            m_DeviceResetToken;
 	D3DDISPLAYMODE                  m_DisplayMode;              // Adapter's display mode.
@@ -130,13 +166,6 @@ private:
 	BOOL                            m_b3DVideo;
 	BOOL                            m_bFullScreenState;
 	BOOL                            m_bCanProcessNextSample;
-	RECT                            m_displayRect;
-	UINT32                          m_imageWidthInPixels;
-	UINT32                          m_imageHeightInPixels;
-	UINT32                          m_uiRealDisplayWidth;
-	UINT32                          m_uiRealDisplayHeight;
-	RECT                            m_rcSrcApp;
-	RECT                            m_rcDstApp;
 
 	// Define a function pointer to the Direct3DCreate9Ex function.
 	typedef HRESULT( WINAPI *LPDIRECT3DCREATE9EX )( UINT, IDirect3D9Ex ** );

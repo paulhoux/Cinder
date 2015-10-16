@@ -941,6 +941,76 @@ HRESULT MFPlayer::AddBranchToPartialTopology( IMFTopology *pTopology, IMFMediaSo
 	return hr;
 }
 
+/*// ----------------------------------------------------------------------------
+
+ScopedLockDevice::ScopedLockDevice( IDirect3DDeviceManager9 *pDeviceManager, BOOL fBlock )
+	: m_pDeviceManager( NULL )
+	, m_pDevice( NULL )
+	, m_pHandle( NULL )
+{
+	HRESULT hr = S_OK;
+
+	do {
+		HANDLE hDevice = 0;
+		hr = pDeviceManager->OpenDeviceHandle( &hDevice );
+		BREAK_ON_FAIL( hr );
+
+		hr = pDeviceManager->LockDevice( hDevice, &m_pDevice, fBlock );
+
+		if( hr == DXVA2_E_NEW_VIDEO_DEVICE ) {
+			// Invalid device handle. Try to open a new device handle.
+			hr = pDeviceManager->CloseDeviceHandle( hDevice );
+			BREAK_ON_FAIL( hr );
+
+			hr = pDeviceManager->OpenDeviceHandle( &hDevice );
+			BREAK_ON_FAIL( hr );
+
+			// Try to lock the device again.
+			hr = pDeviceManager->LockDevice( hDevice, &m_pDevice, TRUE );
+			BREAK_ON_FAIL( hr );
+		}
+		else {
+			BREAK_ON_FAIL( hr );
+		}
+
+		m_pHandle = hDevice;
+
+		m_pDeviceManager = pDeviceManager;
+		m_pDeviceManager->AddRef();
+	} while( FALSE );
+}
+
+ScopedLockDevice::~ScopedLockDevice()
+{
+	HRESULT hr = S_OK;
+
+	do {
+		if( m_pHandle != NULL && m_pDeviceManager != NULL ) {
+			hr = m_pDeviceManager->UnlockDevice( m_pHandle, FALSE );
+			BREAK_ON_FAIL( hr );
+
+			hr = m_pDeviceManager->CloseDeviceHandle( m_pHandle );
+			BREAK_ON_FAIL( hr );
+		}
+	} while( FALSE );
+
+	SafeRelease( m_pDeviceManager );
+}
+
+HRESULT ScopedLockDevice::GetDevice( IDirect3DDevice9** pDevice )
+{
+	if( pDevice == NULL )
+		return E_POINTER;
+
+	if( m_pDevice == NULL )
+		return E_FAIL;
+
+	*pDevice = m_pDevice;
+
+	return S_OK;
+}
+//*/
+
 } // namespace msw
 } // namespace cinder
 

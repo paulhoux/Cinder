@@ -26,14 +26,15 @@ POSSIBILITY OF SUCH DAMAGE.
 
 #pragma once
 
-#include "cinder/Cinder.h"
 #include "cinder/Exception.h"
 #include "cinder/app/Window.h" // ci::app::Window::Format
+#include "cinder/msw/CinderMsw.h"
 
-#include <windows.h>
 #include <mfapi.h>
 #include <mferror.h>
 #include <mfidl.h>
+#include <d3d9.h>
+#include <dxva2api.h>
 #include <evr.h>
 
 #define MF_USE_DXVA2_DECODER 1
@@ -54,6 +55,19 @@ struct ScopedMFInitializer {
 		::MFShutdown();
 	}
 };
+
+/*//
+struct ScopedLockDevice {
+	ScopedLockDevice( IDirect3DDeviceManager9 *pDeviceManager, BOOL fBlock );
+	~ScopedLockDevice();
+
+	STDMETHODIMP GetDevice( IDirect3DDevice9** pDevice );
+
+private:
+	IDirect3DDeviceManager9*  m_pDeviceManager;
+	IDirect3DDevice9*         m_pDevice;
+	HANDLE                    m_pHandle;
+};//*/
 
 //------------------------------------------------------------------------------------
 
@@ -200,6 +214,88 @@ HRESULT MFGetEventObject( IMFMediaEvent *pEvent, Q **ppObject )
 		}
 		PropVariantClear( &var );
 	}
+
+	return hr;
+}
+
+//------------------------------------------------------------------------------------
+
+inline HRESULT GetDXVA2ExtendedFormat( IMFMediaType* pMediaType, DXVA2_ExtendedFormat* pFormat )
+{
+	if( pFormat == NULL )
+		return E_POINTER;
+
+	if( pMediaType == NULL )
+		return E_POINTER;
+
+	HRESULT hr = S_OK;
+
+	do {
+		MFVideoInterlaceMode interlace = (MFVideoInterlaceMode)MFGetAttributeUINT32( pMediaType, MF_MT_INTERLACE_MODE, MFVideoInterlace_Unknown );
+
+		if( interlace == MFVideoInterlace_MixedInterlaceOrProgressive ) {
+			pFormat->SampleFormat = DXVA2_SampleFieldInterleavedEvenFirst;
+		}
+		else {
+			pFormat->SampleFormat = (UINT)interlace;
+		}
+
+		pFormat->VideoChromaSubsampling =
+			MFGetAttributeUINT32( pMediaType, MF_MT_VIDEO_CHROMA_SITING, MFVideoChromaSubsampling_Unknown );
+		pFormat->NominalRange =
+			MFGetAttributeUINT32( pMediaType, MF_MT_VIDEO_NOMINAL_RANGE, MFNominalRange_Unknown );
+		pFormat->VideoTransferMatrix =
+			MFGetAttributeUINT32( pMediaType, MF_MT_YUV_MATRIX, MFVideoTransferMatrix_Unknown );
+		pFormat->VideoLighting =
+			MFGetAttributeUINT32( pMediaType, MF_MT_VIDEO_LIGHTING, MFVideoLighting_Unknown );
+		pFormat->VideoPrimaries =
+			MFGetAttributeUINT32( pMediaType, MF_MT_VIDEO_PRIMARIES, MFVideoPrimaries_Unknown );
+		pFormat->VideoTransferFunction =
+			MFGetAttributeUINT32( pMediaType, MF_MT_TRANSFER_FUNCTION, MFVideoTransFunc_Unknown );
+	} while( FALSE );
+
+	return hr;
+}
+
+inline HRESULT ConvertToDXVAType( IMFMediaType* pMediaType, DXVA2_VideoDesc* pDesc ) {
+	if( pDesc == NULL )
+		return E_POINTER;
+
+	if( pMediaType == NULL )
+		return E_POINTER;
+
+	HRESULT hr = S_OK;
+
+	ZeroMemory( pDesc, sizeof( *pDesc ) );
+
+	do {
+		GUID guidSubType = GUID_NULL;
+		hr = pMediaType->GetGUID( MF_MT_SUBTYPE, &guidSubType );
+		BREAK_ON_FAIL( hr );
+
+		UINT32 width = 0, height = 0;
+		hr = MFGetAttributeSize( pMediaType, MF_MT_FRAME_SIZE, &width, &height );
+		BREAK_ON_FAIL( hr );
+
+		UINT32 fpsNumerator = 0, fpsDenominator = 0;
+		hr = MFGetAttributeRatio( pMediaType, MF_MT_FRAME_RATE, &fpsNumerator, &fpsDenominator );
+		BREAK_ON_FAIL( hr );
+
+		pDesc->Format = (D3DFORMAT)guidSubType.Data1;
+		pDesc->SampleWidth = width;
+		pDesc->SampleHeight = height;
+		pDesc->InputSampleFreq.Numerator = fpsNumerator;
+		pDesc->InputSampleFreq.Denominator = fpsDenominator;
+
+		hr = GetDXVA2ExtendedFormat( pMediaType, &pDesc->SampleFormat );
+		BREAK_ON_FAIL( hr );
+
+		pDesc->OutputFrameFreq = pDesc->InputSampleFreq;
+		if( ( pDesc->SampleFormat.SampleFormat == DXVA2_SampleFieldInterleavedEvenFirst ) ||
+			( pDesc->SampleFormat.SampleFormat == DXVA2_SampleFieldInterleavedOddFirst ) ) {
+			pDesc->OutputFrameFreq.Numerator *= 2;
+		}
+	} while( FALSE );
 
 	return hr;
 }
