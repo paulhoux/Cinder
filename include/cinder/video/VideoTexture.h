@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include "cinder/Signals.h"
 #include "cinder/gl/Texture.h"
 #include "cinder/video/Video.h"
 
@@ -42,6 +43,11 @@ public:
 	const Texture2dRef getTexture() const;
 
 private:
+	void close();
+
+private:
+	signals::ScopedConnection mConnCleanup;
+
 #if defined(CINDER_MSW)
 	msw::MFPlayer  *mPlayerPtr;
 #endif

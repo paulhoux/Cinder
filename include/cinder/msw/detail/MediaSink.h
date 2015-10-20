@@ -9,7 +9,7 @@ namespace cinder {
 namespace msw {
 namespace detail {
 
-class MediaSink :
+class __declspec( uuid( "2083AAAE-A8A1-4AE7-8F21-F43B7AC15A97" ) ) MediaSink :
 	public IMFMediaSink,
 	public IMFClockStateSink,
 	public IMFGetService,

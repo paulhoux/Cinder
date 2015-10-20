@@ -302,7 +302,7 @@ inline HRESULT ConvertToDXVAType( IMFMediaType* pMediaType, DXVA2_VideoDesc* pDe
 
 //------------------------------------------------------------------------------------
 
-class MFPlayer : public IMFAsyncCallback {
+class __declspec( uuid( "5D1B744C-7145-431D-B62C-6BF08BB9E17C" ) ) MFPlayer : public IMFAsyncCallback {
 public:
 	typedef enum State {
 		Closed = 0,     // No session.

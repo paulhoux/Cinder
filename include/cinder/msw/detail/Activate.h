@@ -7,7 +7,7 @@ namespace cinder {
 namespace msw {
 namespace detail {
 
-class Activate : public MFAttributesImpl<IMFActivate>, public IPersistStream {
+class __declspec( uuid( "30212DC8-9CE6-4CEF-BF26-4CA034A3476F" ) ) Activate : public MFAttributesImpl<IMFActivate>, public IPersistStream {
 public:
 	static HRESULT CreateInstance( HWND hwnd, IMFActivate** ppActivate );
 

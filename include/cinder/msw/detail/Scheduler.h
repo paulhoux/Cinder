@@ -35,7 +35,7 @@ struct SchedulerCallback {
 // for repaints).
 //-----------------------------------------------------------------------------
 
-class Scheduler :
+class __declspec( uuid( "9D28C5FA-DD8B-4758-B828-EB254AC707EA" ) ) Scheduler :
 	public IUnknown {
 public:
 	Scheduler( CriticalSection& critSec );

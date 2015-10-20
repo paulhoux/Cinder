@@ -26,7 +26,7 @@ IMarker : public IUnknown
 
 // Holds marker information for IMFStreamSink::PlaceMarker
 
-class Marker : public IMarker {
+class __declspec( uuid( "FFE16F68-75F9-41F4-88B4-0E2787DB5283" ) ) Marker : public IMarker {
 public:
 	static HRESULT Create(
 		MFSTREAMSINK_MARKER_TYPE eMarkerType,

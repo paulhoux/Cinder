@@ -52,7 +52,7 @@ private:
 	DWORD                         m_Count;
 };//*/
 
-class PresenterDX9 : public Presenter {
+class __declspec( uuid( "011760FC-FF4C-4B8B-B0CE-823842C812E9" ) ) PresenterDX9 : public Presenter {
 public:
 	PresenterDX9( void );
 	virtual ~PresenterDX9( void );
@@ -149,6 +149,9 @@ private:
 	STDMETHODIMP GetVideoDisplayArea( IMFMediaType* pType, MFVideoArea* pArea );
 	STDMETHODIMP ProcessFrameUsingD3D9( IDirect3DTexture9* pLeftTexture2D, IDirect3DTexture9* pRightTexture2D, UINT dwLeftViewIndex, UINT dwRightViewIndex, RECT rcDest, UINT32 unInterlaceMode, IMFSample** ppVideoOutFrame );
 
+	_Post_satisfies_( this->m_pSwapChain != NULL )
+	STDMETHODIMP UpdateDX9SwapChain( void );
+
 	UINT                            m_DeviceResetToken;
 	D3DDISPLAYMODE                  m_DisplayMode;              // Adapter's display mode.
 
@@ -159,6 +162,8 @@ private:
 
 	IDirectXVideoDecoderService*    m_pDecoderService;
 	GUID                            m_DecoderGUID;
+
+	IDirect3DSwapChain9*            m_pSwapChain;
 
 	// Dynamically link to DirectX.
 	HMODULE                         m_D3D9Module;

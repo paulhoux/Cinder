@@ -23,7 +23,7 @@ namespace cinder {
 namespace msw {
 namespace detail {
 
-class PresenterDX11 : public Presenter {
+class __declspec( uuid( "B85BC91A-0513-4015-9AE6-C10FEB1D00E9" ) ) PresenterDX11 : public Presenter {
 public:
 	PresenterDX11( void );
 	virtual ~PresenterDX11( void );

@@ -32,6 +32,7 @@
 #include <string>
 #include <windows.h>
 #include <Objidl.h>
+#include <Shlwapi.h>
 #undef min
 #undef max
 
@@ -57,6 +58,10 @@ namespace msw {
 #ifndef BREAK_ON_FAIL
 #define BREAK_ON_FAIL(value)          if( FAILED( value ) ) { /*__debugbreak();*/ break; }
 #endif // !BREAK_ON_FAIL
+
+#ifndef BREAK_ON_FAIL_MSG
+#define BREAK_ON_FAIL_MSG(value, msg) if( FAILED( value ) ) { CI_LOG_E(msg); /*__debugbreak();*/ break; }
+#endif // !BREAK_ON_FAIL_MSG
 
 #ifndef BREAK_ON_NULL
 #define BREAK_ON_NULL(value, result)  if( value == NULL ) { hr = result; /*__debugbreak();*/ break; }
@@ -89,6 +94,39 @@ inline vec2 toVec2( const ::POINTFX &p )
 	return vec2( ( ( p.x.value << 16 ) | p.x.fract ) / 65535.0f, ( ( p.y.value << 16 ) | p.y.fract ) / 65535.0f );
 }
 #endif
+
+//!
+inline BOOL GetInterfaceName( __RPC__in const UUID& interface_id, __RPC__out std::wstring& wstrInterfaceNameReceiver )
+{
+	std::wstring wszSubKeyName;
+	LPOLESTR  pwszInterfaceIDString = NULL;
+
+	StringFromIID( interface_id, &pwszInterfaceIDString );
+
+	wszSubKeyName = L"Interface\\";
+	wszSubKeyName += (WCHAR*)pwszInterfaceIDString;
+
+	CoTaskMemFree( (LPVOID)pwszInterfaceIDString );
+	pwszInterfaceIDString = NULL;
+
+	DWORD   dwType = 0;
+	DWORD   dwDataSize = 0;
+
+	wstrInterfaceNameReceiver.resize( 256, 0 );
+	dwDataSize = wstrInterfaceNameReceiver.size() * sizeof( WCHAR );
+	LONG lRet = SHRegGetValue
+		(
+			HKEY_CLASSES_ROOT,
+			(wchar_t*)( wszSubKeyName.c_str() ),
+			NULL,  // This would obtain the default value.
+			RRF_RT_REG_SZ,
+			&dwType,
+			(PVOID)&( wstrInterfaceNameReceiver[0] ),
+			&dwDataSize
+			);
+
+	return ( lRet == 0 );
+}
 
 //! Closes a handle if not NULL, and sets the handle to NULL.
 inline void SafeCloseHandle( HANDLE& h )

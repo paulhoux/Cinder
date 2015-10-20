@@ -11,7 +11,7 @@ namespace cinder {
 namespace msw {
 namespace detail {
 
-class StreamSink :
+class __declspec( uuid( "FCB11007-A68C-4383-8640-9887BBE597E8" ) ) StreamSink :
 	public IMFStreamSink,
 	public IMFMediaTypeHandler,
 	public IMFGetService,
@@ -110,7 +110,7 @@ private:
 	// called, we use it to queue a marker. This way, samples and markers can live in
 	// the same queue. We need this because the sink has to serialize marker events
 	// with sample processing.
-	class CAsyncOperation : public IUnknown {
+	class __declspec( uuid( "0A2DF44B-3108-44F2-B5A8-0D85B4273CD2" ) ) CAsyncOperation : public IUnknown {
 	public:
 
 		CAsyncOperation( StreamOperation op );

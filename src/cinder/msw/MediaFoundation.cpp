@@ -32,7 +32,6 @@ POSSIBILITY OF SUCH DAMAGE.
 #include "cinder/msw/CinderMsw.h"
 #include "cinder/msw/MediaFoundation.h"
 #include "cinder/msw/ScopedPtr.h"
-
 #include "cinder/msw/detail/Activate.h"
 
 #include <string>
@@ -637,7 +636,7 @@ void MFPlayer::RegisterWindowClass()
 	wc.hInstance = instance;
 	wc.hIcon = ::LoadIcon( NULL, IDI_WINLOGO );
 	wc.hCursor = ::LoadCursor( NULL, IDC_ARROW );
-	wc.hbrBackground = (HBRUSH)( BLACK_BRUSH );
+	wc.hbrBackground = (HBRUSH)::GetStockObject( BLACK_BRUSH );
 	wc.lpszMenuName = NULL;
 	wc.lpszClassName = MF_WINDOW_CLASS_NAME;
 

@@ -36,7 +36,7 @@ namespace msw {
 namespace detail {
 
 //! Abstract base class.
-class Presenter : public IMFVideoDisplayControl, public IMFGetService {
+class __declspec( uuid( "F57105CF-F608-4107-ADD5-B0CF01CBFD0D" ) ) Presenter : public IMFVideoDisplayControl, public IMFGetService {
 public:
 	Presenter()
 		: m_nRefCount( 1 )

@@ -122,6 +122,7 @@ PresenterDX9::PresenterDX9( void )
 	, m_D3D9Module( NULL )
 	, m_pDecoderService( NULL )
 	, m_DecoderGUID( GUID_NULL )
+	, m_pSwapChain( NULL )
 	, m_b3DVideo( FALSE )
 	, _Direct3DCreate9Ex( NULL )
 {
@@ -362,9 +363,9 @@ HRESULT PresenterDX9::IsMediaTypeSupported( IMFMediaType *pMediaType )
 		BREAK_ON_FAIL( hr );
 
 		// Reject interlaced formats.
-		MFVideoInterlaceMode interlaceMode;
-		hr = pMediaType->GetUINT32( MF_MT_INTERLACE_MODE, (UINT32*)&interlaceMode );
-		BREAK_ON_FAIL( hr );
+		//MFVideoInterlaceMode interlaceMode;
+		//hr = pMediaType->GetUINT32( MF_MT_INTERLACE_MODE, (UINT32*)&interlaceMode );
+		//BREAK_ON_FAIL( hr );
 		//BREAK_IF_FALSE( interlaceMode == MFVideoInterlace_Progressive, MF_E_INVALIDMEDIATYPE );
 #endif
 	} while( FALSE );
@@ -475,17 +476,6 @@ HRESULT PresenterDX9::ProcessFrame( IMFMediaType* pCurrentType, IMFSample* pSamp
 		hr = MFGetService( pBuffer, MR_BUFFER_SERVICE, __uuidof( IDirect3DSurface9 ), (void**)&pSurface );
 		BREAK_ON_FAIL( hr );
 
-		// Get the swap chain from the surface.
-		//ScopedPtr<IDirect3DSwapChain9> pSwapChain;
-		//hr = pSurface->GetContainer( __uuidof( IDirect3DSwapChain9 ), (LPVOID*)&pSwapChain );
-		//BREAK_ON_FAIL( hr );
-		
-		// Present the swap chain.
-		ScopedPtr<IDirect3DSurface9> pBackBuffer;
-		//pSwapChain->GetBackBuffer( 0, D3DBACKBUFFER_TYPE_MONO, &pBackBuffer );
-		hr = m_pD3DDevice->GetBackBuffer( 0, 0, D3DBACKBUFFER_TYPE_MONO, &pBackBuffer );
-		BREAK_ON_FAIL( hr );
-
 		// TEMP!
 
 		// remember the original rectangles
@@ -501,7 +491,31 @@ HRESULT PresenterDX9::ProcessFrame( IMFMediaType* pCurrentType, IMFSample* pSamp
 		m_rcSrcApp.right = m_uiRealDisplayWidth;
 		m_rcSrcApp.bottom = m_uiRealDisplayHeight;
 
-		UpdateRectangles( &m_rcDstApp, &m_rcSrcApp );
+		// now create the input and output media types - these need to reflect
+		// the src and destination rectangles that we have been given.
+		RECT TRect = m_rcDstApp;
+		RECT SRect = m_rcSrcApp;
+		UpdateRectangles( &TRect, &SRect );
+
+		const BOOL fDestRectChanged = !EqualRect( &TRect, &TRectOld );
+
+		if( !m_pSwapChain || fDestRectChanged ) {
+			hr = UpdateDX9SwapChain();
+			BREAK_ON_FAIL( hr );
+		}
+
+		m_bCanProcessNextSample = FALSE;
+
+		// Get Backbuffer
+
+		// Get the swap chain from the surface.
+		//ScopedPtr<IDirect3DSwapChain9> pSwapChain;
+		//hr = pSurface->GetContainer( __uuidof( IDirect3DSwapChain9 ), (LPVOID*)&pSwapChain );
+		//BREAK_ON_FAIL( hr );
+
+		ScopedPtr<IDirect3DSurface9> pBackBuffer;
+		m_pSwapChain->GetBackBuffer( 0, D3DBACKBUFFER_TYPE_MONO, &pBackBuffer );
+		BREAK_ON_FAIL( hr );
 
 		// END TEMP!
 
@@ -509,8 +523,8 @@ HRESULT PresenterDX9::ProcessFrame( IMFMediaType* pCurrentType, IMFSample* pSamp
 		hr = m_pD3DDevice->StretchRect( pSurface, NULL, pBackBuffer, NULL, D3DTEXF_NONE );
 		BREAK_ON_FAIL( hr );
 
-		//hr = pSwapChain->Present( NULL, &rcDest, m_hwndVideo, NULL, 0 );
-		hr = m_pD3DDevice->Present( NULL, &m_rcDstApp, m_hwndVideo, NULL );
+		hr = m_pSwapChain->Present( NULL, &TRect, m_hwndVideo, NULL, 0 );
+		//hr = m_pD3DDevice->Present( NULL, &TRect, m_hwndVideo, NULL );
 		BREAK_ON_FAIL( hr );
 		//*/
 
@@ -641,10 +655,11 @@ HRESULT PresenterDX9::Shutdown( void )
 
 	m_IsShutdown = TRUE;
 
+	SafeRelease( m_pSwapChain );
 	SafeRelease( m_pDecoderService );
 	SafeRelease( m_pSampleAllocator );
-	SafeRelease( m_pD3DDevice );
 	SafeRelease( m_pDeviceManager );
+	SafeRelease( m_pD3DDevice );
 	SafeRelease( m_pD3D9 );
 
 	return hr;
@@ -720,14 +735,12 @@ HRESULT PresenterDX9::CreateDXVA2ManagerAndDevice( D3D_DRIVER_TYPE DriverType )
 			BREAK_ON_FAIL( hr );
 		}
 
-#if MF_USE_DXVA2_DECODER
 		// Ensure we can do the YCbCr->RGB conversion in StretchRect.
 		hr = m_pD3D9->CheckDeviceFormatConversion( D3DADAPTER_DEFAULT,
 												   D3DDEVTYPE_HAL,
 												   (D3DFORMAT)MAKEFOURCC( 'N', 'V', '1', '2' ),
 												   D3DFMT_X8R8G8B8 );
-		BREAK_ON_FAIL( hr );
-#endif
+		BREAK_ON_FAIL_MSG( hr, "Conversion from YUV to RGB is not supported." );
 
 		// Close existing video decoder and device manager.
 		SafeRelease( m_pDecoderService );
@@ -742,7 +755,7 @@ HRESULT PresenterDX9::CreateDXVA2ManagerAndDevice( D3D_DRIVER_TYPE DriverType )
 		ZeroMemory( &ddCaps, sizeof( ddCaps ) );
 
 		hr = m_pD3D9->GetDeviceCaps( m_ConnectionGUID, D3DDEVTYPE_HAL, &ddCaps );
-		BREAK_ON_FAIL( hr );
+		BREAK_ON_FAIL_MSG( hr, "No hardware renderer available." );
 
 		// Check if device supports hardware processing.
 		BREAK_IF_FALSE( ddCaps.DevCaps & D3DDEVCAPS_HWTRANSFORMANDLIGHT, E_FAIL );
@@ -1007,7 +1020,7 @@ HRESULT PresenterDX9::ProcessFrameUsingD3D9( IDirect3DTexture9* pLeftTexture2D, 
 		hr = pRTSample->AddBuffer( pBuffer );
 		BREAK_ON_FAIL( hr );
 
-		if( m_b3DVideo && FALSE  ) { // 0 != m_vp3DOutput 
+		if( m_b3DVideo && FALSE  ) { // 0 != m_vp3DOutput
 			SafeRelease( pBuffer );
 
 			hr = MFCreateDXGISurfaceBuffer( __uuidof( ID3D11Texture2D ), pDXGIBackBuffer, 1, FALSE, &pBuffer );
@@ -1131,6 +1144,76 @@ HRESULT PresenterDX9::ProcessFrameUsingD3D9( IDirect3DTexture9* pLeftTexture2D, 
 	SafeRelease( pRightInputView );
 	SafeRelease( pVideoContext );
 //*/
+	return hr;
+}
+
+//+-------------------------------------------------------------------------
+//
+//  Member:     UpdateDXGISwapChain
+//
+//  Synopsis:   Creates SwapChain for HWND or DComp or Resizes buffers in case of resolution change
+//
+//--------------------------------------------------------------------------
+
+_Post_satisfies_( this->m_pSwapChain != NULL )
+HRESULT PresenterDX9::UpdateDX9SwapChain( void )
+{
+	HRESULT hr = S_OK;
+
+	// Get the IDirect3DSwapChain9
+	//DXGI_SWAP_CHAIN_DESC1 scd;
+	//ZeroMemory( &scd, sizeof( scd ) );
+	//scd.SampleDesc.Count = 1;
+	//scd.SampleDesc.Quality = 0;
+	//scd.SwapEffect = DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL;
+	//scd.Scaling = DXGI_SCALING_STRETCH;
+	//scd.Width = m_rcDstApp.right;
+	//scd.Height = m_rcDstApp.bottom;
+	//scd.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
+	//scd.Stereo = m_bStereoEnabled;
+	//scd.BufferUsage = DXGI_USAGE_BACK_BUFFER | DXGI_USAGE_RENDER_TARGET_OUTPUT;
+	//scd.Flags = m_bStereoEnabled ? DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH : 0; //opt in to do direct flip;
+	//scd.BufferCount = 4;
+
+	D3DPRESENT_PARAMETERS pPresentParams;
+	ZeroMemory( &pPresentParams, sizeof( pPresentParams ) );
+
+	pPresentParams.BackBufferWidth = 0;
+	pPresentParams.BackBufferHeight = 0;
+	pPresentParams.BackBufferCount = 1;
+	pPresentParams.Windowed = !m_bFullScreenState;
+	pPresentParams.SwapEffect = D3DSWAPEFFECT_DISCARD; // D3DSWAPEFFECT_COPY;
+	pPresentParams.BackBufferFormat = D3DFMT_UNKNOWN;
+	pPresentParams.hDeviceWindow = m_hwndVideo; // GetDesktopWindow();
+	pPresentParams.Flags = D3DPRESENTFLAG_VIDEO;
+	pPresentParams.PresentationInterval = D3DPRESENT_INTERVAL_DEFAULT;
+
+	do {
+		SafeRelease( m_pSwapChain );
+
+		{
+			ULONG rc = m_pD3DDevice->AddRef();
+			m_pD3DDevice->Release();
+		}
+
+		hr = m_pD3DDevice->CreateAdditionalSwapChain( &pPresentParams, &m_pSwapChain );
+		BREAK_ON_FAIL( hr );
+
+		{
+			ULONG rc = m_pD3DDevice->AddRef();
+			m_pD3DDevice->Release();
+		}
+
+		/*if( m_bFullScreenState ) {
+			hr = m_pSwapChain->SetFullscreenState( TRUE, NULL );
+			BREAK_ON_FAIL( hr );
+		}
+		else {
+			hr = m_pSwapChain->SetFullscreenState( FALSE, NULL );
+			BREAK_ON_FAIL( hr );
+		}*/
+	} while( FALSE );
+
 	return hr;
 }
 
