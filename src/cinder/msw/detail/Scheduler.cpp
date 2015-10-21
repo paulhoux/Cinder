@@ -13,7 +13,6 @@ namespace msw {
 namespace detail {
 
 Scheduler::Scheduler( CriticalSection& critSec ) :
-	m_nRefCount( 1 ),
 	m_critSec( critSec ),
 	m_pCB( NULL ),
 	m_ScheduledSamples(), // default ctor
@@ -38,39 +37,6 @@ Scheduler::~Scheduler( void )
 	m_ScheduledSamples.Clear();
 
 	SafeRelease( m_pClock );
-}
-
-// IUnknown methods
-
-ULONG Scheduler::AddRef()
-{
-	return InterlockedIncrement( &m_nRefCount );
-}
-
-ULONG  Scheduler::Release()
-{
-	ULONG uCount = InterlockedDecrement( &m_nRefCount );
-	if( uCount == 0 ) {
-		delete this;
-	}
-	// For thread safety, return a temporary variable.
-	return uCount;
-}
-
-HRESULT Scheduler::QueryInterface( REFIID iid, __RPC__deref_out _Result_nullonfailure_ void** ppv )
-{
-	if( !ppv ) {
-		return E_POINTER;
-	}
-	if( iid == IID_IUnknown ) {
-		*ppv = static_cast<IUnknown*>( this );
-	}
-	else {
-		*ppv = NULL;
-		return E_NOINTERFACE;
-	}
-	AddRef();
-	return S_OK;
 }
 
 //-----------------------------------------------------------------------------

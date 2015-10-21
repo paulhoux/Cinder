@@ -36,15 +36,10 @@ struct SchedulerCallback {
 //-----------------------------------------------------------------------------
 
 class __declspec( uuid( "9D28C5FA-DD8B-4758-B828-EB254AC707EA" ) ) Scheduler :
-	public IUnknown {
+	public ComObject {
 public:
 	Scheduler( CriticalSection& critSec );
 	virtual ~Scheduler( void );
-
-	// IUnknown
-	STDMETHODIMP_( ULONG ) AddRef();
-	STDMETHODIMP_( ULONG ) Release();
-	STDMETHODIMP QueryInterface( REFIID iid, __RPC__deref_out _Result_nullonfailure_ void** ppv );
 
 	void SetCallback( SchedulerCallback* pCB ) { m_pCB = pCB; }
 
@@ -69,7 +64,6 @@ private:
 	HRESULT OnTimer( __RPC__in_opt IMFAsyncResult* pResult );
 	METHODASYNCCALLBACKEX( OnTimer, Scheduler, 0, MFASYNC_CALLBACK_QUEUE_MULTITHREADED );
 
-	long                        m_nRefCount;
 	CriticalSection&            m_critSec;          // critical section for thread safety
 	SchedulerCallback*          m_pCB;              // Weak reference; do not delete.
 	ThreadSafeQueue<IMFSample>  m_ScheduledSamples; // Samples waiting to be presented.

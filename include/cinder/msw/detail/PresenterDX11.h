@@ -1,6 +1,7 @@
 #pragma once
 
 #include "cinder/msw/detail/Presenter.h"
+#include "cinder/msw/detail/Queue.h"
 
 #include <d3d11.h>
 #include <dxgi1_2.h>
@@ -54,7 +55,6 @@ public:
 
 	// Presenter
 	STDMETHODIMP Initialize( void );
-	// Presenter
 	STDMETHODIMP_( BOOL ) CanProcessNextSample( void ) { return m_bCanProcessNextSample; }
 	STDMETHODIMP Flush( void );
 	STDMETHODIMP GetMonitorRefreshRate( DWORD* pdwMonitorRefreshRate );
@@ -73,7 +73,6 @@ private:
 	STDMETHODIMP CreateDXGIManagerAndDevice( D3D_DRIVER_TYPE DriverType = D3D_DRIVER_TYPE_HARDWARE );
 	STDMETHODIMP FindBOBProcessorIndex( DWORD* pIndex );
 	STDMETHODIMP GetVideoDisplayArea( IMFMediaType* pType, MFVideoArea* pArea );
-
 	STDMETHODIMP ProcessFrameUsingD3D11( ID3D11Texture2D* pLeftTexture2D, ID3D11Texture2D* pRightTexture2D, UINT dwLeftViewIndex, UINT dwRightViewIndex, RECT rcDest, UINT32 unInterlaceMode, IMFSample** ppVideoOutFrame );
 	STDMETHODIMP_( VOID ) SetVideoContextParameters( ID3D11VideoContext* pVideoContext, const RECT* pSRect, const RECT* pTRect, UINT32 unInterlaceMode );
 
@@ -116,6 +115,8 @@ private:
 	ID3D11VideoDevice*              m_pVideoDevice;
 	ID3D11VideoProcessorEnumerator* m_pVideoProcessorEnum;
 	ID3D11VideoProcessor*           m_pVideoProcessor;
+
+	Queue<ID3D11Texture2D>*         m_pQueue;
 
 #if (WINVER >= _WIN32_WINNT_WIN8)
 	IDCompositionDevice*            m_pDCompDevice;
@@ -330,7 +331,7 @@ public:
 
 		m_pReal->AddRef();
 
-		ScopedPtr<ID3D11VideoDevice> pDevice;
+		ScopedComPtr<ID3D11VideoDevice> pDevice;
 		m_pReal->QueryInterface( __uuidof( ID3D11VideoDevice ), (void**)&pDevice );
 		m_pVideoDevice = new CPrivate_ID3D11VideoDevice( pDevice );
 	}

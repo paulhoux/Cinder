@@ -601,7 +601,7 @@ HRESULT StreamSink::GetMediaTypeByIndex( DWORD dwIndex, _Outptr_ IMFMediaType** 
 			break;
 		}
 
-		ScopedPtr<IMFMediaType> pVideoMediaType;
+		ScopedComPtr<IMFMediaType> pVideoMediaType;
 
 		do {
 			hr = MFCreateMediaType( &pVideoMediaType );
@@ -623,8 +623,8 @@ HRESULT StreamSink::GetMediaTypeByIndex( DWORD dwIndex, _Outptr_ IMFMediaType** 
 				BREAK_ON_FAIL( hr );
 			}
 
-			pVideoMediaType->AddRef();
 			*ppType = pVideoMediaType;
+			( *ppType )->AddRef();
 		} while( FALSE );
 
 		BREAK_ON_FAIL( hr );
@@ -821,7 +821,7 @@ HRESULT StreamSink::SetCurrentMediaType( IMFMediaType* pMediaType )
 
 HRESULT StreamSink::GetService( __RPC__in REFGUID guidService, __RPC__in REFIID riid, __RPC__deref_out_opt LPVOID* ppvObject )
 {
-	ScopedPtr<IMFGetService> pGetService;
+	ScopedComPtr<IMFGetService> pGetService;
 	HRESULT hr = m_pSink->QueryInterface( IID_PPV_ARGS( &pGetService ) );
 	if( SUCCEEDED( hr ) ) {
 		hr = pGetService->GetService( guidService, riid, ppvObject );
@@ -1177,7 +1177,7 @@ HRESULT StreamSink::OnDispatchWorkItem( IMFAsyncResult* pAsyncResult )
 		hr = CheckShutdown();
 		BREAK_ON_FAIL( hr );
 
-		ScopedPtr<IUnknown> pState;
+		ScopedComPtr<IUnknown> pState;
 		hr = pAsyncResult->GetState( &pState );
 		BREAK_ON_FAIL( hr );
 
@@ -1431,40 +1431,8 @@ HRESULT StreamSink::ValidateOperation( StreamOperation op )
 /////////////////////////////////////////////////////////////////////////////////////////////
 
 StreamSink::CAsyncOperation::CAsyncOperation( StreamOperation op ) :
-	m_nRefCount( 1 ),
 	m_op( op )
 {
-}
-
-ULONG StreamSink::CAsyncOperation::AddRef( void )
-{
-	return InterlockedIncrement( &m_nRefCount );
-}
-
-HRESULT StreamSink::CAsyncOperation::QueryInterface( REFIID iid, __RPC__deref_out _Result_nullonfailure_ void** ppv )
-{
-	if( !ppv ) {
-		return E_POINTER;
-	}
-	if( iid == IID_IUnknown ) {
-		*ppv = static_cast<IUnknown*>( this );
-	}
-	else {
-		*ppv = NULL;
-		return E_NOINTERFACE;
-	}
-	AddRef();
-	return S_OK;
-}
-
-ULONG StreamSink::CAsyncOperation::Release( void )
-{
-	ULONG uCount = InterlockedDecrement( &m_nRefCount );
-	if( uCount == 0 ) {
-		delete this;
-	}
-	// For thread safety, return a temporary variable.
-	return uCount;
 }
 
 StreamSink::CAsyncOperation::~CAsyncOperation( void )

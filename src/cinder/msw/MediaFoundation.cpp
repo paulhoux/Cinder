@@ -340,7 +340,7 @@ HRESULT MFPlayer::CloseSession()
 		if( SUCCEEDED( hr ) ) {
 			dwWaitResult = WaitForSingleObject( mCloseEvent, 5000 );
 			if( dwWaitResult == WAIT_TIMEOUT ) {
-				assert( 0 );
+				CI_LOG_W( "Timeout closing session." );
 			}
 			// Now there will be no more events from this session.
 		}

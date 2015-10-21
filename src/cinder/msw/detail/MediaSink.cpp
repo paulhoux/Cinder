@@ -695,7 +695,7 @@ HRESULT MediaSink::Initialize( void )
 			BREAK_ON_FAIL( hr );
 		}
 
-		ScopedPtr<IMFMediaSink> pSink;
+		ScopedComPtr<IMFMediaSink> pSink;
 		hr = QueryInterface( IID_PPV_ARGS( &pSink ) );
 		BREAK_ON_FAIL( hr );
 

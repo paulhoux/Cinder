@@ -96,11 +96,11 @@ HRESULT Activate::ActivateObject( __RPC__in REFIID riid, __RPC__deref_out_opt vo
 			hr = MediaSink::CreateInstance( IID_PPV_ARGS( &m_pMediaSink ) );
 			BREAK_ON_FAIL( hr );
 
-			ScopedPtr<IMFGetService> pSinkGetService;
+			ScopedComPtr<IMFGetService> pSinkGetService;
 			hr = m_pMediaSink->QueryInterface( IID_PPV_ARGS( &pSinkGetService ) );
 			BREAK_ON_FAIL( hr );
 
-			ScopedPtr<IMFVideoDisplayControl> pSinkVideoDisplayControl;
+			ScopedComPtr<IMFVideoDisplayControl> pSinkVideoDisplayControl;
 			hr = pSinkGetService->GetService( MR_VIDEO_RENDER_SERVICE, IID_PPV_ARGS( &pSinkVideoDisplayControl ) );
 			BREAK_ON_FAIL( hr );
 

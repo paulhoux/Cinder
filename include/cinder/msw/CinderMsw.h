@@ -199,6 +199,51 @@ using ManagedComPtr = std::unique_ptr<T, ComDeleter>;
 template<typename T>
 ManagedComPtr<T> makeComUnique( T *p ) { return ManagedComPtr<T>( p ); }
 
+//! Provides a base IUnknown implementation.
+class ComObject : public IUnknown {
+public:
+	ComObject()
+		: m_nRefCount( 1 )
+	{
+	}
+	virtual ~ComObject() {}
+
+	// IUnknown
+	virtual STDMETHODIMP QueryInterface( REFIID iid, __RPC__deref_out _Result_nullonfailure_ void** ppv )
+	{
+		if( !ppv ) {
+			return E_POINTER;
+		}
+		if( iid == IID_IUnknown ) {
+			*ppv = static_cast<IUnknown*>( this );
+		}
+		else {
+			*ppv = NULL;
+			return E_NOINTERFACE;
+		}
+		AddRef();
+		return S_OK;
+	}
+
+	STDMETHODIMP_( ULONG ) AddRef( void )
+	{
+		return InterlockedIncrement( &m_nRefCount );
+	}
+
+	STDMETHODIMP_( ULONG ) Release( void )
+	{
+		ULONG uCount = InterlockedDecrement( &m_nRefCount );
+		if( uCount == 0 ) {
+			delete this;
+		}
+		// For thread safety, return a temporary variable.
+		return uCount;
+	}
+
+private:
+	long              m_nRefCount;                // reference count
+};
+
 //! Wraps a cinder::OStream with a COM ::IStream
 class ComOStream : public ::IStream {
 public:

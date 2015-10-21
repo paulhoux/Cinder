@@ -16,100 +16,6 @@ namespace cinder {
 namespace msw {
 namespace detail {
 
-/*//
-IMFSamplePool::IMFSamplePool( IDirectXVideoDecoderService* pDecoder, IMFMediaType* pMediaType )
-	: m_nRefCount( 1 )
-	, m_pDecoderService( pDecoder )
-	, m_Count( 0 )
-{
-	ZeroMemory( m_aSurfaces, sizeof( m_aSurfaces ) );
-	ZeroMemory( m_aSamples, sizeof( m_aSamples ) );
-
-	assert( m_pDecoderService != NULL );
-	assert( pMediaType != NULL );
-
-	HRESULT hr = ConvertToDXVAType( pMediaType, &m_Desc );
-	//BREAK_ON_FAIL( hr );
-
-	m_pDecoderService->AddRef();
-}
-
-IMFSamplePool::~IMFSamplePool()
-{
-	for( DWORD i = 0; i < 8; ++i ) {
-		SafeRelease( m_aSamples[i] );
-		SafeRelease( m_aSurfaces[i] );
-	}
-
-	SafeRelease( m_pDecoderService );
-}
-
-// IUnknown
-HRESULT IMFSamplePool::QueryInterface( REFIID iid, void ** ppv )
-{
-	if( !ppv ) {
-		return E_POINTER;
-	}
-	if( iid == IID_IUnknown ) {
-		*ppv = static_cast<IUnknown*>( this );
-	}
-	//else if( iid == __uuidof( IMFVideoDisplayControl ) ) {
-	//*ppv = static_cast<IMFVideoDisplayControl*>( this );
-	//}
-	//else if( iid == __uuidof( IMFGetService ) ) {
-	//*ppv = static_cast<IMFGetService*>( this );
-	//}
-	else {
-		*ppv = NULL;
-		return E_NOINTERFACE;
-	}
-	AddRef();
-	return S_OK;
-}
-
-HRESULT IMFSamplePool::SetMaxPoolSize( DWORD size )
-{
-	return E_NOTIMPL;
-}
-
-HRESULT IMFSamplePool::GetFreeSample( IMFSample **pSample )
-{
-	HRESULT hr = S_OK;
-
-	do {
-		// TODO: Check if we have a free sample available.
-
-
-		// If not, check if there is room for one more.
-		BREAK_IF_FALSE( m_Count < 8, E_FAIL );
-
-		// If maximum pool size has  not been reached, create new sample.
-		ScopedPtr<IDirect3DSurface9> pSurface;
-		hr = m_pDecoderService->CreateSurface(
-			m_Desc.SampleWidth, m_Desc.SampleHeight, 0, (D3DFORMAT)MAKEFOURCC( 'N', 'V', '1', '2' ),
-			D3DPOOL_DEFAULT, 0, DXVA2_VideoDecoderRenderTarget, &pSurface, NULL );
-		BREAK_ON_FAIL( hr );
-
-		ScopedPtr<IMFSample> pTemp;
-		hr = MFCreateVideoSampleFromSurface( pSurface, &pTemp );
-		BREAK_ON_FAIL( hr );
-
-		// Store surface and sample.
-		m_aSurfaces[0] = pSurface;
-		m_aSurfaces[0]->AddRef();
-
-		m_aSamples[0] = pTemp;
-		m_aSamples[0]->AddRef();
-
-		// TODO: Mark sample as 'in use' and set callback(?).
-
-		( *pSample ) = pTemp;
-		( *pSample )->AddRef();
-	} while( FALSE );
-
-	return hr;
-}//*/
-
 // ------------------------------------------------------------------------------
 
 PresenterDX9::PresenterDX9( void )
@@ -123,6 +29,7 @@ PresenterDX9::PresenterDX9( void )
 	, m_pDecoderService( NULL )
 	, m_DecoderGUID( GUID_NULL )
 	, m_pSwapChain( NULL )
+	, m_bCanProcessNextSample( TRUE )
 	, m_b3DVideo( FALSE )
 	, _Direct3DCreate9Ex( NULL )
 {
@@ -285,6 +192,17 @@ HRESULT PresenterDX9::Initialize( void )
 	return S_OK;
 }
 
+STDMETHODIMP PresenterDX9::Flush( void )
+{
+	ScopedCriticalSection lock( m_critSec );
+
+	HRESULT hr = CheckShutdown();
+
+	m_bCanProcessNextSample = TRUE;
+
+	return hr;
+}
+
 STDMETHODIMP PresenterDX9::GetMonitorRefreshRate( DWORD * pdwRefreshRate )
 {
 	if( pdwRefreshRate == NULL ) {
@@ -334,7 +252,7 @@ HRESULT PresenterDX9::IsMediaTypeSupported( IMFMediaType *pMediaType )
 		hr = m_pDecoderService->GetDecoderConfigurations( m_DecoderGUID, &desc, NULL, &configCount, &configs );
 		BREAK_ON_FAIL( hr );
 
-		ScopedPtr<IDirect3DSurface9> pSurface;
+		ScopedComPtr<IDirect3DSurface9> pSurface;
 		hr = m_pDecoderService->CreateSurface(
 			desc.SampleWidth, desc.SampleHeight, 0, (D3DFORMAT)MAKEFOURCC( 'N', 'V', '1', '2' ),
 			D3DPOOL_DEFAULT, 0, DXVA2_VideoDecoderRenderTarget, &pSurface, NULL );
@@ -342,7 +260,7 @@ HRESULT PresenterDX9::IsMediaTypeSupported( IMFMediaType *pMediaType )
 
 		IDirect3DSurface9* surfaces = pSurface.get();
 		for( UINT i = 0; i < configCount; i++ ) {
-			ScopedPtr<IDirectXVideoDecoder> pDecoder;
+			ScopedComPtr<IDirectXVideoDecoder> pDecoder;
 			hr = m_pDecoderService->CreateVideoDecoder( m_DecoderGUID, &desc, &configs[i], &surfaces, 1, &pDecoder );
 			if( SUCCEEDED( hr ) && pDecoder )
 				break;
@@ -378,21 +296,38 @@ HRESULT PresenterDX9::IsMediaTypeSupported( IMFMediaType *pMediaType )
 	return hr;
 }
 
+STDMETHODIMP PresenterDX9::PresentFrame( void )
+{
+	HRESULT hr = S_OK;
+
+	ScopedCriticalSection lock( m_critSec );
+
+	do {
+		hr = CheckShutdown();
+		BREAK_ON_FAIL( hr );
+
+		BREAK_ON_NULL( m_pSwapChain, E_POINTER );
+
+		RECT rcDest;
+		ZeroMemory( &rcDest, sizeof( rcDest ) );
+		if( CheckEmptyRect( &rcDest ) ) {
+			hr = S_OK;
+			break;
+		}
+
+		hr = m_pSwapChain->Present( NULL, &rcDest, /*m_hwndVideo*/ NULL, NULL, 0 );
+		BREAK_ON_FAIL( hr );
+
+		m_bCanProcessNextSample = TRUE;
+	} while( FALSE );
+
+	return hr;
+}
+
 // Presenter
 HRESULT PresenterDX9::ProcessFrame( IMFMediaType* pCurrentType, IMFSample* pSample, UINT32* punInterlaceMode, BOOL* pbDeviceChanged, BOOL* pbProcessAgain, IMFSample** ppOutputSample )
 {
 	HRESULT hr = S_OK;
-	//BYTE* pData = NULL;
-	//DWORD dwSampleSize = 0;
-	//IMFMediaBuffer* pEVBuffer = NULL;
-	//IDirect3DDevice9* pDeviceInput = NULL;
-	//ID3D11Texture2D* pTexture2D = NULL;
-	//IMFDXGIBuffer* pDXGIBuffer = NULL;
-	//ID3D11Texture2D* pEVTexture2D = NULL;
-	//IMFDXGIBuffer* pEVDXGIBuffer = NULL;
-	//ID3D11Device* pDeviceInput = NULL;
-	UINT dwViewIndex = 0;
-	UINT dwEVViewIndex = 0;
 
 	ScopedCriticalSection lock( m_critSec );
 
@@ -412,7 +347,7 @@ HRESULT PresenterDX9::ProcessFrame( IMFMediaType* pCurrentType, IMFSample* pSamp
 		hr = pSample->GetBufferCount( &cBuffers );
 		BREAK_ON_FAIL( hr );
 
-		ScopedPtr<IMFMediaBuffer> pBuffer;
+		ScopedComPtr<IMFMediaBuffer> pBuffer;
 		if( 1 == cBuffers ) {
 			hr = pSample->GetBufferByIndex( 0, &pBuffer );
 		}
@@ -454,119 +389,31 @@ HRESULT PresenterDX9::ProcessFrame( IMFMediaType* pCurrentType, IMFSample* pSamp
 			}
 		}
 
-		//////////////
-
-		// Allocate uncompressed buffers.
-		DXVA2_VideoDesc desc;
-		hr = ConvertToDXVAType( pCurrentType, &desc );
-		BREAK_ON_FAIL( hr );
-
-		//ScopedPtr<IDirect3DSurface9> pSurface;
-		//hr = m_pDecoderService->CreateSurface(
-		//	desc.SampleWidth, desc.SampleHeight, 0, (D3DFORMAT)MAKEFOURCC( 'N', 'V', '1', '2' ),
-		//	D3DPOOL_DEFAULT, 0, DXVA2_VideoDecoderRenderTarget, &pSurface, NULL );
-		//BREAK_ON_FAIL( hr );
-
-		//ScopedPtr<IMFSample> pSample;
-		//hr = MFCreateVideoSampleFromSurface( pSurface, &pSample );
-		//BREAK_ON_FAIL( hr );
-
-		//
-		ScopedPtr<IDirect3DSurface9> pSurface;
+		// Obtain surface from buffer.
+		ScopedComPtr<IDirect3DSurface9> pSurface;
 		hr = MFGetService( pBuffer, MR_BUFFER_SERVICE, __uuidof( IDirect3DSurface9 ), (void**)&pSurface );
 		BREAK_ON_FAIL( hr );
 
-		// TEMP!
+		hr = ProcessFrameUsingD3D9( pSurface, 0, rcDest, *punInterlaceMode, ppOutputSample );
 
-		// remember the original rectangles
-		RECT TRectOld = m_rcDstApp;
-		RECT SRectOld = m_rcSrcApp;
-		UpdateRectangles( &TRectOld, &SRectOld );
+		LONGLONG hnsDuration = 0;
+		LONGLONG hnsTime = 0;
+		DWORD dwSampleFlags = 0;
 
-		//Update destination rect with current client rect
-		m_rcDstApp = rcDest;
+		if( ppOutputSample != NULL && *ppOutputSample != NULL ) {
+			if( SUCCEEDED( pSample->GetSampleDuration( &hnsDuration ) ) ) {
+				( *ppOutputSample )->SetSampleDuration( hnsDuration );
+			}
 
-		m_rcSrcApp.left = 0;
-		m_rcSrcApp.top = 0;
-		m_rcSrcApp.right = m_uiRealDisplayWidth;
-		m_rcSrcApp.bottom = m_uiRealDisplayHeight;
+			if( SUCCEEDED( pSample->GetSampleTime( &hnsTime ) ) ) {
+				( *ppOutputSample )->SetSampleTime( hnsTime );
+			}
 
-		// now create the input and output media types - these need to reflect
-		// the src and destination rectangles that we have been given.
-		RECT TRect = m_rcDstApp;
-		RECT SRect = m_rcSrcApp;
-		UpdateRectangles( &TRect, &SRect );
-
-		const BOOL fDestRectChanged = !EqualRect( &TRect, &TRectOld );
-
-		if( !m_pSwapChain || fDestRectChanged ) {
-			hr = UpdateDX9SwapChain();
-			BREAK_ON_FAIL( hr );
-		}
-
-		m_bCanProcessNextSample = FALSE;
-
-		// Get Backbuffer
-
-		// Get the swap chain from the surface.
-		//ScopedPtr<IDirect3DSwapChain9> pSwapChain;
-		//hr = pSurface->GetContainer( __uuidof( IDirect3DSwapChain9 ), (LPVOID*)&pSwapChain );
-		//BREAK_ON_FAIL( hr );
-
-		ScopedPtr<IDirect3DSurface9> pBackBuffer;
-		m_pSwapChain->GetBackBuffer( 0, D3DBACKBUFFER_TYPE_MONO, &pBackBuffer );
-		BREAK_ON_FAIL( hr );
-
-		// END TEMP!
-
-		//
-		hr = m_pD3DDevice->StretchRect( pSurface, NULL, pBackBuffer, NULL, D3DTEXF_NONE );
-		BREAK_ON_FAIL( hr );
-
-		hr = m_pSwapChain->Present( NULL, &TRect, m_hwndVideo, NULL, 0 );
-		//hr = m_pD3DDevice->Present( NULL, &TRect, m_hwndVideo, NULL );
-		BREAK_ON_FAIL( hr );
-		//*/
-
-		/*//
-		hr = pBuffer->QueryInterface( __uuidof( IMFDXGIBuffer ), (LPVOID*)&pDXGIBuffer );
-		BREAK_ON_FAIL( hr );
-
-		hr = pDXGIBuffer->GetResource( __uuidof( ID3D11Texture2D ), (LPVOID*)&pTexture2D );
-		BREAK_ON_FAIL( hr );
-
-		hr = pDXGIBuffer->GetSubresourceIndex( &dwViewIndex );
-		BREAK_ON_FAIL( hr );
-
-		pTexture2D->GetDevice( &pDeviceInput );
-		if( ( NULL == pDeviceInput ) || ( pDeviceInput != m_pD3DDevice ) ) {
-			break;
-		}
-		//*/
-
-		/*//
-		{
-			hr = ProcessFrameUsingD3D11( pTexture2D, pEVTexture2D, dwViewIndex, dwEVViewIndex, rcDest, *punInterlaceMode, ppOutputSample );
-
-			LONGLONG hnsDuration = 0;
-			LONGLONG hnsTime = 0;
-			DWORD dwSampleFlags = 0;
-
-			if( ppOutputSample != NULL && *ppOutputSample != NULL ) {
-				if( SUCCEEDED( pSample->GetSampleDuration( &hnsDuration ) ) ) {
-					( *ppOutputSample )->SetSampleDuration( hnsDuration );
-				}
-
-				if( SUCCEEDED( pSample->GetSampleTime( &hnsTime ) ) ) {
-					( *ppOutputSample )->SetSampleTime( hnsTime );
-				}
-
-				if( SUCCEEDED( pSample->GetSampleFlags( &dwSampleFlags ) ) ) {
-					( *ppOutputSample )->SetSampleFlags( dwSampleFlags );
-				}
+			if( SUCCEEDED( pSample->GetSampleFlags( &dwSampleFlags ) ) ) {
+				( *ppOutputSample )->SetSampleFlags( dwSampleFlags );
 			}
 		}
-		//*/
+
 	} while( FALSE );
 
 	return hr;
@@ -576,7 +423,6 @@ HRESULT PresenterDX9::ProcessFrame( IMFMediaType* pCurrentType, IMFSample* pSamp
 HRESULT PresenterDX9::SetCurrentMediaType( IMFMediaType *pMediaType )
 {
 	HRESULT hr = S_OK;
-	IMFAttributes* pAttributes = NULL;
 
 	ScopedCriticalSection lock( m_critSec );
 
@@ -584,6 +430,7 @@ HRESULT PresenterDX9::SetCurrentMediaType( IMFMediaType *pMediaType )
 		hr = CheckShutdown();
 		BREAK_ON_FAIL( hr );
 
+		ScopedComPtr<IMFAttributes> pAttributes;
 		hr = pMediaType->QueryInterface( IID_IMFAttributes, reinterpret_cast<void**>( &pAttributes ) );
 		BREAK_ON_FAIL( hr );
 
@@ -629,19 +476,17 @@ HRESULT PresenterDX9::SetCurrentMediaType( IMFMediaType *pMediaType )
 		//hr = ConvertToDXVAType( pMediaType, &desc );
 		//BREAK_ON_FAIL( hr );
 
-		//ScopedPtr<IDirect3DSurface9> pSurface;
+		//ScopedComPtr<IDirect3DSurface9> pSurface;
 		//hr = m_pDecoderService->CreateSurface(
 		//	desc.SampleWidth, desc.SampleHeight, 0, (D3DFORMAT)MAKEFOURCC( 'N', 'V', '1', '2' ),
 		//	D3DPOOL_DEFAULT, 0, DXVA2_VideoDecoderRenderTarget, &pSurface, NULL );
 		//BREAK_ON_FAIL( hr );
 
-		//ScopedPtr<IMFSample> pSample;
+		//ScopedComPtr<IMFSample> pSample;
 		//hr = MFCreateVideoSampleFromSurface( pSurface, &pSample );
 		//BREAK_ON_FAIL( hr );
 #endif
 	} while( FALSE );
-
-	SafeRelease( pAttributes );
 
 	return hr;
 }
@@ -829,167 +674,73 @@ HRESULT PresenterDX9::CreateDXVA2ManagerAndDevice( D3D_DRIVER_TYPE DriverType )
 HRESULT PresenterDX9::GetVideoDisplayArea( IMFMediaType* pType, MFVideoArea* pArea )
 {
 	HRESULT hr = S_OK;
-	BOOL bPanScan = FALSE;
-	UINT32 uimageWidthInPixels = 0, uimageHeightInPixels = 0;
 
-	hr = MFGetAttributeSize( pType, MF_MT_FRAME_SIZE, &uimageWidthInPixels, &uimageHeightInPixels );
-	if( FAILED( hr ) ) {
-		return hr;
-	}
+	do {
+		UINT32 uimageWidthInPixels = 0, uimageHeightInPixels = 0;
+		hr = MFGetAttributeSize( pType, MF_MT_FRAME_SIZE, &uimageWidthInPixels, &uimageHeightInPixels );
+		BREAK_ON_FAIL( hr );
 
-	if( uimageWidthInPixels != m_imageWidthInPixels || uimageHeightInPixels != m_imageHeightInPixels ) {
-		//SafeRelease( m_pVideoProcessorEnum );
-		//SafeRelease( m_pVideoProcessor );
-		//SafeRelease( m_pSwapChain1 );
-	}
-
-	m_imageWidthInPixels = uimageWidthInPixels;
-	m_imageHeightInPixels = uimageHeightInPixels;
-
-	bPanScan = MFGetAttributeUINT32( pType, MF_MT_PAN_SCAN_ENABLED, FALSE );
-
-	// In pan/scan mode, try to get the pan/scan region.
-	if( bPanScan ) {
-		hr = pType->GetBlob(
-			MF_MT_PAN_SCAN_APERTURE,
-			(UINT8*)pArea,
-			sizeof( MFVideoArea ),
-			NULL
-			);
-	}
-
-	// If not in pan/scan mode, or the pan/scan region is not set,
-	// get the minimimum display aperture.
-
-	if( !bPanScan || hr == MF_E_ATTRIBUTENOTFOUND ) {
-		hr = pType->GetBlob(
-			MF_MT_MINIMUM_DISPLAY_APERTURE,
-			(UINT8*)pArea,
-			sizeof( MFVideoArea ),
-			NULL
-			);
-
-		if( hr == MF_E_ATTRIBUTENOTFOUND ) {
-			// Minimum display aperture is not set.
-
-			// For backward compatibility with some components,
-			// check for a geometric aperture.
-
-			hr = pType->GetBlob(
-				MF_MT_GEOMETRIC_APERTURE,
-				(UINT8*)pArea,
-				sizeof( MFVideoArea ),
-				NULL
-				);
+		if( uimageWidthInPixels != m_imageWidthInPixels || uimageHeightInPixels != m_imageHeightInPixels ) {
+			//SafeRelease( m_pVideoProcessorEnum );
+			//SafeRelease( m_pVideoProcessor );
+			//SafeRelease( m_pSwapChain1 );
 		}
 
-		// Default: Use the entire video area.
+		m_imageWidthInPixels = uimageWidthInPixels;
+		m_imageHeightInPixels = uimageHeightInPixels;
 
-		if( hr == MF_E_ATTRIBUTENOTFOUND ) {
-			*pArea = MFMakeArea( 0.0, 0.0, m_imageWidthInPixels, m_imageHeightInPixels );
-			hr = S_OK;
+		BOOL bPanScan = FALSE;
+		bPanScan = MFGetAttributeUINT32( pType, MF_MT_PAN_SCAN_ENABLED, FALSE );
+
+		// In pan/scan mode, try to get the pan/scan region.
+		if( bPanScan ) {
+			hr = pType->GetBlob( MF_MT_PAN_SCAN_APERTURE, (UINT8*)pArea, sizeof( MFVideoArea ), NULL );
 		}
-	}
+
+		// If not in pan/scan mode, or the pan/scan region is not set,
+		// get the minimimum display aperture.
+		if( !bPanScan || hr == MF_E_ATTRIBUTENOTFOUND ) {
+			hr = pType->GetBlob( MF_MT_MINIMUM_DISPLAY_APERTURE, (UINT8*)pArea, sizeof( MFVideoArea ), NULL );
+
+			if( hr == MF_E_ATTRIBUTENOTFOUND ) {
+				// Minimum display aperture is not set.
+
+				// For backward compatibility with some components,
+				// check for a geometric aperture.
+
+				hr = pType->GetBlob( MF_MT_GEOMETRIC_APERTURE, (UINT8*)pArea, sizeof( MFVideoArea ), NULL );
+			}
+
+			// Default: Use the entire video area.
+			if( hr == MF_E_ATTRIBUTENOTFOUND ) {
+				*pArea = MFMakeArea( 0.0, 0.0, m_imageWidthInPixels, m_imageHeightInPixels );
+				hr = S_OK;
+			}
+		}
+	} while( FALSE );
 
 	return hr;
 }
 
-HRESULT PresenterDX9::ProcessFrameUsingD3D9( IDirect3DTexture9* pLeftTexture2D, IDirect3DTexture9* pRightTexture2D, UINT dwLeftViewIndex, UINT dwRightViewIndex, RECT rcDest, UINT32 unInterlaceMode, IMFSample** ppVideoOutFrame )
+HRESULT PresenterDX9::ProcessFrameUsingD3D9( IDirect3DSurface9* pSurface, UINT dwViewIndex, RECT rcDest, UINT32 unInterlaceMode, IMFSample** ppVideoOutFrame )
 {
 	HRESULT hr = S_OK;
-	/*//
-	//ID3D11VideoContext* pVideoContext = NULL;
-	//ID3D11VideoProcessorInputView* pLeftInputView = NULL;
-	//ID3D11VideoProcessorInputView* pRightInputView = NULL;
-	//ID3D11VideoProcessorOutputView* pOutputView = NULL;
-	//ID3D11Texture2D* pDXGIBackBuffer = NULL;
-	//ID3D11RenderTargetView* pRTView = NULL;
-	IMFSample* pRTSample = NULL;
-	IMFMediaBuffer* pBuffer = NULL;
-	//D3D11_VIDEO_PROCESSOR_CAPS vpCaps = { 0 };
+
 	LARGE_INTEGER lpcStart, lpcEnd;
 
 	do {
-		//if( !m_pVideoDevice ) {
-		//	hr = m_pD3DDevice->QueryInterface( __uuidof( ID3D11VideoDevice ), (void**)&m_pVideoDevice );
-		//	BREAK_ON_FAIL( hr );
-		//}
-
-		//hr = m_pD3DImmediateContext->QueryInterface( __uuidof( ID3D11VideoContext ), (void**)&pVideoContext );
-		//BREAK_ON_FAIL( hr );
-
-		// remember the original rectangles
+		// Remember the original rectangles.
 		RECT TRectOld = m_rcDstApp;
 		RECT SRectOld = m_rcSrcApp;
 		UpdateRectangles( &TRectOld, &SRectOld );
 
-		//Update destination rect with current client rect
+		// Update destination rect with current client rect.
 		m_rcDstApp = rcDest;
 
-		//D3D11_TEXTURE2D_DESC surfaceDesc;
-		//pLeftTexture2D->GetDesc( &surfaceDesc );
-
-		//if( !m_pVideoProcessorEnum || !m_pVideoProcessor || m_imageWidthInPixels != surfaceDesc.Width || m_imageHeightInPixels != surfaceDesc.Height ) {
-		//	SafeRelease( m_pVideoProcessorEnum );
-		//	SafeRelease( m_pVideoProcessor );
-
-		//	m_imageWidthInPixels = surfaceDesc.Width;
-		//	m_imageHeightInPixels = surfaceDesc.Height;
-
-		//	D3D11_VIDEO_PROCESSOR_CONTENT_DESC ContentDesc;
-		//	ZeroMemory( &ContentDesc, sizeof( ContentDesc ) );
-		//	ContentDesc.InputFrameFormat = D3D11_VIDEO_FRAME_FORMAT_INTERLACED_TOP_FIELD_FIRST;
-		//	ContentDesc.InputWidth = surfaceDesc.Width;
-		//	ContentDesc.InputHeight = surfaceDesc.Height;
-		//	ContentDesc.OutputWidth = surfaceDesc.Width;
-		//	ContentDesc.OutputHeight = surfaceDesc.Height;
-		//	ContentDesc.Usage = D3D11_VIDEO_USAGE_PLAYBACK_NORMAL;
-
-		//	hr = m_pVideoDevice->CreateVideoProcessorEnumerator( &ContentDesc, &m_pVideoProcessorEnum );
-		//	BREAK_ON_FAIL( hr );
-
-		//	UINT uiFlags;
-		//	DXGI_FORMAT VP_Output_Format = DXGI_FORMAT_B8G8R8A8_UNORM;
-
-		//	hr = m_pVideoProcessorEnum->CheckVideoProcessorFormat( VP_Output_Format, &uiFlags );
-		//	if( FAILED( hr ) || 0 == ( uiFlags & D3D11_VIDEO_PROCESSOR_FORMAT_SUPPORT_OUTPUT ) ) {
-		//		hr = MF_E_UNSUPPORTED_D3D_TYPE;
-		//		break;
-		//	}
-
-		//	m_rcSrcApp.left = 0;
-		//	m_rcSrcApp.top = 0;
-		//	m_rcSrcApp.right = m_uiRealDisplayWidth;
-		//	m_rcSrcApp.bottom = m_uiRealDisplayHeight;
-
-		//	DWORD index;
-		//	hr = FindBOBProcessorIndex( &index );
-		//	BREAK_ON_FAIL( hr );
-
-		//	hr = m_pVideoDevice->CreateVideoProcessor( m_pVideoProcessorEnum, index, &m_pVideoProcessor );
-		//	BREAK_ON_FAIL( hr );
-
-		//	if( m_b3DVideo ) {
-		//		hr = m_pVideoProcessorEnum->GetVideoProcessorCaps( &vpCaps );
-		//		BREAK_ON_FAIL( hr );
-
-		//		if( vpCaps.FeatureCaps & D3D11_VIDEO_PROCESSOR_FEATURE_CAPS_STEREO ) {
-		//			m_bStereoEnabled = TRUE;
-		//		}
-
-		//		DXGI_MODE_DESC1 modeFilter = { 0 };
-		//		modeFilter.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
-		//		modeFilter.Width = surfaceDesc.Width;
-		//		modeFilter.Height = surfaceDesc.Height;
-		//		modeFilter.Stereo = m_bStereoEnabled;
-
-		//		DXGI_MODE_DESC1 matchedMode;
-		//		if( m_bFullScreenState ) {
-		//			hr = m_pDXGIOutput1->FindClosestMatchingMode1( &modeFilter, &matchedMode, m_pD3DDevice );
-		//			BREAK_ON_FAIL( hr );
-		//		}
-		//	}
-		//}
+		m_rcSrcApp.left = 0;
+		m_rcSrcApp.top = 0;
+		m_rcSrcApp.right = m_uiRealDisplayWidth;
+		m_rcSrcApp.bottom = m_uiRealDisplayHeight;
 
 		// now create the input and output media types - these need to reflect
 		// the src and destination rectangles that we have been given.
@@ -999,133 +750,34 @@ HRESULT PresenterDX9::ProcessFrameUsingD3D9( IDirect3DTexture9* pLeftTexture2D, 
 
 		const BOOL fDestRectChanged = !EqualRect( &TRect, &TRectOld );
 
-		if( !m_pSwapChain1 || fDestRectChanged ) {
-			hr = UpdateDXGISwapChain();
+		if( !m_pSwapChain || fDestRectChanged ) {
+			hr = UpdateDX9SwapChain();
 			BREAK_ON_FAIL( hr );
 		}
 
 		m_bCanProcessNextSample = FALSE;
 
-		// Get Backbuffer
-		hr = m_pSwapChain1->GetBuffer( 0, __uuidof( ID3D11Texture2D ), (void**)&pDXGIBackBuffer );
+		QueryPerformanceCounter( &lpcStart );
+
+		// Get Backbuffer.
+		ScopedComPtr<IDirect3DSurface9> pBackBuffer;
+		m_pSwapChain->GetBackBuffer( 0, D3DBACKBUFFER_TYPE_MONO, &pBackBuffer );
 		BREAK_ON_FAIL( hr );
 
-		// create the output media sample
+		// We're required to create an output sample for the Scheduler. See: Scheduler::ProcessSamplesFromQueue().
+		ScopedComPtr<IMFMediaBuffer> pBuffer;
+		hr = MFCreateDXSurfaceBuffer( __uuidof( IDirect3DSurface9 ), pBackBuffer, FALSE, &pBuffer );
+		BREAK_ON_FAIL( hr );
+
+		ScopedComPtr<IMFSample> pRTSample;
 		hr = MFCreateSample( &pRTSample );
-		BREAK_ON_FAIL( hr );
-
-		hr = MFCreateDXGISurfaceBuffer( __uuidof( ID3D11Texture2D ), pDXGIBackBuffer, 0, FALSE, &pBuffer );
 		BREAK_ON_FAIL( hr );
 
 		hr = pRTSample->AddBuffer( pBuffer );
 		BREAK_ON_FAIL( hr );
 
-		if( m_b3DVideo && FALSE  ) { // 0 != m_vp3DOutput
-			SafeRelease( pBuffer );
-
-			hr = MFCreateDXGISurfaceBuffer( __uuidof( ID3D11Texture2D ), pDXGIBackBuffer, 1, FALSE, &pBuffer );
-			BREAK_ON_FAIL( hr );
-
-			hr = pRTSample->AddBuffer( pBuffer );
-			BREAK_ON_FAIL( hr );
-		}
-
-		QueryPerformanceCounter( &lpcStart );
-
-		QueryPerformanceCounter( &lpcEnd );
-
-		//
-		// Create Output View of Output Surfaces.
-		//
-		D3D11_VIDEO_PROCESSOR_OUTPUT_VIEW_DESC OutputViewDesc;
-		ZeroMemory( &OutputViewDesc, sizeof( OutputViewDesc ) );
-		if( m_b3DVideo && m_bStereoEnabled ) {
-			OutputViewDesc.ViewDimension = D3D11_VPOV_DIMENSION_TEXTURE2DARRAY;
-		}
-		else {
-			OutputViewDesc.ViewDimension = D3D11_VPOV_DIMENSION_TEXTURE2D;
-		}
-		OutputViewDesc.Texture2D.MipSlice = 0;
-		OutputViewDesc.Texture2DArray.MipSlice = 0;
-		OutputViewDesc.Texture2DArray.FirstArraySlice = 0;
-		if( m_b3DVideo && FALSE  ) { // 0 != m_vp3DOutput
-			OutputViewDesc.Texture2DArray.ArraySize = 2; // STEREO
-		}
-
-		QueryPerformanceCounter( &lpcStart );
-
-		hr = m_pVideoDevice->CreateVideoProcessorOutputView( pDXGIBackBuffer, m_pVideoProcessorEnum, &OutputViewDesc, &pOutputView );
-		BREAK_ON_FAIL( hr );
-
-		D3D11_VIDEO_PROCESSOR_INPUT_VIEW_DESC InputLeftViewDesc;
-		ZeroMemory( &InputLeftViewDesc, sizeof( InputLeftViewDesc ) );
-		InputLeftViewDesc.FourCC = 0;
-		InputLeftViewDesc.ViewDimension = D3D11_VPIV_DIMENSION_TEXTURE2D;
-		InputLeftViewDesc.Texture2D.MipSlice = 0;
-		InputLeftViewDesc.Texture2D.ArraySlice = dwLeftViewIndex;
-
-		hr = m_pVideoDevice->CreateVideoProcessorInputView( pLeftTexture2D, m_pVideoProcessorEnum, &InputLeftViewDesc, &pLeftInputView );
-		BREAK_ON_FAIL( hr );
-
-		if( m_b3DVideo && FALSE  && pRightTexture2D ) { // MFVideo3DSampleFormat_MultiView == m_vp3DOutput
-			D3D11_VIDEO_PROCESSOR_INPUT_VIEW_DESC InputRightViewDesc;
-			ZeroMemory( &InputRightViewDesc, sizeof( InputRightViewDesc ) );
-			InputRightViewDesc.FourCC = 0;
-			InputRightViewDesc.ViewDimension = D3D11_VPIV_DIMENSION_TEXTURE2D;
-			InputRightViewDesc.Texture2D.MipSlice = 0;
-			InputRightViewDesc.Texture2D.ArraySlice = dwRightViewIndex;
-
-			hr = m_pVideoDevice->CreateVideoProcessorInputView( pRightTexture2D, m_pVideoProcessorEnum, &InputRightViewDesc, &pRightInputView );
-			BREAK_ON_FAIL( hr );
-		}
-		QueryPerformanceCounter( &lpcEnd );
-
-		QueryPerformanceCounter( &lpcStart );
-
-		SetVideoContextParameters( pVideoContext, &SRect, &TRect, unInterlaceMode );
-
-#if (WINVER >= _WIN32_WINNT_WIN8)
-		// Enable/Disable Stereo
-		if( m_b3DVideo ) {
-			pVideoContext->VideoProcessorSetOutputStereoMode( m_pVideoProcessor, m_bStereoEnabled );
-
-			D3D11_VIDEO_PROCESSOR_STEREO_FORMAT vpStereoFormat = D3D11_VIDEO_PROCESSOR_STEREO_FORMAT_SEPARATE;
-			if( MFVideo3DSampleFormat_Packed_LeftRight == m_vp3DOutput ) {
-				vpStereoFormat = D3D11_VIDEO_PROCESSOR_STEREO_FORMAT_HORIZONTAL;
-			}
-			else if( MFVideo3DSampleFormat_Packed_TopBottom == m_vp3DOutput ) {
-				vpStereoFormat = D3D11_VIDEO_PROCESSOR_STEREO_FORMAT_VERTICAL;
-			}
-
-			pVideoContext->VideoProcessorSetStreamStereoFormat( m_pVideoProcessor,
-																0, m_bStereoEnabled, vpStereoFormat, TRUE, TRUE, D3D11_VIDEO_PROCESSOR_STEREO_FLIP_NONE, 0 );
-		}
-#endif
-
-		QueryPerformanceCounter( &lpcEnd );
-
-		QueryPerformanceCounter( &lpcStart );
-
-		D3D11_VIDEO_PROCESSOR_STREAM StreamData;
-		ZeroMemory( &StreamData, sizeof( StreamData ) );
-		StreamData.Enable = TRUE;
-		StreamData.OutputIndex = 0;
-		StreamData.InputFrameOrField = 0;
-		StreamData.PastFrames = 0;
-		StreamData.FutureFrames = 0;
-		StreamData.ppPastSurfaces = NULL;
-		StreamData.ppFutureSurfaces = NULL;
-		StreamData.pInputSurface = pLeftInputView;
-		StreamData.ppPastSurfacesRight = NULL;
-		StreamData.ppFutureSurfacesRight = NULL;
-
-#if (WINVER >= _WIN32_WINNT_WIN8)
-		if( m_b3DVideo && MFVideo3DSampleFormat_MultiView == m_vp3DOutput && pRightTexture2D ) {
-			StreamData.pInputSurfaceRight = pRightInputView;
-		}
-#endif
-
-		hr = pVideoContext->VideoProcessorBlt( m_pVideoProcessor, pOutputView, 0, 1, &StreamData );
+		// Draw the surface to the backbuffer, decompressing YUV to RGB if needed.
+		hr = m_pD3DDevice->StretchRect( pSurface, NULL, pBackBuffer, NULL, D3DTEXF_NONE );
 		BREAK_ON_FAIL( hr );
 
 		QueryPerformanceCounter( &lpcEnd );
@@ -1136,14 +788,6 @@ HRESULT PresenterDX9::ProcessFrameUsingD3D9( IDirect3DTexture9* pLeftTexture2D, 
 		}
 	} while( FALSE );
 
-	SafeRelease( pBuffer );
-	SafeRelease( pRTSample );
-	SafeRelease( pDXGIBackBuffer );
-	SafeRelease( pOutputView );
-	SafeRelease( pLeftInputView );
-	SafeRelease( pRightInputView );
-	SafeRelease( pVideoContext );
-//*/
 	return hr;
 }
 
@@ -1160,21 +804,6 @@ HRESULT PresenterDX9::UpdateDX9SwapChain( void )
 {
 	HRESULT hr = S_OK;
 
-	// Get the IDirect3DSwapChain9
-	//DXGI_SWAP_CHAIN_DESC1 scd;
-	//ZeroMemory( &scd, sizeof( scd ) );
-	//scd.SampleDesc.Count = 1;
-	//scd.SampleDesc.Quality = 0;
-	//scd.SwapEffect = DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL;
-	//scd.Scaling = DXGI_SCALING_STRETCH;
-	//scd.Width = m_rcDstApp.right;
-	//scd.Height = m_rcDstApp.bottom;
-	//scd.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
-	//scd.Stereo = m_bStereoEnabled;
-	//scd.BufferUsage = DXGI_USAGE_BACK_BUFFER | DXGI_USAGE_RENDER_TARGET_OUTPUT;
-	//scd.Flags = m_bStereoEnabled ? DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH : 0; //opt in to do direct flip;
-	//scd.BufferCount = 4;
-
 	D3DPRESENT_PARAMETERS pPresentParams;
 	ZeroMemory( &pPresentParams, sizeof( pPresentParams ) );
 
@@ -1182,9 +811,9 @@ HRESULT PresenterDX9::UpdateDX9SwapChain( void )
 	pPresentParams.BackBufferHeight = 0;
 	pPresentParams.BackBufferCount = 1;
 	pPresentParams.Windowed = !m_bFullScreenState;
-	pPresentParams.SwapEffect = D3DSWAPEFFECT_DISCARD; // D3DSWAPEFFECT_COPY;
+	pPresentParams.SwapEffect = D3DSWAPEFFECT_DISCARD;
 	pPresentParams.BackBufferFormat = D3DFMT_UNKNOWN;
-	pPresentParams.hDeviceWindow = m_hwndVideo; // GetDesktopWindow();
+	pPresentParams.hDeviceWindow = m_hwndVideo;
 	pPresentParams.Flags = D3DPRESENTFLAG_VIDEO;
 	pPresentParams.PresentationInterval = D3DPRESENT_INTERVAL_DEFAULT;
 

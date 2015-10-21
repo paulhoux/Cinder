@@ -1760,5 +1760,8 @@
     <ClInclude Include="..\include\cinder\msw\detail\PresenterDX9.h">
       <Filter>Header Files\msw\detail</Filter>
     </ClInclude>
+    <ClInclude Include="..\include\cinder\msw\detail\Queue.h">
+      <Filter>Header Files\msw\detail</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

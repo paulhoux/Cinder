@@ -783,6 +783,7 @@
     <ClInclude Include="..\include\cinder\msw\detail\MediaSink.h" />
     <ClInclude Include="..\include\cinder\msw\detail\MFAttributesImpl.h" />
     <ClInclude Include="..\include\cinder\msw\detail\MonitorArray.h" />
+    <ClInclude Include="..\include\cinder\msw\detail\Queue.h" />
     <ClInclude Include="..\include\cinder\msw\detail\Presenter.h" />
     <ClInclude Include="..\include\cinder\msw\detail\PresenterDX11.h" />
     <ClInclude Include="..\include\cinder\msw\detail\PresenterDX9.h" />

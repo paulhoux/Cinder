@@ -110,15 +110,10 @@ private:
 	// called, we use it to queue a marker. This way, samples and markers can live in
 	// the same queue. We need this because the sink has to serialize marker events
 	// with sample processing.
-	class __declspec( uuid( "0A2DF44B-3108-44F2-B5A8-0D85B4273CD2" ) ) CAsyncOperation : public IUnknown {
+	class __declspec( uuid( "0A2DF44B-3108-44F2-B5A8-0D85B4273CD2" ) ) CAsyncOperation : public ComObject {
 	public:
 
 		CAsyncOperation( StreamOperation op );
-
-		// IUnknown methods.
-		STDMETHODIMP_( ULONG ) AddRef( void );
-		STDMETHODIMP QueryInterface( REFIID iid, __RPC__deref_out _Result_nullonfailure_ void** ppv );
-		STDMETHODIMP_( ULONG ) Release( void );
 
 		// Structure data.
 		StreamOperation m_op;   // The operation to perform.
@@ -127,8 +122,6 @@ private:
 	private:
 
 		virtual ~CAsyncOperation( void );
-
-		long m_nRefCount;
 	};
 
 	static GUID const* const s_pVideoFormats9[];
