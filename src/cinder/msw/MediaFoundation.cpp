@@ -633,7 +633,7 @@ void MFPlayer::RegisterWindowClass()
 	wc.hInstance = instance;
 	wc.hIcon = ::LoadIcon( NULL, IDI_WINLOGO );
 	wc.hCursor = ::LoadCursor( NULL, IDC_ARROW );
-	wc.hbrBackground = (HBRUSH)::GetStockObject( BLACK_BRUSH );
+	wc.hbrBackground = NULL; // Don't specify brush to eliminate flicker.
 	wc.lpszMenuName = NULL;
 	wc.lpszClassName = MF_WINDOW_CLASS_NAME;
 

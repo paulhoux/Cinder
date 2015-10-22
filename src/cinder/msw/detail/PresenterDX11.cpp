@@ -245,7 +245,7 @@ HRESULT PresenterDX11::GetService( __RPC__in REFGUID guidService, __RPC__in REFI
 HRESULT PresenterDX11::Initialize( void )
 {
 	// TEMP: Force DX9.
-	return E_FAIL;
+	//return E_FAIL;
 
 	if( !m_D3D11Module ) {
 		// Dynamically load D3D11 functions (to avoid static linkage with d3d11.lib)
@@ -501,7 +501,7 @@ HRESULT PresenterDX11::ProcessFrame( IMFMediaType* pCurrentType, IMFSample* pSam
 #if (WINVER >= _WIN32_WINNT_WIN8)
 		if( m_b3DVideo && 0 != m_vp3DOutput ) {
 			if( pEVBuffer && MFVideo3DSampleFormat_MultiView == m_vp3DOutput ) {
-				hr = pEVBuffer->QueryInterface( __uuidof( IMFDXGIBuffer ), (LPVOID*)&pEVDXGIBuffer );
+				hr = pEVBuffer.QueryInterface( __uuidof( IMFDXGIBuffer ), (LPVOID*)&pEVDXGIBuffer );
 				BREAK_ON_FAIL( hr );
 
 				hr = pEVDXGIBuffer->GetResource( __uuidof( ID3D11Texture2D ), (LPVOID*)&pEVTexture2D );
@@ -1265,7 +1265,7 @@ HRESULT PresenterDX11::ProcessFrameUsingD3D11( ID3D11Texture2D* pLeftTexture2D, 
 
 		// Blit video to shared texture.
 		QueryPerformanceCounter( &lpcStart );
-#if 1
+#if 0
 		do {
 			BREAK_ON_NULL( m_pQueue, E_POINTER );
 
@@ -1278,6 +1278,7 @@ HRESULT PresenterDX11::ProcessFrameUsingD3D11( ID3D11Texture2D* pLeftTexture2D, 
 				pSharedTexture->GetDesc( &desc );
 
 				if( desc.Width != surfaceDesc.Width || desc.Height != surfaceDesc.Height ) {
+					// Do not return it to the pool.
 					pSharedTexture.Release();
 					hr = E_FAIL;
 				}
@@ -1502,6 +1503,68 @@ HRESULT PresenterDX11::ProcessFrameUsingXVP( IMFMediaType* pCurrentType, IMFSamp
 		else {
 			*pbInputFrameUsed = FALSE;
 		}
+
+		// Blit video to shared texture.
+#if 0
+		do {
+			BREAK_ON_NULL( m_pQueue, E_POINTER );
+
+			ScopedComPtr<ID3D11Texture2D> pSharedTexture;
+			hr = m_pQueue->RemoveBack( &pSharedTexture );
+
+			// Check texture compatibility.
+			if( SUCCEEDED( hr ) ) {
+				D3D11_TEXTURE2D_DESC desc;
+				pSharedTexture->GetDesc( &desc );
+
+				if( desc.Width != surfaceDesc.Width || desc.Height != surfaceDesc.Height ) {
+					// Do not return it to the pool.
+					pSharedTexture.Release();
+					hr = E_FAIL;
+				}
+			}
+
+			// If no existing texture is available, create new one.
+			if( FAILED( hr ) ) {
+				D3D11_TEXTURE2D_DESC desc;
+				desc.Width = surfaceDesc.Width;
+				desc.Height = surfaceDesc.Height;
+				desc.MipLevels = 1;
+				desc.ArraySize = 1;
+				desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+				desc.SampleDesc.Count = 1;
+				desc.SampleDesc.Quality = 0;
+				desc.Usage = D3D11_USAGE_DEFAULT;
+				desc.BindFlags = D3D11_BIND_RENDER_TARGET;
+				desc.CPUAccessFlags = 0;
+				desc.MiscFlags = 0;
+
+				hr = m_pD3DDevice->CreateTexture2D( &desc, NULL, &pSharedTexture );
+			}
+			BREAK_ON_FAIL( hr );
+
+
+			// TODO: copy the decoded image to the texture
+
+
+
+			//// Reuse output view.
+			//ZeroMemory( &OutputViewDesc, sizeof( OutputViewDesc ) );
+			//OutputViewDesc.ViewDimension = D3D11_VPOV_DIMENSION_TEXTURE2D;
+
+			//pOutputView.Release();
+			//hr = m_pVideoDevice->CreateVideoProcessorOutputView( pSharedTexture, m_pVideoProcessorEnum, &OutputViewDesc, &pOutputView );
+			//BREAK_ON_FAIL( hr );
+
+			//// Blit to texture.
+			//hr = pVideoContext->VideoProcessorBlt( m_pVideoProcessor, pOutputView, 0, 1, &StreamData );
+			//BREAK_ON_FAIL_MSG( hr, "Failed to blit to shared texture." );
+
+			// Add to front of queue.
+			hr = m_pQueue->InsertFront( pSharedTexture );
+		} while( FALSE );
+		// TEMP: end
+#endif
 
 		if( ppVideoOutFrame != NULL ) {
 			*ppVideoOutFrame = pRTSample;
