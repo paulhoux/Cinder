@@ -31,6 +31,7 @@
 
 #include <string>
 #include <windows.h>
+#include <comdef.h> // for _com_error
 #include <Objidl.h>
 #include <Shlwapi.h>
 #undef min
@@ -55,12 +56,16 @@ namespace msw {
 #define HIDWORD(_qw)    ((DWORD)(((_qw) >> 32) & 0xffffffff))
 #endif // !HIDWORD
 
+#ifndef HRESULT_STRING
+#define HRESULT_STRING(hr)            ci::msw::toUtf8String(std::wstring((const wchar_t*)_com_error(hr).ErrorMessage()))
+#endif // HRESULT_STRING
+
 #ifndef BREAK_ON_FAIL
 #define BREAK_ON_FAIL(value)          if( FAILED( value ) ) { /*__debugbreak();*/ break; }
 #endif // !BREAK_ON_FAIL
 
 #ifndef BREAK_ON_FAIL_MSG
-#define BREAK_ON_FAIL_MSG(value, msg) if( FAILED( value ) ) { CI_LOG_E(msg); /*__debugbreak();*/ break; }
+#define BREAK_ON_FAIL_MSG(value, msg) if( FAILED( value ) ) { CI_LOG_E(msg << " (" << HRESULT_STRING(hr) << ")"); /*__debugbreak();*/ break; }
 #endif // !BREAK_ON_FAIL_MSG
 
 #ifndef BREAK_ON_NULL
@@ -68,7 +73,7 @@ namespace msw {
 #endif // !BREAK_ON_NULL
 
 #ifndef BREAK_ON_NULL_MSG
-#define BREAK_ON_NULL_MSG(value, result, msg)  if( value == NULL ) { hr = result; CI_LOG_E(msg); /*__debugbreak();*/ break; }
+#define BREAK_ON_NULL_MSG(value, result, msg)  if( value == NULL ) { hr = result; CI_LOG_E(msg << " (" << HRESULT_STRING(hr) << ")"); /*__debugbreak();*/ break; }
 #endif // !BREAK_ON_NULL_MSG
 
 #ifndef BREAK_IF_TRUE
