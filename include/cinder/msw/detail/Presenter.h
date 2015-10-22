@@ -78,21 +78,21 @@ public:
 	}
 
 	// Presenter
-	virtual STDMETHODIMP          Initialize( void ) = 0;
-	virtual STDMETHODIMP_( BOOL ) CanProcessNextSample( void ) = 0;
-	virtual STDMETHODIMP          Flush( void ) = 0;
-	virtual STDMETHODIMP          GetMonitorRefreshRate( DWORD* pdwMonitorRefreshRate ) = 0;
-	virtual STDMETHODIMP          IsMediaTypeSupported( IMFMediaType* pMediaType ) = 0;
-	virtual STDMETHODIMP          PresentFrame( void ) = 0;
-	virtual STDMETHODIMP          ProcessFrame( IMFMediaType* pCurrentType, IMFSample* pSample, UINT32* punInterlaceMode, BOOL* pbDeviceChanged, BOOL* pbProcessAgain, IMFSample** ppOutputSample = NULL ) = 0;
-	virtual STDMETHODIMP          SetCurrentMediaType( IMFMediaType* pMediaType ) = 0;
-	virtual STDMETHODIMP          Shutdown( void ) = 0;
-	virtual STDMETHODIMP_( BOOL ) IsDX9() const = 0;
-	virtual STDMETHODIMP_( BOOL ) IsDX11() const = 0;
+	virtual STDMETHODIMP           Initialize( void ) = 0;
+	virtual STDMETHODIMP_( BOOL )  CanProcessNextSample( void ) = 0;
+	virtual STDMETHODIMP           Flush( void ) = 0;
+	virtual STDMETHODIMP           GetMonitorRefreshRate( DWORD* pdwMonitorRefreshRate ) = 0;
+	virtual STDMETHODIMP           IsMediaTypeSupported( IMFMediaType* pMediaType ) = 0;
+	virtual STDMETHODIMP           PresentFrame( void ) = 0;
+	virtual STDMETHODIMP           ProcessFrame( IMFMediaType* pCurrentType, IMFSample* pSample, UINT32* punInterlaceMode, BOOL* pbDeviceChanged, BOOL* pbProcessAgain, IMFSample** ppOutputSample = NULL ) = 0;
+	virtual STDMETHODIMP           SetCurrentMediaType( IMFMediaType* pMediaType ) = 0;
+	virtual STDMETHODIMP           Shutdown( void ) = 0;
+	virtual STDMETHODIMP           GetMediaTypeByIndex( DWORD dwIndex, GUID *subType ) const = 0;
+	virtual STDMETHODIMP_( DWORD ) GetMediaTypeCount() const = 0;
 
 protected:
-	STDMETHODIMP_( BOOL )         CheckEmptyRect( RECT* pDst );
-	STDMETHODIMP                  CheckShutdown( void ) const;
+	STDMETHODIMP_( BOOL )          CheckEmptyRect( RECT* pDst );
+	STDMETHODIMP                   CheckShutdown( void ) const;
 
 	STDMETHODIMP SetMonitor( UINT adapterID )
 	{
@@ -120,34 +120,28 @@ protected:
 	STDMETHODIMP SetVideoMonitor( HWND hwndVideo )
 	{
 		HRESULT hr = S_OK;
-		AMDDrawMonitorInfo* pMonInfo = NULL;
-		HMONITOR hMon = NULL;
-
-		if( !m_pMonitors ) {
-			return E_UNEXPECTED;
-		}
-
-		hMon = MonitorFromWindow( hwndVideo, MONITOR_DEFAULTTONULL );
 
 		do {
-			if( NULL != hMon ) {
-				m_pMonitors->TerminateDisplaySystem();
-				m_lpCurrMon = NULL;
+			BREAK_ON_NULL( m_pMonitors, E_UNEXPECTED );
 
-				hr = m_pMonitors->InitializeDisplaySystem( hwndVideo );
+			HMONITOR hMon = MonitorFromWindow( hwndVideo, MONITOR_DEFAULTTONULL );
+			BREAK_ON_NULL( hMon, E_POINTER );
+
+			if( NULL != m_lpCurrMon && m_lpCurrMon->hMon == hMon )
+				return S_OK;
+
+			m_pMonitors->TerminateDisplaySystem();
+			m_lpCurrMon = NULL;
+
+			hr = m_pMonitors->InitializeDisplaySystem( hwndVideo );
+			BREAK_ON_FAIL( hr );
+
+			AMDDrawMonitorInfo* pMonInfo = m_pMonitors->FindMonitor( hMon );
+			if( NULL != pMonInfo && pMonInfo->uDevID != m_ConnectionGUID ) {
+				hr = SetMonitor( pMonInfo->uDevID );
 				BREAK_ON_FAIL( hr );
 
-				pMonInfo = m_pMonitors->FindMonitor( hMon );
-				if( NULL != pMonInfo && pMonInfo->uDevID != m_ConnectionGUID ) {
-					hr = SetMonitor( pMonInfo->uDevID );
-					BREAK_ON_FAIL( hr );
-
-					hr = S_FALSE; // Signal lost device.
-				}
-			}
-			else {
-				hr = E_POINTER;
-				BREAK_ON_FAIL( hr );
+				hr = S_FALSE; // Signal lost device.
 			}
 		} while( FALSE );
 

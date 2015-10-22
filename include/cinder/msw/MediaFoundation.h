@@ -329,9 +329,10 @@ public:
 	HRESULT SetPosition( MFTIME position );
 	//!
 	HRESULT SetLoop( BOOL loop ) { mIsLooping = loop; return S_OK; }
-
 	//! Returns the current state.
-	State GetState() const { return mState; }
+	State   GetState() const { return mState; }
+	//! TEMP: attempts to get the latest frame and share it.
+	HRESULT GetFrame();
 
 	// IUnknown methods
 	STDMETHODIMP QueryInterface( REFIID iid, void** ppv );
@@ -374,12 +375,12 @@ private:
 	static void RegisterWindowClass();
 
 	static HRESULT CreateMediaSource( LPCWSTR pUrl, IMFMediaSource **ppSource );
-	static HRESULT CreatePlaybackTopology( IMFMediaSource *pSource, IMFPresentationDescriptor *pPD, HWND hVideoWnd, IMFTopology **ppTopology, IMFVideoPresenter *pVideoPresenter );
-	static HRESULT CreateMediaSinkActivate( IMFStreamDescriptor *pSourceSD, HWND hVideoWindow, IMFActivate **ppActivate, IMFVideoPresenter *pVideoPresenter, IMFMediaSink **ppMediaSink );
+	static HRESULT CreatePlaybackTopology( IMFMediaSource *pSource, IMFPresentationDescriptor *pPD, HWND hVideoWnd, IMFTopology **ppTopology );
+	static HRESULT CreateMediaSinkActivate( IMFStreamDescriptor *pSourceSD, HWND hVideoWindow, IMFActivate **ppActivate );
 	static HRESULT AddSourceNode( IMFTopology *pTopology, IMFMediaSource *pSource, IMFPresentationDescriptor *pPD, IMFStreamDescriptor *pSD, IMFTopologyNode **ppNode );
 	static HRESULT AddOutputNode( IMFTopology *pTopology, IMFStreamSink *pStreamSink, IMFTopologyNode **ppNode );
 	static HRESULT AddOutputNode( IMFTopology *pTopology, IMFActivate *pActivate, DWORD dwId, IMFTopologyNode **ppNode );
-	static HRESULT AddBranchToPartialTopology( IMFTopology *pTopology, IMFMediaSource *pSource, IMFPresentationDescriptor *pPD, DWORD iStream, HWND hVideoWnd, IMFVideoPresenter *pVideoPresenter );
+	static HRESULT AddBranchToPartialTopology( IMFTopology *pTopology, IMFMediaSource *pSource, IMFPresentationDescriptor *pPD, DWORD iStream, HWND hVideoWnd );
 
 private:
 	//! Makes sure Media Foundation is initialized. 
@@ -398,11 +399,6 @@ private:
 
 	IMFMediaSession         *mSessionPtr;
 	IMFMediaSource          *mSourcePtr;
-	
-	IMFVideoPresenter       *mPresenterPtr;
-	//IMFMediaSink            *mSinkPtr;
-
-	IMFVideoDisplayControl  *mVideoDisplayPtr;
 
 	//! Allows control over the created window.
 	ci::app::Window::Format  mWindowFormat;

@@ -29,6 +29,32 @@ const PresenterDX11::FormatEntry PresenterDX11::s_DXGIFormatMapping[] =
 	{ MFVideoFormat_420O,      DXGI_FORMAT_420_OPAQUE }
 };
 
+GUID const* const PresenterDX11::s_pVideoFormats[] =
+{
+	&MFVideoFormat_NV12,
+	&MFVideoFormat_IYUV,
+	&MFVideoFormat_YUY2,
+	&MFVideoFormat_YV12,
+	&MFVideoFormat_RGB32,
+	&MFVideoFormat_ARGB32,
+	&MFVideoFormat_RGB24,
+	&MFVideoFormat_RGB555,
+	&MFVideoFormat_RGB565,
+	&MFVideoFormat_RGB8,
+	&MFVideoFormat_AYUV,
+	&MFVideoFormat_UYVY,
+	&MFVideoFormat_YVYU,
+	&MFVideoFormat_YVU9,
+	//&MEDIASUBTYPE_V216,
+	&MFVideoFormat_v410,
+	&MFVideoFormat_I420,
+	&MFVideoFormat_NV11,
+	&MFVideoFormat_420O
+};
+
+const DWORD PresenterDX11::s_dwNumVideoFormats = sizeof( PresenterDX11::s_pVideoFormats ) / sizeof( PresenterDX11::s_pVideoFormats[0] );
+
+
 /////////////////////////////////////////////////////////////////////////////////////////////
 //
 // PresenterDX11 class. - Presents samples using DX11.
@@ -115,6 +141,9 @@ HRESULT PresenterDX11::QueryInterface( REFIID iid, __RPC__deref_out _Result_null
 	}
 	else if( iid == __uuidof( IMFGetService ) ) {
 		*ppv = static_cast<IMFGetService*>( this );
+	}
+	else if( iid == __uuidof( PresenterDX11 ) ) {
+		*ppv = static_cast<PresenterDX11*>( this );
 	}
 	else {
 		*ppv = NULL;
@@ -241,11 +270,31 @@ HRESULT PresenterDX11::GetService( __RPC__in REFGUID guidService, __RPC__in REFI
 	return hr;
 }
 
+HRESULT PresenterDX11::GetFrame( ID3D11Texture2D **ppFrame )
+{
+	HRESULT hr = S_OK;
+
+	ScopedCriticalSection lock( m_critSec );
+
+	do {
+		BREAK_ON_NULL( m_pQueue, E_FAIL );
+
+		ScopedComPtr<ID3D11Texture2D> pSurface;
+		hr = m_pQueue->RemoveFront( &pSurface );
+		BREAK_ON_FAIL( hr );
+
+		( *ppFrame ) = pSurface;
+		( *ppFrame )->AddRef();
+	} while( FALSE );
+
+	return hr;
+}
+
 // Presenter
 HRESULT PresenterDX11::Initialize( void )
 {
 	// TEMP: Force DX9.
-	//return E_FAIL;
+	return E_FAIL;
 
 	if( !m_D3D11Module ) {
 		// Dynamically load D3D11 functions (to avoid static linkage with d3d11.lib)
@@ -455,6 +504,11 @@ HRESULT PresenterDX11::ProcessFrame( IMFMediaType* pCurrentType, IMFSample* pSam
 		hr = CheckDeviceState( pbDeviceChanged );
 		BREAK_ON_FAIL( hr );
 
+		if( *pbDeviceChanged ) {
+			hr = CreateDXGIManagerAndDevice();
+			BREAK_ON_FAIL( hr );
+		}
+
 		// Adjust output size.
 		RECT rcDest;
 		ZeroMemory( &rcDest, sizeof( rcDest ) );
@@ -663,6 +717,17 @@ HRESULT PresenterDX11::Shutdown( void )
 	return hr;
 }
 
+// Presenter
+HRESULT PresenterDX11::GetMediaTypeByIndex( DWORD dwIndex, GUID *subType ) const
+{
+	if( dwIndex >= s_dwNumVideoFormats )
+		return MF_E_NO_MORE_TYPES;
+
+	*subType = *s_pVideoFormats[dwIndex];
+
+	return S_OK;
+}
+
 /// Private methods
 
 void PresenterDX11::CheckDecodeSwitchRegKey( void )
@@ -715,32 +780,12 @@ HRESULT PresenterDX11::CheckDeviceState( BOOL* pbDeviceChanged )
 	do {
 		BREAK_ON_NULL( pbDeviceChanged, E_POINTER );
 
-		static int deviceStateChecks = 0;
-		static D3D_DRIVER_TYPE driverType = D3D_DRIVER_TYPE_HARDWARE;
-
 		hr = SetVideoMonitor( m_hwndVideo );
 		BREAK_ON_FAIL( hr );
 
-		if( m_pD3DDevice != NULL ) {
+		if( S_FALSE == hr && m_pD3DDevice != NULL ) {
 			// Lost/hung device. Destroy the device and create a new one.
-			if( S_FALSE == hr || ( m_DXSWSwitch > 0 && deviceStateChecks == m_DXSWSwitch ) ) {
-				if( m_DXSWSwitch > 0 && deviceStateChecks == m_DXSWSwitch ) {
-					( driverType == D3D_DRIVER_TYPE_HARDWARE ) ? driverType = D3D_DRIVER_TYPE_WARP : driverType = D3D_DRIVER_TYPE_HARDWARE;
-				}
-
-				hr = CreateDXGIManagerAndDevice( driverType );
-				BREAK_ON_FAIL( hr );
-
-				*pbDeviceChanged = TRUE;
-
-				SafeRelease( m_pVideoDevice );
-				SafeRelease( m_pVideoProcessorEnum );
-				SafeRelease( m_pVideoProcessor );
-				SafeRelease( m_pSwapChain1 );
-
-				deviceStateChecks = 0;
-			}
-			deviceStateChecks++;
+			*pbDeviceChanged = TRUE;
 		}
 	} while( FALSE );
 
@@ -782,7 +827,7 @@ HRESULT PresenterDX11::CreateDCompDeviceAndVisual( void )
 //       IDX11VideoRenderer.
 //-------------------------------------------------------------------
 
-HRESULT PresenterDX11::CreateDXGIManagerAndDevice( D3D_DRIVER_TYPE DriverType )
+HRESULT PresenterDX11::CreateDXGIManagerAndDevice()
 {
 	HRESULT hr = S_OK;
 
@@ -791,35 +836,26 @@ HRESULT PresenterDX11::CreateDXGIManagerAndDevice( D3D_DRIVER_TYPE DriverType )
 
 	do {
 		SafeRelease( m_pD3DDevice );
+		SafeRelease( m_pVideoDevice );
+		SafeRelease( m_pVideoProcessorEnum );
+		SafeRelease( m_pVideoProcessor );
+		SafeRelease( m_pSwapChain1 );
+		SafeRelease( m_pD3DImmediateContext );
 
-		if( D3D_DRIVER_TYPE_WARP == DriverType ) {
-			// (phoux) I changed the reference counting on pD3D11Device from the original implementation (see also CPrivate_ID3D11Device). Please check for memory leaks.
-			ScopedComPtr<ID3D11Device> pD3D11Device;
-			hr = (_D3D11CreateDevice)( NULL, D3D_DRIVER_TYPE_HARDWARE, NULL, m_useDebugLayer, featureLevels, ARRAYSIZE( featureLevels ), D3D11_SDK_VERSION, &pD3D11Device, &featureLevel, NULL );
-
+		// Find and create D3DDevice with highest compatible feature level.
+		for( DWORD dwCount = 0; dwCount < ARRAYSIZE( featureLevels ); dwCount++ ) {
+			hr = (_D3D11CreateDevice)( NULL, D3D_DRIVER_TYPE_HARDWARE, NULL, m_useDebugLayer, &featureLevels[dwCount], 1, D3D11_SDK_VERSION, &m_pD3DDevice, &featureLevel, NULL );
 			if( SUCCEEDED( hr ) ) {
-				m_pD3DDevice = new CPrivate_ID3D11Device( pD3D11Device );
-				if( NULL == m_pD3DDevice ) {
-					E_OUTOFMEMORY;
-				}
-			}
-		}
-		else {
-			// Find and create D3DDevice with highest compatible feature level.
-			for( DWORD dwCount = 0; dwCount < ARRAYSIZE( featureLevels ); dwCount++ ) {
-				hr = (_D3D11CreateDevice)( NULL, DriverType, NULL, m_useDebugLayer, &featureLevels[dwCount], 1, D3D11_SDK_VERSION, &m_pD3DDevice, &featureLevel, NULL );
+				// Check if it supports a D3D11VideoDevice.
+				ScopedComPtr<ID3D11VideoDevice> pDX11VideoDevice;
+				hr = m_pD3DDevice->QueryInterface( __uuidof( ID3D11VideoDevice ), (void**)&pDX11VideoDevice );
+
 				if( SUCCEEDED( hr ) ) {
-					// Check if it supports a D3D11VideoDevice.
-					ScopedComPtr<ID3D11VideoDevice> pDX11VideoDevice;
-					hr = m_pD3DDevice->QueryInterface( __uuidof( ID3D11VideoDevice ), (void**)&pDX11VideoDevice );
-
-					if( SUCCEEDED( hr ) ) {
-						break;
-					}
-
-					// If not, try next device.
-					SafeRelease( m_pD3DDevice );
+					break;
 				}
+
+				// If not, try next device.
+				SafeRelease( m_pD3DDevice );
 			}
 		}
 		BREAK_ON_FAIL( hr );
@@ -834,7 +870,6 @@ HRESULT PresenterDX11::CreateDXGIManagerAndDevice( D3D_DRIVER_TYPE DriverType )
 		hr = m_pDXGIManager->ResetDevice( m_pD3DDevice, m_DeviceResetToken );
 		BREAK_ON_FAIL( hr );
 
-		SafeRelease( m_pD3DImmediateContext );
 		m_pD3DDevice->GetImmediateContext( &m_pD3DImmediateContext );
 
 		// Need to explitly set the multithreaded mode for this device
@@ -874,7 +909,7 @@ HRESULT PresenterDX11::CreateDXGIManagerAndDevice( D3D_DRIVER_TYPE DriverType )
 		}
 
 		SafeRelease( m_pQueue );
-		m_pQueue = new Queue<ID3D11Texture2D>();
+		m_pQueue = new Queue<ID3D11Texture2D>(); // Created with ref count = 1.
 	} while( FALSE );
 
 	return hr;
@@ -1156,6 +1191,11 @@ HRESULT PresenterDX11::ProcessFrameUsingD3D11( ID3D11Texture2D* pLeftTexture2D, 
 			BREAK_ON_FAIL( hr );
 		}
 
+		if( ppVideoOutFrame != NULL ) {
+			*ppVideoOutFrame = pRTSample;
+			( *ppVideoOutFrame )->AddRef();
+		}
+
 		QueryPerformanceCounter( &lpcEnd );
 
 		// Create Output View of Output Surfaces.
@@ -1265,21 +1305,21 @@ HRESULT PresenterDX11::ProcessFrameUsingD3D11( ID3D11Texture2D* pLeftTexture2D, 
 
 		// Blit video to shared texture.
 		QueryPerformanceCounter( &lpcStart );
-#if 0
+#if 1
 		do {
 			BREAK_ON_NULL( m_pQueue, E_POINTER );
 
-			ScopedComPtr<ID3D11Texture2D> pSharedTexture;
-			hr = m_pQueue->RemoveBack( &pSharedTexture );
+			ScopedComPtr<ID3D11Texture2D> pFrame;
+			hr = m_pQueue->RemoveBack( &pFrame );
 
 			// Check texture compatibility.
 			if( SUCCEEDED( hr ) ) {
 				D3D11_TEXTURE2D_DESC desc;
-				pSharedTexture->GetDesc( &desc );
+				pFrame->GetDesc( &desc );
 
 				if( desc.Width != surfaceDesc.Width || desc.Height != surfaceDesc.Height ) {
 					// Do not return it to the pool.
-					pSharedTexture.Release();
+					pFrame.Release();
 					hr = E_FAIL;
 				}
 			}
@@ -1299,33 +1339,28 @@ HRESULT PresenterDX11::ProcessFrameUsingD3D11( ID3D11Texture2D* pLeftTexture2D, 
 				desc.CPUAccessFlags = 0;
 				desc.MiscFlags = 0;
 
-				hr = m_pD3DDevice->CreateTexture2D( &desc, NULL, &pSharedTexture );
+				hr = m_pD3DDevice->CreateTexture2D( &desc, NULL, &pFrame );
 			}
 			BREAK_ON_FAIL( hr );
 
-			// Reuse output view.
-			ZeroMemory( &OutputViewDesc, sizeof( OutputViewDesc ) );
-			OutputViewDesc.ViewDimension = D3D11_VPOV_DIMENSION_TEXTURE2D;
+			//// Reuse output view.
+			//ZeroMemory( &OutputViewDesc, sizeof( OutputViewDesc ) );
+			//OutputViewDesc.ViewDimension = D3D11_VPOV_DIMENSION_TEXTURE2D;
 
-			pOutputView.Release();
-			hr = m_pVideoDevice->CreateVideoProcessorOutputView( pSharedTexture, m_pVideoProcessorEnum, &OutputViewDesc, &pOutputView );
-			BREAK_ON_FAIL( hr );
+			//pOutputView.Release();
+			//hr = m_pVideoDevice->CreateVideoProcessorOutputView( pFrame, m_pVideoProcessorEnum, &OutputViewDesc, &pOutputView );
+			//BREAK_ON_FAIL( hr );
 
-			// Blit to texture.
-			hr = pVideoContext->VideoProcessorBlt( m_pVideoProcessor, pOutputView, 0, 1, &StreamData );
-			BREAK_ON_FAIL_MSG( hr, "Failed to blit to shared texture." );
+			//// Blit to texture.
+			//hr = pVideoContext->VideoProcessorBlt( m_pVideoProcessor, pOutputView, 0, 1, &StreamData );
+			//BREAK_ON_FAIL_MSG( hr, "Failed to blit to shared texture." );
 
 			// Add to front of queue.
-			hr = m_pQueue->InsertFront( pSharedTexture );
+			hr = m_pQueue->InsertFront( pFrame );
 		} while( FALSE );
 		// TEMP: end
 #endif
 		QueryPerformanceCounter( &lpcEnd );
-
-		if( ppVideoOutFrame != NULL ) {
-			*ppVideoOutFrame = pRTSample;
-			( *ppVideoOutFrame )->AddRef();
-		}
 	} while( FALSE );
 
 	return hr;
@@ -1485,6 +1520,11 @@ HRESULT PresenterDX11::ProcessFrameUsingXVP( IMFMediaType* pCurrentType, IMFSamp
 			BREAK_ON_FAIL( hr );
 		}
 
+		if( ppVideoOutFrame != NULL ) {
+			*ppVideoOutFrame = pRTSample;
+			( *ppVideoOutFrame )->AddRef();
+		}
+
 		DWORD dwStatus = 0;
 		MFT_OUTPUT_DATA_BUFFER outputDataBuffer = {};
 		outputDataBuffer.pSample = pRTSample;
@@ -1565,11 +1605,6 @@ HRESULT PresenterDX11::ProcessFrameUsingXVP( IMFMediaType* pCurrentType, IMFSamp
 		} while( FALSE );
 		// TEMP: end
 #endif
-
-		if( ppVideoOutFrame != NULL ) {
-			*ppVideoOutFrame = pRTSample;
-			( *ppVideoOutFrame )->AddRef();
-		}
 	} while( FALSE );
 
 	SafeRelease( pAttributes );

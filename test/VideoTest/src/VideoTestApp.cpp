@@ -40,6 +40,10 @@ void VideoTestApp::setup()
 
 void VideoTestApp::update()
 {
+	for( auto &video : mVideos ) {
+		// TEMP
+		video->getTexture();
+	}
 }
 
 void VideoTestApp::draw()

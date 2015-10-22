@@ -34,9 +34,9 @@ private:
 	Activate( void );
 	~Activate( void );
 
-	long m_lRefCount;
-	IMFMediaSink* m_pMediaSink;
-	HWND m_hwnd;
+	long           m_lRefCount;
+	IMFMediaSink*  m_pMediaSink;
+	HWND           m_hwnd;
 };
 
 } // namespace detail

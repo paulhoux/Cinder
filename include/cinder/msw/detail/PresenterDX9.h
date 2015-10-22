@@ -1,6 +1,7 @@
 #pragma once
 
 #include "cinder/msw/detail/Presenter.h"
+#include "cinder/msw/detail/Queue.h"
 
 #include <d3d9.h>
 #include <dxva2api.h>
@@ -40,6 +41,10 @@ public:
 	STDMETHODIMP GetService( __RPC__in REFGUID guidService, __RPC__in REFIID riid, __RPC__deref_out_opt LPVOID* ppvObject );
 
 	// Presenter
+
+	//! Retrieves the current video frame.
+	STDMETHODIMP          GetFrame( IDirect3DSurface9 **ppFrame );
+
 	STDMETHODIMP Initialize( void );
 	STDMETHODIMP_( BOOL ) CanProcessNextSample( void ) { return m_bCanProcessNextSample; }
 	STDMETHODIMP Flush( void );
@@ -49,8 +54,8 @@ public:
 	STDMETHODIMP ProcessFrame( IMFMediaType* pCurrentType, IMFSample* pSample, UINT32* punInterlaceMode, BOOL* pbDeviceChanged, BOOL* pbProcessAgain, IMFSample** ppOutputSample = NULL );
 	STDMETHODIMP SetCurrentMediaType( IMFMediaType* pMediaType );
 	STDMETHODIMP Shutdown( void );
-	STDMETHODIMP_( BOOL ) IsDX9() const { return TRUE; }
-	STDMETHODIMP_( BOOL ) IsDX11() const { return FALSE; }
+	STDMETHODIMP GetMediaTypeByIndex( DWORD dwIndex, GUID *subType ) const;
+	STDMETHODIMP_( DWORD ) GetMediaTypeCount() const { return s_dwNumVideoFormats; }
 
 private:
 	STDMETHODIMP CheckDeviceState( BOOL* pbDeviceChanged );
@@ -74,6 +79,8 @@ private:
 
 	IDirect3DSwapChain9*            m_pSwapChain;
 
+	Queue<IDirect3DSurface9>*       m_pQueue;
+
 	// Dynamically link to DirectX.
 	HMODULE                         m_D3D9Module;
 
@@ -85,6 +92,10 @@ private:
 	typedef HRESULT( WINAPI *LPDIRECT3DCREATE9EX )( UINT, IDirect3D9Ex ** );
 
 	LPDIRECT3DCREATE9EX             _Direct3DCreate9Ex;
+
+	// Supported video formats.
+	static GUID const* const s_pVideoFormats[];
+	static const DWORD s_dwNumVideoFormats;
 };
 
 } // namespace detail

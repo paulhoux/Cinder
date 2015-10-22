@@ -124,12 +124,6 @@ private:
 		virtual ~CAsyncOperation( void );
 	};
 
-	static GUID const* const s_pVideoFormats9[];
-	static GUID const* const s_pVideoFormats11[];
-
-	static const DWORD s_dwNumVideoFormats9;
-	static const DWORD s_dwNumVideoFormats11;
-
 	static const MFRatio s_DefaultFrameRate;
 	static BOOL ValidStateMatrix[State_Count][Op_Count]; // Defines a look-up table that says which operations are valid from which states.
 

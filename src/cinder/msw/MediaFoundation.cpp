@@ -33,6 +33,8 @@ POSSIBILITY OF SUCH DAMAGE.
 #include "cinder/msw/MediaFoundation.h"
 #include "cinder/msw/ScopedPtr.h"
 #include "cinder/msw/detail/Activate.h"
+#include "cinder/msw/detail/PresenterDX9.h"
+#include "cinder/msw/detail/PresenterDX11.h"
 
 #include <string>
 #include <Shlwapi.h>
@@ -95,30 +97,22 @@ LRESULT CALLBACK MFWndProc( HWND wnd, UINT uMsg, WPARAM wParam, LPARAM lParam )
 
 // ----------------------------------------------------------------------------
 
+using namespace detail;
+
 MFPlayer::MFPlayer()
 	: mRefCount( 1 ), mState( Closed ), mWnd( NULL )
 	, mPlayWhenReady( FALSE ), mIsLooping( FALSE ), mWidth( 0 ), mHeight( 0 )
-	, mSessionPtr( NULL ), mSourcePtr( NULL ), mPresenterPtr( NULL ) /* mSinkPtr( NULL ) */, mVideoDisplayPtr( NULL )
+	, mSessionPtr( NULL ), mSourcePtr( NULL )
 {
 	mCloseEvent = ::CreateEventA( NULL, FALSE, FALSE, NULL );
 	if( mCloseEvent == NULL )
 		throw Exception( "MFPlayer: failed to create Close event." );
 
 	CreateWnd();
-
-	// Create custom EVR presenter.
-	/*mPresenterPtr = new EVRCustomPresenter();
-
-	HRESULT hr = static_cast<EVRCustomPresenter*>( mPresenterPtr )->SetVideoWindow( mWnd );
-	if( FAILED( hr ) )
-		throw Exception( "MFPlayer: failed to set video window." );*/
 }
 
 MFPlayer::~MFPlayer()
 {
-	// Destroy EVR custom presenter.
-	SafeRelease( mPresenterPtr );
-
 	DestroyWnd();
 
 	if( mCloseEvent ) {
@@ -235,23 +229,69 @@ HRESULT MFPlayer::SetPosition( MFTIME position )
 	return hr;
 }
 
+HRESULT MFPlayer::GetFrame()
+{
+	HRESULT hr = S_OK;
+
+	do {
+		BREAK_ON_NULL( mSessionPtr, E_POINTER );
+
+		// Obtain reference to video display.
+		ScopedComPtr<IMFVideoDisplayControl> pVideoDisplayControl;
+		hr = MFGetService( mSessionPtr, MR_VIDEO_RENDER_SERVICE, IID_PPV_ARGS( &pVideoDisplayControl ) );
+		BREAK_ON_FAIL( hr );
+
+		ScopedComPtr<PresenterDX9> pPresenterDX9;
+		hr = pVideoDisplayControl.QueryInterface( __uuidof( PresenterDX9 ), (void**)&pPresenterDX9 );
+		if( SUCCEEDED( hr ) ) {
+			ScopedComPtr<IDirect3DSurface9> pFrame;
+			hr = pPresenterDX9->GetFrame( &pFrame );
+			BREAK_ON_FAIL( hr );
+
+			// TODO: process frame.
+		}
+		else {
+			ScopedComPtr<PresenterDX11> pPresenterDX11;
+			hr = pVideoDisplayControl.QueryInterface( __uuidof( PresenterDX11 ), (void**)&pPresenterDX11 );
+			if( SUCCEEDED( hr ) ) {
+				ScopedComPtr<ID3D11Texture2D> pFrame;
+				hr = pPresenterDX11->GetFrame( &pFrame );
+				BREAK_ON_FAIL( hr );
+
+				// TODO: process frame.
+			}
+		}
+	} while( FALSE );
+
+	return hr;
+}
+
 HRESULT MFPlayer::OnTopologyStatus( IMFMediaEvent *pEvent )
 {
-	UINT32 status;
+	HRESULT hr = S_OK;
 
-	HRESULT hr = pEvent->GetUINT32( MF_EVENT_TOPOLOGY_STATUS, &status );
-	if( SUCCEEDED( hr ) && ( status == MF_TOPOSTATUS_READY ) ) {
-		SafeRelease( mVideoDisplayPtr );
+	do {
+		UINT32 status;
+		hr = pEvent->GetUINT32( MF_EVENT_TOPOLOGY_STATUS, &status );
+		BREAK_ON_FAIL( hr );
 
-		// Get the IMFVideoDisplayControl interface from EVR. This call is
-		// expected to fail if the media file does not have a video stream.
-		(void)MFGetService( mSessionPtr, MR_VIDEO_RENDER_SERVICE, IID_PPV_ARGS( &mVideoDisplayPtr ) );
+		if( status == MF_TOPOSTATUS_READY ) {
+			// Get the IMFVideoDisplayControl interface from EVR. This call is
+			// expected to fail if the media file does not have a video stream.
+			ScopedComPtr<IMFVideoDisplayControl> pVideoDisplayControl;
+			hr = MFGetService( mSessionPtr, MR_VIDEO_RENDER_SERVICE, IID_PPV_ARGS( &pVideoDisplayControl ) );
+			if( FAILED( hr ) ) {
+				CI_LOG_E( "Failed to get IMFVideoDisplayControl interface from EVR. " << HRESULT_STRING( hr ) );
+				__debugbreak();
+			}
 
-		mState = Paused;
+			mState = Paused;
 
-		if( mPlayWhenReady )
-			hr = Play();
-	}
+			if( mPlayWhenReady )
+				hr = Play();
+		}
+	} while( FALSE );
+
 	return hr;
 }
 
@@ -327,8 +367,6 @@ HRESULT MFPlayer::CloseSession()
 	//  
 	//  MESessionClosed is guaranteed to be the last event that the media session fires.
 
-	SafeRelease( mVideoDisplayPtr );
-
 	// First close the media session.
 	if( mSessionPtr ) {
 		DWORD dwWaitResult = 0;
@@ -375,8 +413,16 @@ HRESULT MFPlayer::Repaint()
 	PAINTSTRUCT ps;
 	::BeginPaint( mWnd, &ps );
 
-	if( mVideoDisplayPtr )
-		hr = mVideoDisplayPtr->RepaintVideo();
+	do {
+		BREAK_ON_NULL( mSessionPtr, E_POINTER );
+
+		// Obtain reference to video display.
+		ScopedComPtr<IMFVideoDisplayControl> pVideoDisplayControl;
+		hr = MFGetService( mSessionPtr, MR_VIDEO_RENDER_SERVICE, IID_PPV_ARGS( &pVideoDisplayControl ) );
+		BREAK_ON_FAIL( hr );
+
+		pVideoDisplayControl->RepaintVideo();
+	} while( FALSE );
 
 	::EndPaint( mWnd, &ps );
 
@@ -385,13 +431,21 @@ HRESULT MFPlayer::Repaint()
 
 HRESULT MFPlayer::ResizeVideo( WORD width, WORD height )
 {
-	if( mVideoDisplayPtr ) {
+	HRESULT hr = S_OK;
+
+	do {
+		BREAK_ON_NULL( mSessionPtr, E_POINTER );
+
+		// Obtain reference to video display.
+		ScopedComPtr<IMFVideoDisplayControl> pVideoDisplayControl;
+		hr = MFGetService( mSessionPtr, MR_VIDEO_RENDER_SERVICE, IID_PPV_ARGS( &pVideoDisplayControl ) );
+		BREAK_ON_FAIL( hr );
+
 		RECT rcDest = { 0, 0, width, height };
-		return mVideoDisplayPtr->SetVideoPosition( NULL, &rcDest );
-	}
-	else {
-		return S_OK;
-	}
+		hr = pVideoDisplayControl->SetVideoPosition( NULL, &rcDest );
+	} while( FALSE );
+
+	return hr;
 }
 
 HRESULT MFPlayer::CreatePartialTopology( IMFPresentationDescriptor *pDescriptor )
@@ -400,7 +454,7 @@ HRESULT MFPlayer::CreatePartialTopology( IMFPresentationDescriptor *pDescriptor 
 
 	do {
 		ScopedComPtr<IMFTopology> pTopology;
-		hr = CreatePlaybackTopology( mSourcePtr, pDescriptor, mWnd, &pTopology, mPresenterPtr );
+		hr = CreatePlaybackTopology( mSourcePtr, pDescriptor, mWnd, &pTopology );
 		BREAK_ON_FAIL( hr );
 
 		hr = SetMediaInfo( pDescriptor );
@@ -677,7 +731,7 @@ HRESULT MFPlayer::CreateMediaSource( LPCWSTR pUrl, IMFMediaSource **ppSource )
 }
 
 //  Create a playback topology from a media source.
-HRESULT MFPlayer::CreatePlaybackTopology( IMFMediaSource *pSource, IMFPresentationDescriptor *pPD, HWND hVideoWnd, IMFTopology **ppTopology, IMFVideoPresenter *pVideoPresenter )
+HRESULT MFPlayer::CreatePlaybackTopology( IMFMediaSource *pSource, IMFPresentationDescriptor *pPD, HWND hVideoWnd, IMFTopology **ppTopology )
 {
 	HRESULT hr = S_OK;
 
@@ -694,7 +748,7 @@ HRESULT MFPlayer::CreatePlaybackTopology( IMFMediaSource *pSource, IMFPresentati
 
 		// For each stream, create the topology nodes and add them to the topology.
 		for( DWORD i = 0; i < dwSourceStreams; i++ ) {
-			hr = AddBranchToPartialTopology( pTopology, pSource, pPD, i, hVideoWnd, pVideoPresenter );
+			hr = AddBranchToPartialTopology( pTopology, pSource, pPD, i, hVideoWnd );
 			BREAK_ON_FAIL( hr );
 		}
 		BREAK_ON_FAIL( hr );
@@ -708,7 +762,7 @@ HRESULT MFPlayer::CreatePlaybackTopology( IMFMediaSource *pSource, IMFPresentati
 }
 
 //  Create an activation object for a renderer, based on the stream media type.
-HRESULT MFPlayer::CreateMediaSinkActivate( IMFStreamDescriptor *pSourceSD, HWND hVideoWindow, IMFActivate **ppActivate, IMFVideoPresenter *pVideoPresenter, IMFMediaSink **ppMediaSink )
+HRESULT MFPlayer::CreateMediaSinkActivate( IMFStreamDescriptor *pSourceSD, HWND hVideoWindow, IMFActivate **ppActivate )
 {
 	HRESULT hr = S_OK;
 
@@ -735,40 +789,21 @@ HRESULT MFPlayer::CreateMediaSinkActivate( IMFStreamDescriptor *pSourceSD, HWND 
 			( *ppActivate )->AddRef();
 		}
 		else if( MFMediaType_Video == guidMajorType ) {
-			if( pVideoPresenter != NULL ) {
-				// Create the video renderer.
-				ScopedComPtr<IMFMediaSink> pSink;
-				hr = ::MFCreateVideoRenderer( __uuidof( IMFMediaSink ), (void**)&pSink );
-				BREAK_ON_FAIL( hr );
+			// Create our own Presenter.
+			ScopedComPtr<IMFActivate> pActivate;
+			hr = detail::Activate::CreateInstance( hVideoWindow, &pActivate );
 
-				ScopedComPtr<IMFVideoRenderer> pVideoRenderer;
-				hr = pSink.QueryInterface( __uuidof( IMFVideoRenderer ), (void**)&pVideoRenderer );
-				BREAK_ON_FAIL( hr );
+			if( FAILED( hr ) ) {
+				CI_LOG_E( "MFPlayer: failed to create custom EVR, falling back to default." );
 
-				hr = pVideoRenderer->InitializeRenderer( NULL, pVideoPresenter );
+				// Use default presenter (EVR).
+				hr = MFCreateVideoRendererActivate( hVideoWindow, &pActivate );
 				BREAK_ON_FAIL( hr );
-
-				// Return IMFMediaSink pointer to caller.
-				*ppMediaSink = pSink;
-				( *ppMediaSink )->AddRef();
 			}
-			else {
-				// Use custom EVR.
-				ScopedComPtr<IMFActivate> pActivate;
-				hr = detail::Activate::CreateInstance( hVideoWindow, &pActivate );
 
-				if( FAILED( hr ) ) {
-					CI_LOG_E( "MFPlayer: failed to create custom EVR, falling back to default." );
-
-					// Use default EVR.
-					hr = MFCreateVideoRendererActivate( hVideoWindow, &pActivate );
-					BREAK_ON_FAIL( hr );
-				}
-
-				// Return IMFActivate pointer to caller.
-				*ppActivate = pActivate;
-				( *ppActivate )->AddRef();
-			}
+			// Return IMFActivate pointer to caller.
+			*ppActivate = pActivate;
+			( *ppActivate )->AddRef();
 		}
 		else {
 			// Unknown stream type.
@@ -887,7 +922,7 @@ HRESULT MFPlayer::AddOutputNode( IMFTopology *pTopology, IMFActivate *pActivate,
 //
 //  The media session will add any decoders that are needed.
 
-HRESULT MFPlayer::AddBranchToPartialTopology( IMFTopology *pTopology, IMFMediaSource *pSource, IMFPresentationDescriptor *pPD, DWORD iStream, HWND hVideoWnd, IMFVideoPresenter *pVideoPresenter )
+HRESULT MFPlayer::AddBranchToPartialTopology( IMFTopology *pTopology, IMFMediaSource *pSource, IMFPresentationDescriptor *pPD, DWORD iStream, HWND hVideoWnd )
 {
 	HRESULT hr = S_OK;
 
@@ -903,8 +938,7 @@ HRESULT MFPlayer::AddBranchToPartialTopology( IMFTopology *pTopology, IMFMediaSo
 		if( fSelected ) {
 			// Create the media sink activation object.
 			ScopedComPtr<IMFActivate> pSinkActivate;
-			ScopedComPtr<IMFMediaSink> pMediaSink;
-			hr = CreateMediaSinkActivate( pSD, hVideoWnd, &pSinkActivate, pVideoPresenter, &pMediaSink );
+			hr = CreateMediaSinkActivate( pSD, hVideoWnd, &pSinkActivate );
 			BREAK_ON_FAIL( hr );
 
 			// Add a source node for this stream.
@@ -914,18 +948,7 @@ HRESULT MFPlayer::AddBranchToPartialTopology( IMFTopology *pTopology, IMFMediaSo
 
 			// Create the output node for the renderer.
 			ScopedComPtr<IMFTopologyNode> pOutputNode;
-			if( pSinkActivate ) {
-				hr = AddOutputNode( pTopology, pSinkActivate, 0, &pOutputNode );
-			}
-			else if( pMediaSink ) {
-				IMFStreamSink* pStreamSink = NULL;
-				DWORD streamCount;
-
-				pMediaSink->GetStreamSinkCount( &streamCount );
-				pMediaSink->GetStreamSinkByIndex( 0, &pStreamSink );
-
-				hr = AddOutputNode( pTopology, pStreamSink, &pOutputNode );
-			}
+			hr = AddOutputNode( pTopology, pSinkActivate, 0, &pOutputNode );
 			BREAK_ON_FAIL( hr );
 
 			// Connect the source node to the output node.

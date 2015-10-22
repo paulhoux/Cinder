@@ -57,6 +57,11 @@ void VideoTexture::stop()
 
 const Texture2dRef VideoTexture::getTexture() const
 {
+#if defined(CINDER_MSW)
+	if( mPlayerPtr )
+		mPlayerPtr->GetFrame();
+#endif
+
 	return Texture2dRef();
 }
 

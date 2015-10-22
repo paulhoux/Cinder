@@ -15,67 +15,6 @@ namespace cinder {
 namespace msw {
 namespace detail {
 
-// Video formats supported by the DX9 backend.
-#if MF_USE_DXVA2_DECODER
-GUID const* const StreamSink::s_pVideoFormats9[] =
-{
-	&MFVideoFormat_NV12,
-	&MFVideoFormat_IYUV,
-	&MFVideoFormat_YUY2,
-	&MFVideoFormat_YV12,
-	&MFVideoFormat_RGB32,
-	&MFVideoFormat_ARGB32,
-	&MFVideoFormat_RGB24,
-	&MFVideoFormat_RGB555,
-	&MFVideoFormat_RGB565,
-	&MFVideoFormat_RGB8,
-	&MFVideoFormat_AYUV,
-	&MFVideoFormat_UYVY,
-	&MFVideoFormat_YVYU,
-	&MFVideoFormat_YVU9,
-	//&MEDIASUBTYPE_V216,
-	&MFVideoFormat_v410,
-	&MFVideoFormat_I420,
-	&MFVideoFormat_NV11,
-	&MFVideoFormat_420O
-};
-#else
-GUID const* const StreamSink::s_pVideoFormats9[] =
-{
-	&MFVideoFormat_YUY2,
-	&MFVideoFormat_ARGB32,
-	&MFVideoFormat_RGB24,
-	&MFVideoFormat_RGB32
-};
-#endif
-
-// Video formats supported by the DX11 backend.
-GUID const* const StreamSink::s_pVideoFormats11[] =
-{
-	&MFVideoFormat_NV12,
-	&MFVideoFormat_IYUV,
-	&MFVideoFormat_YUY2,
-	&MFVideoFormat_YV12,
-	&MFVideoFormat_RGB32,
-	&MFVideoFormat_ARGB32,
-	&MFVideoFormat_RGB24,
-	&MFVideoFormat_RGB555,
-	&MFVideoFormat_RGB565,
-	&MFVideoFormat_RGB8,
-	&MFVideoFormat_AYUV,
-	&MFVideoFormat_UYVY,
-	&MFVideoFormat_YVYU,
-	&MFVideoFormat_YVU9,
-	//&MEDIASUBTYPE_V216,
-	&MFVideoFormat_v410,
-	&MFVideoFormat_I420,
-	&MFVideoFormat_NV11,
-	&MFVideoFormat_420O
-};
-
-const DWORD StreamSink::s_dwNumVideoFormats9 = sizeof( StreamSink::s_pVideoFormats9 ) / sizeof( StreamSink::s_pVideoFormats9[0] );
-const DWORD StreamSink::s_dwNumVideoFormats11 = sizeof( StreamSink::s_pVideoFormats11 ) / sizeof( StreamSink::s_pVideoFormats11[0] );
-
 const MFRatio StreamSink::s_DefaultFrameRate = { 30, 1 };
 
 // Control how we batch work from the decoder.
@@ -584,50 +523,28 @@ HRESULT StreamSink::GetMediaTypeByIndex( DWORD dwIndex, _Outptr_ IMFMediaType** 
 	HRESULT hr = S_OK;
 
 	do {
-		if( ppType == NULL ) {
-			hr = E_POINTER;
-			break;
-		}
+		BREAK_ON_NULL( ppType, E_POINTER );
+		BREAK_ON_NULL( m_pPresenter, E_POINTER );
 
 		hr = CheckShutdown();
 		BREAK_ON_FAIL( hr );
 
-		if( m_pPresenter->IsDX9() && dwIndex >= s_dwNumVideoFormats9 ) {
-			hr = MF_E_NO_MORE_TYPES;
-			break;
-		}
-		else if( m_pPresenter->IsDX11() && dwIndex >= s_dwNumVideoFormats11 ) {
-			hr = MF_E_NO_MORE_TYPES;
-			break;
-		}
+		GUID subType = GUID_NULL;
+		hr = m_pPresenter->GetMediaTypeByIndex( dwIndex, &subType );
+		BREAK_ON_FAIL( hr );
 
 		ScopedComPtr<IMFMediaType> pVideoMediaType;
-
-		do {
-			hr = MFCreateMediaType( &pVideoMediaType );
-			BREAK_ON_FAIL( hr );
-
-			hr = pVideoMediaType->SetGUID( MF_MT_MAJOR_TYPE, MFMediaType_Video );
-			BREAK_ON_FAIL( hr );
-
-			if( m_pPresenter->IsDX9() ) {
-				hr = pVideoMediaType->SetGUID( MF_MT_SUBTYPE, *( s_pVideoFormats9[dwIndex] ) );
-				BREAK_ON_FAIL( hr );
-			}
-			else if( m_pPresenter->IsDX11() ) {
-				hr = pVideoMediaType->SetGUID( MF_MT_SUBTYPE, *( s_pVideoFormats11[dwIndex] ) );
-				BREAK_ON_FAIL( hr );
-			}
-			else {
-				hr = E_NOTIMPL;
-				BREAK_ON_FAIL( hr );
-			}
-
-			*ppType = pVideoMediaType;
-			( *ppType )->AddRef();
-		} while( FALSE );
-
+		hr = MFCreateMediaType( &pVideoMediaType );
 		BREAK_ON_FAIL( hr );
+
+		hr = pVideoMediaType->SetGUID( MF_MT_MAJOR_TYPE, MFMediaType_Video );
+		BREAK_ON_FAIL( hr );
+
+		hr = pVideoMediaType->SetGUID( MF_MT_SUBTYPE, subType );
+		BREAK_ON_FAIL( hr );
+
+		*ppType = pVideoMediaType;
+		( *ppType )->AddRef();
 	} while( FALSE );
 
 	return hr;
@@ -643,20 +560,13 @@ HRESULT StreamSink::GetMediaTypeCount( __RPC__out DWORD* pdwTypeCount )
 	HRESULT hr = S_OK;
 
 	do {
-		if( pdwTypeCount == NULL ) {
-			hr = E_POINTER;
-			break;
-		}
+		BREAK_ON_NULL( pdwTypeCount, E_POINTER );
+		BREAK_ON_NULL( m_pPresenter, E_POINTER );
 
 		hr = CheckShutdown();
 		BREAK_ON_FAIL( hr );
 
-		if( m_pPresenter->IsDX9() )
-			*pdwTypeCount = s_dwNumVideoFormats9;
-		else if( m_pPresenter->IsDX11() )
-			*pdwTypeCount = s_dwNumVideoFormats11;
-		else
-			hr = E_NOTIMPL;
+		*pdwTypeCount = m_pPresenter->GetMediaTypeCount();
 	} while( FALSE );
 
 	return hr;

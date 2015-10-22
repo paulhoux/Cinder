@@ -53,7 +53,12 @@ public:
 	// IMFGetService
 	STDMETHODIMP GetService( __RPC__in REFGUID guidService, __RPC__in REFIID riid, __RPC__deref_out_opt LPVOID* ppvObject );
 
+
 	// Presenter
+
+	//! Retrieves the current video frame.
+	STDMETHODIMP          GetFrame( ID3D11Texture2D **ppFrame );
+
 	STDMETHODIMP Initialize( void );
 	STDMETHODIMP_( BOOL ) CanProcessNextSample( void ) { return m_bCanProcessNextSample; }
 	STDMETHODIMP Flush( void );
@@ -63,14 +68,14 @@ public:
 	STDMETHODIMP ProcessFrame( IMFMediaType* pCurrentType, IMFSample* pSample, UINT32* punInterlaceMode, BOOL* pbDeviceChanged, BOOL* pbProcessAgain, IMFSample** ppOutputSample = NULL );
 	STDMETHODIMP SetCurrentMediaType( IMFMediaType* pMediaType );
 	STDMETHODIMP Shutdown( void );
-	STDMETHODIMP_( BOOL ) IsDX9() const { return FALSE; }
-	STDMETHODIMP_( BOOL ) IsDX11() const { return TRUE; }
+	STDMETHODIMP GetMediaTypeByIndex( DWORD dwIndex, GUID *subType ) const;
+	STDMETHODIMP_( DWORD ) GetMediaTypeCount() const { return s_dwNumVideoFormats; }
 
 private:
 	STDMETHODIMP_( VOID ) CheckDecodeSwitchRegKey( void );
 	STDMETHODIMP CheckDeviceState( BOOL* pbDeviceChanged );
 	STDMETHODIMP CreateDCompDeviceAndVisual( void );
-	STDMETHODIMP CreateDXGIManagerAndDevice( D3D_DRIVER_TYPE DriverType = D3D_DRIVER_TYPE_HARDWARE );
+	STDMETHODIMP CreateDXGIManagerAndDevice();
 	STDMETHODIMP FindBOBProcessorIndex( DWORD* pIndex );
 	STDMETHODIMP GetVideoDisplayArea( IMFMediaType* pType, MFVideoArea* pArea );
 	STDMETHODIMP ProcessFrameUsingD3D11( ID3D11Texture2D* pLeftTexture2D, ID3D11Texture2D* pRightTexture2D, UINT dwLeftViewIndex, UINT dwRightViewIndex, RECT rcDest, UINT32 unInterlaceMode, IMFSample** ppVideoOutFrame );
@@ -131,8 +136,13 @@ private:
 	HMODULE                         m_D3D11Module;
 
 	PFN_D3D11_CREATE_DEVICE         _D3D11CreateDevice;
+
+	// Supported video formats.
+	static GUID const* const s_pVideoFormats[];
+	static const DWORD s_dwNumVideoFormats;
 };
 
+/*
 /////////////////////////////////////////////////////////////////////////////////////////////
 // Wrapper class for D3D11 Device and D3D11 Video device used for DXVA to Software decode switch
 class CPrivate_ID3D11VideoDevice : public ID3D11VideoDevice {
@@ -154,8 +164,9 @@ public:
 	}
 
 	STDMETHODIMP QueryInterface(
-		/* [in] */ REFIID riid,
-		/* [iid_is][out] */ __RPC__deref_out void __RPC_FAR* __RPC_FAR* ppvObject )
+		REFIID riid, // [in]
+		__RPC__deref_out void __RPC_FAR* __RPC_FAR* ppvObject // [iid_is][out]
+		)
 	{
 		if( __uuidof( ID3D11VideoDevice ) == riid ) {
 			this->AddRef();
@@ -343,8 +354,9 @@ public:
 	}
 
 	STDMETHODIMP QueryInterface(
-		/* [in] */ REFIID riid,
-		/* [iid_is][out] */ __RPC__deref_out void __RPC_FAR* __RPC_FAR* ppvObject )
+		REFIID riid, // [in]
+		__RPC__deref_out void __RPC_FAR* __RPC_FAR* ppvObject // [iid_is][out]
+		)
 	{
 		if( __uuidof( ID3D11VideoDevice ) == riid ) {
 			m_pVideoDevice->AddRef();
@@ -686,6 +698,8 @@ public:
 		return m_pReal->GetExceptionMode();
 	}
 };
+
+//*/
 
 } // namespace detail
 } // namespace msw

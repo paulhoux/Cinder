@@ -16,6 +16,41 @@ namespace cinder {
 namespace msw {
 namespace detail {
 
+#if MF_USE_DXVA2_DECODER
+GUID const* const PresenterDX9::s_pVideoFormats[] =
+{
+	&MFVideoFormat_NV12,
+	&MFVideoFormat_IYUV,
+	&MFVideoFormat_YUY2,
+	&MFVideoFormat_YV12,
+	&MFVideoFormat_RGB32,
+	&MFVideoFormat_ARGB32,
+	&MFVideoFormat_RGB24,
+	&MFVideoFormat_RGB555,
+	&MFVideoFormat_RGB565,
+	&MFVideoFormat_RGB8,
+	&MFVideoFormat_AYUV,
+	&MFVideoFormat_UYVY,
+	&MFVideoFormat_YVYU,
+	&MFVideoFormat_YVU9,
+	//&MEDIASUBTYPE_V216,
+	&MFVideoFormat_v410,
+	&MFVideoFormat_I420,
+	&MFVideoFormat_NV11,
+	&MFVideoFormat_420O
+};
+#else
+GUID const* const PresenterDX9::s_pVideoFormats[] =
+{
+	&MFVideoFormat_YUY2,
+	&MFVideoFormat_ARGB32,
+	&MFVideoFormat_RGB24,
+	&MFVideoFormat_RGB32
+};
+#endif
+
+const DWORD PresenterDX9::s_dwNumVideoFormats = sizeof( PresenterDX9::s_pVideoFormats ) / sizeof( PresenterDX9::s_pVideoFormats[0] );
+
 // ------------------------------------------------------------------------------
 
 PresenterDX9::PresenterDX9( void )
@@ -29,6 +64,7 @@ PresenterDX9::PresenterDX9( void )
 	, m_pDecoderService( NULL )
 	, m_DecoderGUID( GUID_NULL )
 	, m_pSwapChain( NULL )
+	, m_pQueue( NULL )
 	, m_bCanProcessNextSample( TRUE )
 	, m_b3DVideo( FALSE )
 	, _Direct3DCreate9Ex( NULL )
@@ -58,6 +94,9 @@ HRESULT PresenterDX9::QueryInterface( REFIID iid, __RPC__deref_out _Result_nullo
 	}
 	else if( iid == __uuidof( IMFGetService ) ) {
 		*ppv = static_cast<IMFGetService*>( this );
+	}
+	else if( iid == __uuidof( PresenterDX9 ) ) {
+		*ppv = static_cast<PresenterDX9*>( this );
 	}
 	else {
 		*ppv = NULL;
@@ -174,6 +213,26 @@ HRESULT PresenterDX9::GetService( REFGUID guidService, REFIID riid, LPVOID * ppv
 	return hr;
 }
 
+HRESULT PresenterDX9::GetFrame( IDirect3DSurface9 **ppFrame )
+{
+	HRESULT hr = S_OK;
+
+	ScopedCriticalSection lock( m_critSec );
+
+	do {
+		BREAK_ON_NULL( m_pQueue, E_FAIL );
+
+		ScopedComPtr<IDirect3DSurface9> pSurface;
+		hr = m_pQueue->RemoveFront( &pSurface );
+		BREAK_ON_FAIL( hr );
+
+		( *ppFrame ) = pSurface;
+		( *ppFrame )->AddRef();
+	} while( FALSE );
+
+	return hr;
+}
+
 // Presenter
 HRESULT PresenterDX9::Initialize( void )
 {
@@ -266,6 +325,8 @@ HRESULT PresenterDX9::IsMediaTypeSupported( IMFMediaType *pMediaType )
 				break;
 		}
 #else
+		break; // Allow for now.
+
 		// Check if format can be used as the back-buffer format for the swap chains.
 		GUID subType = GUID_NULL;
 		hr = pMediaType->GetGUID( MF_MT_SUBTYPE, &subType );
@@ -361,6 +422,11 @@ HRESULT PresenterDX9::ProcessFrame( IMFMediaType* pCurrentType, IMFSample* pSamp
 		// Check if device is still valid.
 		hr = CheckDeviceState( pbDeviceChanged );
 		BREAK_ON_FAIL( hr );
+
+		if( *pbDeviceChanged ) {
+			hr = CreateDXVA2ManagerAndDevice();
+			BREAK_ON_FAIL( hr );
+		}
 
 		// Adjust output size.
 		RECT rcDest;
@@ -501,6 +567,7 @@ HRESULT PresenterDX9::Shutdown( void )
 
 	m_IsShutdown = TRUE;
 
+	SafeRelease( m_pQueue );
 	SafeRelease( m_pSwapChain );
 	SafeRelease( m_pDecoderService );
 	SafeRelease( m_pSampleAllocator );
@@ -511,13 +578,21 @@ HRESULT PresenterDX9::Shutdown( void )
 	return hr;
 }
 
+// Presenter
+HRESULT PresenterDX9::GetMediaTypeByIndex( DWORD dwIndex, GUID *subType ) const
+{
+	if( dwIndex >= s_dwNumVideoFormats )
+		return MF_E_NO_MORE_TYPES;
+
+	*subType = *s_pVideoFormats[dwIndex];
+
+	return S_OK;
+}
+
 /// Private methods
 
 HRESULT PresenterDX9::CheckDeviceState( BOOL * pbDeviceChanged )
 {
-	static int deviceStateChecks = 0;
-	static D3D_DRIVER_TYPE driverType = D3D_DRIVER_TYPE_HARDWARE;
-
 	HRESULT hr = S_OK;
 
 	do {
@@ -535,10 +610,6 @@ HRESULT PresenterDX9::CheckDeviceState( BOOL * pbDeviceChanged )
 
 				if( hr == DXVA2_E_NEW_VIDEO_DEVICE ) {
 					*pbDeviceChanged = TRUE;
-
-					// Create a new video decoder.
-					hr = CreateDXVA2ManagerAndDevice();
-					BREAK_ON_FAIL( hr );
 				}
 			}
 		}
@@ -547,22 +618,9 @@ HRESULT PresenterDX9::CheckDeviceState( BOOL * pbDeviceChanged )
 		hr = SetVideoMonitor( m_hwndVideo );
 		BREAK_ON_FAIL( hr );
 
-		if( m_pD3DDevice != NULL ) {
+		if( S_FALSE == hr && m_pD3DDevice != NULL ) {
 			// Lost/hung device. Destroy the device and create a new one.
-			if( S_FALSE == hr ) {
-				*pbDeviceChanged = TRUE;
-
-				hr = CreateDXVA2ManagerAndDevice( driverType );
-				BREAK_ON_FAIL( hr );
-
-				/*SafeRelease( m_pVideoDevice );
-				SafeRelease( m_pVideoProcessorEnum );
-				SafeRelease( m_pVideoProcessor );
-				SafeRelease( m_pSwapChain1 );*/
-
-				deviceStateChecks = 0;
-			}
-			deviceStateChecks++;
+			*pbDeviceChanged = TRUE;
 		}
 
 	} while( FALSE );
@@ -588,9 +646,12 @@ HRESULT PresenterDX9::CreateDXVA2ManagerAndDevice( D3D_DRIVER_TYPE DriverType )
 												   D3DFMT_X8R8G8B8 );
 		BREAK_ON_FAIL_MSG( hr, "Conversion from YUV to RGB is not supported." );
 
-		// Close existing video decoder and device manager.
+		// Close existing interfaces.
 		SafeRelease( m_pDecoderService );
 		SafeRelease( m_pDeviceManager );
+		SafeRelease( m_pQueue );
+
+		m_DecoderGUID = GUID_NULL;
 
 		// Create the device manager and initialize it.
 		hr = DXVA2CreateDirect3DDeviceManager9( &m_DeviceResetToken, &m_pDeviceManager );
@@ -617,7 +678,7 @@ HRESULT PresenterDX9::CreateDXVA2ManagerAndDevice( D3D_DRIVER_TYPE DriverType )
 		pPresentParams.BackBufferHeight = 1;
 		pPresentParams.BackBufferCount = 1;
 		pPresentParams.Windowed = TRUE;
-		pPresentParams.SwapEffect = D3DSWAPEFFECT_DISCARD; // D3DSWAPEFFECT_COPY;
+		pPresentParams.SwapEffect = D3DSWAPEFFECT_DISCARD;
 		pPresentParams.BackBufferFormat = D3DFMT_UNKNOWN;
 		pPresentParams.hDeviceWindow = NULL; //  m_hwndVideo;
 		pPresentParams.Flags = D3DPRESENTFLAG_VIDEO;
@@ -636,6 +697,13 @@ HRESULT PresenterDX9::CreateDXVA2ManagerAndDevice( D3D_DRIVER_TYPE DriverType )
 		// Reset the D3DDeviceManager with the new device.
 		hr = m_pDeviceManager->ResetDevice( m_pD3DDevice, m_DeviceResetToken );
 		BREAK_ON_FAIL( hr );
+
+		// Create (additional) swap chain.
+		hr = UpdateDX9SwapChain();
+		BREAK_ON_FAIL( hr );
+
+		// Create shared surface queue.
+		m_pQueue = new Queue<IDirect3DSurface9>(); // Created with ref count = 1.
 
 #if MF_USE_DXVA2_DECODER
 		// Create the video decoder service.
@@ -778,6 +846,11 @@ HRESULT PresenterDX9::ProcessFrameUsingD3D9( IDirect3DSurface9* pSurface, UINT d
 		hr = pRTSample->AddBuffer( pBuffer );
 		BREAK_ON_FAIL( hr );
 
+		if( ppVideoOutFrame != NULL ) {
+			*ppVideoOutFrame = pRTSample;
+			( *ppVideoOutFrame )->AddRef();
+		}
+
 		// Fill backbuffer with black.
 		hr = m_pD3DDevice->ColorFill( pBackBuffer, NULL, D3DCOLOR_ARGB( 0xFF, 0x00, 0x00, 0x00 ) );
 
@@ -787,10 +860,50 @@ HRESULT PresenterDX9::ProcessFrameUsingD3D9( IDirect3DSurface9* pSurface, UINT d
 
 		QueryPerformanceCounter( &lpcEnd );
 
-		if( ppVideoOutFrame != NULL ) {
-			*ppVideoOutFrame = pRTSample;
-			( *ppVideoOutFrame )->AddRef();
-		}
+		// Blit video to shared texture.
+		QueryPerformanceCounter( &lpcStart );
+#if 1
+		do {
+			BREAK_ON_NULL( m_pQueue, E_POINTER );
+
+			D3DSURFACE_DESC surfaceDesc;
+			hr = pSurface->GetDesc( &surfaceDesc );
+			BREAK_ON_FAIL( hr );
+
+			ScopedComPtr<IDirect3DSurface9> pFrame;
+			hr = m_pQueue->RemoveBack( &pFrame );
+
+			// Check texture compatibility.
+			if( SUCCEEDED( hr ) ) {
+				D3DSURFACE_DESC desc;
+				hr = pSurface->GetDesc( &desc );
+
+				if( FAILED( hr ) || desc.Width != surfaceDesc.Width || desc.Height != surfaceDesc.Height ) {
+					// Do not return it to the pool.
+					pFrame.Release();
+					hr = E_FAIL;
+				}
+			}
+
+			// If no existing texture is available, create new one.
+			if( FAILED( hr ) ) {
+				D3DSURFACE_DESC desc = surfaceDesc;
+				desc.Format = D3DFMT_A8R8G8B8;
+				desc.Usage = D3DUSAGE_RENDERTARGET;
+
+				HANDLE pSharedHandle = NULL;
+				hr = m_pD3DDevice->CreateRenderTarget( desc.Width, desc.Height, desc.Format, D3DMULTISAMPLE_NONE, 0, FALSE, &pFrame, &pSharedHandle );
+			}
+			BREAK_ON_FAIL( hr );
+
+			// TODO: blit to texture.
+
+			// Add to front of queue.
+			hr = m_pQueue->InsertFront( pFrame );
+		} while( FALSE );
+		// TEMP: end
+#endif
+		QueryPerformanceCounter( &lpcEnd );
 	} while( FALSE );
 
 	return hr;
@@ -832,6 +945,6 @@ HRESULT PresenterDX9::UpdateDX9SwapChain( void )
 	return hr;
 }
 
-} // namespace detail
+	} // namespace detail
 } // namespace msw
 } // namespace cinder
