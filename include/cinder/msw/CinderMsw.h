@@ -67,6 +67,10 @@ namespace msw {
 #define BREAK_ON_NULL(value, result)  if( value == NULL ) { hr = result; /*__debugbreak();*/ break; }
 #endif // !BREAK_ON_NULL
 
+#ifndef BREAK_ON_NULL_MSG
+#define BREAK_ON_NULL_MSG(value, result, msg)  if( value == NULL ) { hr = result; CI_LOG_E(msg); /*__debugbreak();*/ break; }
+#endif // !BREAK_ON_NULL_MSG
+
 #ifndef BREAK_IF_TRUE
 #define BREAK_IF_TRUE(test, result)  if( (test) ) { hr = result; break; }
 #endif // !BREAK_IF_TRUE

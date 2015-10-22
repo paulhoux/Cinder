@@ -302,6 +302,7 @@ HRESULT MFPlayer::CreateSession()
 
 		// Sanity check.
 		assert( mState == Closed );
+		assert( mSessionPtr == NULL );
 
 		// Create the media session.
 		hr = ::MFCreateMediaSession( NULL, &mSessionPtr );
@@ -385,11 +386,7 @@ HRESULT MFPlayer::Repaint()
 HRESULT MFPlayer::ResizeVideo( WORD width, WORD height )
 {
 	if( mVideoDisplayPtr ) {
-		// Set the destination rectangle.
-		// Leave the default source rectangle (0,0,1,1).
-
 		RECT rcDest = { 0, 0, width, height };
-
 		return mVideoDisplayPtr->SetVideoPosition( NULL, &rcDest );
 	}
 	else {

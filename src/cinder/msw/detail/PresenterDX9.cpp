@@ -306,7 +306,7 @@ STDMETHODIMP PresenterDX9::PresentFrame( void )
 		hr = CheckShutdown();
 		BREAK_ON_FAIL( hr );
 
-		BREAK_ON_NULL( m_pSwapChain, E_POINTER );
+		BREAK_ON_NULL_MSG( m_pSwapChain, E_POINTER, "No swap chain available." );
 
 		RECT rcDest;
 		ZeroMemory( &rcDest, sizeof( rcDest ) );
@@ -315,8 +315,9 @@ STDMETHODIMP PresenterDX9::PresentFrame( void )
 			break;
 		}
 
+		//hr = m_pD3DDevice->Present( NULL, &rcDest, NULL, NULL );
 		hr = m_pSwapChain->Present( NULL, &rcDest, /*m_hwndVideo*/ NULL, NULL, 0 );
-		BREAK_ON_FAIL( hr );
+		BREAK_ON_FAIL_MSG( hr, "Failed to present swap chain" );
 
 		m_bCanProcessNextSample = TRUE;
 	} while( FALSE );
@@ -612,13 +613,13 @@ HRESULT PresenterDX9::CreateDXVA2ManagerAndDevice( D3D_DRIVER_TYPE DriverType )
 		D3DPRESENT_PARAMETERS pPresentParams;
 		ZeroMemory( &pPresentParams, sizeof( pPresentParams ) );
 
-		pPresentParams.BackBufferWidth = 0;
-		pPresentParams.BackBufferHeight = 0;
+		pPresentParams.BackBufferWidth = 1;
+		pPresentParams.BackBufferHeight = 1;
 		pPresentParams.BackBufferCount = 1;
 		pPresentParams.Windowed = TRUE;
 		pPresentParams.SwapEffect = D3DSWAPEFFECT_DISCARD; // D3DSWAPEFFECT_COPY;
 		pPresentParams.BackBufferFormat = D3DFMT_UNKNOWN;
-		pPresentParams.hDeviceWindow = m_hwndVideo; // GetDesktopWindow();
+		pPresentParams.hDeviceWindow = NULL; //  m_hwndVideo;
 		pPresentParams.Flags = D3DPRESENTFLAG_VIDEO;
 		pPresentParams.PresentationInterval = D3DPRESENT_INTERVAL_DEFAULT;
 
@@ -761,6 +762,7 @@ HRESULT PresenterDX9::ProcessFrameUsingD3D9( IDirect3DSurface9* pSurface, UINT d
 
 		// Get Backbuffer.
 		ScopedComPtr<IDirect3DSurface9> pBackBuffer;
+		//m_pD3DDevice->GetBackBuffer( 0, 0, D3DBACKBUFFER_TYPE_MONO, &pBackBuffer );
 		m_pSwapChain->GetBackBuffer( 0, D3DBACKBUFFER_TYPE_MONO, &pBackBuffer );
 		BREAK_ON_FAIL( hr );
 
@@ -776,9 +778,12 @@ HRESULT PresenterDX9::ProcessFrameUsingD3D9( IDirect3DSurface9* pSurface, UINT d
 		hr = pRTSample->AddBuffer( pBuffer );
 		BREAK_ON_FAIL( hr );
 
+		// Fill backbuffer with black.
+		hr = m_pD3DDevice->ColorFill( pBackBuffer, NULL, D3DCOLOR_ARGB( 0xFF, 0x00, 0x00, 0x00 ) );
+
 		// Draw the surface to the backbuffer, decompressing YUV to RGB if needed.
-		hr = m_pD3DDevice->StretchRect( pSurface, NULL, pBackBuffer, NULL, D3DTEXF_NONE );
-		BREAK_ON_FAIL( hr );
+		hr = m_pD3DDevice->StretchRect( pSurface, NULL, pBackBuffer, &TRect, D3DTEXF_NONE );
+		BREAK_ON_FAIL_MSG( hr, "Failed to render to back buffer." );
 
 		QueryPerformanceCounter( &lpcEnd );
 
@@ -793,9 +798,9 @@ HRESULT PresenterDX9::ProcessFrameUsingD3D9( IDirect3DSurface9* pSurface, UINT d
 
 //+-------------------------------------------------------------------------
 //
-//  Member:     UpdateDXGISwapChain
+//  Member:     UpdateDX9SwapChain
 //
-//  Synopsis:   Creates SwapChain for HWND or DComp or Resizes buffers in case of resolution change
+//  Synopsis:   Creates SwapChain for HWND or Resizes buffers in case of resolution change
 //
 //--------------------------------------------------------------------------
 
@@ -820,27 +825,8 @@ HRESULT PresenterDX9::UpdateDX9SwapChain( void )
 	do {
 		SafeRelease( m_pSwapChain );
 
-		{
-			ULONG rc = m_pD3DDevice->AddRef();
-			m_pD3DDevice->Release();
-		}
-
 		hr = m_pD3DDevice->CreateAdditionalSwapChain( &pPresentParams, &m_pSwapChain );
 		BREAK_ON_FAIL( hr );
-
-		{
-			ULONG rc = m_pD3DDevice->AddRef();
-			m_pD3DDevice->Release();
-		}
-
-		/*if( m_bFullScreenState ) {
-			hr = m_pSwapChain->SetFullscreenState( TRUE, NULL );
-			BREAK_ON_FAIL( hr );
-		}
-		else {
-			hr = m_pSwapChain->SetFullscreenState( FALSE, NULL );
-			BREAK_ON_FAIL( hr );
-		}*/
 	} while( FALSE );
 
 	return hr;
