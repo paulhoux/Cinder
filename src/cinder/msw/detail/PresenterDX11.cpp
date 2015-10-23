@@ -274,7 +274,9 @@ HRESULT PresenterDX11::GetFrame( ID3D11Texture2D **ppFrame )
 {
 	HRESULT hr = S_OK;
 
-	ScopedCriticalSection lock( m_critSec );
+	// Note: we don't need a critical section, as the
+	//       queue is already thread-safe. This way,
+	//       we don't have to block more than necessary.
 
 	do {
 		BREAK_ON_NULL( m_pQueue, E_FAIL );
@@ -285,6 +287,24 @@ HRESULT PresenterDX11::GetFrame( ID3D11Texture2D **ppFrame )
 
 		( *ppFrame ) = pSurface;
 		( *ppFrame )->AddRef();
+	} while( FALSE );
+
+	return hr;
+}
+
+HRESULT PresenterDX11::ReturnFrame( ID3D11Texture2D *pFrame )
+{
+	HRESULT hr = S_OK;
+
+	// Note: we don't need a critical section, as the
+	//       queue is already thread-safe. This way,
+	//       we don't have to block more than necessary.
+
+	do {
+		BREAK_ON_NULL( m_pQueue, E_FAIL );
+
+		hr = m_pQueue->InsertBack( pFrame );
+		BREAK_ON_FAIL( hr );
 	} while( FALSE );
 
 	return hr;
@@ -1303,64 +1323,7 @@ HRESULT PresenterDX11::ProcessFrameUsingD3D11( ID3D11Texture2D* pLeftTexture2D, 
 
 		QueryPerformanceCounter( &lpcEnd );
 
-		// Blit video to shared texture.
-		QueryPerformanceCounter( &lpcStart );
-#if 1
-		do {
-			BREAK_ON_NULL( m_pQueue, E_POINTER );
-
-			ScopedComPtr<ID3D11Texture2D> pFrame;
-			hr = m_pQueue->RemoveBack( &pFrame );
-
-			// Check texture compatibility.
-			if( SUCCEEDED( hr ) ) {
-				D3D11_TEXTURE2D_DESC desc;
-				pFrame->GetDesc( &desc );
-
-				if( desc.Width != surfaceDesc.Width || desc.Height != surfaceDesc.Height ) {
-					// Do not return it to the pool.
-					pFrame.Release();
-					hr = E_FAIL;
-				}
-			}
-
-			// If no existing texture is available, create new one.
-			if( FAILED( hr ) ) {
-				D3D11_TEXTURE2D_DESC desc;
-				desc.Width = surfaceDesc.Width;
-				desc.Height = surfaceDesc.Height;
-				desc.MipLevels = 1;
-				desc.ArraySize = 1;
-				desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-				desc.SampleDesc.Count = 1;
-				desc.SampleDesc.Quality = 0;
-				desc.Usage = D3D11_USAGE_DEFAULT;
-				desc.BindFlags = D3D11_BIND_RENDER_TARGET;
-				desc.CPUAccessFlags = 0;
-				desc.MiscFlags = 0;
-
-				hr = m_pD3DDevice->CreateTexture2D( &desc, NULL, &pFrame );
-			}
-			BREAK_ON_FAIL( hr );
-
-			// Reuse output view.
-			ZeroMemory( &OutputViewDesc, sizeof( OutputViewDesc ) );
-			OutputViewDesc.ViewDimension = D3D11_VPOV_DIMENSION_TEXTURE2D;
-
-			pOutputView.Release();
-			hr = m_pVideoDevice->CreateVideoProcessorOutputView( pFrame, m_pVideoProcessorEnum, &OutputViewDesc, &pOutputView );
-			BREAK_ON_FAIL( hr );
-
-			// Blit to texture.
-			hr = pVideoContext->VideoProcessorBlt( m_pVideoProcessor, pOutputView, 0, 1, &StreamData );
-			BREAK_ON_FAIL_MSG( hr, "Failed to blit to shared texture." );
-
-			// Add to front of queue.
-			hr = m_pQueue->InsertFront( pFrame );
-		} while( FALSE );
-		// TEMP: end
-#endif
-		QueryPerformanceCounter( &lpcEnd );
+		hr = BlitToShared( &StreamData, unInterlaceMode );
 	} while( FALSE );
 
 	return hr;
@@ -1642,12 +1605,12 @@ void PresenterDX11::SetVideoContextParameters( ID3D11VideoContext* pVideoContext
 	pVideoContext->VideoProcessorSetStreamOutputRate( m_pVideoProcessor, 0, D3D11_VIDEO_PROCESSOR_OUTPUT_RATE_NORMAL, TRUE, NULL );
 
 	// Source rect
-	pVideoContext->VideoProcessorSetStreamSourceRect( m_pVideoProcessor, 0, TRUE, pSRect );
+	pVideoContext->VideoProcessorSetStreamSourceRect( m_pVideoProcessor, 0, ( NULL == pSRect ) ? FALSE : TRUE, pSRect );
 
 	// Stream dest rect
-	pVideoContext->VideoProcessorSetStreamDestRect( m_pVideoProcessor, 0, TRUE, pTRect );
+	pVideoContext->VideoProcessorSetStreamDestRect( m_pVideoProcessor, 0, ( NULL == pTRect ) ? FALSE : TRUE, pTRect );
 
-	pVideoContext->VideoProcessorSetOutputTargetRect( m_pVideoProcessor, TRUE, &m_rcDstApp );
+	pVideoContext->VideoProcessorSetOutputTargetRect( m_pVideoProcessor, FALSE, NULL );
 
 	// Stream color space
 	D3D11_VIDEO_PROCESSOR_COLOR_SPACE colorSpace = {};
@@ -1665,6 +1628,92 @@ void PresenterDX11::SetVideoContextParameters( ID3D11VideoContext* pVideoContext
 	backgroundColor.RGBA.B = 1.0F * static_cast<float>( GetBValue( 0 ) ) / 255.0F;
 
 	pVideoContext->VideoProcessorSetOutputBackgroundColor( m_pVideoProcessor, FALSE, &backgroundColor );
+}
+
+//+-------------------------------------------------------------------------
+//
+//  Member:     BlitToShared
+//
+//  Synopsis:   Blits a sample to a texture or surface for sharing.
+//
+//--------------------------------------------------------------------------
+
+HRESULT PresenterDX11::BlitToShared( const D3D11_VIDEO_PROCESSOR_STREAM *pStream, UINT32 unInterlaceMode )
+{
+	HRESULT hr = S_OK;
+
+	do {
+		BREAK_ON_NULL( pStream, E_POINTER );
+		BREAK_ON_NULL( m_pQueue, E_POINTER );
+
+		D3D11_TEXTURE2D_DESC desc;
+		desc.Width = m_imageWidthInPixels;
+		desc.Height = m_imageHeightInPixels;
+		desc.MipLevels = 1;
+		desc.ArraySize = 1;
+		desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+		desc.SampleDesc.Count = 1;
+		desc.SampleDesc.Quality = 0;
+		desc.Usage = D3D11_USAGE_DEFAULT;
+		desc.BindFlags = D3D11_BIND_RENDER_TARGET;
+		desc.CPUAccessFlags = 0;
+		desc.MiscFlags = 0;
+
+		ScopedComPtr<ID3D11Texture2D> pFrame;
+
+		////Make sure we have at least 2 free textures in the queue.
+		//while( m_pQueue->GetCount() < 2 ) {
+		//	hr = m_pD3DDevice->CreateTexture2D( &desc, NULL, &pFrame );
+		//	BREAK_ON_FAIL( hr );
+
+		//	hr = m_pQueue->InsertBack( pFrame );
+		//	pFrame.Release();
+		//	BREAK_ON_FAIL( hr );
+		//}
+
+		// Get free texture.
+		hr = m_pQueue->RemoveBack( &pFrame );
+
+		// Check texture compatibility.
+		if( SUCCEEDED( hr ) ) {
+			D3D11_TEXTURE2D_DESC frameDesc;
+			pFrame->GetDesc( &frameDesc );
+
+			if( frameDesc.Width != desc.Width || frameDesc.Height != desc.Height ) {
+				// Do not return it to the pool.
+				pFrame.Release();
+				hr = E_FAIL;
+			}
+		}
+
+		// If no existing texture is available, create new one.
+		if( FAILED( hr ) ) {
+			hr = m_pD3DDevice->CreateTexture2D( &desc, NULL, &pFrame );
+		}
+		BREAK_ON_FAIL( hr );
+
+		D3D11_VIDEO_PROCESSOR_OUTPUT_VIEW_DESC OutputViewDesc;
+		ZeroMemory( &OutputViewDesc, sizeof( OutputViewDesc ) );
+		OutputViewDesc.ViewDimension = D3D11_VPOV_DIMENSION_TEXTURE2D;
+
+		ScopedComPtr<ID3D11VideoProcessorOutputView> pOutputView;
+		hr = m_pVideoDevice->CreateVideoProcessorOutputView( pFrame, m_pVideoProcessorEnum, &OutputViewDesc, &pOutputView );
+		BREAK_ON_FAIL( hr );
+
+		ScopedComPtr<ID3D11VideoContext> pVideoContext;
+		hr = m_pD3DImmediateContext->QueryInterface( __uuidof( ID3D11VideoContext ), (void**)&pVideoContext );
+		BREAK_ON_FAIL( hr );
+
+		SetVideoContextParameters( pVideoContext, NULL, NULL, unInterlaceMode );
+
+		hr = pVideoContext->VideoProcessorBlt( m_pVideoProcessor, pOutputView, 0, 1, pStream );
+		BREAK_ON_FAIL_MSG( hr, "Failed to blit to shared texture." );
+
+		// Add to front of queue.
+		hr = m_pQueue->InsertFront( pFrame );
+	} while( FALSE );
+
+	return hr;
 }
 
 //-------------------------------------------------------------------

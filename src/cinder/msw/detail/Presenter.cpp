@@ -23,6 +23,60 @@ HRESULT Presenter::CheckShutdown( void ) const
 	}
 }
 
+HRESULT Presenter::SetMonitor( UINT adapterID )
+{
+	HRESULT hr = S_OK;
+	DWORD dwMatchID = 0;
+
+	ScopedCriticalSection lock( m_critSec );
+
+	do {
+		hr = m_pMonitors->MatchGUID( adapterID, &dwMatchID );
+		BREAK_ON_FAIL( hr );
+
+		if( hr == S_FALSE ) {
+			hr = E_INVALIDARG;
+			break;
+		}
+
+		m_lpCurrMon = &( *m_pMonitors )[dwMatchID];
+		m_ConnectionGUID = adapterID;
+	} while( FALSE );
+
+	return hr;
+}
+
+HRESULT Presenter::SetVideoMonitor( HWND hwndVideo )
+{
+	HRESULT hr = S_OK;
+
+	do {
+		BREAK_ON_NULL( m_pMonitors, E_UNEXPECTED );
+
+		HMONITOR hMon = MonitorFromWindow( hwndVideo, MONITOR_DEFAULTTONULL );
+		BREAK_ON_NULL( hMon, E_POINTER );
+
+		if( NULL != m_lpCurrMon && m_lpCurrMon->hMon == hMon )
+			return S_OK;
+
+		m_pMonitors->TerminateDisplaySystem();
+		m_lpCurrMon = NULL;
+
+		hr = m_pMonitors->InitializeDisplaySystem( hwndVideo );
+		BREAK_ON_FAIL( hr );
+
+		AMDDrawMonitorInfo* pMonInfo = m_pMonitors->FindMonitor( hMon );
+		if( NULL != pMonInfo && pMonInfo->uDevID != m_ConnectionGUID ) {
+			hr = SetMonitor( pMonInfo->uDevID );
+			BREAK_ON_FAIL( hr );
+
+			hr = S_FALSE; // Signal lost device.
+		}
+	} while( FALSE );
+
+	return hr;
+}
+
 //+-------------------------------------------------------------------------
 //
 //  Function:   ReduceToLowestTerms

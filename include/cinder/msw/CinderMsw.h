@@ -165,12 +165,16 @@ template <class T> inline void SafeDeleteArray( T*& pT )
 }
 
 //! Releases a COM pointer if the pointer is not NULL, and sets the pointer to NULL.
-template <class T> inline void SafeRelease( T*& pT )
+template <class T> inline ULONG SafeRelease( T*& pT )
 {
+	ULONG rc = 0;
+
 	if( pT != NULL ) {
-		pT->Release();
+		rc = pT->Release();
 		pT = NULL;
 	}
+
+	return rc;
 }
 
 //! Converts a value in ticks to a value in milliseconds. One tick is 100 nanoseconds.

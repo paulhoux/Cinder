@@ -27,68 +27,67 @@ namespace detail {
 class __declspec( uuid( "B85BC91A-0513-4015-9AE6-C10FEB1D00E9" ) ) PresenterDX11 : public Presenter {
 public:
 	PresenterDX11( void );
-	virtual ~PresenterDX11( void );
+	~PresenterDX11( void );
 
 	// IUnknown
-	STDMETHODIMP QueryInterface( REFIID iid, __RPC__deref_out _Result_nullonfailure_ void** ppv );
+	STDMETHODIMP            QueryInterface( REFIID iid, __RPC__deref_out _Result_nullonfailure_ void** ppv );
 
 	// IMFVideoDisplayControl
-	STDMETHODIMP GetAspectRatioMode( __RPC__out DWORD* pdwAspectRatioMode ) { return E_NOTIMPL; }
-	STDMETHODIMP GetBorderColor( __RPC__out COLORREF* pClr ) { return E_NOTIMPL; }
-	STDMETHODIMP GetCurrentImage( __RPC__inout BITMAPINFOHEADER* pBih, __RPC__deref_out_ecount_full_opt( *pcbDib ) BYTE** pDib, __RPC__out DWORD* pcbDib, __RPC__inout_opt LONGLONG* pTimestamp ) { return E_NOTIMPL; }
-	STDMETHODIMP GetFullscreen( __RPC__out BOOL* pfFullscreen );
-	STDMETHODIMP GetIdealVideoSize( __RPC__inout_opt SIZE* pszMin, __RPC__inout_opt SIZE* pszMax ) { return E_NOTIMPL; }
-	STDMETHODIMP GetNativeVideoSize( __RPC__inout_opt SIZE* pszVideo, __RPC__inout_opt SIZE* pszARVideo ) { return E_NOTIMPL; }
-	STDMETHODIMP GetRenderingPrefs( __RPC__out DWORD* pdwRenderFlags ) { return E_NOTIMPL; }
-	STDMETHODIMP GetVideoPosition( __RPC__out MFVideoNormalizedRect* pnrcSource, __RPC__out LPRECT prcDest ) { return E_NOTIMPL; }
-	STDMETHODIMP GetVideoWindow( __RPC__deref_out_opt HWND* phwndVideo ) { return E_NOTIMPL; }
-	STDMETHODIMP RepaintVideo( void ) { return E_NOTIMPL; }
-	STDMETHODIMP SetAspectRatioMode( DWORD dwAspectRatioMode ) { return E_NOTIMPL; }
-	STDMETHODIMP SetBorderColor( COLORREF Clr ) { return E_NOTIMPL; }
-	STDMETHODIMP SetFullscreen( BOOL fFullscreen );
-	STDMETHODIMP SetRenderingPrefs( DWORD dwRenderingPrefs ) { return E_NOTIMPL; }
-	STDMETHODIMP SetVideoPosition( __RPC__in_opt const MFVideoNormalizedRect* pnrcSource, __RPC__in_opt const LPRECT prcDest ) { return E_NOTIMPL; }
-	STDMETHODIMP SetVideoWindow( __RPC__in HWND hwndVideo );
+	STDMETHODIMP            GetAspectRatioMode( __RPC__out DWORD* pdwAspectRatioMode ) { return E_NOTIMPL; }
+	STDMETHODIMP            GetBorderColor( __RPC__out COLORREF* pClr ) { return E_NOTIMPL; }
+	STDMETHODIMP            GetCurrentImage( __RPC__inout BITMAPINFOHEADER* pBih, __RPC__deref_out_ecount_full_opt( *pcbDib ) BYTE** pDib, __RPC__out DWORD* pcbDib, __RPC__inout_opt LONGLONG* pTimestamp ) { return E_NOTIMPL; }
+	STDMETHODIMP            GetFullscreen( __RPC__out BOOL* pfFullscreen );
+	STDMETHODIMP            GetIdealVideoSize( __RPC__inout_opt SIZE* pszMin, __RPC__inout_opt SIZE* pszMax ) { return E_NOTIMPL; }
+	STDMETHODIMP            GetNativeVideoSize( __RPC__inout_opt SIZE* pszVideo, __RPC__inout_opt SIZE* pszARVideo ) { return E_NOTIMPL; }
+	STDMETHODIMP            GetRenderingPrefs( __RPC__out DWORD* pdwRenderFlags ) { return E_NOTIMPL; }
+	STDMETHODIMP            GetVideoPosition( __RPC__out MFVideoNormalizedRect* pnrcSource, __RPC__out LPRECT prcDest ) { return E_NOTIMPL; }
+	STDMETHODIMP            GetVideoWindow( __RPC__deref_out_opt HWND* phwndVideo ) { return E_NOTIMPL; }
+	STDMETHODIMP            RepaintVideo( void ) { return E_NOTIMPL; }
+	STDMETHODIMP            SetAspectRatioMode( DWORD dwAspectRatioMode ) { return E_NOTIMPL; }
+	STDMETHODIMP            SetBorderColor( COLORREF Clr ) { return E_NOTIMPL; }
+	STDMETHODIMP            SetFullscreen( BOOL fFullscreen );
+	STDMETHODIMP            SetRenderingPrefs( DWORD dwRenderingPrefs ) { return E_NOTIMPL; }
+	STDMETHODIMP            SetVideoPosition( __RPC__in_opt const MFVideoNormalizedRect* pnrcSource, __RPC__in_opt const LPRECT prcDest ) { return E_NOTIMPL; }
+	STDMETHODIMP            SetVideoWindow( __RPC__in HWND hwndVideo );
 
 	// IMFGetService
-	STDMETHODIMP GetService( __RPC__in REFGUID guidService, __RPC__in REFIID riid, __RPC__deref_out_opt LPVOID* ppvObject );
+	STDMETHODIMP            GetService( __RPC__in REFGUID guidService, __RPC__in REFIID riid, __RPC__deref_out_opt LPVOID* ppvObject );
 
 
 	// Presenter
-
-	//! Retrieves the current video frame.
-	STDMETHODIMP          GetFrame( ID3D11Texture2D **ppFrame );
-
-	STDMETHODIMP Initialize( void );
-	STDMETHODIMP_( BOOL ) CanProcessNextSample( void ) { return m_bCanProcessNextSample; }
-	STDMETHODIMP Flush( void );
-	STDMETHODIMP GetMonitorRefreshRate( DWORD* pdwMonitorRefreshRate );
-	STDMETHODIMP IsMediaTypeSupported( IMFMediaType* pMediaType );
-	STDMETHODIMP PresentFrame( void );
-	STDMETHODIMP ProcessFrame( IMFMediaType* pCurrentType, IMFSample* pSample, UINT32* punInterlaceMode, BOOL* pbDeviceChanged, BOOL* pbProcessAgain, IMFSample** ppOutputSample = NULL );
-	STDMETHODIMP SetCurrentMediaType( IMFMediaType* pMediaType );
-	STDMETHODIMP Shutdown( void );
-	STDMETHODIMP GetMediaTypeByIndex( DWORD dwIndex, GUID *subType ) const;
-	STDMETHODIMP_( DWORD ) GetMediaTypeCount() const { return s_dwNumVideoFormats; }
+	STDMETHODIMP            Initialize( void );
+	STDMETHODIMP_( BOOL )   CanProcessNextSample( void ) { return m_bCanProcessNextSample; }
+	STDMETHODIMP            Flush( void );
+	STDMETHODIMP            GetMonitorRefreshRate( DWORD* pdwMonitorRefreshRate );
+	STDMETHODIMP            IsMediaTypeSupported( IMFMediaType* pMediaType );
+	STDMETHODIMP            PresentFrame( void );
+	STDMETHODIMP            ProcessFrame( IMFMediaType* pCurrentType, IMFSample* pSample, UINT32* punInterlaceMode, BOOL* pbDeviceChanged, BOOL* pbProcessAgain, IMFSample** ppOutputSample = NULL );
+	STDMETHODIMP            SetCurrentMediaType( IMFMediaType* pMediaType );
+	STDMETHODIMP            Shutdown( void );
+	STDMETHODIMP            GetMediaTypeByIndex( DWORD dwIndex, GUID *subType ) const;
+	STDMETHODIMP_( DWORD )  GetMediaTypeCount() const { return s_dwNumVideoFormats; }
+	STDMETHODIMP            GetFrame( ID3D11Texture2D **ppFrame );
+	STDMETHODIMP            ReturnFrame( ID3D11Texture2D *pFrame );
 
 private:
-	STDMETHODIMP_( VOID ) CheckDecodeSwitchRegKey( void );
-	STDMETHODIMP CheckDeviceState( BOOL* pbDeviceChanged );
-	STDMETHODIMP CreateDCompDeviceAndVisual( void );
-	STDMETHODIMP CreateDXGIManagerAndDevice();
-	STDMETHODIMP FindBOBProcessorIndex( DWORD* pIndex );
-	STDMETHODIMP GetVideoDisplayArea( IMFMediaType* pType, MFVideoArea* pArea );
-	STDMETHODIMP ProcessFrameUsingD3D11( ID3D11Texture2D* pLeftTexture2D, ID3D11Texture2D* pRightTexture2D, UINT dwLeftViewIndex, UINT dwRightViewIndex, RECT rcDest, UINT32 unInterlaceMode, IMFSample** ppVideoOutFrame );
-	STDMETHODIMP_( VOID ) SetVideoContextParameters( ID3D11VideoContext* pVideoContext, const RECT* pSRect, const RECT* pTRect, UINT32 unInterlaceMode );
+	STDMETHODIMP_( VOID )   CheckDecodeSwitchRegKey( void );
+	STDMETHODIMP            CheckDeviceState( BOOL* pbDeviceChanged );
+	STDMETHODIMP            CreateDCompDeviceAndVisual( void );
+	STDMETHODIMP            CreateDXGIManagerAndDevice();
+	STDMETHODIMP            FindBOBProcessorIndex( DWORD* pIndex );
+	STDMETHODIMP            GetVideoDisplayArea( IMFMediaType* pType, MFVideoArea* pArea );
+	STDMETHODIMP            ProcessFrameUsingD3D11( ID3D11Texture2D* pLeftTexture2D, ID3D11Texture2D* pRightTexture2D, UINT dwLeftViewIndex, UINT dwRightViewIndex, RECT rcDest, UINT32 unInterlaceMode, IMFSample** ppVideoOutFrame );
+	STDMETHODIMP_( VOID )   SetVideoContextParameters( ID3D11VideoContext* pVideoContext, const RECT* pSRect, const RECT* pTRect, UINT32 unInterlaceMode );
+	STDMETHODIMP            BlitToShared( const D3D11_VIDEO_PROCESSOR_STREAM *pStream, UINT32 unInterlaceMode );
 
 #if (WINVER >=_WIN32_WINNT_WIN8)
-	STDMETHODIMP CreateXVP( void );
-	STDMETHODIMP ProcessFrameUsingXVP( IMFMediaType* pCurrentType, IMFSample* pVideoFrame, ID3D11Texture2D* pTexture2D, RECT rcDest, IMFSample** ppVideoOutFrame, BOOL* pbInputFrameUsed );
-	STDMETHODIMP SetXVPOutputMediaType( IMFMediaType* pType, DXGI_FORMAT vpOutputFormat );
+	STDMETHODIMP            CreateXVP( void );
+	STDMETHODIMP            ProcessFrameUsingXVP( IMFMediaType* pCurrentType, IMFSample* pVideoFrame, ID3D11Texture2D* pTexture2D, RECT rcDest, IMFSample** ppVideoOutFrame, BOOL* pbInputFrameUsed );
+	STDMETHODIMP            SetXVPOutputMediaType( IMFMediaType* pType, DXGI_FORMAT vpOutputFormat );
 #endif
 
 	_Post_satisfies_( this->m_pSwapChain1 != NULL )
-		STDMETHODIMP UpdateDXGISwapChain( void );
+	STDMETHODIMP            UpdateDXGISwapChain( void );
 
 	static const struct FormatEntry {
 		GUID            Subtype;

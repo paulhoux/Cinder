@@ -97,66 +97,14 @@ public:
 protected:
 	STDMETHODIMP_( BOOL )          CheckEmptyRect( RECT* pDst );
 	STDMETHODIMP                   CheckShutdown( void ) const;
+	STDMETHODIMP                   SetMonitor( UINT adapterID );
+	STDMETHODIMP                   SetVideoMonitor( HWND hwndVideo );
 
-	STDMETHODIMP SetMonitor( UINT adapterID )
-	{
-		HRESULT hr = S_OK;
-		DWORD dwMatchID = 0;
-
-		ScopedCriticalSection lock( m_critSec );
-
-		do {
-			hr = m_pMonitors->MatchGUID( adapterID, &dwMatchID );
-			BREAK_ON_FAIL( hr );
-
-			if( hr == S_FALSE ) {
-				hr = E_INVALIDARG;
-				break;
-			}
-
-			m_lpCurrMon = &( *m_pMonitors )[dwMatchID];
-			m_ConnectionGUID = adapterID;
-		} while( FALSE );
-
-		return hr;
-	}
-
-	STDMETHODIMP SetVideoMonitor( HWND hwndVideo )
-	{
-		HRESULT hr = S_OK;
-
-		do {
-			BREAK_ON_NULL( m_pMonitors, E_UNEXPECTED );
-
-			HMONITOR hMon = MonitorFromWindow( hwndVideo, MONITOR_DEFAULTTONULL );
-			BREAK_ON_NULL( hMon, E_POINTER );
-
-			if( NULL != m_lpCurrMon && m_lpCurrMon->hMon == hMon )
-				return S_OK;
-
-			m_pMonitors->TerminateDisplaySystem();
-			m_lpCurrMon = NULL;
-
-			hr = m_pMonitors->InitializeDisplaySystem( hwndVideo );
-			BREAK_ON_FAIL( hr );
-
-			AMDDrawMonitorInfo* pMonInfo = m_pMonitors->FindMonitor( hMon );
-			if( NULL != pMonInfo && pMonInfo->uDevID != m_ConnectionGUID ) {
-				hr = SetMonitor( pMonInfo->uDevID );
-				BREAK_ON_FAIL( hr );
-
-				hr = S_FALSE; // Signal lost device.
-			}
-		} while( FALSE );
-
-		return hr;
-	}
-
-	STDMETHODIMP_( VOID ) ReduceToLowestTerms( int NumeratorIn, int DenominatorIn, int * pNumeratorOut, int * pDenominatorOut );
-	STDMETHODIMP_( VOID ) LetterBoxDstRect( LPRECT lprcLBDst, const RECT & rcSrc, const RECT & rcDst );
-	STDMETHODIMP_( VOID ) PixelAspectToPictureAspect( int Width, int Height, int PixelAspectX, int PixelAspectY, int * pPictureAspectX, int * pPictureAspectY );
-	STDMETHODIMP_( VOID ) AspectRatioCorrectSize( LPSIZE lpSizeImage, const SIZE & sizeAr, const SIZE & sizeOrig, BOOL ScaleXorY );
-	STDMETHODIMP_( VOID ) UpdateRectangles( RECT* pDst, RECT* pSrc );
+	STDMETHODIMP_( VOID )          ReduceToLowestTerms( int NumeratorIn, int DenominatorIn, int * pNumeratorOut, int * pDenominatorOut );
+	STDMETHODIMP_( VOID )          LetterBoxDstRect( LPRECT lprcLBDst, const RECT & rcSrc, const RECT & rcDst );
+	STDMETHODIMP_( VOID )          PixelAspectToPictureAspect( int Width, int Height, int PixelAspectX, int PixelAspectY, int * pPictureAspectX, int * pPictureAspectY );
+	STDMETHODIMP_( VOID )          AspectRatioCorrectSize( LPSIZE lpSizeImage, const SIZE & sizeAr, const SIZE & sizeOrig, BOOL ScaleXorY );
+	STDMETHODIMP_( VOID )          UpdateRectangles( RECT* pDst, RECT* pSrc );
 
 protected:
 	CriticalSection                 m_critSec;                  // critical section for thread safety

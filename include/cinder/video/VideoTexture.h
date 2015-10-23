@@ -2,12 +2,17 @@
 
 #pragma once
 
+#include "cinder/Cinder.h"
 #include "cinder/Signals.h"
-#include "cinder/gl/Texture.h"
+#include "cinder/gl/gl.h"
 #include "cinder/video/Video.h"
 
 #if defined(CINDER_MSW)
+#include "cinder/msw/CinderMsw.h"
 #include "cinder/msw/MediaFoundation.h"
+#include "cinder/msw/ScopedPtr.h"
+#include "cinder/msw/detail/PresenterDX9.h"
+#include "cinder/msw/detail/PresenterDX11.h"
 #endif
 
 namespace cinder {
@@ -40,7 +45,7 @@ public:
 	//! Draws the video using the specified \a bounds.
 	void draw( const ci::Area &bounds ) override {}
 
-	const Texture2dRef getTexture() const;
+	const Texture2dRef getTexture();
 
 private:
 	void close();
@@ -50,6 +55,13 @@ private:
 
 #if defined(CINDER_MSW)
 	msw::MFPlayer  *mPlayerPtr;
+
+	// TEMP: interop stuff.
+	IUnknown       *m_pFrame;
+
+	HANDLE          m_hDevice;
+	HANDLE          m_hObject;
+	GLuint          m_texId;
 #endif
 };
 

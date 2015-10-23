@@ -37,9 +37,6 @@ POSSIBILITY OF SUCH DAMAGE.
 #include <dxva2api.h>
 #include <evr.h>
 
-// TEMP: interop stuffs
-#include "cinder/gl/gl.h"
-
 #define MF_USE_DXVA2_DECODER 1
 
 namespace cinder {
@@ -334,8 +331,6 @@ public:
 	HRESULT SetLoop( BOOL loop ) { mIsLooping = loop; return S_OK; }
 	//! Returns the current state.
 	State   GetState() const { return mState; }
-	//! TEMP: attempts to get the latest frame and share it.
-	ci::gl::Texture2dRef GetFrame();
 
 	// IUnknown methods
 	STDMETHODIMP QueryInterface( REFIID iid, void** ppv );
@@ -405,13 +400,6 @@ private:
 
 	//! Allows control over the created window.
 	ci::app::Window::Format  mWindowFormat;
-
-	// TEMP: interop stuff.
-	IUnknown  *m_pFrame;
-
-	HANDLE     m_hDevice;
-	HANDLE     m_hObject;
-	GLuint     m_texId;
 };
 
 }

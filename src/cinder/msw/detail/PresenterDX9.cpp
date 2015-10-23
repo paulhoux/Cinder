@@ -217,7 +217,9 @@ HRESULT PresenterDX9::GetFrame( IDirect3DSurface9 **ppFrame )
 {
 	HRESULT hr = S_OK;
 
-	ScopedCriticalSection lock( m_critSec );
+	// Note: we don't need a critical section, as the
+	//       queue is already thread-safe. This way,
+	//       we don't have to block more than necessary.
 
 	do {
 		BREAK_ON_NULL( m_pQueue, E_FAIL );

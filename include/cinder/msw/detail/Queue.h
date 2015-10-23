@@ -31,6 +31,11 @@ public:
 		return S_OK;
 	}
 
+	STDMETHODIMP_( DWORD ) GetCount()
+	{
+		return m_queue.GetCount();
+	}
+
 	//! Caller is responsible for releasing the item.
 	STDMETHODIMP RemoveBack( T** ppItem )
 	{
