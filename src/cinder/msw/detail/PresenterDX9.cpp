@@ -884,15 +884,19 @@ HRESULT PresenterDX9::ProcessFrameUsingD3D9( IDirect3DSurface9* pSurface, UINT d
 					hr = E_FAIL;
 				}
 			}
-
+			
 			// If no existing texture is available, create new one.
 			if( FAILED( hr ) ) {
 				D3DSURFACE_DESC desc = surfaceDesc;
 				desc.Format = D3DFMT_A8R8G8B8;
 				desc.Usage = D3DUSAGE_RENDERTARGET;
 
-				HANDLE pSharedHandle = NULL;
-				hr = m_pD3DDevice->CreateRenderTarget( desc.Width, desc.Height, desc.Format, D3DMULTISAMPLE_NONE, 0, FALSE, &pFrame, &pSharedHandle );
+				HANDLE sharedHandle = NULL;
+				hr = m_pD3DDevice->CreateRenderTarget( desc.Width, desc.Height, desc.Format, D3DMULTISAMPLE_NONE, 0, FALSE, &pFrame, &sharedHandle );
+				BREAK_ON_FAIL( hr );
+
+				// Set private data.
+				//hr = pFrame->SetPrivateData( GUID_SharedHandle, sharedHandle, sizeof( HANDLE ), 0 );
 			}
 			BREAK_ON_FAIL( hr );
 

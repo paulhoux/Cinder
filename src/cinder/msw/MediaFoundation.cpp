@@ -47,9 +47,9 @@ POSSIBILITY OF SUCH DAMAGE.
 #pragma comment(lib, "winmm.lib") // for timeBeginPeriod and timeEndPeriod
 #pragma comment (lib,"uuid.lib")
 
-//#pragma comment(lib,"dxva2.lib")
-//#pragma comment (lib,"evr.lib")
-//#pragma comment (lib,"dcomp.lib")
+// TEMP: OpenGL interop stuff - should be moved to somewhere else!
+#include "cinder/gl/Context.h"
+#include "glload/wgl_all.h"
 
 namespace cinder {
 namespace msw {
@@ -100,9 +100,19 @@ LRESULT CALLBACK MFWndProc( HWND wnd, UINT uMsg, WPARAM wParam, LPARAM lParam )
 using namespace detail;
 
 MFPlayer::MFPlayer()
-	: mRefCount( 1 ), mState( Closed ), mWnd( NULL )
-	, mPlayWhenReady( FALSE ), mIsLooping( FALSE ), mWidth( 0 ), mHeight( 0 )
-	, mSessionPtr( NULL ), mSourcePtr( NULL )
+	: mRefCount( 1 )
+	, mState( Closed )
+	, mWnd( NULL )
+	, mPlayWhenReady( FALSE )
+	, mIsLooping( FALSE )
+	, mWidth( 0 )
+	, mHeight( 0 )
+	, mSessionPtr( NULL )
+	, mSourcePtr( NULL )
+	, m_pFrame( NULL )
+	, m_hDevice( NULL )
+	, m_hObject( NULL )
+	, m_texId( 0 )
 {
 	mCloseEvent = ::CreateEventA( NULL, FALSE, FALSE, NULL );
 	if( mCloseEvent == NULL )
@@ -229,9 +239,11 @@ HRESULT MFPlayer::SetPosition( MFTIME position )
 	return hr;
 }
 
-HRESULT MFPlayer::GetFrame()
+ci::gl::Texture2dRef MFPlayer::GetFrame()
 {
 	HRESULT hr = S_OK;
+
+	ci::gl::Texture2dRef result;
 
 	do {
 		BREAK_ON_NULL( mSessionPtr, E_POINTER );
@@ -248,22 +260,130 @@ HRESULT MFPlayer::GetFrame()
 			hr = pPresenterDX9->GetFrame( &pFrame );
 			BREAK_ON_FAIL( hr );
 
-			// TODO: process frame.
+			//// TODO: process frame.
+			//ScopedComPtr<IDirect3DDevice9> pDevice;
+			//hr = pFrame->GetDevice( &pDevice );
+			//BREAK_ON_FAIL( hr );
+
+			//ScopedComPtr<IDXGIResource1> pDXGIResource1; // TODO only works for DX11 :(
+			//hr = pFrame.QueryInterface( __uuidof( IDXGIResource1 ), (void**)&pDXGIResource1 );
+			//BREAK_ON_FAIL( hr );
+
+			//HANDLE sharedHandle = NULL;
+			//hr = pDXGIResource1->GetSharedHandle( &sharedHandle );
+			//BREAK_ON_FAIL( hr );
+
+			//HANDLE hDevice = ::wglDXOpenDeviceNV( pDevice );
+			//BREAK_ON_NULL( hDevice, E_POINTER );
+
+			//BOOL success = ::wglDXSetResourceShareHandleNV( pFrame, sharedHandle );
+
+			//GLuint texId = 0;
+			//::glGenTextures( 1, &texId );
+
+			//HANDLE hObject = ::wglDXRegisterObjectNV( hDevice, (void*)pFrame, texId, GL_TEXTURE_RECTANGLE, WGL_ACCESS_READ_ONLY_NV );
+			//if( NULL == hObject ) {
+			//	DWORD err = ::GetLastError();
+			//	switch( err ) {
+			//		case ERROR_INVALID_HANDLE:
+			//			CI_LOG_E( "ERROR_INVALID_HANDLE" );
+			//			break;
+			//		case ERROR_INVALID_DATA:
+			//			CI_LOG_E( "ERROR_INVALID_DATA" );
+			//			break;
+			//		case ERROR_OPEN_FAILED:
+			//			CI_LOG_E( "ERROR_OPEN_FAILED" );
+			//			break;
+			//		default:
+			//			CI_LOG_E( "Unknown error" );
+			//			break;
+			//	}
+			//}
+
+			//BOOL locked = ::wglDXLockObjectsNV( hDevice, 1, &hObject );
+
+			//// Cleanup
+			//BOOL unlocked = ::wglDXUnlockObjectsNV( hDevice, 1, &hObject );
+
+			//BOOL unregistered = ::wglDXUnregisterObjectNV( hDevice, hObject );
+
+			//::glDeleteTextures( 1, &texId );
+
+			//BOOL closed = ::wglDXCloseDeviceNV( hDevice );
 		}
 		else {
 			ScopedComPtr<PresenterDX11> pPresenterDX11;
 			hr = pVideoDisplayControl.QueryInterface( __uuidof( PresenterDX11 ), (void**)&pPresenterDX11 );
 			if( SUCCEEDED( hr ) ) {
+				// Get latest video frame.
 				ScopedComPtr<ID3D11Texture2D> pFrame;
 				hr = pPresenterDX11->GetFrame( &pFrame );
 				BREAK_ON_FAIL( hr );
 
-				// TODO: process frame.
+				if( m_pFrame ) {
+					BOOL unlocked = ::wglDXUnlockObjectsNV( m_hDevice, 1, &m_hObject );
+
+					BOOL unregistered = ::wglDXUnregisterObjectNV( m_hDevice, m_hObject );
+
+					::glDeleteTextures( 1, &m_texId );
+					m_texId = 0;
+
+					SafeRelease( m_pFrame );
+				}
+
+				m_pFrame = pFrame;
+				m_pFrame->AddRef();
+
+				// Open Interop device.
+				if( NULL == m_hDevice ) {
+					ScopedComPtr<ID3D11Device> pDevice;
+					pFrame->GetDevice( &pDevice );
+					BREAK_ON_NULL( pDevice, E_POINTER );
+
+					m_hDevice = ::wglDXOpenDeviceNV( pDevice );
+					BREAK_ON_NULL( m_hDevice, E_POINTER );
+				}
+
+				// Generate texture name.
+				if( 0 == m_texId ) {
+					::glGenTextures( 1, &m_texId );
+					BREAK_IF_TRUE( m_texId == 0, E_FAIL );
+				}
+
+				// Register with OpenGL.
+				m_hObject = ::wglDXRegisterObjectNV( m_hDevice, (void*)pFrame, m_texId, GL_TEXTURE_RECTANGLE, WGL_ACCESS_READ_ONLY_NV );
+				if( NULL == m_hObject ) {
+					DWORD err = ::GetLastError();
+					switch( err ) {
+						case ERROR_INVALID_HANDLE:
+							CI_LOG_E( "ERROR_INVALID_HANDLE" );
+							break;
+						case ERROR_INVALID_DATA:
+							CI_LOG_E( "ERROR_INVALID_DATA" );
+							break;
+						case ERROR_OPEN_FAILED:
+							CI_LOG_E( "ERROR_OPEN_FAILED" );
+							break;
+						default:
+							CI_LOG_E( "Unknown error" );
+							break;
+					}
+					BREAK_ON_NULL( hr, E_FAIL );
+				}
+
+				// Lock texture.
+				BOOL locked = ::wglDXLockObjectsNV( m_hDevice, 1, &m_hObject );
+
+				D3D11_TEXTURE2D_DESC desc;
+				pFrame->GetDesc( &desc );
+
+				result = ci::gl::Texture2d::create( GL_TEXTURE_RECTANGLE, m_texId, desc.Width, desc.Height, true, []( ci::gl::Texture2d* ) {} );
+				result->setTopDown( true );
 			}
 		}
 	} while( FALSE );
 
-	return hr;
+	return result;
 }
 
 HRESULT MFPlayer::OnTopologyStatus( IMFMediaEvent *pEvent )

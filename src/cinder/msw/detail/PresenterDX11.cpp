@@ -294,7 +294,7 @@ HRESULT PresenterDX11::GetFrame( ID3D11Texture2D **ppFrame )
 HRESULT PresenterDX11::Initialize( void )
 {
 	// TEMP: Force DX9.
-	return E_FAIL;
+	//return E_FAIL;
 
 	if( !m_D3D11Module ) {
 		// Dynamically load D3D11 functions (to avoid static linkage with d3d11.lib)
@@ -1343,17 +1343,17 @@ HRESULT PresenterDX11::ProcessFrameUsingD3D11( ID3D11Texture2D* pLeftTexture2D, 
 			}
 			BREAK_ON_FAIL( hr );
 
-			//// Reuse output view.
-			//ZeroMemory( &OutputViewDesc, sizeof( OutputViewDesc ) );
-			//OutputViewDesc.ViewDimension = D3D11_VPOV_DIMENSION_TEXTURE2D;
+			// Reuse output view.
+			ZeroMemory( &OutputViewDesc, sizeof( OutputViewDesc ) );
+			OutputViewDesc.ViewDimension = D3D11_VPOV_DIMENSION_TEXTURE2D;
 
-			//pOutputView.Release();
-			//hr = m_pVideoDevice->CreateVideoProcessorOutputView( pFrame, m_pVideoProcessorEnum, &OutputViewDesc, &pOutputView );
-			//BREAK_ON_FAIL( hr );
+			pOutputView.Release();
+			hr = m_pVideoDevice->CreateVideoProcessorOutputView( pFrame, m_pVideoProcessorEnum, &OutputViewDesc, &pOutputView );
+			BREAK_ON_FAIL( hr );
 
-			//// Blit to texture.
-			//hr = pVideoContext->VideoProcessorBlt( m_pVideoProcessor, pOutputView, 0, 1, &StreamData );
-			//BREAK_ON_FAIL_MSG( hr, "Failed to blit to shared texture." );
+			// Blit to texture.
+			hr = pVideoContext->VideoProcessorBlt( m_pVideoProcessor, pOutputView, 0, 1, &StreamData );
+			BREAK_ON_FAIL_MSG( hr, "Failed to blit to shared texture." );
 
 			// Add to front of queue.
 			hr = m_pQueue->InsertFront( pFrame );

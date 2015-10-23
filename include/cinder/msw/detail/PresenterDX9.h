@@ -43,7 +43,7 @@ public:
 	// Presenter
 
 	//! Retrieves the current video frame.
-	STDMETHODIMP          GetFrame( IDirect3DSurface9 **ppFrame );
+	STDMETHODIMP GetFrame( IDirect3DSurface9 **ppFrame );
 
 	STDMETHODIMP Initialize( void );
 	STDMETHODIMP_( BOOL ) CanProcessNextSample( void ) { return m_bCanProcessNextSample; }

@@ -26,6 +26,8 @@ public:
 private:
 	Rectf                             mClearRegion;
 	std::vector<gl::VideoTextureRef>  mVideos;
+
+	ci::gl::Texture2dRef              mTexture;
 };
 
 void VideoTestApp::setup()
@@ -34,16 +36,12 @@ void VideoTestApp::setup()
 	//VLDEnable();
 #endif
 
-	gl::enableVerticalSync( true );
+	gl::enableVerticalSync( false );
 	disableFrameRate();
 }
 
 void VideoTestApp::update()
 {
-	for( auto &video : mVideos ) {
-		// TEMP
-		video->getTexture();
-	}
 }
 
 void VideoTestApp::draw()
@@ -52,6 +50,16 @@ void VideoTestApp::draw()
 
 	gl::ScopedColor color( 1, 0, 0 );
 	gl::drawSolidRoundedRect( mClearRegion, 10.0f );
+
+	if( !mVideos.empty() ) {
+		auto texture = mVideos.front()->getTexture();
+
+		if( texture )
+			mTexture = texture;
+
+		gl::ScopedColor color( 1, 1, 1 );
+		gl::draw( mTexture );
+	}
 }
 
 void VideoTestApp::mouseDown( MouseEvent event )

@@ -59,7 +59,7 @@ const Texture2dRef VideoTexture::getTexture() const
 {
 #if defined(CINDER_MSW)
 	if( mPlayerPtr )
-		mPlayerPtr->GetFrame();
+		return mPlayerPtr->GetFrame();
 #endif
 
 	return Texture2dRef();
