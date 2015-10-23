@@ -23,7 +23,6 @@
 
 #pragma once
 
-#include "cinder/Cinder.h"
 #if( _WIN32_WINNT < _WIN32_WINNT_VISTA )
 	#error "WASAPI only available on Windows Vista or newer"
 #else
