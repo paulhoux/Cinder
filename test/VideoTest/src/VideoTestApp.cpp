@@ -5,7 +5,7 @@
 #include "cinder/app/App.h"
 #include "cinder/app/RendererGl.h"
 #include "cinder/gl/gl.h"
-#include "cinder/video/VideoTexture.h"
+#include "cinder/wmf/MediaFoundationGlImpl.h" // replace with MediaFoundation.h
 #include "cinder/Log.h"
 
 using namespace ci;
@@ -24,10 +24,10 @@ public:
 	void resize() override;
 
 private:
-	Rectf                             mClearRegion;
-	std::vector<gl::VideoTextureRef>  mVideos;
+	Rectf                         mClearRegion;
+	std::vector<wmf::MovieGlRef>  mVideos;
 
-	ci::gl::Texture2dRef              mTexture;
+	ci::gl::Texture2dRef          mTexture;
 };
 
 void VideoTestApp::setup()
@@ -65,6 +65,8 @@ void VideoTestApp::draw()
 void VideoTestApp::mouseDown( MouseEvent event )
 {
 	if( mClearRegion.contains( event.getPos() ) ) {
+		mTexture.reset(); // TEMP
+
 		if( !mVideos.empty() )
 			mVideos.pop_back();
 	}
@@ -75,7 +77,7 @@ void VideoTestApp::fileDrop( FileDropEvent event )
 	size_t count = event.getNumFiles();
 	for( size_t i = 0; i < count; ++i ) {
 		try {
-			auto video = gl::VideoTexture::create( event.getFile( i ) );
+			auto video = wmf::MovieGl::create( event.getFile( i ) );
 
 			video->setLoop( true );
 			video->play();

@@ -148,12 +148,6 @@
     <Filter Include="Header Files\jsoncpp">
       <UniqueIdentifier>{1f0d2d7b-fc30-443d-a52d-dd3867811355}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Header Files\video">
-      <UniqueIdentifier>{a1e2b547-d50a-4a69-bd15-5e129fe46c73}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source Files\video">
-      <UniqueIdentifier>{ad30ec1b-e1fd-486d-87d8-a83ea829d55a}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Source Files\tinyexr">
       <UniqueIdentifier>{9fb9c4db-7e15-4606-a469-e540c1a38f74}</UniqueIdentifier>
     </Filter>
@@ -165,6 +159,12 @@
     </Filter>
     <Filter Include="Source Files\msw\detail">
       <UniqueIdentifier>{c586c686-42a1-4433-9641-ee20ec9bbb2b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\wmf">
+      <UniqueIdentifier>{42a52dee-5bbe-4dd8-bb7f-b3a72b7fde82}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\wmf">
+      <UniqueIdentifier>{b3f728ab-020e-4e21-bd21-f6ff1f1aa010}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -795,9 +795,6 @@
     <ClCompile Include="..\src\cinder\gl\ConstantConversions.cpp">
       <Filter>Source Files\gl</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\cinder\video\VideoTexture.cpp">
-      <Filter>Source Files\video</Filter>
-    </ClCompile>
     <ClCompile Include="..\src\cinder\msw\MediaFoundation.cpp">
       <Filter>Source Files\msw</Filter>
     </ClCompile>
@@ -833,6 +830,9 @@
     </ClCompile>
     <ClCompile Include="..\src\cinder\msw\detail\Presenter.cpp">
       <Filter>Source Files\msw\detail</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\cinder\wmf\MediaFoundationGlImpl.cpp">
+      <Filter>Source Files\wmf</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -1694,12 +1694,6 @@
     <ClInclude Include="..\include\cinder\gl\Ssbo.h">
       <Filter>Header Files\gl</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\cinder\video\Video.h">
-      <Filter>Header Files\video</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\cinder\video\VideoTexture.h">
-      <Filter>Header Files\video</Filter>
-    </ClInclude>
     <ClInclude Include="..\include\cinder\msw\MediaFoundation.h">
       <Filter>Header Files\msw</Filter>
     </ClInclude>
@@ -1756,6 +1750,12 @@
     </ClInclude>
     <ClInclude Include="..\include\cinder\msw\detail\Queue.h">
       <Filter>Header Files\msw\detail</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\cinder\wmf\MediaFoundationImpl.h">
+      <Filter>Header Files\wmf</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\cinder\wmf\MediaFoundationGlImpl.h">
+      <Filter>Header Files\wmf</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

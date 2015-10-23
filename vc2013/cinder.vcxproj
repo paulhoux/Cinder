@@ -572,7 +572,7 @@
     <ClCompile Include="..\src\cinder\Url.cpp" />
     <ClCompile Include="..\src\cinder\UrlImplWinInet.cpp" />
     <ClCompile Include="..\src\cinder\Utilities.cpp" />
-    <ClCompile Include="..\src\cinder\video\VideoTexture.cpp" />
+    <ClCompile Include="..\src\cinder\wmf\MediaFoundationGlImpl.cpp" />
     <ClCompile Include="..\src\cinder\Xml.cpp" />
     <ClCompile Include="..\src\cinder\app\KeyEvent.cpp" />
     <ClCompile Include="..\src\cinder\app\Renderer.cpp" />
@@ -809,8 +809,8 @@
     <ClInclude Include="..\include\cinder\Tween.h" />
     <ClInclude Include="..\include\cinder\Unicode.h" />
     <ClInclude Include="..\include\cinder\UrlImplWinInet.h" />
-    <ClInclude Include="..\include\cinder\video\Video.h" />
-    <ClInclude Include="..\include\cinder\video\VideoTexture.h" />
+    <ClInclude Include="..\include\cinder\wmf\MediaFoundationGlImpl.h" />
+    <ClInclude Include="..\include\cinder\wmf\MediaFoundationImpl.h" />
     <ClInclude Include="..\include\jsoncpp\json\json-forwards.h" />
     <ClInclude Include="..\include\jsoncpp\json\json.h" />
     <ClInclude Include="..\include\rapidxml\rapidxml.hpp" />
