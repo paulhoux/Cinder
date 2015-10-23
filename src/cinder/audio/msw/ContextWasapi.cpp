@@ -22,7 +22,7 @@
 */
 
 #include "cinder/Cinder.h"
-#if( _WIN32_WINNT >= _WIN32_WINNT_VISTA )
+#if defined( CINDER_WINRT ) || ( _WIN32_WINNT >= _WIN32_WINNT_VISTA ) // Requires Windows Vista
 
 #include "cinder/audio/msw/ContextWasapi.h"
 #include "cinder/audio/msw/DeviceManagerWasapi.h"
@@ -579,4 +579,4 @@ InputDeviceNodeRef ContextWasapi::createInputDeviceNode( const DeviceRef &device
 
 } } } // namespace cinder::audio::msw
 
-#endif // ( _WIN32_WINNT >= _WIN32_WINNT_VISTA )
+#endif // defined( CINDER_WINRT ) || ( _WIN32_WINNT >= _WIN32_WINNT_VISTA )
