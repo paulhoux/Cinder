@@ -1644,7 +1644,10 @@ HRESULT PresenterDX11::BlitToShared( const D3D11_VIDEO_PROCESSOR_STREAM *pStream
 
 	do {
 		BREAK_ON_NULL( pStream, E_POINTER );
+
 		BREAK_ON_NULL( m_pQueue, E_POINTER );
+		BREAK_ON_NULL( m_pVideoProcessorEnum, E_POINTER );
+		BREAK_ON_NULL( m_pVideoProcessor, E_POINTER );
 
 		D3D11_TEXTURE2D_DESC desc;
 		desc.Width = m_imageWidthInPixels;

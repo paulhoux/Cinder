@@ -177,6 +177,22 @@ const Texture2dRef VideoTexture::getTexture()
 void VideoTexture::close()
 {
 #if defined(CINDER_MSW)
+	if( m_pFrame ) {
+		BOOL unlocked = ::wglDXUnlockObjectsNV( m_hDevice, 1, &m_hObject );
+		BOOL unregistered = ::wglDXUnregisterObjectNV( m_hDevice, m_hObject );
+		m_hObject = NULL;
+
+		::glDeleteTextures( 1, &m_texId );
+		m_texId = 0;
+
+		BOOL closed = ::wglDXCloseDeviceNV( m_hDevice );
+		m_hDevice = NULL;
+
+		// TODO: copy existing textures?
+
+		SafeRelease( m_pFrame );
+	}
+
 	if( mPlayerPtr )
 		mPlayerPtr->Close();
 
