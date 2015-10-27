@@ -54,6 +54,8 @@ public:
 	// IMFMediaSinkPreroll
 	STDMETHODIMP NotifyPreroll( MFTIME hnsUpcomingStartTime );
 
+	static MFPlayerDirectXVersion s_version; // which version of the DirectX backend do we want to use
+
 private:
 
 	static CriticalSection s_csStreamSinkAndScheduler; // critical section for thread safety, used for CStreamSink and CScheduler

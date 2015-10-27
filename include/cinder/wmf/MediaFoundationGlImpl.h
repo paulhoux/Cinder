@@ -34,8 +34,11 @@ POSSIBILITY OF SUCH DAMAGE.
 #include "cinder/msw/CinderMsw.h"
 #include "cinder/msw/MediaFoundation.h"
 #include "cinder/msw/ScopedPtr.h"
+#include "cinder/msw/detail/MediaSink.h"
 #include "cinder/msw/detail/PresenterDX9.h"
 #include "cinder/msw/detail/PresenterDX11.h"
+
+#include "glload/wgl_all.h"
 
 namespace cinder {
 namespace wmf {
@@ -77,6 +80,16 @@ protected:
 			: mPlayerPtr( NULL )
 			, mDeviceHandle( NULL )
 		{
+			// Check availability of interop extensions.
+			if( msw::detail::MediaSink::s_version > msw::MFPlayerDirectXVersion::DX_9 && !wglext_NV_DX_interop2 ) {
+				CI_LOG_V( "NV_DX_interop2 extension not available, trying DX9..." );
+				msw::detail::MediaSink::s_version = msw::MFPlayerDirectXVersion::DX_9;
+			}
+
+			if( !wglext_NV_DX_interop ) {
+				throw std::exception( "NV_DX_interop extension not available!" );
+			}
+
 			// Create player.
 			mPlayerPtr = new msw::MFPlayer(); // Created with ref count = 1.
 			if( NULL == mPlayerPtr )

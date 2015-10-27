@@ -20,6 +20,7 @@ namespace detail {
 /////////////////////////////////////////////////////////////////////////////////////////////
 
 CriticalSection MediaSink::s_csStreamSinkAndScheduler;
+MFPlayerDirectXVersion MediaSink::s_version = DX_11;
 
 //-------------------------------------------------------------------
 // Name: CreateInstance
@@ -627,15 +628,15 @@ STDMETHODIMP MediaSink::NotifyPreroll( MFTIME hnsUpcomingStartTime )
 // MediaSink constructor.
 //-------------------------------------------------------------------
 
-MediaSink::MediaSink( void ) :
-	STREAM_ID( 0 ),
-	m_nRefCount( 1 ),
-	m_csMediaSink(), // default ctor
-	m_IsShutdown( FALSE ),
-	m_pStream( NULL ),
-	m_pClock( NULL ),
-	m_pScheduler( NULL ),
-	m_pPresenter( NULL )
+MediaSink::MediaSink( )
+	: STREAM_ID( 0 )
+	, m_nRefCount( 1 )
+	, m_csMediaSink() // default ctor
+	, m_IsShutdown( FALSE )
+	, m_pStream( NULL )
+	, m_pClock( NULL )
+	, m_pScheduler( NULL )
+	, m_pPresenter( NULL )
 {
 }
 
@@ -677,23 +678,31 @@ HRESULT MediaSink::Initialize( void )
 		BREAK_ON_NULL( m_pStream, E_OUTOFMEMORY );
 
 		// Try initializing the DX11 pipeline.
-		m_pPresenter = new PresenterDX11(); // Created with ref count = 1.
-		BREAK_ON_NULL( m_pPresenter, E_OUTOFMEMORY );
-
-		hr = m_pPresenter->Initialize();
-		if( FAILED( hr ) ) {
-			SafeRelease( m_pPresenter );
-
-			// Try initializing the DX9 pipeline.
-			m_pPresenter = new PresenterDX9(); // Created with ref count = 1.
-			BREAK_ON_NULL( m_pPresenter, E_OUTOFMEMORY );
+		if( s_version <= DX_11 ) {
+			m_pPresenter = new PresenterDX11(); // Created with ref count = 1.
+			BREAK_ON_NULL_MSG( m_pPresenter, E_OUTOFMEMORY, "Failed to create DX11 presenter." );
 
 			hr = m_pPresenter->Initialize();
-			if( FAILED( hr ) )
+			if( FAILED( hr ) ) {
+				CI_LOG_V( "Failed to create DX11 presenter." );
 				SafeRelease( m_pPresenter );
-
-			BREAK_ON_FAIL( hr );
+				s_version = DX_9;
+			}
 		}
+
+		// Try initializing the DX9 pipeline.
+		if( s_version <= DX_9 ) {
+			m_pPresenter = new PresenterDX9(); // Created with ref count = 1.
+			BREAK_ON_NULL_MSG( m_pPresenter, E_OUTOFMEMORY, "Failed to create DX9 presenter." );
+
+			hr = m_pPresenter->Initialize();
+			if( FAILED( hr ) ){
+				CI_LOG_V( "Failed to create DX9 presenter." );
+				SafeRelease( m_pPresenter );
+			}
+		}
+
+		BREAK_ON_FAIL( hr );
 
 		ScopedComPtr<IMFMediaSink> pSink;
 		hr = QueryInterface( IID_PPV_ARGS( &pSink ) );

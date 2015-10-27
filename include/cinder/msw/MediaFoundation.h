@@ -42,6 +42,8 @@ POSSIBILITY OF SUCH DAMAGE.
 namespace cinder {
 namespace msw {
 
+typedef enum { DX_9, DX_11 } MFPlayerDirectXVersion;
+
 struct ScopedMFInitializer {
 	ScopedMFInitializer() : ScopedMFInitializer( MF_VERSION, MFSTARTUP_FULL ) {}
 	ScopedMFInitializer( ULONG version, DWORD params )
@@ -55,19 +57,6 @@ struct ScopedMFInitializer {
 		::MFShutdown();
 	}
 };
-
-/*//
-struct ScopedLockDevice {
-	ScopedLockDevice( IDirect3DDeviceManager9 *pDeviceManager, BOOL fBlock );
-	~ScopedLockDevice();
-
-	STDMETHODIMP GetDevice( IDirect3DDevice9** pDevice );
-
-private:
-	IDirect3DDeviceManager9*  m_pDeviceManager;
-	IDirect3DDevice9*         m_pDevice;
-	HANDLE                    m_pHandle;
-};//*/
 
 //------------------------------------------------------------------------------------
 
