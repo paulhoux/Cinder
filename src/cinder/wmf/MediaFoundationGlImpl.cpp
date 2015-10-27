@@ -91,11 +91,76 @@ const gl::TextureRef MovieGl::getTexture()
 		ScopedComPtr<PresenterDX9> pPresenterDX9;
 		hr = mObj->mPlayerPtr->QueryInterface( __uuidof( PresenterDX9 ), (void**)&pPresenterDX9 );
 		if( SUCCEEDED( hr ) ) {
+			// Get latest video frame.
 			ScopedComPtr<IDirect3DSurface9> pFrame;
 			hr = pPresenterDX9->GetFrame( &pFrame );
 			BREAK_ON_FAIL( hr );
 
-			// TODO
+			// Open Interop device.
+			if( NULL == mObj->mDeviceHandle ) {
+				ScopedComPtr<IDirect3DDevice9> pDevice;
+				pFrame->GetDevice( &pDevice );
+				BREAK_ON_NULL( pDevice, E_POINTER );
+
+				mObj->mDeviceHandle = ::wglDXOpenDeviceNV( pDevice );
+				BREAK_ON_NULL_MSG( mObj->mDeviceHandle, E_POINTER, "Failed to open DX/GL interop device." );
+			}
+
+			// Set share handle.
+			HANDLE sharedHandle = NULL;
+			DWORD sizeOfData = sizeof( sharedHandle );
+			hr = pFrame->GetPrivateData( GUID_SharedHandle, &sharedHandle, &sizeOfData );
+			BREAK_ON_FAIL( hr );
+
+			BOOL shared = ::wglDXSetResourceShareHandleNV( (void*)pFrame, sharedHandle );
+			//BREAK_IF_FALSE( shared, E_FAIL );
+
+			// Register with OpenGL.
+			HANDLE objectHandle = ::wglDXRegisterObjectNV( mObj->mDeviceHandle, (void*)pFrame, textureID, GL_TEXTURE_RECTANGLE, WGL_ACCESS_READ_ONLY_NV );
+			if( NULL == objectHandle ) {
+				DWORD err = ::GetLastError();
+				switch( err ) {
+					case ERROR_INVALID_HANDLE:
+						CI_LOG_E( "ERROR_INVALID_HANDLE" );
+						break;
+					case ERROR_INVALID_DATA:
+						CI_LOG_E( "ERROR_INVALID_DATA" );
+						break;
+					case ERROR_OPEN_FAILED:
+						CI_LOG_E( "ERROR_OPEN_FAILED" );
+						break;
+					default:
+						CI_LOG_E( "Unknown error" );
+						break;
+				}
+				BREAK_ON_NULL( hr, E_FAIL );
+			}
+
+			// Lock object.
+			BOOL locked = ::wglDXLockObjectsNV( mObj->mDeviceHandle, 1, &objectHandle );
+			BREAK_IF_FALSE( locked, E_FAIL );
+
+			// Create GL texture.
+			D3DSURFACE_DESC desc;
+			pFrame->GetDesc( &desc );
+
+			auto deviceHandle = mObj->mDeviceHandle;
+			IDirect3DSurface9* framePtr = pFrame.get();
+			framePtr->AddRef();
+
+			texture = ci::gl::Texture2d::create( GL_TEXTURE_RECTANGLE, textureID, desc.Width, desc.Height, false, [pPresenterDX9, deviceHandle, objectHandle, framePtr]( gl::Texture* tex ) {
+				BOOL unlocked = ::wglDXUnlockObjectsNV( deviceHandle, 1, const_cast<HANDLE*>( &objectHandle ) );
+				BOOL unregistered = ::wglDXUnregisterObjectNV( deviceHandle, objectHandle );
+
+				if( framePtr ) {
+					HRESULT hr = pPresenterDX9->ReturnFrame( const_cast<IDirect3DSurface9**>( &framePtr ) );
+				}
+
+				delete tex;
+			} );
+			texture->setTopDown( true );
+
+			mObj->mTextures.push_back( texture );
 		}
 		else {
 			ScopedComPtr<PresenterDX11> pPresenterDX11;
@@ -210,7 +275,6 @@ void MovieGl::close()
 		mObj->mDeviceHandle = NULL;
 	}
 }
-
 
 }
 }

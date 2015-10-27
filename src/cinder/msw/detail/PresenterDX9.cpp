@@ -65,6 +65,7 @@ PresenterDX9::PresenterDX9( void )
 	, m_DecoderGUID( GUID_NULL )
 	, m_pSwapChain( NULL )
 	, m_pPool( NULL )
+	, m_pReady( NULL )
 	, m_bCanProcessNextSample( TRUE )
 	, m_b3DVideo( FALSE )
 	, _Direct3DCreate9Ex( NULL )
@@ -189,19 +190,6 @@ HRESULT PresenterDX9::GetService( REFGUID guidService, REFIID riid, LPVOID * ppv
 				hr = E_NOINTERFACE;
 			}
 		}
-		/*//
-		else if( riid == __uuidof( IMFVideoSampleAllocator ) ) {
-			if( NULL == m_pSampleAllocator ) {
-				hr = MFCreateVideoSampleAllocator( IID_IMFVideoSampleAllocator, (LPVOID*)&m_pSampleAllocator );
-				if( SUCCEEDED( hr ) && NULL != m_pDeviceManager ) {
-					hr = m_pSampleAllocator->SetDirectXManager( m_pDeviceManager );
-				}
-			}
-			if( SUCCEEDED( hr ) ) {
-				hr = m_pSampleAllocator->QueryInterface( riid, ppvObject );
-			}
-		}
-		//*/
 		else {
 			hr = E_NOINTERFACE;
 		}
@@ -213,7 +201,31 @@ HRESULT PresenterDX9::GetService( REFGUID guidService, REFIID riid, LPVOID * ppv
 	return hr;
 }
 
+// Presenter
 HRESULT PresenterDX9::GetFrame( IDirect3DSurface9 **ppFrame )
+{
+	HRESULT hr = S_OK;
+
+	// Note: we don't need a critical section, as the
+	//       queue is already thread-safe. This way,
+	//       we don't have to block more than necessary.
+
+	do {
+		BREAK_ON_NULL( m_pReady, E_FAIL );
+
+		ScopedComPtr<IDirect3DSurface9> pSurface;
+		hr = m_pReady->RemoveFront( &pSurface );
+		BREAK_ON_FAIL( hr );
+
+		( *ppFrame ) = pSurface;
+		( *ppFrame )->AddRef();
+	} while( FALSE );
+
+	return hr;
+}
+
+// Presenter
+HRESULT PresenterDX9::ReturnFrame( IDirect3DSurface9 ** ppFrame )
 {
 	HRESULT hr = S_OK;
 
@@ -224,12 +236,10 @@ HRESULT PresenterDX9::GetFrame( IDirect3DSurface9 **ppFrame )
 	do {
 		BREAK_ON_NULL( m_pPool, E_FAIL );
 
-		ScopedComPtr<IDirect3DSurface9> pSurface;
-		hr = m_pPool->RemoveFront( &pSurface );
+		hr = m_pPool->InsertBack( *ppFrame );
 		BREAK_ON_FAIL( hr );
 
-		( *ppFrame ) = pSurface;
-		( *ppFrame )->AddRef();
+		SafeRelease( *ppFrame );
 	} while( FALSE );
 
 	return hr;
@@ -570,6 +580,7 @@ HRESULT PresenterDX9::Shutdown( void )
 	m_IsShutdown = TRUE;
 
 	SafeRelease( m_pPool );
+	SafeRelease( m_pReady );
 	SafeRelease( m_pSwapChain );
 	SafeRelease( m_pDecoderService );
 	SafeRelease( m_pSampleAllocator );
@@ -652,6 +663,7 @@ HRESULT PresenterDX9::CreateDXVA2ManagerAndDevice( D3D_DRIVER_TYPE DriverType )
 		SafeRelease( m_pDecoderService );
 		SafeRelease( m_pDeviceManager );
 		SafeRelease( m_pPool );
+		SafeRelease( m_pReady );
 
 		m_DecoderGUID = GUID_NULL;
 
@@ -706,6 +718,7 @@ HRESULT PresenterDX9::CreateDXVA2ManagerAndDevice( D3D_DRIVER_TYPE DriverType )
 
 		// Create shared surface queue.
 		m_pPool = new Queue<IDirect3DSurface9>(); // Created with ref count = 1.
+		m_pReady = new Queue<IDirect3DSurface9>(); // Created with ref count = 1.
 
 #if MF_USE_DXVA2_DECODER
 		// Create the video decoder service.
@@ -863,53 +876,7 @@ HRESULT PresenterDX9::ProcessFrameUsingD3D9( IDirect3DSurface9* pSurface, UINT d
 		QueryPerformanceCounter( &lpcEnd );
 
 		// Blit video to shared texture.
-		QueryPerformanceCounter( &lpcStart );
-#if 1
-		do {
-			BREAK_ON_NULL( m_pPool, E_POINTER );
-
-			D3DSURFACE_DESC surfaceDesc;
-			hr = pSurface->GetDesc( &surfaceDesc );
-			BREAK_ON_FAIL( hr );
-
-			ScopedComPtr<IDirect3DSurface9> pFrame;
-			hr = m_pPool->RemoveBack( &pFrame );
-
-			// Check texture compatibility.
-			if( SUCCEEDED( hr ) ) {
-				D3DSURFACE_DESC desc;
-				hr = pSurface->GetDesc( &desc );
-
-				if( FAILED( hr ) || desc.Width != surfaceDesc.Width || desc.Height != surfaceDesc.Height ) {
-					// Do not return it to the pool.
-					pFrame.Release();
-					hr = E_FAIL;
-				}
-			}
-			
-			// If no existing texture is available, create new one.
-			if( FAILED( hr ) ) {
-				D3DSURFACE_DESC desc = surfaceDesc;
-				desc.Format = D3DFMT_A8R8G8B8;
-				desc.Usage = D3DUSAGE_RENDERTARGET;
-
-				HANDLE sharedHandle = NULL;
-				hr = m_pD3DDevice->CreateRenderTarget( desc.Width, desc.Height, desc.Format, D3DMULTISAMPLE_NONE, 0, FALSE, &pFrame, &sharedHandle );
-				BREAK_ON_FAIL( hr );
-
-				// Set private data.
-				//hr = pFrame->SetPrivateData( GUID_SharedHandle, sharedHandle, sizeof( HANDLE ), 0 );
-			}
-			BREAK_ON_FAIL( hr );
-
-			// TODO: blit to texture.
-
-			// Add to front of queue.
-			hr = m_pPool->InsertFront( pFrame );
-		} while( FALSE );
-		// TEMP: end
-#endif
-		QueryPerformanceCounter( &lpcEnd );
+		BlitToShared( pSurface );
 	} while( FALSE );
 
 	return hr;
@@ -946,6 +913,67 @@ HRESULT PresenterDX9::UpdateDX9SwapChain( void )
 
 		hr = m_pD3DDevice->CreateAdditionalSwapChain( &pPresentParams, &m_pSwapChain );
 		BREAK_ON_FAIL( hr );
+	} while( FALSE );
+
+	return hr;
+}
+
+HRESULT PresenterDX9::BlitToShared( IDirect3DSurface9* pSurface )
+{
+	HRESULT hr = S_OK;
+
+	do {
+		BREAK_ON_NULL( m_pPool, E_POINTER );
+		BREAK_ON_NULL( m_pReady, E_POINTER );
+
+		// Get free texture.
+		D3DSURFACE_DESC surfaceDesc;
+		hr = pSurface->GetDesc( &surfaceDesc );
+		BREAK_ON_FAIL( hr );
+
+		ScopedComPtr<IDirect3DSurface9> pFrame;
+		hr = m_pPool->RemoveBack( &pFrame );
+
+		// Check texture compatibility.
+		if( SUCCEEDED( hr ) ) {
+			D3DSURFACE_DESC desc;
+			hr = pSurface->GetDesc( &desc );
+
+			if( FAILED( hr ) || desc.Width != surfaceDesc.Width || desc.Height != surfaceDesc.Height ) {
+				// Do not return it to the pool.
+				pFrame.Release();
+				hr = E_FAIL;
+			}
+		}
+
+		// If no existing texture is available, create new one.
+		if( FAILED( hr ) ) {
+			D3DSURFACE_DESC desc = surfaceDesc;
+			desc.Format = D3DFMT_A8R8G8B8;
+			desc.Usage = D3DUSAGE_RENDERTARGET;
+
+			HANDLE sharedHandle = NULL;
+			hr = m_pD3DDevice->CreateRenderTarget( desc.Width, desc.Height, desc.Format, D3DMULTISAMPLE_NONE, 0, FALSE, &pFrame, &sharedHandle );
+			BREAK_ON_FAIL( hr );
+
+			// Set private data.
+			hr = pFrame->SetPrivateData( GUID_SharedHandle, &sharedHandle, sizeof( HANDLE ), 0 );
+		}
+		BREAK_ON_FAIL( hr );
+
+		// Draw the surface to the frame, decompressing YUV to RGB if needed.
+		hr = m_pD3DDevice->StretchRect( pSurface, NULL, pFrame, NULL, D3DTEXF_NONE );
+		BREAK_ON_FAIL_MSG( hr, "Failed to render to shared texture." );
+
+		// Make it available. If another frame is already available,
+		// swap it out and return it to the pool. Ideally this is an
+		// atomic operation, but it proved hard to maintain proper
+		// refcounts, so we do it in two steps for now.
+		ScopedComPtr<IDirect3DSurface9> pTemp;
+		if( SUCCEEDED( m_pReady->RemoveFront( &pTemp ) ) )
+			m_pPool->InsertBack( pTemp );
+
+		m_pReady->InsertFront( pFrame );
 	} while( FALSE );
 
 	return hr;

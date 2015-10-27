@@ -53,13 +53,14 @@ public:
 	STDMETHODIMP             GetMediaTypeByIndex( DWORD dwIndex, GUID *subType ) const;
 	STDMETHODIMP_( DWORD )   GetMediaTypeCount() const { return s_dwNumVideoFormats; }
 	STDMETHODIMP             GetFrame( IDirect3DSurface9 **ppFrame );
+	STDMETHODIMP             ReturnFrame( IDirect3DSurface9 **ppFrame );
 
 private:
 	STDMETHODIMP             CheckDeviceState( BOOL* pbDeviceChanged );
 	STDMETHODIMP             CreateDXVA2ManagerAndDevice( D3D_DRIVER_TYPE DriverType = D3D_DRIVER_TYPE_HARDWARE );
 	STDMETHODIMP             GetVideoDisplayArea( IMFMediaType* pType, MFVideoArea* pArea );
 	STDMETHODIMP             ProcessFrameUsingD3D9( IDirect3DSurface9* pTexture2D, UINT dwViewIndex, RECT rcDest, UINT32 unInterlaceMode, IMFSample** ppVideoOutFrame );
-	STDMETHODIMP             BlitToShared( IMFSample* pSample ) { return E_NOTIMPL; }
+	STDMETHODIMP             BlitToShared( IDirect3DSurface9* pSurface );
 
 	_Post_satisfies_( this->m_pSwapChain != NULL )
 	STDMETHODIMP             UpdateDX9SwapChain( void );
@@ -78,6 +79,7 @@ private:
 	IDirect3DSwapChain9*            m_pSwapChain;
 
 	Queue<IDirect3DSurface9>*       m_pPool;
+	Queue<IDirect3DSurface9>*       m_pReady;
 
 	// Dynamically link to DirectX.
 	HMODULE                         m_D3D9Module;
