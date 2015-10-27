@@ -40,8 +40,8 @@ namespace wmf {
 MovieGl::MovieGl()
 	: MovieBase(), mObj( new Obj() )
 {
-	// Make sure this instance is properly destroyed before the application quits.
-	mObj->mConnCleanup = app::App::get()->getSignalCleanup().connect( [&]() { close(); } );
+	// Make sure this instance is properly destroyed before the window closes.
+	mObj->mConnClose = app::App::get()->getWindow()->getSignalClose().connect( [&]() { close(); } );
 }
 
 MovieGl::MovieGl( const fs::path & path )
@@ -55,6 +55,8 @@ MovieGl::MovieGl( const fs::path & path )
 MovieGl::~MovieGl()
 {
 	close();
+
+	mObj.reset();
 }
 
 void MovieGl::setLoop( bool enabled )
@@ -72,6 +74,24 @@ void MovieGl::stop()
 {
 	if( mObj->mPlayerPtr )
 		mObj->mPlayerPtr->Pause();
+}
+
+void MovieGl::draw()
+{
+	auto texture = getTexture();
+	if( texture ) {
+		gl::ScopedColor color( 1, 1, 1 );
+		gl::draw( texture );
+	}
+}
+
+void MovieGl::draw( const ci::Area &bounds )
+{
+	auto texture = getTexture();
+	if( texture ) {
+		gl::ScopedColor color( 1, 1, 1 );
+		gl::draw( texture, bounds );
+	}
 }
 
 const gl::TextureRef MovieGl::getTexture()
@@ -128,6 +148,12 @@ const gl::TextureRef MovieGl::getTexture()
 						break;
 					case ERROR_OPEN_FAILED:
 						CI_LOG_E( "ERROR_OPEN_FAILED" );
+
+						// Close interop device.
+						if( mObj->mDeviceHandle ) {
+							BOOL closed = ::wglDXCloseDeviceNV( mObj->mDeviceHandle );
+							mObj->mDeviceHandle = NULL;
+						}
 						break;
 					default:
 						CI_LOG_E( "Unknown error" );
@@ -143,6 +169,9 @@ const gl::TextureRef MovieGl::getTexture()
 			// Create GL texture.
 			D3DSURFACE_DESC desc;
 			pFrame->GetDesc( &desc );
+
+			mObj->mWidth = desc.Width;
+			mObj->mHeight = desc.Height;
 
 			auto deviceHandle = mObj->mDeviceHandle;
 			IDirect3DSurface9* framePtr = pFrame.get();
@@ -194,6 +223,12 @@ const gl::TextureRef MovieGl::getTexture()
 							break;
 						case ERROR_OPEN_FAILED:
 							CI_LOG_E( "ERROR_OPEN_FAILED" );
+
+							// Close interop device.
+							if( mObj->mDeviceHandle ) {
+								BOOL closed = ::wglDXCloseDeviceNV( mObj->mDeviceHandle );
+								mObj->mDeviceHandle = NULL;
+							}
 							break;
 						default:
 							CI_LOG_E( "Unknown error" );
@@ -209,6 +244,9 @@ const gl::TextureRef MovieGl::getTexture()
 				// Create GL texture.
 				D3D11_TEXTURE2D_DESC desc;
 				pFrame->GetDesc( &desc );
+
+				mObj->mWidth = desc.Width;
+				mObj->mHeight = desc.Height;
 
 				auto deviceHandle = mObj->mDeviceHandle;
 				ID3D11Texture2D* framePtr = pFrame.get();
@@ -250,9 +288,8 @@ const gl::TextureRef MovieGl::getTexture()
 
 void MovieGl::close()
 {
-	// Close player.
-	if( mObj->mPlayerPtr )
-		mObj->mPlayerPtr->Close();
+	if( !mObj )
+		return;
 
 	// Check if textures are unique and replace their contents if they are not. Also don't forget to replace their deleter.
 	if( gl::context() ) {
@@ -274,6 +311,10 @@ void MovieGl::close()
 		BOOL closed = ::wglDXCloseDeviceNV( mObj->mDeviceHandle );
 		mObj->mDeviceHandle = NULL;
 	}
+
+	// Close player.
+	if( mObj->mPlayerPtr )
+		mObj->mPlayerPtr->Close();
 }
 
 }

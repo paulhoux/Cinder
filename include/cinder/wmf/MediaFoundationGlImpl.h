@@ -61,18 +61,18 @@ public:
 	void stop() override;
 
 	//! Draws the video at full resolution.
-	void draw() override {}
+	void draw() override;
 	//! Draws the video using the specified \a bounds.
-	void draw( const ci::Area &bounds ) override {}
-
-	//! Returns the gl::Texture representing the Movie's current frame, bound to the \c GL_TEXTURE_RECTANGLE_ARB target.
-	const gl::TextureRef getTexture();
+	void draw( const ci::Area &bounds ) override;
 
 protected:
 	MovieGl();
 	MovieGl( const fs::path &path );
 
 	void close();
+
+	//! Returns the gl::Texture representing the Movie's current frame, bound to the \c GL_TEXTURE_RECTANGLE_ARB target.
+	const gl::TextureRef getTexture();
 
 protected:
 	struct Obj : public MovieBase::Obj {
@@ -107,7 +107,7 @@ protected:
 		// GL textures, shared from DX.
 		std::vector<gl::TextureRef>  mTextures;
 
-		signals::ScopedConnection    mConnCleanup;
+		signals::ScopedConnection    mConnClose;
 	};
 
 	std::shared_ptr<Obj>	mObj;

@@ -14,6 +14,8 @@ using namespace std;
 
 class VideoTestApp : public App {
 public:
+	static void prepare( Settings *settings );
+
 	void setup() override;
 	void update() override;
 	void draw() override;
@@ -30,6 +32,11 @@ private:
 	ci::gl::Texture2dRef          mTexture;
 };
 
+void VideoTestApp::prepare( Settings *settings )
+{
+	settings->setResizable( false );
+}
+
 void VideoTestApp::setup()
 {
 #if _DEBUG
@@ -42,6 +49,11 @@ void VideoTestApp::setup()
 
 void VideoTestApp::update()
 {
+	if( !mVideos.empty() ) {
+		if( !( getWindowSize() == mVideos.front()->getSize() ) ) {
+			getWindow()->setSize( mVideos.front()->getSize() );
+		}
+	}
 }
 
 void VideoTestApp::draw()
@@ -52,13 +64,14 @@ void VideoTestApp::draw()
 	gl::drawSolidRoundedRect( mClearRegion, 10.0f );
 
 	if( !mVideos.empty() ) {
-		auto texture = mVideos.front()->getTexture();
+		//auto texture = mVideos.front()->getTexture();
 
-		if( texture )
-			mTexture = texture;
+		//if( texture )
+		//	mTexture = texture;
 
-		gl::ScopedColor color( 1, 1, 1 );
-		gl::draw( mTexture );
+		//gl::ScopedColor color( 1, 1, 1 );
+		//gl::draw( mTexture );
+		mVideos.front()->draw();
 	}
 }
 
@@ -95,4 +108,4 @@ void VideoTestApp::resize()
 	mClearRegion = Rectf( getWindowBounds() ).inflated( vec2( -128 ) );
 }
 
-CINDER_APP( VideoTestApp, RendererGl )
+CINDER_APP( VideoTestApp, RendererGl, &VideoTestApp::prepare )
