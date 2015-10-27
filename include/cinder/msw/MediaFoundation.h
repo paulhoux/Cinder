@@ -37,7 +37,7 @@ POSSIBILITY OF SUCH DAMAGE.
 #include <dxva2api.h>
 #include <evr.h>
 
-#define MF_USE_DXVA2_DECODER 1
+#define MF_USE_DXVA2_DECODER 0
 
 namespace cinder {
 namespace msw {

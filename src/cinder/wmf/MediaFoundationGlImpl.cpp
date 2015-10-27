@@ -116,6 +116,12 @@ const gl::TextureRef MovieGl::getTexture()
 			hr = pPresenterDX9->GetFrame( &pFrame );
 			BREAK_ON_FAIL( hr );
 
+			D3DSURFACE_DESC desc;
+			pFrame->GetDesc( &desc );
+
+			mObj->mWidth = desc.Width;
+			mObj->mHeight = desc.Height;
+
 			// Open Interop device.
 			if( NULL == mObj->mDeviceHandle ) {
 				ScopedComPtr<IDirect3DDevice9> pDevice;
@@ -148,12 +154,6 @@ const gl::TextureRef MovieGl::getTexture()
 						break;
 					case ERROR_OPEN_FAILED:
 						CI_LOG_E( "ERROR_OPEN_FAILED" );
-
-						// Close interop device.
-						if( mObj->mDeviceHandle ) {
-							BOOL closed = ::wglDXCloseDeviceNV( mObj->mDeviceHandle );
-							mObj->mDeviceHandle = NULL;
-						}
 						break;
 					default:
 						CI_LOG_E( "Unknown error" );
@@ -167,12 +167,6 @@ const gl::TextureRef MovieGl::getTexture()
 			BREAK_IF_FALSE( locked, E_FAIL );
 
 			// Create GL texture.
-			D3DSURFACE_DESC desc;
-			pFrame->GetDesc( &desc );
-
-			mObj->mWidth = desc.Width;
-			mObj->mHeight = desc.Height;
-
 			auto deviceHandle = mObj->mDeviceHandle;
 			IDirect3DSurface9* framePtr = pFrame.get();
 			framePtr->AddRef();
@@ -199,6 +193,12 @@ const gl::TextureRef MovieGl::getTexture()
 				ScopedComPtr<ID3D11Texture2D> pFrame;
 				hr = pPresenterDX11->GetFrame( &pFrame );
 				BREAK_ON_FAIL( hr );
+				
+				D3D11_TEXTURE2D_DESC desc;
+				pFrame->GetDesc( &desc );
+
+				mObj->mWidth = desc.Width;
+				mObj->mHeight = desc.Height;
 
 				// Open Interop device.
 				if( NULL == mObj->mDeviceHandle ) {
@@ -223,12 +223,6 @@ const gl::TextureRef MovieGl::getTexture()
 							break;
 						case ERROR_OPEN_FAILED:
 							CI_LOG_E( "ERROR_OPEN_FAILED" );
-
-							// Close interop device.
-							if( mObj->mDeviceHandle ) {
-								BOOL closed = ::wglDXCloseDeviceNV( mObj->mDeviceHandle );
-								mObj->mDeviceHandle = NULL;
-							}
 							break;
 						default:
 							CI_LOG_E( "Unknown error" );
@@ -242,12 +236,6 @@ const gl::TextureRef MovieGl::getTexture()
 				BREAK_IF_FALSE( locked, E_FAIL );
 
 				// Create GL texture.
-				D3D11_TEXTURE2D_DESC desc;
-				pFrame->GetDesc( &desc );
-
-				mObj->mWidth = desc.Width;
-				mObj->mHeight = desc.Height;
-
 				auto deviceHandle = mObj->mDeviceHandle;
 				ID3D11Texture2D* framePtr = pFrame.get();
 				framePtr->AddRef();

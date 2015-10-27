@@ -153,7 +153,7 @@ private:
 	IMFMediaEventQueue*          m_pEventQueue;                  // Event queue
 	IMFByteStream*               m_pByteStream;                  // Bytestream where we write the data.
 	Presenter*                   m_pPresenter;
-	Scheduler*                   m_pScheduler;
+	Scheduler*                   m_pScheduler;                   // Warning! Does not own pointer, MediaSink does.
 	IMFMediaType*                m_pCurrentType;
 	BOOL                         m_fPrerolling;
 	BOOL                         m_fWaitingForOnClockStart;
