@@ -170,10 +170,10 @@ HRESULT Activate::GetClassID( __RPC__out CLSID* pClassID )
 }
 
 // ctor
-Activate::Activate( void ) :
-	m_lRefCount( 0 ),
-	m_pMediaSink( NULL ),
-	m_hwnd( NULL )
+Activate::Activate( void )
+	: m_lRefCount( 0 )
+	, m_pMediaSink( NULL )
+	, m_hwnd( NULL )
 {
 }
 

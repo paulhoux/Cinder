@@ -354,10 +354,10 @@ public:
 		if( !ptr_ )
 			return 0;
 
-		ULONG rc = ptr_->AddRef();
-		ptr_->Release();
+		ptr_->AddRef();
+		ULONG rc = ptr_->Release();
 
-		return ( rc - 1 );
+		return rc;
 	}
 
 	// Provides direct access to the interface.
