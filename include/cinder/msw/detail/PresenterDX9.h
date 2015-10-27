@@ -77,7 +77,7 @@ private:
 
 	IDirect3DSwapChain9*            m_pSwapChain;
 
-	Queue<IDirect3DSurface9>*       m_pQueue;
+	Queue<IDirect3DSurface9>*       m_pPool;
 
 	// Dynamically link to DirectX.
 	HMODULE                         m_D3D9Module;

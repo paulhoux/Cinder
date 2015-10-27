@@ -28,9 +28,6 @@ POSSIBILITY OF SUCH DAMAGE.
 #include "cinder/msw/CinderMsw.h"
 #include "cinder/wmf/MediaFoundationGlImpl.h"
 
-#include "cinder/gl/Context.h"
-#include "glload/wgl_all.h"
-
 #include <algorithm> // for std::remove_if
 
 namespace cinder {
@@ -149,15 +146,16 @@ const gl::TextureRef MovieGl::getTexture()
 				pFrame->GetDesc( &desc );
 
 				auto deviceHandle = mObj->mDeviceHandle;
-				IUnknown* framePtr = static_cast<IUnknown*>( pFrame.get() );
+				ID3D11Texture2D* framePtr = pFrame.get();
 				framePtr->AddRef();
 
-				texture = ci::gl::Texture2d::create( GL_TEXTURE_RECTANGLE, textureID, desc.Width, desc.Height, false, [deviceHandle, objectHandle, framePtr]( gl::Texture* tex ) {
+				texture = ci::gl::Texture2d::create( GL_TEXTURE_RECTANGLE, textureID, desc.Width, desc.Height, false, [pPresenterDX11, deviceHandle, objectHandle, framePtr]( gl::Texture* tex ) {
 					BOOL unlocked = ::wglDXUnlockObjectsNV( deviceHandle, 1, const_cast<HANDLE*>( &objectHandle ) );
 					BOOL unregistered = ::wglDXUnregisterObjectNV( deviceHandle, objectHandle );
 
-					ULONG rc = msw::SafeRelease( const_cast<IUnknown*>( framePtr ) );
-					assert( rc == 0 );
+					if( framePtr ) {
+						HRESULT hr = pPresenterDX11->ReturnFrame( const_cast<ID3D11Texture2D**>( &framePtr ) );
+					}
 
 					delete tex;
 				} );
@@ -192,12 +190,14 @@ void MovieGl::close()
 		mObj->mPlayerPtr->Close();
 
 	// Check if textures are unique and replace their contents if they are not. Also don't forget to replace their deleter.
-	for( auto &texture : mObj->mTextures ) {
-		if( !texture.unique() ) {
-			size_t w = texture->getWidth();
-			size_t h = texture->getHeight();
-			std::vector<uint32_t> data( w*h, 0xFFFF0000 );
-			texture->update( (const void*)data.data(), GL_RGB, GL_UNSIGNED_BYTE, 0, w, h );
+	if( gl::context() ) {
+		for( auto &texture : mObj->mTextures ) {
+			if( !texture.unique() ) {
+				size_t w = texture->getWidth();
+				size_t h = texture->getHeight();
+				std::vector<uint32_t> data( w*h, 0xFFFF0000 );
+				texture->update( (const void*)data.data(), GL_RGB, GL_UNSIGNED_BYTE, 0, w, h );
+			}
 		}
 	}
 

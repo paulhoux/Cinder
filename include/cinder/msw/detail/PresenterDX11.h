@@ -67,7 +67,7 @@ public:
 	STDMETHODIMP            GetMediaTypeByIndex( DWORD dwIndex, GUID *subType ) const;
 	STDMETHODIMP_( DWORD )  GetMediaTypeCount() const { return s_dwNumVideoFormats; }
 	STDMETHODIMP            GetFrame( ID3D11Texture2D **ppFrame );
-	STDMETHODIMP            ReturnFrame( ID3D11Texture2D *pFrame );
+	STDMETHODIMP            ReturnFrame( ID3D11Texture2D **ppFrame );
 
 private:
 	STDMETHODIMP_( VOID )   CheckDecodeSwitchRegKey( void );
@@ -120,7 +120,8 @@ private:
 	ID3D11VideoProcessorEnumerator* m_pVideoProcessorEnum;
 	ID3D11VideoProcessor*           m_pVideoProcessor;
 
-	Queue<ID3D11Texture2D>*         m_pQueue;
+	Queue<ID3D11Texture2D>*         m_pPool;
+	Queue<ID3D11Texture2D>*         m_pReady;
 
 #if (WINVER >= _WIN32_WINNT_WIN8)
 	IDCompositionDevice*            m_pDCompDevice;

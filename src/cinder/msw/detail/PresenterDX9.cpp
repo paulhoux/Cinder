@@ -64,7 +64,7 @@ PresenterDX9::PresenterDX9( void )
 	, m_pDecoderService( NULL )
 	, m_DecoderGUID( GUID_NULL )
 	, m_pSwapChain( NULL )
-	, m_pQueue( NULL )
+	, m_pPool( NULL )
 	, m_bCanProcessNextSample( TRUE )
 	, m_b3DVideo( FALSE )
 	, _Direct3DCreate9Ex( NULL )
@@ -222,10 +222,10 @@ HRESULT PresenterDX9::GetFrame( IDirect3DSurface9 **ppFrame )
 	//       we don't have to block more than necessary.
 
 	do {
-		BREAK_ON_NULL( m_pQueue, E_FAIL );
+		BREAK_ON_NULL( m_pPool, E_FAIL );
 
 		ScopedComPtr<IDirect3DSurface9> pSurface;
-		hr = m_pQueue->RemoveFront( &pSurface );
+		hr = m_pPool->RemoveFront( &pSurface );
 		BREAK_ON_FAIL( hr );
 
 		( *ppFrame ) = pSurface;
@@ -569,7 +569,7 @@ HRESULT PresenterDX9::Shutdown( void )
 
 	m_IsShutdown = TRUE;
 
-	SafeRelease( m_pQueue );
+	SafeRelease( m_pPool );
 	SafeRelease( m_pSwapChain );
 	SafeRelease( m_pDecoderService );
 	SafeRelease( m_pSampleAllocator );
@@ -651,7 +651,7 @@ HRESULT PresenterDX9::CreateDXVA2ManagerAndDevice( D3D_DRIVER_TYPE DriverType )
 		// Close existing interfaces.
 		SafeRelease( m_pDecoderService );
 		SafeRelease( m_pDeviceManager );
-		SafeRelease( m_pQueue );
+		SafeRelease( m_pPool );
 
 		m_DecoderGUID = GUID_NULL;
 
@@ -705,7 +705,7 @@ HRESULT PresenterDX9::CreateDXVA2ManagerAndDevice( D3D_DRIVER_TYPE DriverType )
 		BREAK_ON_FAIL( hr );
 
 		// Create shared surface queue.
-		m_pQueue = new Queue<IDirect3DSurface9>(); // Created with ref count = 1.
+		m_pPool = new Queue<IDirect3DSurface9>(); // Created with ref count = 1.
 
 #if MF_USE_DXVA2_DECODER
 		// Create the video decoder service.
@@ -866,14 +866,14 @@ HRESULT PresenterDX9::ProcessFrameUsingD3D9( IDirect3DSurface9* pSurface, UINT d
 		QueryPerformanceCounter( &lpcStart );
 #if 1
 		do {
-			BREAK_ON_NULL( m_pQueue, E_POINTER );
+			BREAK_ON_NULL( m_pPool, E_POINTER );
 
 			D3DSURFACE_DESC surfaceDesc;
 			hr = pSurface->GetDesc( &surfaceDesc );
 			BREAK_ON_FAIL( hr );
 
 			ScopedComPtr<IDirect3DSurface9> pFrame;
-			hr = m_pQueue->RemoveBack( &pFrame );
+			hr = m_pPool->RemoveBack( &pFrame );
 
 			// Check texture compatibility.
 			if( SUCCEEDED( hr ) ) {
@@ -905,7 +905,7 @@ HRESULT PresenterDX9::ProcessFrameUsingD3D9( IDirect3DSurface9* pSurface, UINT d
 			// TODO: blit to texture.
 
 			// Add to front of queue.
-			hr = m_pQueue->InsertFront( pFrame );
+			hr = m_pPool->InsertFront( pFrame );
 		} while( FALSE );
 		// TEMP: end
 #endif
