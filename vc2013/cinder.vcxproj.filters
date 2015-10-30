@@ -154,12 +154,6 @@
     <Filter Include="Header Files\tinyexr">
       <UniqueIdentifier>{7db91fc3-293a-46f9-a07c-f55c2de26b5b}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Header Files\msw\detail">
-      <UniqueIdentifier>{44080b1a-76f6-447a-891f-313003d0751d}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source Files\msw\detail">
-      <UniqueIdentifier>{c586c686-42a1-4433-9641-ee20ec9bbb2b}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Header Files\wmf">
       <UniqueIdentifier>{42a52dee-5bbe-4dd8-bb7f-b3a72b7fde82}</UniqueIdentifier>
     </Filter>
@@ -795,43 +789,43 @@
     <ClCompile Include="..\src\cinder\gl\ConstantConversions.cpp">
       <Filter>Source Files\gl</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\cinder\msw\MediaFoundation.cpp">
-      <Filter>Source Files\msw</Filter>
-    </ClCompile>
     <ClCompile Include="..\src\tinyexr\tinyexr.cc">
       <Filter>Source Files\tinyexr</Filter>
     </ClCompile>
     <ClCompile Include="..\src\cinder\ImageFileTinyExr.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\cinder\msw\detail\StreamSink.cpp">
-      <Filter>Source Files\msw\detail</Filter>
-    </ClCompile>
-    <ClCompile Include="..\src\cinder\msw\detail\Activate.cpp">
-      <Filter>Source Files\msw\detail</Filter>
-    </ClCompile>
-    <ClCompile Include="..\src\cinder\msw\detail\Marker.cpp">
-      <Filter>Source Files\msw\detail</Filter>
-    </ClCompile>
-    <ClCompile Include="..\src\cinder\msw\detail\MediaSink.cpp">
-      <Filter>Source Files\msw\detail</Filter>
-    </ClCompile>
-    <ClCompile Include="..\src\cinder\msw\detail\MonitorArray.cpp">
-      <Filter>Source Files\msw\detail</Filter>
-    </ClCompile>
-    <ClCompile Include="..\src\cinder\msw\detail\PresenterDX11.cpp">
-      <Filter>Source Files\msw\detail</Filter>
-    </ClCompile>
-    <ClCompile Include="..\src\cinder\msw\detail\Scheduler.cpp">
-      <Filter>Source Files\msw\detail</Filter>
-    </ClCompile>
-    <ClCompile Include="..\src\cinder\msw\detail\PresenterDX9.cpp">
-      <Filter>Source Files\msw\detail</Filter>
-    </ClCompile>
-    <ClCompile Include="..\src\cinder\msw\detail\Presenter.cpp">
-      <Filter>Source Files\msw\detail</Filter>
-    </ClCompile>
     <ClCompile Include="..\src\cinder\wmf\MediaFoundationGlImpl.cpp">
+      <Filter>Source Files\wmf</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\cinder\wmf\StreamSink.cpp">
+      <Filter>Source Files\wmf</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\cinder\wmf\Activate.cpp">
+      <Filter>Source Files\wmf</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\cinder\wmf\Marker.cpp">
+      <Filter>Source Files\wmf</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\cinder\wmf\MediaSink.cpp">
+      <Filter>Source Files\wmf</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\cinder\wmf\MonitorArray.cpp">
+      <Filter>Source Files\wmf</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\cinder\wmf\Presenter.cpp">
+      <Filter>Source Files\wmf</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\cinder\wmf\PresenterDX9.cpp">
+      <Filter>Source Files\wmf</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\cinder\wmf\PresenterDX11.cpp">
+      <Filter>Source Files\wmf</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\cinder\wmf\Scheduler.cpp">
+      <Filter>Source Files\wmf</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\cinder\wmf\Player.cpp">
       <Filter>Source Files\wmf</Filter>
     </ClCompile>
   </ItemGroup>
@@ -1694,41 +1688,11 @@
     <ClInclude Include="..\include\cinder\gl\Ssbo.h">
       <Filter>Header Files\gl</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\cinder\msw\MediaFoundation.h">
-      <Filter>Header Files\msw</Filter>
-    </ClInclude>
     <ClInclude Include="..\include\cinder\msw\ScopedPtr.h">
       <Filter>Header Files\msw</Filter>
     </ClInclude>
     <ClInclude Include="..\include\tinyexr\tinyexr.h">
       <Filter>Header Files\tinyexr</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\cinder\msw\detail\LinkList.h">
-      <Filter>Header Files\msw\detail</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\cinder\msw\detail\Marker.h">
-      <Filter>Header Files\msw\detail</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\cinder\msw\detail\MediaSink.h">
-      <Filter>Header Files\msw\detail</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\cinder\msw\detail\MFAttributesImpl.h">
-      <Filter>Header Files\msw\detail</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\cinder\msw\detail\MonitorArray.h">
-      <Filter>Header Files\msw\detail</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\cinder\msw\detail\Scheduler.h">
-      <Filter>Header Files\msw\detail</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\cinder\msw\detail\StaticAsyncCallback.h">
-      <Filter>Header Files\msw\detail</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\cinder\msw\detail\StreamSink.h">
-      <Filter>Header Files\msw\detail</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\cinder\msw\detail\ThreadSafeQueue.h">
-      <Filter>Header Files\msw\detail</Filter>
     </ClInclude>
     <ClInclude Include="..\include\cinder\msw\StackWalker.h">
       <Filter>Header Files\msw</Filter>
@@ -1736,25 +1700,58 @@
     <ClInclude Include="..\include\cinder\msw\CinderWindowsFwd.h">
       <Filter>Header Files\msw</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\cinder\msw\detail\Activate.h">
-      <Filter>Header Files\msw\detail</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\cinder\msw\detail\PresenterDX11.h">
-      <Filter>Header Files\msw\detail</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\cinder\msw\detail\Presenter.h">
-      <Filter>Header Files\msw\detail</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\cinder\msw\detail\PresenterDX9.h">
-      <Filter>Header Files\msw\detail</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\cinder\msw\detail\Queue.h">
-      <Filter>Header Files\msw\detail</Filter>
-    </ClInclude>
     <ClInclude Include="..\include\cinder\wmf\MediaFoundationImpl.h">
       <Filter>Header Files\wmf</Filter>
     </ClInclude>
     <ClInclude Include="..\include\cinder\wmf\MediaFoundationGlImpl.h">
+      <Filter>Header Files\wmf</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\cinder\wmf\MediaFoundation.h">
+      <Filter>Header Files\wmf</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\cinder\wmf\MediaSink.h">
+      <Filter>Header Files\wmf</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\cinder\wmf\MFAttributesImpl.h">
+      <Filter>Header Files\wmf</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\cinder\wmf\MonitorArray.h">
+      <Filter>Header Files\wmf</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\cinder\wmf\Presenter.h">
+      <Filter>Header Files\wmf</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\cinder\wmf\PresenterDX9.h">
+      <Filter>Header Files\wmf</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\cinder\wmf\PresenterDX11.h">
+      <Filter>Header Files\wmf</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\cinder\wmf\Scheduler.h">
+      <Filter>Header Files\wmf</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\cinder\wmf\StaticAsyncCallback.h">
+      <Filter>Header Files\wmf</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\cinder\wmf\StreamSink.h">
+      <Filter>Header Files\wmf</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\cinder\wmf\Activate.h">
+      <Filter>Header Files\wmf</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\cinder\wmf\Marker.h">
+      <Filter>Header Files\wmf</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\cinder\msw\LinkList.h">
+      <Filter>Header Files\msw</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\cinder\msw\Queue.h">
+      <Filter>Header Files\msw</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\cinder\msw\ThreadSafeQueue.h">
+      <Filter>Header Files\msw</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\cinder\wmf\Player.h">
       <Filter>Header Files\wmf</Filter>
     </ClInclude>
   </ItemGroup>

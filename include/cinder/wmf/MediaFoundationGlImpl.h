@@ -26,18 +26,16 @@ POSSIBILITY OF SUCH DAMAGE.
 
 #pragma once
 
-#include "cinder/Cinder.h"
+#include "cinder/wmf/MediaFoundationImpl.h"
+#if ( _WIN32_WINNT >= _WIN32_WINNT_VISTA ) // Requires Windows Vista
+
+#include "cinder/wmf/Player.h"
+#include "cinder/wmf/MediaSink.h"
+#include "cinder/wmf/PresenterDX9.h"
+#include "cinder/wmf/PresenterDX11.h"
+
 #include "cinder/Signals.h"
 #include "cinder/gl/gl.h"
-#include "cinder/wmf/MediaFoundationImpl.h"
-
-#include "cinder/msw/CinderMsw.h"
-#include "cinder/msw/MediaFoundation.h"
-#include "cinder/msw/ScopedPtr.h"
-#include "cinder/msw/detail/MediaSink.h"
-#include "cinder/msw/detail/PresenterDX9.h"
-#include "cinder/msw/detail/PresenterDX11.h"
-
 #include "glload/wgl_all.h"
 
 namespace cinder {
@@ -80,10 +78,12 @@ protected:
 			: mPlayerPtr( NULL )
 			, mDeviceHandle( NULL )
 		{
+			DirectXVersion dxVersion = DX_11;
+
 			// Check availability of interop extensions.
-			if( msw::detail::MediaSink::s_version > msw::MFPlayerDirectXVersion::DX_9 && !wglext_NV_DX_interop2 ) {
+			if( !wglext_NV_DX_interop2 ) {
 				CI_LOG_V( "NV_DX_interop2 extension not available, trying DX9..." );
-				msw::detail::MediaSink::s_version = msw::MFPlayerDirectXVersion::DX_9;
+				dxVersion = DX_9;
 			}
 
 			if( !wglext_NV_DX_interop ) {
@@ -91,17 +91,17 @@ protected:
 			}
 
 			// Create player.
-			mPlayerPtr = new msw::MFPlayer(); // Created with ref count = 1.
+			mPlayerPtr = new Player( dxVersion ); // Created with ref count = 1.
 			if( NULL == mPlayerPtr )
 				throw std::exception( "Out of memory" );
 		}
 		~Obj()
 		{
-			SafeRelease( mPlayerPtr );
+			msw::SafeRelease( mPlayerPtr );
 		}
 
 		// Instance of the Media Foundation player backend.
-		msw::MFPlayer*               mPlayerPtr;
+		Player*                      mPlayerPtr;
 		// DX/GL interop device handle.
 		HANDLE                       mDeviceHandle;
 		// GL textures, shared from DX.
@@ -123,4 +123,6 @@ public:
 };
 
 }
-}
+} // namespace ci::wmf
+
+#endif // ( _WIN32_WINNT >= _WIN32_WINNT_VISTA )

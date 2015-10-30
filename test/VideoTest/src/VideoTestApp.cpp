@@ -2,10 +2,10 @@
 
 //#pragma comment(lib, "vld.lib")
 
+#include "cinder/wmf/MediaFoundationGlImpl.h"
 #include "cinder/app/App.h"
 #include "cinder/app/RendererGl.h"
 #include "cinder/gl/gl.h"
-#include "cinder/wmf/MediaFoundationGlImpl.h" // replace with MediaFoundation.h
 #include "cinder/Log.h"
 
 using namespace ci;
@@ -27,7 +27,7 @@ public:
 
 private:
 	Rectf                         mClearRegion;
-	std::vector<wmf::MovieGlRef>  mVideos;
+	std::vector<ci::wmf::MovieGlRef>  mVideos;
 
 	ci::gl::Texture2dRef          mTexture;
 };

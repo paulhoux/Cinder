@@ -24,17 +24,14 @@ NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVE
 POSSIBILITY OF SUCH DAMAGE.
 */
 
-#include "cinder/app/App.h"
-#include "cinder/msw/CinderMsw.h"
 #include "cinder/wmf/MediaFoundationGlImpl.h"
+#if ( _WIN32_WINNT >= _WIN32_WINNT_VISTA ) // Requires Windows Vista
 
-#include <algorithm> // for std::remove_if
+#include "cinder/app/App.h"
+
+using namespace cinder::msw;
 
 namespace cinder {
-
-using namespace msw;
-using namespace msw::detail;
-
 namespace wmf {
 
 MovieGl::MovieGl()
@@ -307,4 +304,6 @@ void MovieGl::close()
 
 }
 }
+
+#endif // ( _WIN32_WINNT >= _WIN32_WINNT_VISTA )
 
