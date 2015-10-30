@@ -50,7 +50,7 @@ void VideoTestApp::setup()
 void VideoTestApp::update()
 {
 	if( !mVideos.empty() ) {
-		if( !( getWindowSize() == mVideos.front()->getSize() ) ) {
+		if( getWindowSize() != mVideos.front()->getSize() && mVideos.front()->getSize().x > 0 && mVideos.front()->getSize().y > 0 ) {
 			getWindow()->setSize( mVideos.front()->getSize() );
 		}
 	}

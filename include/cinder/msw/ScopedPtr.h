@@ -142,6 +142,12 @@ public:
 		return ptr_;
 	}
 
+	//Can be used instead of operator&. Use with care!
+	T** swapable() throw( )
+	{
+		return &ptr_;
+	}
+
 	ScopedPtr<T>& operator=( T* p )
 	{
 		// AddRef first so that self assignment should work

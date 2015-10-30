@@ -36,6 +36,35 @@ public:
 		return m_queue.GetCount();
 	}
 
+	//! 
+	STDMETHODIMP SwapBack( T** ppItem )
+	{
+		HRESULT hr = S_OK;
+
+		ScopedCriticalSection lock( m_critSec );
+
+		do {
+			if( NULL == ppItem )
+				return E_POINTER;
+
+			ScopedComPtr<T> pTemp;
+			hr = m_queue.RemoveBack( &pTemp );
+
+			if( NULL != *ppItem ) {
+				m_queue.InsertBack( *ppItem );
+			}
+
+			SafeRelease( *ppItem );
+
+			if( SUCCEEDED( hr ) ) {
+				( *ppItem ) = pTemp;
+				( *ppItem )->AddRef();
+			}
+		} while( FALSE );
+
+		return hr;
+	}
+
 	//! Caller is responsible for releasing the item.
 	STDMETHODIMP RemoveBack( T** ppItem )
 	{
@@ -68,6 +97,35 @@ public:
 			hr = m_queue.InsertBack( pItem );
 			BREAK_ON_FAIL( hr );
 
+		} while( FALSE );
+
+		return hr;
+	}
+
+	//! 
+	STDMETHODIMP SwapFront( T** ppItem )
+	{
+		HRESULT hr = S_OK;
+
+		ScopedCriticalSection lock( m_critSec );
+
+		do {
+			if( NULL == ppItem )
+				return E_POINTER;
+
+			ScopedComPtr<T> pTemp;
+			hr = m_queue.RemoveFront( &pTemp );
+
+			if( NULL != *ppItem ) {
+				m_queue.InsertFront( *ppItem );
+			}
+
+			SafeRelease( *ppItem );
+
+			if( SUCCEEDED( hr ) ) {
+				( *ppItem ) = pTemp;
+				( *ppItem )->AddRef();
+			}
 		} while( FALSE );
 
 		return hr;

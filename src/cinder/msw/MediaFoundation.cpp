@@ -664,8 +664,8 @@ void MFPlayer::CreateWnd()
 		if( !mWnd )
 			throw Exception( "MFPlayer: failed to create window." );
 
-		::ShowWindow( mWnd, SW_SHOW );
-		::UpdateWindow( mWnd );
+		//::ShowWindow( mWnd, SW_SHOW );
+		//::UpdateWindow( mWnd );
 	}
 }
 

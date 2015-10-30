@@ -1324,8 +1324,10 @@ HRESULT PresenterDX11::ProcessFrameUsingD3D11( ID3D11Texture2D* pLeftTexture2D, 
 		}
 #endif
 
-		hr = pVideoContext->VideoProcessorBlt( m_pVideoProcessor, pOutputView, 0, 1, &StreamData );
-		BREAK_ON_FAIL_MSG( hr, "Failed to blit to back buffer." );
+		if( ::IsWindowVisible( m_hwndVideo ) ) {
+			hr = pVideoContext->VideoProcessorBlt( m_pVideoProcessor, pOutputView, 0, 1, &StreamData );
+			BREAK_ON_FAIL_MSG( hr, "Failed to blit to back buffer." );
+		}
 
 		QueryPerformanceCounter( &lpcEnd );
 
@@ -1602,7 +1604,7 @@ HRESULT PresenterDX11::BlitToShared( const D3D11_VIDEO_PROCESSOR_STREAM *pStream
 		desc.BindFlags = D3D11_BIND_RENDER_TARGET;
 		desc.CPUAccessFlags = 0;
 #if (WINVER >= _WIN32_WINNT_WIN8)
-		#error Untested!
+#error Untested!
 		desc.MiscFlags = D3D11_RESOURCE_MISC_SHARED_NTHANDLE | D3D11_RESOURCE_MISC_SHARED_KEYEDMUTEX;
 #else
 		desc.MiscFlags = D3D11_RESOURCE_MISC_SHARED;
@@ -1648,14 +1650,10 @@ HRESULT PresenterDX11::BlitToShared( const D3D11_VIDEO_PROCESSOR_STREAM *pStream
 		BREAK_ON_FAIL_MSG( hr, "Failed to blit to shared texture." );
 
 		// Make it available. If another frame is already available,
-		// swap it out and return it to the pool. Ideally this is an
-		// atomic operation, but it proved hard to maintain proper
-		// refcounts, so we do it in two steps for now.
-		ScopedComPtr<ID3D11Texture2D> pTemp;
-		if( SUCCEEDED( m_pReady->RemoveFront( &pTemp ) ) )
-			m_pPool->InsertBack( pTemp );
+		// swap it out and return it to the pool. 
+		if( SUCCEEDED( m_pReady->SwapFront( pFrame.swapable() ) ) ) 
+			m_pPool->InsertBack( pFrame );
 
-		m_pReady->InsertFront( pFrame );
 	} while( FALSE );
 
 	return hr;

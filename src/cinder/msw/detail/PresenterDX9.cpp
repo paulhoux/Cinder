@@ -866,12 +866,15 @@ HRESULT PresenterDX9::ProcessFrameUsingD3D9( IDirect3DSurface9* pSurface, UINT d
 			( *ppVideoOutFrame )->AddRef();
 		}
 
-		// Fill backbuffer with black.
-		hr = m_pD3DDevice->ColorFill( pBackBuffer, NULL, D3DCOLOR_ARGB( 0xFF, 0x00, 0x00, 0x00 ) );
+		//if( ::IsWindowVisible( m_hwndVideo ) ) // Skipping this causes stuttering on Intel.
+		{
+			// Fill backbuffer with black.
+			hr = m_pD3DDevice->ColorFill( pBackBuffer, NULL, D3DCOLOR_ARGB( 0xFF, 0x00, 0x00, 0x00 ) );
 
-		// Draw the surface to the backbuffer, decompressing YUV to RGB if needed.
-		hr = m_pD3DDevice->StretchRect( pSurface, NULL, pBackBuffer, &TRect, D3DTEXF_NONE );
-		BREAK_ON_FAIL_MSG( hr, "Failed to render to back buffer." );
+			// Draw the surface to the backbuffer, decompressing YUV to RGB if needed.
+			hr = m_pD3DDevice->StretchRect( pSurface, NULL, pBackBuffer, &TRect, D3DTEXF_NONE );
+			BREAK_ON_FAIL_MSG( hr, "Failed to render to back buffer." );
+		}
 
 		QueryPerformanceCounter( &lpcEnd );
 
@@ -966,19 +969,15 @@ HRESULT PresenterDX9::BlitToShared( IDirect3DSurface9* pSurface )
 		BREAK_ON_FAIL_MSG( hr, "Failed to render to shared texture." );
 
 		// Make it available. If another frame is already available,
-		// swap it out and return it to the pool. Ideally this is an
-		// atomic operation, but it proved hard to maintain proper
-		// refcounts, so we do it in two steps for now.
-		ScopedComPtr<IDirect3DSurface9> pTemp;
-		if( SUCCEEDED( m_pReady->RemoveFront( &pTemp ) ) )
-			m_pPool->InsertBack( pTemp );
+		// swap it out and return it to the pool. 
+		if( SUCCEEDED( m_pReady->SwapFront( pFrame.swapable() ) ) )
+			m_pPool->InsertBack( pFrame );
 
-		m_pReady->InsertFront( pFrame );
 	} while( FALSE );
 
 	return hr;
 }
 
-	} // namespace detail
+} // namespace detail
 } // namespace msw
 } // namespace cinder
