@@ -1601,7 +1601,12 @@ HRESULT PresenterDX11::BlitToShared( const D3D11_VIDEO_PROCESSOR_STREAM *pStream
 		desc.Usage = D3D11_USAGE_DEFAULT;
 		desc.BindFlags = D3D11_BIND_RENDER_TARGET;
 		desc.CPUAccessFlags = 0;
-		desc.MiscFlags = 0;
+#if (WINVER >= _WIN32_WINNT_WIN8)
+		#error Untested!
+		desc.MiscFlags = D3D11_RESOURCE_MISC_SHARED_NTHANDLE | D3D11_RESOURCE_MISC_SHARED_KEYEDMUTEX;
+#else
+		desc.MiscFlags = D3D11_RESOURCE_MISC_SHARED;
+#endif
 
 		// Get free texture.
 		ScopedComPtr<ID3D11Texture2D> pFrame;
