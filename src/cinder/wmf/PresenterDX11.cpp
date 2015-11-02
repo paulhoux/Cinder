@@ -119,8 +119,13 @@ PresenterDX11::~PresenterDX11( void )
 {
 	// Unload D3D11.
 	if( m_D3D11Module ) {
-		FreeLibrary( m_D3D11Module );
+		// Then again... let's not. Why pay the cost of loading it again?
+		// Furthermore, we're holding references to DX11 constructs outside
+		// this class that may rely on DX11 to be present.
+		//::FreeLibrary( m_D3D11Module );
+
 		m_D3D11Module = NULL;
+		_D3D11CreateDevice = NULL;
 	}
 }
 
