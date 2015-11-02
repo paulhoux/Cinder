@@ -10,6 +10,7 @@
 
 using namespace ci;
 using namespace ci::app;
+using namespace ci::wmf;
 using namespace std;
 
 class VideoTestApp : public App {
@@ -32,7 +33,7 @@ private:
 	std::vector<gl::Texture2dRef>  mSnapshots;
 
 	Rectf                          mClearRegion;
-	std::vector<wmf::MovieGlRef>   mVideos;
+	std::vector<MovieGlRef>        mVideos;
 
 	signals::ScopedConnection      mConnClose;
 };
@@ -118,7 +119,7 @@ void VideoTestApp::fileDrop( FileDropEvent event )
 	size_t count = event.getNumFiles();
 	for( size_t i = 0; i < count; ++i ) {
 		try {
-			auto video = wmf::MovieGl::create( event.getFile( i ) );
+			auto video = MovieGl::create( event.getFile( i ) );
 
 			video->setLoop( true );
 			video->play();
