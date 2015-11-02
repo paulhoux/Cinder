@@ -63,14 +63,17 @@ public:
 	//! Draws the video using the specified \a bounds.
 	void draw( const ci::Area &bounds ) override;
 
+	//! Returns the gl::Texture representing the Movie's current frame, bound to the \c GL_TEXTURE_RECTANGLE_ARB target.
+	const gl::TextureRef& getTexture();
+
 protected:
 	MovieGl();
 	MovieGl( const fs::path &path );
 
 	void close();
 
-	//! Returns the gl::Texture representing the Movie's current frame, bound to the \c GL_TEXTURE_RECTANGLE_ARB target.
-	const gl::TextureRef getTexture();
+	//! Obtains the latest frame from the video player and creates a texture from it.
+	void updateFrame() override;
 
 protected:
 	struct Obj : public MovieBase::Obj {
@@ -94,9 +97,25 @@ protected:
 			mPlayerPtr = new Player( dxVersion ); // Created with ref count = 1.
 			if( NULL == mPlayerPtr )
 				throw std::exception( "Out of memory" );
+
+			// Note: interop device handle will be created when
+			//       we receive the first video frame.
 		}
 		~Obj()
 		{
+			CI_LOG_I( "Destroying MovieGl::Obj" );
+
+			// Close interop device.
+			if( mDeviceHandle ) {
+				BOOL closed = ::wglDXCloseDeviceNV( mDeviceHandle );
+				mDeviceHandle = NULL;
+			}
+
+			// Close player.
+			if( mPlayerPtr )
+				mPlayerPtr->Close();
+
+			// Release player.
 			msw::SafeRelease( mPlayerPtr );
 		}
 
@@ -104,14 +123,15 @@ protected:
 		Player*                      mPlayerPtr;
 		// DX/GL interop device handle.
 		HANDLE                       mDeviceHandle;
-		// GL textures, shared from DX.
-		std::vector<gl::TextureRef>  mTextures;
-
-		signals::ScopedConnection    mConnClose;
 	};
 
 	std::shared_ptr<Obj>	mObj;
 	MovieBase::Obj*	getObj() const override { return mObj.get(); }
+
+	// GL texture, shared from DX.
+	gl::Texture2dRef             mTexture;
+
+	signals::ScopedConnection    mConnClose;
 
 public:
 	//@{

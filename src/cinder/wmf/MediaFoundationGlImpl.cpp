@@ -38,7 +38,7 @@ MovieGl::MovieGl()
 	: MovieBase(), mObj( new Obj() )
 {
 	// Make sure this instance is properly destroyed before the window closes.
-	mObj->mConnClose = app::App::get()->getWindow()->getSignalClose().connect( [&]() { close(); } );
+	mConnClose = app::App::get()->getWindow()->getSignalClose().connect( [&]() { close(); } );
 }
 
 MovieGl::MovieGl( const fs::path & path )
@@ -52,8 +52,6 @@ MovieGl::MovieGl( const fs::path & path )
 MovieGl::~MovieGl()
 {
 	close();
-
-	mObj.reset();
 }
 
 void MovieGl::setLoop( bool enabled )
@@ -75,27 +73,34 @@ void MovieGl::stop()
 
 void MovieGl::draw()
 {
-	auto texture = getTexture();
-	if( texture ) {
+	updateFrame();
+
+	if( mTexture ) {
 		gl::ScopedColor color( 1, 1, 1 );
-		gl::draw( texture );
+		gl::draw( mTexture );
 	}
 }
 
 void MovieGl::draw( const ci::Area &bounds )
 {
-	auto texture = getTexture();
-	if( texture ) {
+	updateFrame();
+
+	if( mTexture ) {
 		gl::ScopedColor color( 1, 1, 1 );
-		gl::draw( texture, bounds );
+		gl::draw( mTexture, bounds );
 	}
 }
 
-const gl::TextureRef MovieGl::getTexture()
+const gl::Texture2dRef& MovieGl::getTexture()
+{
+	updateFrame();
+
+	return mTexture;
+}
+
+void MovieGl::updateFrame()
 {
 	HRESULT hr = S_OK;
-
-	ci::gl::Texture2dRef texture;
 
 	// Generate GL texture ID.
 	GLuint textureID = 0;
@@ -163,12 +168,15 @@ const gl::TextureRef MovieGl::getTexture()
 			BOOL locked = ::wglDXLockObjectsNV( mObj->mDeviceHandle, 1, &objectHandle );
 			BREAK_IF_FALSE( locked, E_FAIL );
 
-			// Create GL texture.
+			// Create GL texture:
+			//  1) obtain a pointer to the DX texture.
 			auto deviceHandle = mObj->mDeviceHandle;
 			IDirect3DSurface9* framePtr = pFrame.get();
 			framePtr->AddRef();
-
-			texture = ci::gl::Texture2d::create( GL_TEXTURE_RECTANGLE, textureID, desc.Width, desc.Height, false, [pPresenterDX9, deviceHandle, objectHandle, framePtr]( gl::Texture* tex ) {
+			//  2) keep a reference to the player. That way, the player will be around until the last texture has been destroyed.
+			auto obj = mObj;
+			//  3) create a texture wrapper.
+			ci::gl::Texture2dRef texture = ci::gl::Texture2d::create( GL_TEXTURE_RECTANGLE, textureID, desc.Width, desc.Height, false, [obj, pPresenterDX9, deviceHandle, objectHandle, framePtr]( gl::Texture* tex ) {
 				BOOL unlocked = ::wglDXUnlockObjectsNV( deviceHandle, 1, const_cast<HANDLE*>( &objectHandle ) );
 				BOOL unregistered = ::wglDXUnregisterObjectNV( deviceHandle, objectHandle );
 
@@ -179,8 +187,8 @@ const gl::TextureRef MovieGl::getTexture()
 				delete tex;
 			} );
 			texture->setTopDown( true );
-
-			mObj->mTextures.push_back( texture );
+			//  4) assign texture to our member variable.
+			mTexture = texture;
 		}
 		else {
 			ScopedComPtr<PresenterDX11> pPresenterDX11;
@@ -190,7 +198,7 @@ const gl::TextureRef MovieGl::getTexture()
 				ScopedComPtr<ID3D11Texture2D> pFrame;
 				hr = pPresenterDX11->GetFrame( &pFrame );
 				BREAK_ON_FAIL( hr );
-				
+
 				D3D11_TEXTURE2D_DESC desc;
 				pFrame->GetDesc( &desc );
 
@@ -232,12 +240,15 @@ const gl::TextureRef MovieGl::getTexture()
 				BOOL locked = ::wglDXLockObjectsNV( mObj->mDeviceHandle, 1, &objectHandle );
 				BREAK_IF_FALSE( locked, E_FAIL );
 
-				// Create GL texture.
+				// Create GL texture:
+				//  1) obtain a pointer to the DX texture.
 				auto deviceHandle = mObj->mDeviceHandle;
 				ID3D11Texture2D* framePtr = pFrame.get();
 				framePtr->AddRef();
-
-				texture = ci::gl::Texture2d::create( GL_TEXTURE_RECTANGLE, textureID, desc.Width, desc.Height, false, [pPresenterDX11, deviceHandle, objectHandle, framePtr]( gl::Texture* tex ) {
+				//  2) keep a reference to the player. That way, the player will be around until the last texture has been destroyed.
+				auto obj = mObj;
+				//  3) create a texture wrapper.
+				ci::gl::Texture2dRef texture = ci::gl::Texture2d::create( GL_TEXTURE_RECTANGLE, textureID, desc.Width, desc.Height, false, [obj,  pPresenterDX11, deviceHandle, objectHandle, framePtr]( gl::Texture* tex ) {
 					BOOL unlocked = ::wglDXUnlockObjectsNV( deviceHandle, 1, const_cast<HANDLE*>( &objectHandle ) );
 					BOOL unregistered = ::wglDXUnregisterObjectNV( deviceHandle, objectHandle );
 
@@ -248,8 +259,8 @@ const gl::TextureRef MovieGl::getTexture()
 					delete tex;
 				} );
 				texture->setTopDown( true );
-
-				mObj->mTextures.push_back( texture );
+				//  4) assign texture to our member variable.
+				mTexture = texture;
 			}
 		}
 	} while( FALSE );
@@ -258,48 +269,19 @@ const gl::TextureRef MovieGl::getTexture()
 		// Delete any generated texture ID.
 		if( textureID != 0 )
 			::glDeleteTextures( 1, &textureID );
-
-		// See if we have a texture available.
-		if( !mObj->mTextures.empty() )
-			texture = mObj->mTextures.back();
 	}
-
-	// Remove all textures that are no longer in use.
-	if( !mObj->mTextures.empty() )
-		mObj->mTextures.erase( std::remove_if( mObj->mTextures.begin(), mObj->mTextures.end(), []( gl::TextureRef& item ) { return item.unique(); } ), mObj->mTextures.end() );
-
-	return texture;
 }
 
 void MovieGl::close()
 {
-	if( !mObj )
-		return;
+	// Reset texture.
+	mTexture.reset();
+	
+	// Reset player object.
+	if( mObj && !mObj.unique() )
+		CI_LOG_W( "All references to video textures should be released before the GL context is destroyed." );
 
-	// Check if textures are unique and replace their contents if they are not. Also don't forget to replace their deleter.
-	if( gl::context() ) {
-		for( auto &texture : mObj->mTextures ) {
-			if( !texture.unique() ) {
-				size_t w = texture->getWidth();
-				size_t h = texture->getHeight();
-				std::vector<uint32_t> data( w*h, 0xFFFF0000 );
-				texture->update( (const void*)data.data(), GL_RGB, GL_UNSIGNED_BYTE, 0, w, h );
-			}
-		}
-	}
-
-	// Clear textures.
-	mObj->mTextures.clear();
-
-	// Close interop device.
-	if( mObj->mDeviceHandle ) {
-		BOOL closed = ::wglDXCloseDeviceNV( mObj->mDeviceHandle );
-		mObj->mDeviceHandle = NULL;
-	}
-
-	// Close player.
-	if( mObj->mPlayerPtr )
-		mObj->mPlayerPtr->Close();
+	mObj.reset();
 }
 
 }

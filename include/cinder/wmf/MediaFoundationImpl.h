@@ -106,6 +106,10 @@ public:
 	virtual void	draw( const Area &bounds ) = 0;
 
 protected:
+	//! Obtains the latest frame from the video player and creates a texture from it.
+	virtual void updateFrame() = 0;
+
+protected:
 	struct Obj {
 		Obj() : mWidth( 0 ), mHeight( 0 ), mDuration( 0 ) {}
 		virtual ~Obj() {}

@@ -21,15 +21,20 @@ public:
 	void draw() override;
 
 	void mouseDown( MouseEvent event ) override;
+	void keyDown( KeyEvent event ) override;
 	void fileDrop( FileDropEvent event ) override;
 
 	void resize() override;
 
-private:
-	Rectf                         mClearRegion;
-	std::vector<ci::wmf::MovieGlRef>  mVideos;
+	void close();
 
-	ci::gl::Texture2dRef          mTexture;
+private:
+	std::vector<gl::Texture2dRef>  mSnapshots;
+
+	Rectf                          mClearRegion;
+	std::vector<wmf::MovieGlRef>   mVideos;
+
+	signals::ScopedConnection      mConnClose;
 };
 
 void VideoTestApp::prepare( Settings *settings )
@@ -45,6 +50,8 @@ void VideoTestApp::setup()
 
 	gl::enableVerticalSync( false );
 	disableFrameRate();
+
+	mConnClose = getWindow()->getSignalClose().connect( [&]() { close(); } );
 }
 
 void VideoTestApp::update()
@@ -63,25 +70,46 @@ void VideoTestApp::draw()
 	gl::ScopedColor color( 1, 0, 0 );
 	gl::drawSolidRoundedRect( mClearRegion, 10.0f );
 
+	gl::color( 1, 1, 1 );
 	if( !mVideos.empty() ) {
-		//auto texture = mVideos.front()->getTexture();
+		auto texture = mVideos.front()->getTexture();
+		gl::draw( texture );
+	}
 
-		//if( texture )
-		//	mTexture = texture;
-
-		//gl::ScopedColor color( 1, 1, 1 );
-		//gl::draw( mTexture );
-		mVideos.front()->draw();
+	vec2 position;
+	for( auto &snapshot : mSnapshots ) {
+		gl::draw( snapshot, Rectf( position, position + 0.2f * vec2( snapshot->getSize() ) ) );
+		float w = 0.2f * snapshot->getWidth();
+		position.x += w;
+		if( position.x > getWindowWidth() - w ) {
+			position.x = 0;
+			position.y += 0.2f * snapshot->getHeight();
+		}
 	}
 }
 
 void VideoTestApp::mouseDown( MouseEvent event )
 {
 	if( mClearRegion.contains( event.getPos() ) ) {
-		mTexture.reset(); // TEMP
-
 		if( !mVideos.empty() )
 			mVideos.pop_back();
+	}
+}
+
+void VideoTestApp::keyDown( KeyEvent event )
+{
+	switch( event.getCode() ) {
+		case KeyEvent::KEY_SPACE:
+			// Create snapshot.
+			if( auto texture = mVideos.front()->getTexture() )
+				mSnapshots.push_back( texture );
+			break;
+		case KeyEvent::KEY_BACKSPACE:
+		case KeyEvent::KEY_DELETE:
+			if( !mSnapshots.empty() ) {
+				mSnapshots.pop_back();
+			}
+			break;
 	}
 }
 
@@ -106,6 +134,11 @@ void VideoTestApp::fileDrop( FileDropEvent event )
 void VideoTestApp::resize()
 {
 	mClearRegion = Rectf( getWindowBounds() ).inflated( vec2( -128 ) );
+}
+
+void VideoTestApp::close()
+{
+	mSnapshots.clear();
 }
 
 CINDER_APP( VideoTestApp, RendererGl, &VideoTestApp::prepare )
