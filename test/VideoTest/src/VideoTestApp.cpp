@@ -102,8 +102,10 @@ void VideoTestApp::keyDown( KeyEvent event )
 	switch( event.getCode() ) {
 		case KeyEvent::KEY_SPACE:
 			// Create snapshot.
-			if( auto texture = mVideos.front()->getTexture() )
-				mSnapshots.push_back( texture );
+			if( !mVideos.empty() && mSnapshots.size() < 25 ) {
+				if( auto texture = mVideos.front()->getTexture() )
+					mSnapshots.push_back( texture );
+			}
 			break;
 		case KeyEvent::KEY_BACKSPACE:
 		case KeyEvent::KEY_DELETE:
