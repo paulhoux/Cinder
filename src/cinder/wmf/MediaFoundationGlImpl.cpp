@@ -44,7 +44,7 @@ MovieGl::MovieGl()
 MovieGl::MovieGl( const fs::path & path )
 	: MovieGl()
 {
-	if( mObj->mPlayerPtr ) {
+	if( mObj && mObj->mPlayerPtr ) {
 		mObj->mPlayerPtr->OpenURL( msw::toWideString( path.string() ).c_str() );
 	}
 }
@@ -56,18 +56,19 @@ MovieGl::~MovieGl()
 
 void MovieGl::setLoop( bool enabled )
 {
-	mObj->mPlayerPtr->SetLoop( enabled );
+	if( mObj && mObj->mPlayerPtr )
+		mObj->mPlayerPtr->SetLoop( enabled );
 }
 
 void MovieGl::play()
 {
-	if( mObj->mPlayerPtr )
+	if( mObj && mObj->mPlayerPtr )
 		mObj->mPlayerPtr->Play();
 }
 
 void MovieGl::stop()
 {
-	if( mObj->mPlayerPtr )
+	if( mObj && mObj->mPlayerPtr )
 		mObj->mPlayerPtr->Pause();
 }
 
@@ -107,8 +108,10 @@ void MovieGl::updateFrame()
 	::glGenTextures( 1, &textureID );
 
 	do {
-		BREAK_IF_TRUE( textureID == 0, E_FAIL );
+		BREAK_ON_NULL( mObj, E_POINTER );
 		BREAK_ON_NULL( mObj->mPlayerPtr, E_POINTER );
+
+		BREAK_IF_TRUE( textureID == 0, E_FAIL );
 
 		ScopedComPtr<PresenterDX9> pPresenterDX9;
 		hr = mObj->mPlayerPtr->QueryInterface( __uuidof( PresenterDX9 ), (void**)&pPresenterDX9 );
@@ -248,7 +251,7 @@ void MovieGl::updateFrame()
 				//  2) keep a reference to the player. That way, the player will be around until the last texture has been destroyed.
 				auto obj = mObj;
 				//  3) create a texture wrapper.
-				ci::gl::Texture2dRef texture = ci::gl::Texture2d::create( GL_TEXTURE_RECTANGLE, textureID, desc.Width, desc.Height, false, [obj,  pPresenterDX11, deviceHandle, objectHandle, framePtr]( gl::Texture* tex ) {
+				ci::gl::Texture2dRef texture = ci::gl::Texture2d::create( GL_TEXTURE_RECTANGLE, textureID, desc.Width, desc.Height, false, [obj, pPresenterDX11, deviceHandle, objectHandle, framePtr]( gl::Texture* tex ) {
 					BOOL unlocked = ::wglDXUnlockObjectsNV( deviceHandle, 1, const_cast<HANDLE*>( &objectHandle ) );
 					BOOL unregistered = ::wglDXUnregisterObjectNV( deviceHandle, objectHandle );
 
@@ -276,7 +279,7 @@ void MovieGl::close()
 {
 	// Pause the player.
 	stop();
-	
+
 	// Reset texture.
 	mTexture.reset();
 
