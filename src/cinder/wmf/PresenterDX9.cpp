@@ -238,8 +238,11 @@ HRESULT PresenterDX9::ReturnFrame( IDirect3DSurface9 ** ppFrame )
 	do {
 		BREAK_ON_NULL( m_pPool, E_FAIL );
 
-		hr = m_pPool->InsertBack( *ppFrame );
-		BREAK_ON_FAIL( hr );
+		// Only insert if we don't have enough already.
+		if( m_pPool->GetCount() < 2 ) {
+			hr = m_pPool->InsertBack( *ppFrame );
+			BREAK_ON_FAIL( hr );
+		}
 
 		SafeRelease( *ppFrame );
 	} while( FALSE );

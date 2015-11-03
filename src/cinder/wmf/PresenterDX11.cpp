@@ -78,7 +78,7 @@ PresenterDX11::PresenterDX11( void )
 	, m_DeviceResetToken( 0 )
 	, m_DXSWSwitch( 0 )
 	, m_useDCompVisual( 0 )
-	, m_useDebugLayer( D3D11_CREATE_DEVICE_VIDEO_SUPPORT /*| D3D11_CREATE_DEVICE_DEBUG*/ )
+	, m_useDebugLayer( D3D11_CREATE_DEVICE_VIDEO_SUPPORT | D3D11_CREATE_DEVICE_DEBUG )
 	, m_pD3DDevice( NULL )
 	, m_pVideoDevice( NULL )
 	, m_pD3DImmediateContext( NULL )
@@ -305,8 +305,11 @@ HRESULT PresenterDX11::ReturnFrame( ID3D11Texture2D **ppFrame )
 	do {
 		BREAK_ON_NULL( m_pPool, E_FAIL );
 
-		hr = m_pPool->InsertBack( *ppFrame );
-		BREAK_ON_FAIL( hr );
+		// Only insert if we don't have enough already.
+		if( m_pPool->GetCount() < 2 ) {
+			hr = m_pPool->InsertBack( *ppFrame );
+			BREAK_ON_FAIL( hr );
+		}
 
 		SafeRelease( *ppFrame );
 	} while( FALSE );
