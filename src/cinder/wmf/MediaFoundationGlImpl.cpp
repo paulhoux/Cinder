@@ -274,9 +274,12 @@ void MovieGl::updateFrame()
 
 void MovieGl::close()
 {
+	// Pause the player.
+	stop();
+	
 	// Reset texture.
 	mTexture.reset();
-	
+
 	// Reset player object.
 	if( mObj && !mObj.unique() )
 		CI_LOG_W( "All references to video textures should be released before the GL context is destroyed." );
