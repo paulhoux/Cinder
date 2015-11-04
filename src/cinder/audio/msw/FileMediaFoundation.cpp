@@ -22,9 +22,7 @@
 */
 
 #include "cinder/Cinder.h"
-#if ! defined( CINDER_WINRT ) && ( _WIN32_WINNT < _WIN32_WINNT_VISTA )
-#error "Media Foundation only available on Windows Vista or newer"
-#else
+#if ( _WIN32_WINNT >= _WIN32_WINNT_VISTA )
 
 #include "cinder/audio/msw/FileMediaFoundation.h"
 #include "cinder/audio/dsp/Converter.h"
