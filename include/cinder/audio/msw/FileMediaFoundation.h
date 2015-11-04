@@ -23,11 +23,6 @@
 
 #pragma once
 
-#include "cinder/Cinder.h"
-#if ! defined( CINDER_WINRT ) && ( _WIN32_WINNT < _WIN32_WINNT_VISTA )
-#error "Media Foundation only available on Windows Vista or newer"
-#else
-
 #include "cinder/audio/Source.h"
 #include "cinder/audio/Target.h"
 #include "cinder/audio/SampleType.h"
@@ -110,5 +105,3 @@ class MediaFoundationInitializer {
 };
 
 } } } // namespace cinder::audio::msw
-
-#endif // ( _WIN32_WINNT >= _WIN32_WINNT_VISTA )
