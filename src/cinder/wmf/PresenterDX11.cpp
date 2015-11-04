@@ -1,5 +1,5 @@
 
-#include "cinder/wmf/PresenterDX11.h"
+#include "cinder/wmf/Presenter.h"
 #if ( _WIN32_WINNT >= _WIN32_WINNT_VISTA ) // Requires Windows Vista
 
 using namespace cinder::msw;

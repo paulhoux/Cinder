@@ -60,6 +60,10 @@ namespace msw {
 #define HRESULT_STRING(hr)            ci::msw::toUtf8String(std::wstring((const wchar_t*)_com_error(hr).ErrorMessage()))
 #endif // HRESULT_STRING
 
+#ifndef LOG_ERR_MSG
+#define LOG_ERR_MSG(err)              { CHAR msg[1024]; if( ::FormatMessageA( FORMAT_MESSAGE_FROM_SYSTEM, 0, err, 0, (LPSTR)&msg, 1024, 0 ) ) CI_LOG_E( msg ); }
+#endif // LOG_ERR_MSG
+
 #ifndef BREAK_ON_FAIL
 #define BREAK_ON_FAIL(value)          if( FAILED( value ) ) { /*__debugbreak();*/ break; }
 #endif // !BREAK_ON_FAIL

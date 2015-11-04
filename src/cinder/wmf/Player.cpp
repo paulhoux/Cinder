@@ -28,8 +28,7 @@ POSSIBILITY OF SUCH DAMAGE.
 #if ( _WIN32_WINNT >= _WIN32_WINNT_VISTA ) // Requires Windows Vista
 
 #include "cinder/wmf/Activate.h"
-#include "cinder/wmf/PresenterDX9.h"
-#include "cinder/wmf/PresenterDX11.h"
+#include "cinder/wmf/Presenter.h"
 
 // Include these libraries.
 #pragma comment(lib, "mf.lib")

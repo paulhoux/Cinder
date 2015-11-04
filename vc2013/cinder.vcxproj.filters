@@ -1721,12 +1721,6 @@
     <ClInclude Include="..\include\cinder\wmf\Presenter.h">
       <Filter>Header Files\wmf</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\cinder\wmf\PresenterDX9.h">
-      <Filter>Header Files\wmf</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\cinder\wmf\PresenterDX11.h">
-      <Filter>Header Files\wmf</Filter>
-    </ClInclude>
     <ClInclude Include="..\include\cinder\wmf\Scheduler.h">
       <Filter>Header Files\wmf</Filter>
     </ClInclude>

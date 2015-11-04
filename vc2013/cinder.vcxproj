@@ -806,8 +806,6 @@
     <ClInclude Include="..\include\cinder\wmf\MonitorArray.h" />
     <ClInclude Include="..\include\cinder\wmf\Player.h" />
     <ClInclude Include="..\include\cinder\wmf\Presenter.h" />
-    <ClInclude Include="..\include\cinder\wmf\PresenterDX11.h" />
-    <ClInclude Include="..\include\cinder\wmf\PresenterDX9.h" />
     <ClInclude Include="..\include\cinder\wmf\Scheduler.h" />
     <ClInclude Include="..\include\cinder\wmf\StaticAsyncCallback.h" />
     <ClInclude Include="..\include\cinder\wmf\StreamSink.h" />

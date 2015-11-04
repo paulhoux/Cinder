@@ -31,8 +31,7 @@ POSSIBILITY OF SUCH DAMAGE.
 
 #include "cinder/wmf/Player.h"
 #include "cinder/wmf/MediaSink.h"
-#include "cinder/wmf/PresenterDX9.h"
-#include "cinder/wmf/PresenterDX11.h"
+#include "cinder/wmf/Presenter.h"
 
 #include "cinder/Signals.h"
 #include "cinder/gl/gl.h"

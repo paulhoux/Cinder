@@ -199,7 +199,7 @@ void MovieGl::updateFrame()
 				BREAK_ON_NULL( pDevice, E_POINTER );
 
 				mObj->mDeviceHandle = ::wglDXOpenDeviceNV( pDevice );
-				BREAK_ON_NULL_MSG( mObj->mDeviceHandle, E_POINTER, "Failed to open DX/GL interop device." );
+				BREAK_ON_NULL_MSG( mObj->mDeviceHandle, E_FAIL, "Failed to open DX/GL interop device." );
 			}
 
 			// Set share handle.
@@ -214,27 +214,13 @@ void MovieGl::updateFrame()
 			// Register with OpenGL.
 			HANDLE objectHandle = ::wglDXRegisterObjectNV( mObj->mDeviceHandle, (void*)pFrame, textureID, GL_TEXTURE_RECTANGLE, WGL_ACCESS_READ_ONLY_NV );
 			if( NULL == objectHandle ) {
-				DWORD err = ::GetLastError();
-				switch( err ) {
-					case ERROR_INVALID_HANDLE:
-						CI_LOG_E( "ERROR_INVALID_HANDLE" );
-						break;
-					case ERROR_INVALID_DATA:
-						CI_LOG_E( "ERROR_INVALID_DATA" );
-						break;
-					case ERROR_OPEN_FAILED:
-						CI_LOG_E( "ERROR_OPEN_FAILED" );
-						break;
-					default:
-						CI_LOG_E( "Unknown error" );
-						break;
-				}
-				BREAK_ON_NULL( hr, E_FAIL );
+				LOG_ERR_MSG( ::GetLastError() );
+				BREAK_ON_NULL_MSG( objectHandle, E_FAIL, "Failed to register object." );
 			}
 
 			// Lock object.
 			BOOL locked = ::wglDXLockObjectsNV( mObj->mDeviceHandle, 1, &objectHandle );
-			BREAK_IF_FALSE( locked, E_FAIL );
+			BREAK_IF_FALSE_MSG( locked, E_FAIL, "Failed to lock object." );
 
 			// Create GL texture:
 			//  1) obtain a pointer to the DX texture.
@@ -280,33 +266,19 @@ void MovieGl::updateFrame()
 					BREAK_ON_NULL( pDevice, E_POINTER );
 
 					mObj->mDeviceHandle = ::wglDXOpenDeviceNV( pDevice );
-					BREAK_ON_NULL_MSG( mObj->mDeviceHandle, E_POINTER, "Failed to open DX/GL interop device." );
+					BREAK_ON_NULL_MSG( mObj->mDeviceHandle, E_FAIL, "Failed to open DX/GL interop device." );
 				}
 
 				// Register with OpenGL.
 				HANDLE objectHandle = ::wglDXRegisterObjectNV( mObj->mDeviceHandle, (void*)pFrame, textureID, GL_TEXTURE_RECTANGLE, WGL_ACCESS_READ_ONLY_NV );
 				if( NULL == objectHandle ) {
-					DWORD err = ::GetLastError();
-					switch( err ) {
-						case ERROR_INVALID_HANDLE:
-							CI_LOG_E( "ERROR_INVALID_HANDLE" );
-							break;
-						case ERROR_INVALID_DATA:
-							CI_LOG_E( "ERROR_INVALID_DATA" );
-							break;
-						case ERROR_OPEN_FAILED:
-							CI_LOG_E( "ERROR_OPEN_FAILED" );
-							break;
-						default:
-							CI_LOG_E( "Unknown error" );
-							break;
-					}
-					BREAK_ON_NULL( hr, E_FAIL );
+					LOG_ERR_MSG( ::GetLastError() );
+					BREAK_ON_NULL_MSG( objectHandle, E_FAIL, "Failed to register object." );
 				}
 
 				// Lock object.
 				BOOL locked = ::wglDXLockObjectsNV( mObj->mDeviceHandle, 1, &objectHandle );
-				BREAK_IF_FALSE( locked, E_FAIL );
+				BREAK_IF_FALSE_MSG( locked, E_FAIL, "Failed to lock object." );
 
 				// Create GL texture:
 				//  1) obtain a pointer to the DX texture.
