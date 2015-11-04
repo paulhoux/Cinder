@@ -4,7 +4,6 @@
 
 #include "cinder/wmf/MediaFoundation.h"
 
-#include <minwindef.h>
 #include <winerror.h>
 
 namespace cinder {

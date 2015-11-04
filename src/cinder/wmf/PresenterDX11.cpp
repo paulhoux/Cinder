@@ -2,6 +2,9 @@
 #include "cinder/wmf/Presenter.h"
 #if ( _WIN32_WINNT >= _WIN32_WINNT_VISTA ) // Requires Windows Vista
 
+// Include here, since we forward-declared in the header.
+#include <dxgi1_2.h>
+
 using namespace cinder::msw;
 
 namespace cinder {

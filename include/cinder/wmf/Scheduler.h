@@ -4,6 +4,10 @@
 #include "cinder/wmf/StaticAsyncCallback.h"
 #include "cinder/msw/ThreadSafeDeque.h"
 
+#ifndef MFASYNC_CALLBACK_QUEUE_MULTITHREADED
+#define MFASYNC_CALLBACK_QUEUE_MULTITHREADED 0x00000005
+#endif
+
 namespace cinder {
 namespace wmf {
 

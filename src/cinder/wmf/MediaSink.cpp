@@ -2,9 +2,9 @@
 #include "cinder/wmf/MediaSink.h"
 #include "cinder/wmf/Presenter.h"
 
-#include <VersionHelpers.h>
-
 #if ( _WIN32_WINNT >= _WIN32_WINNT_VISTA ) // Requires Windows Vista
+
+#include <VersionHelpers.h>
 
 using namespace cinder::msw;
 

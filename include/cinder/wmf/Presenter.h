@@ -5,10 +5,14 @@
 #include "cinder/msw/ThreadSafeDeque.h"
 
 #include <d3d11.h>
-#include <dxgi1_2.h>
 #include <initguid.h>
 
-#if (WINVER >= _WIN32_WINNT_WIN8)
+// The v120_xp toolset does not know about WIN8.
+#ifndef _WIN32_WINNT_WIN8
+#define _WIN32_WINNT_WIN8 0x0602
+#endif
+
+#if ( _WIN32_WINNT >= _WIN32_WINNT_WIN8 )
 #include <dcomp.h> // for IDCompositionDevice et.al. (Windows 8+ only)
 #pragma message("WARNING! Uses experimental Windows 8+ code that has not been tested for OpenGL compatibility!")
 #endif
@@ -31,6 +35,18 @@ DEFINE_GUID( MF_MT_VIDEO_3D, 0xcb5e88cf, 0x7b5b, 0x476b, 0x85, 0xaa, 0x1c, 0xa5,
 
 // We store the shared texture handle in a private data field of the texture using this custom GUID.
 DEFINE_GUID( GUID_SharedHandle, 0xad243275, 0xbd3a, 0x473d, 0x8c, 0xa5, 0xb9, 0x7a, 0x9c, 0x4e, 0x92, 0x7d );
+
+// Forward-declare the DXGI classes, so we remain "compatible" with XP.
+struct ID3D11VideoContext;
+struct ID3D11VideoDevice;
+struct ID3D11VideoProcessorEnumerator;
+struct ID3D11VideoProcessor;
+struct IDXGIFactory2;
+struct IDXGIOutput1;
+struct IDXGISwapChain1;
+struct IMFDXGIDeviceManager;
+struct IMFVideoSampleAllocatorEx;
+struct D3D11_VIDEO_PROCESSOR_STREAM;
 
 namespace cinder {
 namespace wmf {
