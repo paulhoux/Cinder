@@ -23,9 +23,8 @@
 
 #pragma once
 
-#if( _WIN32_WINNT < _WIN32_WINNT_VISTA )
-	#error "WASAPI only available on Windows Vista or newer"
-#else
+#include "cinder/Cinder.h"
+#if defined( CINDER_WINRT ) || ( _WIN32_WINNT >= 0x0600 ) // requires Windows Vista+
 
 #include "cinder/audio/Device.h"
 
@@ -75,4 +74,4 @@ class DeviceManagerWasapi : public DeviceManager {
 
 } } } // namespace cinder::audio::msw
 
-#endif // ( _WIN32_WINNT >= _WIN32_WINNT_VISTA )
+#endif // #if defined( CINDER_WINRT ) || ( _WIN32_WINNT >= 0x0600 ) // requires Windows Vista+
