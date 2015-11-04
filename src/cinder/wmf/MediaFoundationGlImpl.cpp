@@ -46,6 +46,7 @@ MovieGl::MovieGl( const fs::path & path )
 {
 	if( mObj && mObj->mPlayerPtr ) {
 		mObj->mPlayerPtr->OpenURL( msw::toWideString( path.string() ).c_str() );
+		mObj->mDuration = mObj->mPlayerPtr->GetDuration() * 1.0e-7f;
 	}
 }
 
@@ -54,16 +55,80 @@ MovieGl::~MovieGl()
 	close();
 }
 
+float MovieGl::getCurrentTime() const
+{
+	MFTIME t = 0L;
+
+	if( mObj && mObj->mPlayerPtr ) {
+		HRESULT hr = mObj->mPlayerPtr->GetPosition( &t );
+		if( SUCCEEDED( hr ) )
+			return t * 1.0e-7f;
+	}
+
+	return 0.0f;
+}
+
+void MovieGl::seekToTime( float seconds )
+{
+	if( !( mObj && mObj->mPlayerPtr ) )
+		return;
+
+	seconds = ci::math<float>::clamp( seconds, 0.0f, mObj->mDuration );
+
+	MFTIME t = MFTIME( seconds * 10000000L );
+	mObj->mPlayerPtr->SetPosition( t );
+}
+
+void MovieGl::seekToFrame( int frame )
+{
+	//if( mObj && mObj->mPlayerPtr )
+	//	mObj->mPlayerPtr->
+}
+
+void MovieGl::seekToStart()
+{
+	if( !( mObj && mObj->mPlayerPtr ) )
+		return;
+
+	MFTIME t = MFTIME( 0L );
+	mObj->mPlayerPtr->SetPosition( t );
+}
+
+void MovieGl::seekToEnd()
+{
+	if( !( mObj && mObj->mPlayerPtr ) )
+		return;
+
+	MFTIME t = MFTIME( mObj->mDuration * 10000000L );
+	mObj->mPlayerPtr->SetPosition( t );
+}
+
 void MovieGl::setLoop( bool enabled )
 {
 	if( mObj && mObj->mPlayerPtr )
 		mObj->mPlayerPtr->SetLoop( enabled );
 }
 
+bool MovieGl::isPlaying() const
+{
+	if( mObj && mObj->mPlayerPtr )
+		return ( mObj->mPlayerPtr->GetState() == Player::Started );
+	else
+		return false;
+}
+
+bool MovieGl::isDone() const
+{
+	if( mObj && mObj->mPlayerPtr )
+		return ( mObj->mPlayerPtr->GetState() == Player::Stopped );
+	else
+		return true;
+}
+
 void MovieGl::play()
 {
 	if( mObj && mObj->mPlayerPtr )
-		mObj->mPlayerPtr->Play();
+		mObj->mPlayerPtr->Start();
 }
 
 void MovieGl::stop()

@@ -50,9 +50,24 @@ public:
 
 	static MovieGlRef create( const fs::path &path ) { return std::shared_ptr<MovieGl>( new MovieGl( path ) ); }
 
+	//! Returns the current time of a video in seconds.
+	float getCurrentTime() const;
+	//! Sets the video to the time \a seconds.
+	void seekToTime( float seconds );
+	//! Sets the video time to the start time of frame \a frame.
+	void seekToFrame( int frame );
+	//! Sets the video time to its beginning.
+	void seekToStart();
+	//! Sets the video time to its end.
+	void seekToEnd();
+
 	//! Enable or disable looping.
 	void setLoop( bool enabled = true ) override;
-
+	
+	//! Returns whether the video is currently playing or is paused/stopped.
+	bool isPlaying() const;
+	//! Returns whether the video has completely finished playing.
+	bool isDone() const;
 	//! Begins video playback.
 	void play() override;
 	//! Stops video playback.

@@ -92,9 +92,9 @@ public:
 	virtual float	getVolume() const { return 1.0f; }
 
 	//! Returns whether the video is currently playing or is paused/stopped.
-	virtual bool	isPlaying() const { return true; }
+	virtual bool	isPlaying() const = 0;
 	//! Returns whether the video has completely finished playing.
-	virtual bool	isDone() const { return true; }
+	virtual bool	isDone() const = 0;
 	//! Begins video playback.
 	virtual void	play() = 0;
 	//! Stops video playback.

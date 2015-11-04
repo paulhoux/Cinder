@@ -90,13 +90,21 @@ LRESULT CALLBACK MFWndProc( HWND wnd, UINT uMsg, WPARAM wParam, LPARAM lParam )
 Player::Player( DirectXVersion dxVersion )
 	: mRefCount( 1 )
 	, mState( Closed )
+	, mCommand( CmdNone )
 	, mWnd( NULL )
-	, mPlayWhenReady( FALSE )
-	, mIsLooping( FALSE )
+	, mIsLoop( FALSE )
+	, mIsPending( FALSE )
+	, mCanScrub( FALSE )
 	, mWidth( 0 )
 	, mHeight( 0 )
+	, mDuration( 0 )
+	, mSeekTo( 0 )
+	, mCapabilities( 0 )
 	, mSessionPtr( NULL )
 	, mSourcePtr( NULL )
+	, mClockPtr( NULL )
+	, mRateControlPtr( NULL )
+	, mRateSupportPtr( NULL )
 	, mDxVersion( dxVersion )
 {
 	mCloseEvent = ::CreateEventA( NULL, FALSE, FALSE, NULL );
@@ -116,6 +124,108 @@ Player::~Player()
 	}
 }
 
+// IUnknown
+HRESULT Player::QueryInterface( REFIID iid, __RPC__deref_out _Result_nullonfailure_ void** ppv )
+{
+	if( !ppv ) {
+		return E_POINTER;
+	}
+	if( iid == IID_IUnknown ) {
+		*ppv = static_cast<IUnknown*>( this );
+	}
+	else if( iid == __uuidof( Player ) ) {
+		*ppv = static_cast<Player*>( this );
+	}
+	else if( iid == __uuidof( PresenterDX9 ) ) {
+		if( NULL == mSessionPtr ) {
+			*ppv = NULL;
+			return E_NOINTERFACE;
+		}
+
+		ScopedComPtr<IMFVideoDisplayControl> pVideoDisplayControl;
+		if( FAILED( MFGetService( mSessionPtr, MR_VIDEO_RENDER_SERVICE, IID_PPV_ARGS( &pVideoDisplayControl ) ) ) ) {
+			*ppv = NULL;
+			return E_NOINTERFACE;
+		}
+
+		return pVideoDisplayControl.QueryInterface( __uuidof( PresenterDX9 ), ppv );
+	}
+	else if( iid == __uuidof( PresenterDX11 ) ) {
+		if( NULL == mSessionPtr ) {
+			*ppv = NULL;
+			return E_NOINTERFACE;
+		}
+
+		ScopedComPtr<IMFVideoDisplayControl> pVideoDisplayControl;
+		if( FAILED( MFGetService( mSessionPtr, MR_VIDEO_RENDER_SERVICE, IID_PPV_ARGS( &pVideoDisplayControl ) ) ) ) {
+			*ppv = NULL;
+			return E_NOINTERFACE;
+		}
+
+		return pVideoDisplayControl.QueryInterface( __uuidof( PresenterDX11 ), ppv );
+	}
+	else {
+		*ppv = NULL;
+		return E_NOINTERFACE;
+	}
+	AddRef();
+	return S_OK;
+}
+
+// IUnknown
+ULONG Player::AddRef()
+{
+	return ::InterlockedIncrement( &mRefCount );
+}
+
+// IUnknown
+ULONG Player::Release()
+{
+	ULONG uCount = ::InterlockedDecrement( &mRefCount );
+	if( uCount == 0 ) {
+		delete this;
+	}
+	return uCount;
+}
+
+// Player
+HRESULT Player::CanSeek( BOOL *pbCanSeek ) const
+{
+	if( pbCanSeek == NULL ) {
+		return E_POINTER;
+	}
+
+	// Note: The MFSESSIONCAP_SEEK flag is sufficient for seeking. However, to
+	// implement a seek bar, an application also needs the duration (to get 
+	// the valid range) and a presentation clock (to get the current position).
+
+	*pbCanSeek = ( ( ( mCapabilities & MFSESSIONCAP_SEEK ) == MFSESSIONCAP_SEEK ) && ( mDuration > 0 ) && ( mClockPtr != NULL ) );
+	return S_OK;
+}
+
+// Player
+HRESULT Player::CanFastForward( BOOL *pbCanFF ) const
+{
+	if( pbCanFF == NULL ) {
+		return E_POINTER;
+	}
+
+	*pbCanFF = ( ( mCapabilities & MFSESSIONCAP_RATE_FORWARD ) == MFSESSIONCAP_RATE_FORWARD );
+	return S_OK;
+}
+
+// Player
+HRESULT Player::CanRewind( BOOL *pbCanRewind ) const
+{
+	if( pbCanRewind == NULL ) {
+		return E_POINTER;
+	}
+
+	*pbCanRewind = ( ( mCapabilities & MFSESSIONCAP_RATE_REVERSE ) == MFSESSIONCAP_RATE_REVERSE );
+	return S_OK;
+}
+
+// Player
 HRESULT Player::OpenURL( const WCHAR *url, const WCHAR *audioDeviceId )
 {
 	HRESULT hr = S_OK;
@@ -143,7 +253,8 @@ HRESULT Player::OpenURL( const WCHAR *url, const WCHAR *audioDeviceId )
 		BREAK_ON_FAIL( hr );
 
 		// If SetTopology succeeds, the media session will queue an MESessionTopologySet event.
-		mState = OpenPending;
+		mState = Opening;
+		mIsPending = TRUE;
 	} while( false );
 
 	if( FAILED( hr ) )
@@ -152,10 +263,13 @@ HRESULT Player::OpenURL( const WCHAR *url, const WCHAR *audioDeviceId )
 	return hr;
 }
 
-HRESULT Player::Play()
+// Player
+HRESULT Player::Start()
 {
-	if( mState == OpenPending ) {
-		mPlayWhenReady = TRUE;
+	ScopedCriticalSection lock( mCritSec );
+
+	if( mIsPending ) {
+		mCommand = CmdStart;
 		return S_OK;
 	}
 	else if( mState != Paused && mState != Stopped )
@@ -167,59 +281,180 @@ HRESULT Player::Play()
 	PROPVARIANT varStart;
 	PropVariantInit( &varStart );
 
-	// Note: Start is an asynchronous operation. However, we
-	// can treat our state as being already started. If Start
-	// fails later, we'll get an MESessionStarted event with
-	// an error code, and we will update our state then.
+	// Seek to start if near the end (less than a second to go)
+	MFTIME position = 0L;
+	if( SUCCEEDED( GetPosition( &position ) ) ) {
+		if( ( position + 10000000L ) >= mDuration ) {
+			varStart.vt = VT_I8;
+			varStart.intVal = 0L;
+		}
+	}
 
 	HRESULT hr = mSessionPtr->Start( &GUID_NULL, &varStart );
-	if( SUCCEEDED( hr ) )
+	if( SUCCEEDED( hr ) ) {
 		mState = Started;
+		mIsPending = TRUE;
+	}
 
 	PropVariantClear( &varStart );
+
 	return hr;
 }
 
+// Player
 HRESULT Player::Pause()
 {
-	if( mState != Started )
+	ScopedCriticalSection lock( mCritSec );
+
+	if( mIsPending ) {
+		mCommand = CmdPause;
+		return S_OK;
+	}
+	else if( mState != Started )
 		return MF_E_INVALIDREQUEST;
 
 	if( mSessionPtr == NULL || mSourcePtr == NULL )
 		return E_POINTER;
 
 	HRESULT hr = mSessionPtr->Pause();
-	if( SUCCEEDED( hr ) )
+	if( SUCCEEDED( hr ) ) {
 		mState = Paused;
+		mIsPending = TRUE;
+	}
+
+	return hr;
+}
+
+// Player
+HRESULT Player::Stop()
+{
+	ScopedCriticalSection lock( mCritSec );
+
+	if( mIsPending ) {
+		mCommand = CmdStop;
+		return S_OK;
+	}
+	else if( mState != Started && mState != Paused )
+		return MF_E_INVALIDREQUEST;
+
+	if( mSessionPtr == NULL || mSourcePtr == NULL )
+		return E_POINTER;
+
+	HRESULT hr = mSessionPtr->Stop();
+	if( SUCCEEDED( hr ) ) {
+		mState = Stopped;
+		mIsPending = TRUE;
+	}
+
+	return hr;
+}
+
+HRESULT Player::GetPosition( MFTIME *pPosition )
+{
+	HRESULT hr = S_OK;
+
+	ScopedCriticalSection lock( mCritSec );
+	
+	do {
+		BREAK_ON_NULL( pPosition, E_POINTER );
+		BREAK_ON_NULL( mClockPtr, E_POINTER );
+
+		BREAK_IF_TRUE( mState == Opening, MF_E_INVALIDREQUEST );
+
+		// Return, in order:
+		// 1. Cached seek request (nominal position).
+		// 2. Pending seek operation (nominal position).
+		// 3. Presentation time (actual position).
+		if( mCommand == CmdSeek ) {
+			*pPosition = mSeekTo;
+		}
+		else if( mIsPending && mState == Seeking ) {
+			*pPosition = mSeekTo;
+		}
+		else {
+			hr = mClockPtr->GetTime( pPosition );
+		}
+	} while( FALSE );
 
 	return hr;
 }
 
 HRESULT Player::SetPosition( MFTIME position )
 {
-	if( !mSessionPtr )
-		return E_POINTER;
+	HRESULT hr = S_OK;
 
-	if( mState == OpenPending )
-		return MF_E_INVALIDREQUEST;
+	ScopedCriticalSection lock( mCritSec );
 
-	BOOL bWasPlaying = ( mState == Started );
-	Pause();
+	do {
+		if( mIsPending ) {
+			// Currently seeking or changing rates, so cache this request.
+			mCommand = CmdSeek;
+			mSeekTo = position;
+		}
+		else {
+			hr = SetPositionInternal( position );
+		}
+	} while( FALSE );
 
-	PROPVARIANT varStart;
-	PropVariantInit( &varStart );
-	varStart.vt = VT_I8;
-	varStart.hVal.QuadPart = position;
+	return hr;
+}
 
-	HRESULT hr = mSessionPtr->Start( &GUID_NULL, &varStart );
-	if( SUCCEEDED( hr ) ) {
-		mState = Started;
+HRESULT Player::OnSessionStart( HRESULT hrStatus )
+{
+	HRESULT hr = S_OK;
 
-		if( !bWasPlaying )
-			Pause();
+	if( FAILED( hrStatus ) ) {
+		return hrStatus;
 	}
 
-	PropVariantClear( &varStart );
+	// The Media Session completed a start/seek operation. Check if there
+	// is another seek request pending.
+	UpdatePendingCommands( CmdStart );
+
+	return hr;
+}
+
+HRESULT Player::OnSessionStop( HRESULT hrStatus )
+{
+	HRESULT hr = S_OK;
+
+	if( FAILED( hrStatus ) ) {
+		return hrStatus;
+	}
+
+	// The Media Session completed a transition to stopped. This might occur
+	// because we are changing playback direction (forward/rewind). Check if
+	// there is a pending rate-change request.
+
+	UpdatePendingCommands( CmdStop );
+
+	return hr;
+}
+
+HRESULT Player::OnSessionPause( HRESULT hrStatus )
+{
+	HRESULT hr = S_OK;
+
+	if( FAILED( hrStatus ) ) {
+		return hrStatus;
+	}
+
+	hr = UpdatePendingCommands( CmdPause );
+
+	return hr;
+}
+
+HRESULT Player::OnSessionEnded( HRESULT hr )
+{
+	// After the session ends, playback starts from position zero. But if the
+	// current playback rate is reversed, playback would end immediately 
+	// (reversing from position 0). Therefore, reset the rate to 1x.
+
+	/*if( GetNominalRate() < 0.0f ) {
+		m_state.command = CmdStop;
+
+		hr = CommitRateChange( 1.0f, FALSE );
+	}*/
 
 	return hr;
 }
@@ -245,8 +480,7 @@ HRESULT Player::OnTopologyStatus( IMFMediaEvent *pEvent )
 
 			mState = Paused;
 
-			if( mPlayWhenReady )
-				hr = Play();
+			UpdatePendingCommands( CmdPause );
 		}
 	} while( FALSE );
 
@@ -257,7 +491,7 @@ HRESULT Player::OnPresentationEnded( IMFMediaEvent *pEvent )
 {
 	HRESULT hr = S_OK;
 
-	if( mIsLooping ) {
+	if( mIsLoop ) {
 		// Seek to the beginning.
 		hr = SetPosition( 0 );
 	}
@@ -283,8 +517,63 @@ HRESULT Player::OnNewPresentation( IMFMediaEvent *pEvent )
 		hr = CreatePartialTopology( pPD );
 		BREAK_ON_FAIL( hr );
 
-		mState = OpenPending;
+		mState = Opening;
 	} while( false );
+
+	return hr;
+}
+
+HRESULT Player::UpdatePendingCommands( Command cmd )
+{
+	HRESULT hr = S_OK;
+
+	ScopedCriticalSection lock( mCritSec );
+
+	PROPVARIANT varStart;
+	PropVariantInit( &varStart );
+
+	do {
+		if( mIsPending && mState == (State)cmd ) {
+			mIsPending = FALSE;
+
+			// The current pending command has completed.
+
+			//// First look for rate changes.
+			//if( m_request.fRate != m_state.fRate ) {
+			//	hr = CommitRateChange( m_request.fRate, m_request.bThin );
+			//	if( FAILED( hr ) ) {
+			//		goto done;
+			//	}
+			//}
+
+			// Now look for seek requests.
+			if( !mIsPending ) {
+				switch( mCommand ) {
+					case CmdNone:
+						// Nothing to do.
+						break;
+
+					case CmdStart:
+						Start();
+						break;
+
+					case CmdPause:
+						Pause();
+						break;
+
+					case CmdStop:
+						Stop();
+						break;
+
+					case CmdSeek:
+						SetPositionInternal( mSeekTo );
+						break;
+				}
+
+				mCommand = CmdNone;
+			}
+		}
+	} while( FALSE );
 
 	return hr;
 }
@@ -356,6 +645,9 @@ HRESULT Player::CloseSession()
 		}
 	}
 
+	SafeRelease( mRateSupportPtr );
+	SafeRelease( mRateControlPtr );
+	SafeRelease( mClockPtr );
 	SafeRelease( mSourcePtr );
 	SafeRelease( mSessionPtr );
 
@@ -424,6 +716,27 @@ HRESULT Player::CreatePartialTopology( IMFPresentationDescriptor *pDescriptor )
 
 		// If SetTopology succeeds, the media session will queue an MESessionTopologySet event.
 
+		// Get the presentation clock interface.
+		ScopedComPtr<IMFClock> pClock;
+		hr = mSessionPtr->GetClock( &pClock );
+		BREAK_ON_FAIL( hr );
+
+		hr = pClock.QueryInterface( IID_PPV_ARGS( &mClockPtr ) );
+		BREAK_ON_FAIL( hr );
+
+		// Get the rate control interface.
+		hr = MFGetService( mSessionPtr, MF_RATE_CONTROL_SERVICE, IID_PPV_ARGS( &mRateControlPtr ) );
+		BREAK_ON_FAIL( hr );
+
+		// Get the rate support interface.
+		hr = MFGetService( mSessionPtr, MF_RATE_CONTROL_SERVICE, IID_PPV_ARGS( &mRateSupportPtr ) );
+		BREAK_ON_FAIL( hr );
+
+		// Check if rate 0 (scrubbing) is supported.
+		hr = mRateSupportPtr->IsRateSupported( TRUE, 0, NULL );
+		BREAK_ON_FAIL( hr );
+
+		mCanScrub = TRUE;
 	} while( false );
 
 	return hr;
@@ -440,6 +753,10 @@ HRESULT Player::SetMediaInfo( IMFPresentationDescriptor *pDescriptor )
 		DWORD count;
 		hr = pDescriptor->GetStreamDescriptorCount( &count );
 		BREAK_ON_FAIL( hr );
+
+		// Get duration in 100-nano-second units.
+		mDuration = 0L;
+		hr = pDescriptor->GetUINT64( MF_PD_DURATION, (UINT64*)&mDuration );
 
 		for( DWORD i = 0; i < count; i++ ) {
 			BOOL selected;
@@ -472,68 +789,44 @@ HRESULT Player::SetMediaInfo( IMFPresentationDescriptor *pDescriptor )
 	return hr;
 }
 
-// IUnknown
-HRESULT Player::QueryInterface( REFIID iid, __RPC__deref_out _Result_nullonfailure_ void** ppv )
+HRESULT Player::SetPositionInternal( MFTIME position )
 {
-	if( !ppv ) {
-		return E_POINTER;
-	}
-	if( iid == IID_IUnknown ) {
-		*ppv = static_cast<IUnknown*>( this );
-	}
-	else if( iid == __uuidof( Player ) ) {
-		*ppv = static_cast<Player*>( this );
-	}
-	else if( iid == __uuidof( PresenterDX9 ) ) {
-		if( NULL == mSessionPtr ) {
-			*ppv = NULL;
-			return E_NOINTERFACE;
+	assert( !mIsPending );
+
+	HRESULT hr = S_OK;
+
+	do {
+		BREAK_ON_NULL( mSessionPtr, E_POINTER );
+
+		BREAK_IF_TRUE( mState == Opening, MF_E_INVALIDREQUEST );
+
+		BOOL bPaused = ( mState == Paused );
+		if( !bPaused ) {
+			hr = mSessionPtr->Pause();
+			BREAK_ON_FAIL( hr );
 		}
 
-		ScopedComPtr<IMFVideoDisplayControl> pVideoDisplayControl;
-		if( FAILED( MFGetService( mSessionPtr, MR_VIDEO_RENDER_SERVICE, IID_PPV_ARGS( &pVideoDisplayControl ) ) ) ) {
-			*ppv = NULL;
-			return E_NOINTERFACE;
+		PROPVARIANT varStart;
+		PropVariantInit( &varStart );
+		varStart.vt = VT_I8;
+		varStart.hVal.QuadPart = position;
+
+		hr = mSessionPtr->Start( &GUID_NULL, &varStart );
+		if( SUCCEEDED( hr ) ) {
+			mState = Started;
+			mIsPending = TRUE;
 		}
 
-		return pVideoDisplayControl.QueryInterface( __uuidof( PresenterDX9 ), ppv );
-	}
-	else if( iid == __uuidof( PresenterDX11 ) ) {
-		if( NULL == mSessionPtr ) {
-			*ppv = NULL;
-			return E_NOINTERFACE;
+		PropVariantClear( &varStart );
+
+		if( bPaused ) {
+			hr = mSessionPtr->Pause();
+			mState = Paused;
+			mIsPending = TRUE;
 		}
+	} while( FALSE );
 
-		ScopedComPtr<IMFVideoDisplayControl> pVideoDisplayControl;
-		if( FAILED( MFGetService( mSessionPtr, MR_VIDEO_RENDER_SERVICE, IID_PPV_ARGS( &pVideoDisplayControl ) ) ) ) {
-			*ppv = NULL;
-			return E_NOINTERFACE;
-		}
-
-		return pVideoDisplayControl.QueryInterface( __uuidof( PresenterDX11 ), ppv );
-	}
-	else {
-		*ppv = NULL;
-		return E_NOINTERFACE;
-	}
-	AddRef();
-	return S_OK;
-}
-
-// IUnknown
-ULONG Player::AddRef()
-{
-	return ::InterlockedIncrement( &mRefCount );
-}
-
-// IUnknown
-ULONG Player::Release()
-{
-	ULONG uCount = ::InterlockedDecrement( &mRefCount );
-	if( uCount == 0 ) {
-		delete this;
-	}
-	return uCount;
+	return hr;
 }
 
 // IMFAsyncCallback
@@ -625,6 +918,28 @@ LRESULT Player::HandleEvent( WPARAM wParam )
 				break;
 
 			case MESessionStarted:
+				hr = OnSessionStart( hr );
+				break;
+
+			case MESessionStopped:
+				hr = OnSessionStop( hr );
+				break;
+
+			case MESessionPaused:
+				hr = OnSessionPause( hr );
+				break;
+
+			case MESessionRateChanged:
+				//hr = OnSessionRateChanged( pEvent );
+				break;
+
+			case MESessionEnded:
+				hr = OnSessionEnded( hr );
+				break;
+
+			case MESessionCapabilitiesChanged:
+				// The session capabilities changed. Get the updated capabilities.
+				mCapabilities = MFGetAttributeUINT32( pEvent, MF_EVENT_SESSIONCAPS, mCapabilities );
 				break;
 
 			default:
@@ -793,7 +1108,7 @@ HRESULT Player::CreateMediaSinkActivate( IMFStreamDescriptor *pSourceSD, HWND hV
 			hr = Activate::CreateInstance( hVideoWindow, &pActivate, mDxVersion );
 
 			if( FAILED( hr ) ) {
-				CI_LOG_E( "Player: failed to create custom EVR, falling back to default." );
+				CI_LOG_E( "Failed to create custom Activate, falling back to default." );
 
 				// Use default presenter (EVR).
 				hr = MFCreateVideoRendererActivate( hVideoWindow, &pActivate );
@@ -958,76 +1273,6 @@ HRESULT Player::AddBranchToPartialTopology( IMFTopology *pTopology, IMFMediaSour
 
 	return hr;
 }
-
-/*// ----------------------------------------------------------------------------
-
-ScopedLockDevice::ScopedLockDevice( IDirect3DDeviceManager9 *pDeviceManager, BOOL fBlock )
-	: m_pDeviceManager( NULL )
-	, m_pDevice( NULL )
-	, m_pHandle( NULL )
-{
-	HRESULT hr = S_OK;
-
-	do {
-		HANDLE hDevice = 0;
-		hr = pDeviceManager->OpenDeviceHandle( &hDevice );
-		BREAK_ON_FAIL( hr );
-
-		hr = pDeviceManager->LockDevice( hDevice, &m_pDevice, fBlock );
-
-		if( hr == DXVA2_E_NEW_VIDEO_DEVICE ) {
-			// Invalid device handle. Try to open a new device handle.
-			hr = pDeviceManager->CloseDeviceHandle( hDevice );
-			BREAK_ON_FAIL( hr );
-
-			hr = pDeviceManager->OpenDeviceHandle( &hDevice );
-			BREAK_ON_FAIL( hr );
-
-			// Try to lock the device again.
-			hr = pDeviceManager->LockDevice( hDevice, &m_pDevice, TRUE );
-			BREAK_ON_FAIL( hr );
-		}
-		else {
-			BREAK_ON_FAIL( hr );
-		}
-
-		m_pHandle = hDevice;
-
-		m_pDeviceManager = pDeviceManager;
-		m_pDeviceManager->AddRef();
-	} while( FALSE );
-}
-
-ScopedLockDevice::~ScopedLockDevice()
-{
-	HRESULT hr = S_OK;
-
-	do {
-		if( m_pHandle != NULL && m_pDeviceManager != NULL ) {
-			hr = m_pDeviceManager->UnlockDevice( m_pHandle, FALSE );
-			BREAK_ON_FAIL( hr );
-
-			hr = m_pDeviceManager->CloseDeviceHandle( m_pHandle );
-			BREAK_ON_FAIL( hr );
-		}
-	} while( FALSE );
-
-	SafeRelease( m_pDeviceManager );
-}
-
-HRESULT ScopedLockDevice::GetDevice( IDirect3DDevice9** pDevice )
-{
-	if( pDevice == NULL )
-		return E_POINTER;
-
-	if( m_pDevice == NULL )
-		return E_FAIL;
-
-	*pDevice = m_pDevice;
-
-	return S_OK;
-}
-//*/
 
 } // namespace msw
 } // namespace cinder

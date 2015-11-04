@@ -80,9 +80,17 @@ namespace msw {
 #define BREAK_IF_TRUE(test, result)  if( (test) ) { hr = result; break; }
 #endif // !BREAK_IF_TRUE
 
+#ifndef BREAK_IF_TRUE_MSG
+#define BREAK_IF_TRUE_MSG(test, result, msg)  if( (test) ) { hr = result; CI_LOG_E(msg); break; }
+#endif // !BREAK_IF_TRUE_MSG
+
 #ifndef BREAK_IF_FALSE
 #define BREAK_IF_FALSE(test, result)  if( !(test) ) { hr = result; break; }
 #endif // !BREAK_IF_FALSE
+
+#ifndef BREAK_IF_FALSE_MSG
+#define BREAK_IF_FALSE_MSG(test, result, msg)  if( !(test) ) { hr = result; CI_LOG_E(msg); break; }
+#endif // !BREAK_IF_FALSE_MSG
 
 #undef COMPILE_ASSERT
 #define COMPILE_ASSERT(expr, msg)     static_assert(expr, #msg)

@@ -465,7 +465,7 @@ HRESULT PresenterDX11::PresentFrame( void )
 		hr = CheckShutdown();
 		BREAK_ON_FAIL( hr );
 
-		BREAK_ON_NULL( m_pSwapChain1, E_POINTER );
+		BREAK_ON_NULL_MSG( m_pSwapChain1, E_POINTER, "Swap chain no longer valid" );
 
 		RECT rcDest;
 		ZeroMemory( &rcDest, sizeof( rcDest ) );
@@ -475,7 +475,7 @@ HRESULT PresenterDX11::PresentFrame( void )
 		}
 
 		hr = m_pSwapChain1->Present( 0, 0 );
-		BREAK_ON_FAIL( hr );
+		BREAK_ON_FAIL_MSG( hr, "Failed to present frame" );
 
 		m_bCanProcessNextSample = TRUE;
 	} while( FALSE );

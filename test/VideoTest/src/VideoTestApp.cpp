@@ -7,6 +7,7 @@
 #include "cinder/app/RendererGl.h"
 #include "cinder/gl/gl.h"
 #include "cinder/Log.h"
+#include "cinder/Utilities.h"
 
 using namespace ci;
 using namespace ci::app;
@@ -22,7 +23,9 @@ public:
 	void draw() override;
 
 	void mouseDown( MouseEvent event ) override;
+	void mouseDrag( MouseEvent event ) override;
 	void keyDown( KeyEvent event ) override;
+
 	void fileDrop( FileDropEvent event ) override;
 
 	void resize() override;
@@ -49,7 +52,7 @@ void VideoTestApp::setup()
 	//VLDEnable();
 #endif
 
-	gl::enableVerticalSync( false );
+	gl::enableVerticalSync( true );
 	disableFrameRate();
 
 	mConnClose = getWindow()->getSignalClose().connect( [&]() { close(); } );
@@ -58,9 +61,13 @@ void VideoTestApp::setup()
 void VideoTestApp::update()
 {
 	if( !mVideos.empty() ) {
-		if( getWindowSize() != mVideos.front()->getSize() && mVideos.front()->getSize().x > 0 && mVideos.front()->getSize().y > 0 ) {
-			getWindow()->setSize( mVideos.front()->getSize() );
+		auto &video = mVideos.front();
+
+		if( getWindowSize() != video->getSize() && video->getSize().x > 0 && video->getSize().y > 0 ) {
+			getWindow()->setSize( video->getSize() );
 		}
+
+		getWindow()->setTitle( toString( video->getCurrentTime() ) );
 	}
 }
 
@@ -97,13 +104,24 @@ void VideoTestApp::mouseDown( MouseEvent event )
 	}
 }
 
+void VideoTestApp::mouseDrag( MouseEvent event )
+{
+	if( !mVideos.empty() )
+		mVideos.front()->seekToTime( mVideos.front()->getDuration() * event.getPos().x / float( getWindowWidth() ) );
+}
+
 void VideoTestApp::keyDown( KeyEvent event )
 {
+	if( mVideos.empty() )
+		return;
+
+	auto &video = mVideos.front();
+
 	switch( event.getCode() ) {
 		case KeyEvent::KEY_SPACE:
 			// Create snapshot.
-			if( !mVideos.empty() && mSnapshots.size() < 25 ) {
-				if( auto texture = mVideos.front()->getTexture() )
+			if( mSnapshots.size() < 25 ) {
+				if( auto texture = video->getTexture() )
 					mSnapshots.push_back( texture );
 			}
 			break;
@@ -112,6 +130,18 @@ void VideoTestApp::keyDown( KeyEvent event )
 			if( !mSnapshots.empty() ) {
 				mSnapshots.pop_back();
 			}
+			break;
+		case KeyEvent::KEY_p:
+			if( video->isPlaying() )
+				video->stop();
+			else
+				video->play();
+			break;
+		case KeyEvent::KEY_LEFTBRACKET:
+			video->seekToTime( 10.0f );
+			break;
+		case KeyEvent::KEY_RIGHTBRACKET:
+			video->seekToTime( 110.0f );
 			break;
 	}
 }

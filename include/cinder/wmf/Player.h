@@ -41,31 +41,52 @@ class __declspec( uuid( "5D1B744C-7145-431D-B62C-6BF08BB9E17C" ) ) Player : publ
 public:
 	typedef enum State {
 		Closed = 0,     // No session.
-		Ready,          // Session was created, ready to open a file. 
-		OpenPending,    // Session is opening a file.
+		Stopped,        // Session is stopped (ready to play).
 		Started,        // Session is playing a file.
 		Paused,         // Session is paused.
-		Stopped,        // Session is stopped (ready to play). 
+		Seeking,        // Session is seeking.
+		Ready,          // Session was created, ready to open a file.
+		Opening,        // Session is opening a file.
 		Closing         // Application has closed the session, but is waiting for MESessionClosed.
+	};
+
+	typedef enum Command {
+		CmdNone = 0,
+		CmdStop = State::Stopped,
+		CmdStart = State::Started,
+		CmdPause = State::Paused,
+		CmdSeek = State::Seeking
 	};
 
 public:
 	Player( DirectXVersion dxVersion = DX_11 );
 
+	//!
+	STDMETHODIMP CanSeek( BOOL *pbCanSeek ) const;
+	//!
+	STDMETHODIMP CanFastForward( BOOL *pbCanFF ) const;
+	//!
+	STDMETHODIMP CanRewind( BOOL *pbCanRewind ) const;
 	//! 
-	HRESULT OpenURL( const WCHAR *url, const WCHAR *audioDeviceId = 0 );
+	STDMETHODIMP OpenURL( const WCHAR *url, const WCHAR *audioDeviceId = 0 );
 	//!
-	HRESULT Close() { return CloseSession(); }
+	STDMETHODIMP Close() { return CloseSession(); }
 	//!
-	HRESULT Play();
+	STDMETHODIMP Start();
 	//!
-	HRESULT Pause();
+	STDMETHODIMP Pause();
+	//!
+	STDMETHODIMP Stop();
+	//! Stores the current position in 100-nano-second units in \a pPosition. Returns result code.
+	STDMETHODIMP GetPosition( MFTIME *pPosition );
 	//! Seeks to \a position, which is expressed in 100-nano-second units.
-	HRESULT SetPosition( MFTIME position );
+	STDMETHODIMP SetPosition( MFTIME position );
 	//!
-	HRESULT SetLoop( BOOL loop ) { mIsLooping = loop; return S_OK; }
+	STDMETHODIMP_( UINT64 ) GetDuration() const { return mDuration; }
+	//!
+	STDMETHODIMP SetLoop( BOOL loop ) { mIsLoop = loop; return S_OK; }
 	//! Returns the current state.
-	State   GetState() const { return mState; }
+	STDMETHODIMP_( State ) GetState() const { return mState; }
 
 	// IUnknown methods
 	STDMETHODIMP QueryInterface( REFIID iid, void** ppv );
@@ -82,56 +103,75 @@ private:
 	~Player();
 
 	//! Handle events received from Media Foundation. See: Invoke.
-	LRESULT HandleEvent( WPARAM wParam );
+	STDMETHODIMP_( LRESULT ) HandleEvent( WPARAM wParam );
 	//! Allow MFWndProc access to HandleEvent.
 	friend LRESULT CALLBACK MFWndProc( HWND, UINT, WPARAM, LPARAM );
 
-	HRESULT OnTopologyStatus( IMFMediaEvent *pEvent );
-	HRESULT OnPresentationEnded( IMFMediaEvent *pEvent );
-	HRESULT OnNewPresentation( IMFMediaEvent *pEvent );
-	HRESULT OnSessionEvent( IMFMediaEvent*, MediaEventType ) { return S_OK; }
+	STDMETHODIMP OnSessionStart( HRESULT hrStatus );
+	STDMETHODIMP OnSessionStop( HRESULT hrStatus );
+	STDMETHODIMP OnSessionPause( HRESULT hrStatus );
+	STDMETHODIMP OnSessionEnded( HRESULT hrStatus );
 
-	HRESULT CreateSession();
-	HRESULT CloseSession();
+	STDMETHODIMP OnTopologyStatus( IMFMediaEvent *pEvent );
+	STDMETHODIMP OnPresentationEnded( IMFMediaEvent *pEvent );
+	STDMETHODIMP OnNewPresentation( IMFMediaEvent *pEvent );
+	STDMETHODIMP OnSessionEvent( IMFMediaEvent*, MediaEventType ) { return S_OK; }
 
-	HRESULT Repaint();
-	HRESULT ResizeVideo( WORD width, WORD height );
+	STDMETHODIMP UpdatePendingCommands( Command cmd );
 
-	HRESULT CreatePartialTopology( IMFPresentationDescriptor *pDescriptor );
-	HRESULT SetMediaInfo( IMFPresentationDescriptor *pDescriptor );
+	STDMETHODIMP CreateSession();
+	STDMETHODIMP CloseSession();
+
+	STDMETHODIMP Repaint();
+	STDMETHODIMP ResizeVideo( WORD width, WORD height );
+
+	STDMETHODIMP CreatePartialTopology( IMFPresentationDescriptor *pDescriptor );
+	STDMETHODIMP SetMediaInfo( IMFPresentationDescriptor *pDescriptor );
+
+	STDMETHODIMP SetPositionInternal( MFTIME position );
 
 	//! Creates a (hidden) window used by Media Foundation.
-	void CreateWnd();
+	STDMETHODIMP_( void ) CreateWnd();
 	//! Destroys the (hidden) window.
-	void DestroyWnd();
+	STDMETHODIMP_( void ) DestroyWnd();
 
 	static void RegisterWindowClass();
 
-	HRESULT CreateMediaSource( LPCWSTR pUrl, IMFMediaSource **ppSource ) const;
-	HRESULT CreatePlaybackTopology( IMFMediaSource *pSource, IMFPresentationDescriptor *pPD, HWND hVideoWnd, IMFTopology **ppTopology ) const;
-	HRESULT CreateMediaSinkActivate( IMFStreamDescriptor *pSourceSD, HWND hVideoWindow, IMFActivate **ppActivate ) const;
-	HRESULT AddSourceNode( IMFTopology *pTopology, IMFMediaSource *pSource, IMFPresentationDescriptor *pPD, IMFStreamDescriptor *pSD, IMFTopologyNode **ppNode ) const;
-	HRESULT AddOutputNode( IMFTopology *pTopology, IMFStreamSink *pStreamSink, IMFTopologyNode **ppNode ) const;
-	HRESULT AddOutputNode( IMFTopology *pTopology, IMFActivate *pActivate, DWORD dwId, IMFTopologyNode **ppNode ) const;
-	HRESULT AddBranchToPartialTopology( IMFTopology *pTopology, IMFMediaSource *pSource, IMFPresentationDescriptor *pPD, DWORD iStream, HWND hVideoWnd ) const;
+	STDMETHODIMP CreateMediaSource( LPCWSTR pUrl, IMFMediaSource **ppSource ) const;
+	STDMETHODIMP CreatePlaybackTopology( IMFMediaSource *pSource, IMFPresentationDescriptor *pPD, HWND hVideoWnd, IMFTopology **ppTopology ) const;
+	STDMETHODIMP CreateMediaSinkActivate( IMFStreamDescriptor *pSourceSD, HWND hVideoWindow, IMFActivate **ppActivate ) const;
+	STDMETHODIMP AddSourceNode( IMFTopology *pTopology, IMFMediaSource *pSource, IMFPresentationDescriptor *pPD, IMFStreamDescriptor *pSD, IMFTopologyNode **ppNode ) const;
+	STDMETHODIMP AddOutputNode( IMFTopology *pTopology, IMFStreamSink *pStreamSink, IMFTopologyNode **ppNode ) const;
+	STDMETHODIMP AddOutputNode( IMFTopology *pTopology, IMFActivate *pActivate, DWORD dwId, IMFTopologyNode **ppNode ) const;
+	STDMETHODIMP AddBranchToPartialTopology( IMFTopology *pTopology, IMFMediaSource *pSource, IMFPresentationDescriptor *pPD, DWORD iStream, HWND hVideoWnd ) const;
 
 private:
-	//! Makes sure Media Foundation is initialized. 
-	ScopedMFInitializer  mInitializer;
+	//! Makes sure Media Foundation is initialized.
+	ScopedMFInitializer   mInitializer;
 
-	State   mState;
+	msw::CriticalSection  mCritSec;
 
-	ULONG   mRefCount;
-	HWND    mWnd;
+	State    mState;
+	Command  mCommand;
 
-	BOOL    mPlayWhenReady;
-	BOOL    mIsLooping;
-	UINT32  mWidth, mHeight;
+	ULONG    mRefCount;
+	HWND     mWnd;
 
-	HANDLE  mCloseEvent;
+	BOOL     mIsLoop;
+	BOOL     mIsPending;
+	BOOL     mCanScrub;
+
+	UINT32   mWidth, mHeight;
+	MFTIME   mDuration, mSeekTo;
+	DWORD    mCapabilities;
+
+	HANDLE   mCloseEvent;
 
 	IMFMediaSession         *mSessionPtr;
 	IMFMediaSource          *mSourcePtr;
+	IMFPresentationClock    *mClockPtr;
+	IMFRateControl          *mRateControlPtr;
+	IMFRateSupport          *mRateSupportPtr;
 
 	//! Allows control over the created window.
 	ci::app::Window::Format  mWindowFormat;
