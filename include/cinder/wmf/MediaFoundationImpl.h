@@ -26,11 +26,10 @@ POSSIBILITY OF SUCH DAMAGE.
 
 #pragma once
 
-#include "cinder/wmf/MediaFoundation.h"
-#if ( _WIN32_WINNT >= _WIN32_WINNT_VISTA ) // Requires Windows Vista
-
 #include "cinder/Area.h"
 #include "cinder/Vector.h"
+
+#include "cinder/wmf/MediaFoundation.h"
 
 namespace cinder {
 namespace wmf {
@@ -122,5 +121,3 @@ protected:
 };
 
 } } // namespace ci::wmf
-
-#endif // ( _WIN32_WINNT >= _WIN32_WINNT_VISTA )

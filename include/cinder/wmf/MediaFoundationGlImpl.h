@@ -27,14 +27,13 @@ POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
 #include "cinder/wmf/MediaFoundationImpl.h"
-#if ( _WIN32_WINNT >= _WIN32_WINNT_VISTA ) // Requires Windows Vista
-
-#include "cinder/wmf/Player.h"
 #include "cinder/wmf/MediaSink.h"
+#include "cinder/wmf/Player.h"
 #include "cinder/wmf/Presenter.h"
 
 #include "cinder/Signals.h"
 #include "cinder/gl/gl.h"
+
 #include "glload/wgl_all.h"
 
 namespace cinder {
@@ -91,47 +90,8 @@ protected:
 
 protected:
 	struct Obj : public MovieBase::Obj {
-		Obj()
-			: mPlayerPtr( NULL )
-			, mDeviceHandle( NULL )
-		{
-			DirectXVersion dxVersion = DX_11;
-
-			// Check availability of interop extensions.
-			if( !wglext_NV_DX_interop2 ) {
-				CI_LOG_V( "NV_DX_interop2 extension not available, trying DX9..." );
-				dxVersion = DX_9;
-			}
-
-			if( !wglext_NV_DX_interop ) {
-				throw std::exception( "NV_DX_interop extension not available!" );
-			}
-
-			// Create player.
-			mPlayerPtr = new Player( dxVersion ); // Created with ref count = 1.
-			if( NULL == mPlayerPtr )
-				throw std::exception( "Out of memory" );
-
-			// Note: interop device handle will be created when
-			//       we receive the first video frame.
-		}
-		~Obj()
-		{
-			CI_LOG_I( "Destroying MovieGl::Obj" );
-
-			// Close interop device.
-			if( mDeviceHandle ) {
-				BOOL closed = ::wglDXCloseDeviceNV( mDeviceHandle );
-				mDeviceHandle = NULL;
-			}
-
-			// Close player.
-			if( mPlayerPtr )
-				mPlayerPtr->Close();
-
-			// Release player.
-			msw::SafeRelease( mPlayerPtr );
-		}
+		Obj();
+		~Obj();
 
 		// Instance of the Media Foundation player backend.
 		Player*                      mPlayerPtr;
@@ -158,5 +118,3 @@ public:
 
 }
 } // namespace ci::wmf
-
-#endif // ( _WIN32_WINNT >= _WIN32_WINNT_VISTA )

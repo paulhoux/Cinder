@@ -3,7 +3,6 @@
 #pragma once
 
 #include "cinder/wmf/MediaFoundation.h"
-#if ( _WIN32_WINNT >= _WIN32_WINNT_VISTA ) // Requires Windows Vista
 
 #include <minwindef.h>
 #include <winerror.h>
@@ -71,8 +70,6 @@ typedef struct {
 
 } // namespace wmf
 } // namespace cinder
-
-#endif // ( _WIN32_WINNT >= _WIN32_WINNT_VISTA )
 
 
 

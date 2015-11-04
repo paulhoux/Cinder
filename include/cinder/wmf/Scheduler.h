@@ -1,8 +1,6 @@
 #pragma once
 
 #include "cinder/wmf/MediaFoundation.h"
-#if ( _WIN32_WINNT >= _WIN32_WINNT_VISTA ) // Requires Windows Vista
-
 #include "cinder/wmf/StaticAsyncCallback.h"
 #include "cinder/msw/ThreadSafeDeque.h"
 
@@ -78,5 +76,3 @@ private:
 
 } // namespace wmf
 } // namespace cinder
-
-#endif

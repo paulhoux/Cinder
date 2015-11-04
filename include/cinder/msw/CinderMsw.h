@@ -116,39 +116,6 @@ inline vec2 toVec2( const ::POINTFX &p )
 }
 #endif
 
-//!
-inline BOOL GetInterfaceName( __RPC__in const UUID& interface_id, __RPC__out std::wstring& wstrInterfaceNameReceiver )
-{
-	std::wstring wszSubKeyName;
-	LPOLESTR  pwszInterfaceIDString = NULL;
-
-	StringFromIID( interface_id, &pwszInterfaceIDString );
-
-	wszSubKeyName = L"Interface\\";
-	wszSubKeyName += (WCHAR*)pwszInterfaceIDString;
-
-	CoTaskMemFree( (LPVOID)pwszInterfaceIDString );
-	pwszInterfaceIDString = NULL;
-
-	DWORD   dwType = 0;
-	DWORD   dwDataSize = 0;
-
-	wstrInterfaceNameReceiver.resize( 256, 0 );
-	dwDataSize = wstrInterfaceNameReceiver.size() * sizeof( WCHAR );
-	LONG lRet = SHRegGetValue
-		(
-			HKEY_CLASSES_ROOT,
-			(wchar_t*)( wszSubKeyName.c_str() ),
-			NULL,  // This would obtain the default value.
-			RRF_RT_REG_SZ,
-			&dwType,
-			(PVOID)&( wstrInterfaceNameReceiver[0] ),
-			&dwDataSize
-			);
-
-	return ( lRet == 0 );
-}
-
 //! Closes a handle if not NULL, and sets the handle to NULL.
 inline void SafeCloseHandle( HANDLE& h )
 {

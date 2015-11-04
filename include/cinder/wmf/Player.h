@@ -26,11 +26,10 @@ POSSIBILITY OF SUCH DAMAGE.
 
 #pragma once
 
-#include "cinder/wmf/MediaFoundation.h"
-#if ( _WIN32_WINNT >= _WIN32_WINNT_VISTA ) // Requires Windows Vista
-
 #include "cinder/Exception.h"
+
 #include "cinder/app/Window.h" // ci::app::Window::Format
+#include "cinder/wmf/MediaFoundation.h"
 
 #define MF_USE_DXVA2_DECODER 0
 
@@ -181,5 +180,3 @@ private:
 
 }
 } // namespace ci::wmf
-
-#endif // ( _WIN32_WINNT >= _WIN32_WINNT_VISTA )

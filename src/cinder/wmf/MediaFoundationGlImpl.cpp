@@ -24,10 +24,11 @@ NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVE
 POSSIBILITY OF SUCH DAMAGE.
 */
 
-#include "cinder/wmf/MediaFoundationGlImpl.h"
+#include "cinder/Cinder.h"
 #if ( _WIN32_WINNT >= _WIN32_WINNT_VISTA ) // Requires Windows Vista
 
 #include "cinder/app/App.h"
+#include "cinder/wmf/MediaFoundationGlImpl.h"
 
 using namespace cinder::msw;
 
@@ -325,6 +326,49 @@ void MovieGl::close()
 		CI_LOG_W( "All references to video textures should be released before the GL context is destroyed." );
 
 	mObj.reset();
+}
+
+MovieGl::Obj::Obj()
+	: mPlayerPtr( NULL )
+	, mDeviceHandle( NULL )
+{
+	DirectXVersion dxVersion = DX_11;
+
+	// Check availability of interop extensions.
+	if( !wglext_NV_DX_interop2 ) {
+		CI_LOG_V( "NV_DX_interop2 extension not available, trying DX9..." );
+		dxVersion = DX_9;
+	}
+
+	if( !wglext_NV_DX_interop ) {
+		throw std::exception( "NV_DX_interop extension not available!" );
+	}
+
+	// Create player.
+	mPlayerPtr = new Player( dxVersion ); // Created with ref count = 1.
+	if( NULL == mPlayerPtr )
+		throw std::exception( "Out of memory" );
+
+	// Note: interop device handle will be created when
+	//       we receive the first video frame.
+}
+
+MovieGl::Obj::~Obj()
+{
+	CI_LOG_I( "Destroying MovieGl::Obj" );
+
+	// Close interop device.
+	if( mDeviceHandle ) {
+		BOOL closed = ::wglDXCloseDeviceNV( mDeviceHandle );
+		mDeviceHandle = NULL;
+	}
+
+	// Close player.
+	if( mPlayerPtr )
+		mPlayerPtr->Close();
+
+	// Release player.
+	msw::SafeRelease( mPlayerPtr );
 }
 
 }

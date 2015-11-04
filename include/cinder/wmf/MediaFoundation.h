@@ -26,18 +26,15 @@ POSSIBILITY OF SUCH DAMAGE.
 
 #pragma once
 
-#include "cinder/Cinder.h"
-#if ( _WIN32_WINNT >= _WIN32_WINNT_VISTA ) // Requires Windows Vista
-
 #include "cinder/msw/CinderMsw.h"
 #include "cinder/msw/ScopedPtr.h"
 
+#include <d3dcommon.h>
+#include <d3d9.h> // Required for dxva2api.h
 #include <mfapi.h>
 #include <mferror.h>
 #include <mfidl.h>
 #include <mfobjects.h>
-#include <d3dcommon.h>
-#include <d3d9.h> // Required for dxva2api.h
 #include <dxva2api.h>
 #include <evr.h>
 
@@ -297,5 +294,3 @@ inline HRESULT ConvertToDXVAType( IMFMediaType* pMediaType, DXVA2_VideoDesc* pDe
 //------------------------------------------------------------------------------------
 
 } } // namespace ci::wmf
-
-#endif // ( _WIN32_WINNT >= _WIN32_WINNT_VISTA )

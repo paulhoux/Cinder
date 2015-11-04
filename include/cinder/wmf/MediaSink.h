@@ -1,8 +1,6 @@
 #pragma once
 
 #include "cinder/wmf/MediaFoundation.h"
-#if ( _WIN32_WINNT >= _WIN32_WINNT_VISTA ) // Requires Windows Vista
-
 #include "cinder/wmf/Presenter.h"
 #include "cinder/wmf/Scheduler.h"
 #include "cinder/wmf/StreamSink.h"
@@ -79,5 +77,3 @@ private:
 
 } // namespace wmf
 } // namespace cinder
-
-#endif // ( _WIN32_WINNT >= _WIN32_WINNT_VISTA )
