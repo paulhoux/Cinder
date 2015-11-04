@@ -4,7 +4,7 @@
 #if ( _WIN32_WINNT >= _WIN32_WINNT_VISTA ) // Requires Windows Vista
 
 #include "cinder/wmf/StaticAsyncCallback.h"
-#include "cinder/msw/ThreadSafeQueue.h"
+#include "cinder/msw/ThreadSafeDeque.h"
 
 namespace cinder {
 namespace wmf {
@@ -66,7 +66,7 @@ private:
 
 	msw::CriticalSection&       m_critSec;          // critical section for thread safety
 	SchedulerCallback*          m_pCB;              // Weak reference; do not delete.
-	msw::ThreadSafeQueue<IMFSample>  m_ScheduledSamples; // Samples waiting to be presented.
+	msw::ThreadSafeDeque<IMFSample>  m_ScheduledSamples; // Samples waiting to be presented.
 	IMFClock*                   m_pClock;           // Presentation clock. Can be NULL.
 	float                       m_fRate;            // Playback rate.
 	HANDLE                      m_hWaitTimer;       // Wait Timer after which frame is presented.

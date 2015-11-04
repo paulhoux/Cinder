@@ -1745,14 +1745,11 @@
     <ClInclude Include="..\include\cinder\msw\LinkList.h">
       <Filter>Header Files\msw</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\cinder\msw\Queue.h">
-      <Filter>Header Files\msw</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\cinder\msw\ThreadSafeQueue.h">
-      <Filter>Header Files\msw</Filter>
-    </ClInclude>
     <ClInclude Include="..\include\cinder\wmf\Player.h">
       <Filter>Header Files\wmf</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\cinder\msw\ThreadSafeDeque.h">
+      <Filter>Header Files\msw</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

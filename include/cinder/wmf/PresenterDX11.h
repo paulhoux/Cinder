@@ -4,7 +4,7 @@
 #if ( _WIN32_WINNT >= _WIN32_WINNT_VISTA ) // Requires Windows Vista
 
 #include "cinder/wmf/Presenter.h"
-#include "cinder/msw/Queue.h"
+#include "cinder/msw/ThreadSafeDeque.h"
 
 #include <d3d11.h>
 #include <dxgi1_2.h>
@@ -122,8 +122,8 @@ private:
 	ID3D11VideoProcessorEnumerator* m_pVideoProcessorEnum;
 	ID3D11VideoProcessor*           m_pVideoProcessor;
 
-	msw::Queue<ID3D11Texture2D>*    m_pPool;
-	msw::Queue<ID3D11Texture2D>*    m_pReady;
+	msw::ThreadSafeDeque<ID3D11Texture2D>*    m_pPool;
+	msw::ThreadSafeDeque<ID3D11Texture2D>*    m_pReady;
 
 #if (WINVER >= _WIN32_WINNT_WIN8)
 	IDCompositionDevice*            m_pDCompDevice;

@@ -4,7 +4,7 @@
 #if ( _WIN32_WINNT >= _WIN32_WINNT_VISTA ) // Requires Windows Vista
 
 #include "cinder/wmf/Presenter.h"
-#include "cinder/msw/Queue.h"
+#include "cinder/msw/ThreadSafeDeque.h"
 
 DEFINE_GUID( CLSID_VideoProcessorMFT, 0x88753b26, 0x5b24, 0x49bd, 0xb2, 0xe7, 0xc, 0x44, 0x5c, 0x78, 0xc9, 0x82 );
 
@@ -77,8 +77,8 @@ private:
 
 	IDirect3DSwapChain9*            m_pSwapChain;
 
-	msw::Queue<IDirect3DSurface9>*  m_pPool;
-	msw::Queue<IDirect3DSurface9>*  m_pReady;
+	msw::ThreadSafeDeque<IDirect3DSurface9>*  m_pPool;
+	msw::ThreadSafeDeque<IDirect3DSurface9>*  m_pReady;
 
 	// Dynamically link to DirectX.
 	HMODULE                         m_D3D9Module;

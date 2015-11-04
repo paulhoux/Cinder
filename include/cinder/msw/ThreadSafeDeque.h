@@ -7,19 +7,18 @@ namespace msw {
 
 //! 
 template<typename T, typename = typename std::enable_if< std::is_base_of< IUnknown, T >::value >::type >
-class Queue : public ComObject {
+class ThreadSafeDeque : public ComObject {
 public:
-	Queue()
+	ThreadSafeDeque()
 	{
 	}
 
-	virtual ~Queue()
+	virtual ~ThreadSafeDeque()
 	{
 		// List will clear itself.
 	}
 
-	// Queue
-
+	//! Remove and release all items in the queue.
 	STDMETHODIMP Clear()
 	{
 		ScopedCriticalSection lock( m_critSec );
@@ -29,12 +28,19 @@ public:
 		return S_OK;
 	}
 
+	//! Returns the number of items in the queue.
 	STDMETHODIMP_( DWORD ) GetCount()
 	{
 		return m_queue.GetCount();
 	}
 
-	//! 
+	//! Returns \c TRUE if the queue is empty.
+	STDMETHODIMP_( BOOL ) IsEmpty()
+	{
+		return m_queue.IsEmpty();
+	}
+
+	//! Atomically swaps the item that is currently at the back (if any) with the item pointed to by \a ppItem.
 	STDMETHODIMP SwapBack( T** ppItem )
 	{
 		HRESULT hr = S_OK;
@@ -63,7 +69,7 @@ public:
 		return hr;
 	}
 
-	//! Caller is responsible for releasing the item.
+	//! Removes the item that is currently at the back (if any) and stores it in \a ppItem. Caller is responsible for releasing the item.
 	STDMETHODIMP RemoveBack( T** ppItem )
 	{
 		HRESULT hr = S_OK;
@@ -81,7 +87,7 @@ public:
 		return hr;
 	}
 
-	//! 
+	//! Inserts \a pItem at the back of the queue. Calls AddRef internally.
 	STDMETHODIMP InsertBack( T* pItem )
 	{
 		HRESULT hr = S_OK;
@@ -100,7 +106,7 @@ public:
 		return hr;
 	}
 
-	//! 
+	//! Atomically swaps the item that is currently at the front (if any) with the item pointed to by \a ppItem.
 	STDMETHODIMP SwapFront( T** ppItem )
 	{
 		HRESULT hr = S_OK;
@@ -129,7 +135,7 @@ public:
 		return hr;
 	}
 
-	//! 
+	//! Removes the item that is currently at the front (if any) and stores it in \a ppItem. Caller is responsible for releasing the item.
 	STDMETHODIMP RemoveFront( T** ppItem )
 	{
 		HRESULT hr = S_OK;
@@ -147,7 +153,7 @@ public:
 		return hr;
 	}
 
-	//! 
+	//! Inserts \a pItem at the front of the queue. Calls AddRef internally.
 	STDMETHODIMP InsertFront( T* pItem )
 	{
 		HRESULT hr = S_OK;
@@ -167,8 +173,7 @@ public:
 	}
 
 private:
-	CriticalSection  m_critSec;                  // critical section for thread safety
-
+	CriticalSection  m_critSec;  // critical section for thread safety
 	ComPtrListEx<T>  m_queue;
 };
 

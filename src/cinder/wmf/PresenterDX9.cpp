@@ -722,8 +722,8 @@ HRESULT PresenterDX9::CreateDXVA2ManagerAndDevice( D3D_DRIVER_TYPE DriverType )
 		BREAK_ON_FAIL( hr );
 
 		// Create shared surface queue.
-		m_pPool = new Queue<IDirect3DSurface9>(); // Created with ref count = 1.
-		m_pReady = new Queue<IDirect3DSurface9>(); // Created with ref count = 1.
+		m_pPool = new ThreadSafeDeque<IDirect3DSurface9>(); // Created with ref count = 1.
+		m_pReady = new ThreadSafeDeque<IDirect3DSurface9>(); // Created with ref count = 1.
 
 #if MF_USE_DXVA2_DECODER
 		// Create the video decoder service.

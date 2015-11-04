@@ -149,7 +149,7 @@ HRESULT Scheduler::ScheduleSample( IMFSample* pSample, BOOL bPresentNow )
 	}
 	else {
 		// Queue the sample and ask the scheduler thread to wake up.
-		hr = m_ScheduledSamples.Queue( pSample );
+		hr = m_ScheduledSamples.InsertBack( pSample );
 
 		if( SUCCEEDED( hr ) ) {
 			// process the frame asynchronously
@@ -178,7 +178,7 @@ HRESULT Scheduler::ProcessSamplesInQueue( LONG* plNextSleep )
 
 	// Note: Dequeue returns S_FALSE when the queue is empty.
 
-	while( m_ScheduledSamples.Dequeue( &pSample ) == S_OK ) {
+	while( m_ScheduledSamples.RemoveFront( &pSample ) == S_OK ) {
 		// Process the next sample in the queue. If the sample is not ready
 		// for presentation. the value returned in lWait is > 0, which
 		// means the scheduler should sleep for that amount of time.
@@ -266,7 +266,7 @@ HRESULT Scheduler::ProcessSample( IMFSample* pSample, LONG* plNextSleep )
 	}
 	else {
 		// The sample is not ready yet. Return it to the queue.
-		hr = m_ScheduledSamples.PutBack( pSample );
+		hr = m_ScheduledSamples.InsertFront( pSample );
 	}
 
 	*plNextSleep = lNextSleep;

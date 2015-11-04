@@ -8,7 +8,7 @@
 #include "cinder/wmf/Marker.h"
 #include "cinder/wmf/Presenter.h"
 #include "cinder/wmf/Scheduler.h"
-#include "cinder/msw/ThreadSafeQueue.h"
+#include "cinder/msw/ThreadSafeDeque.h"
 
 namespace cinder {
 namespace wmf {
@@ -159,7 +159,7 @@ private:
 	IMFMediaType*                m_pCurrentType;
 	BOOL                         m_fPrerolling;
 	BOOL                         m_fWaitingForOnClockStart;
-	msw::ThreadSafeQueue<IUnknown>    m_SamplesToProcess;        // Queue to hold samples and markers. Applies to: ProcessSample, PlaceMarker
+	msw::ThreadSafeDeque<IUnknown>    m_SamplesToProcess;        // Queue to hold samples and markers. Applies to: ProcessSample, PlaceMarker
 	UINT32                       m_unInterlaceMode;
 	struct sFraction {
 		DWORD Numerator;

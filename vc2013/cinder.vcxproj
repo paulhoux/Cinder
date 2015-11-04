@@ -776,10 +776,9 @@
     <ClInclude Include="..\include\cinder\Matrix44.h" />
     <ClInclude Include="..\include\cinder\msw\CinderWindowsFwd.h" />
     <ClInclude Include="..\include\cinder\msw\LinkList.h" />
-    <ClInclude Include="..\include\cinder\msw\Queue.h" />
+    <ClInclude Include="..\include\cinder\msw\ThreadSafeDeque.h" />
     <ClInclude Include="..\include\cinder\msw\ScopedPtr.h" />
     <ClInclude Include="..\include\cinder\msw\StackWalker.h" />
-    <ClInclude Include="..\include\cinder\msw\ThreadSafeQueue.h" />
     <ClInclude Include="..\include\cinder\Plane.h" />
     <ClInclude Include="..\include\cinder\Function.h" />
     <ClInclude Include="..\include\cinder\qtime\MovieWriter.h" />

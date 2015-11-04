@@ -938,8 +938,8 @@ HRESULT PresenterDX11::CreateDXGIManagerAndDevice()
 
 		SafeRelease( m_pPool );
 		SafeRelease( m_pReady );
-		m_pPool = new Queue<ID3D11Texture2D>(); // Created with ref count = 1.
-		m_pReady = new Queue<ID3D11Texture2D>(); // Created with ref count = 1.
+		m_pPool = new ThreadSafeDeque<ID3D11Texture2D>(); // Created with ref count = 1.
+		m_pReady = new ThreadSafeDeque<ID3D11Texture2D>(); // Created with ref count = 1.
 	} while( FALSE );
 
 	return hr;

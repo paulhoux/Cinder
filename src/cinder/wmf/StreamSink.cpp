@@ -297,7 +297,7 @@ HRESULT StreamSink::PlaceMarker( MFSTREAMSINK_MARKER_TYPE eMarkerType, __RPC__in
 	}
 
 	if( SUCCEEDED( hr ) ) {
-		hr = m_SamplesToProcess.Queue( pMarker );
+		hr = m_SamplesToProcess.InsertBack( pMarker );
 	}
 
 	// Unless we are paused, start an async operation to dispatch the next sample/marker.
@@ -351,7 +351,7 @@ HRESULT StreamSink::ProcessSample( __RPC__in_opt IMFSample* pSample )
 		}
 
 		// Add the sample to the sample queue.
-		hr = m_SamplesToProcess.Queue( pSample );
+		hr = m_SamplesToProcess.InsertBack( pSample );
 		if( FAILED( hr ) ) {
 			break;
 		}
@@ -1164,7 +1164,7 @@ HRESULT StreamSink::ProcessSamplesFromQueue( ConsumeState bConsumeData )
 	// Enumerate all of the samples/markers in the queue.
 
 	// Note: Dequeue returns S_FALSE when the queue is empty.
-	while( m_SamplesToProcess.Dequeue( &pUnk ) == S_OK ) {
+	while( m_SamplesToProcess.RemoveFront( &pUnk ) == S_OK ) {
 		bProcessMoreSamples = TRUE;
 		IMarker* pMarker = NULL;
 		IMFSample* pSample = NULL;
@@ -1195,7 +1195,7 @@ HRESULT StreamSink::ProcessSamplesFromQueue( ConsumeState bConsumeData )
 
 						if( bProcessAgain ) {
 							// The input sample is not used. Return it to the queue.
-							hr = m_SamplesToProcess.PutBack( pSample );
+							hr = m_SamplesToProcess.InsertFront( pSample );
 						}
 					}
 
