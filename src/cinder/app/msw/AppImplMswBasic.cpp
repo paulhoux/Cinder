@@ -71,16 +71,8 @@ void AppImplMswBasic::run()
 
 	// inner loop
 	while( ! mShouldQuit ) {
-		// all of our Windows will have marked this as true if the user has unplugged, plugged or modified a Monitor
-		if( mNeedsToRefreshDisplays ) {
-			mNeedsToRefreshDisplays = false;
-			PlatformMsw::get()->refreshDisplays();
-		}
-
-		// update and draw
-		mApp->privateUpdate__();
-		for( auto &window : mWindows )
-			window->redraw();
+		// refresh, update, draw
+		idle();
 
 		// get current time in seconds
 		double currentSeconds = mApp->getElapsedSeconds();
@@ -115,6 +107,20 @@ void AppImplMswBasic::run()
 	delete mApp;
 }
 
+void AppImplMswBasic::idle()
+{
+	// all of our Windows will have marked this as true if the user has unplugged, plugged or modified a Monitor
+	if( mNeedsToRefreshDisplays ) {
+		mNeedsToRefreshDisplays = false;
+		PlatformMsw::get()->refreshDisplays();
+	}
+
+	// update and draw
+	mApp->privateUpdate__();
+	for( auto &window : mWindows )
+		window->redraw();
+}
+
 void AppImplMswBasic::sleep( double seconds )
 {
 	// create waitable timer
@@ -144,6 +150,18 @@ void AppImplMswBasic::sleep( double seconds )
 		}
 		else return; // time has elapsed
 	}
+}
+
+void AppImplMswBasic::enterModal( HWND hWnd )
+{
+	// Hard-coded custom event ID = 0x8000
+	::SetTimer( hWnd, 0x8000, USER_TIMER_MINIMUM, NULL );
+}
+
+void AppImplMswBasic::exitModal( HWND hWnd )
+{
+	// Hard-coded custom event ID = 0x8000
+	::KillTimer( hWnd, 0x8000 );
 }
 
 RendererRef AppImplMswBasic::findSharedRenderer( const RendererRef &searchRenderer )

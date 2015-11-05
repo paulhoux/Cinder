@@ -58,7 +58,11 @@ class AppImplMswBasic : public AppImplMsw {
 	void		destroyBlankingWindows();
 
   private:
+	void		idle() override;
 	void		sleep( double seconds );
+
+	void		enterModal( HWND hWnd ) override;
+	void		exitModal( HWND hWnd ) override;
 
 	WindowRef		createWindow( Window::Format format );
 	RendererRef		findSharedRenderer( const RendererRef &searchRenderer );

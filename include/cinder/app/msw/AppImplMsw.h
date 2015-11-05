@@ -86,6 +86,10 @@ class AppImplMsw {
 	virtual void			closeWindow( class WindowImplMsw *windowImpl ) = 0;
 	virtual void			setForegroundWindow( WindowRef window ) = 0;
 
+	virtual void			idle() {}
+	virtual void			enterModal( HWND hWnd ) {}
+	virtual void			exitModal( HWND hWnd ) {}
+
 	class AppBase			*mApp;
 	float					mFrameRate;
 	WindowRef				mActiveWindow;

@@ -972,6 +972,18 @@ LRESULT CALLBACK WndProc(	HWND	mWnd,			// Handle For This Window
 		case WM_DEVICECHANGE:
 			impl->mAppImpl->mNeedsToRefreshDisplays = true;
 		break;
+		case WM_ENTERSIZEMOVE:
+			CI_LOG_W( "Window is being resized/dragged!" );
+			impl->mAppImpl->enterModal( mWnd );
+			break;
+		case WM_EXITSIZEMOVE:
+			CI_LOG_I( "Window no longer is being resized/dragged." );
+			impl->mAppImpl->exitModal( mWnd );
+			break;
+		case WM_TIMER:
+			impl->mAppImpl->idle();
+			impl->draw();
+			break;
 	}
 
 	// unhandled messages To DefWindowProc
