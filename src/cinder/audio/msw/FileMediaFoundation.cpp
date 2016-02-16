@@ -573,4 +573,4 @@ void MediaFoundationInitializer::shutdownMediaFoundation()
 
 } } } // namespace cinder::audio::msw
 
-#endif // ( _WIN32_WINNT >= 0x0600 )
+#endif // ( _WIN32_WINNT >= _WIN32_WINNT_VISTA )
