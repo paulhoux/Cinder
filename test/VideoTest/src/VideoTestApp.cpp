@@ -71,6 +71,7 @@ private:
 	std::vector<signals::Connection> mConnections;
 
 	bool mLoop = true;
+	bool mEnableTest = false;
 };
 
 void VideoTestApp::prepare( Settings *settings )
@@ -120,9 +121,6 @@ void VideoTestApp::cleanup()
 
 void VideoTestApp::update()
 {
-	// Perform test events.
-	//test();
-
 	// Update user interface.
 	if( !mVideos.empty() ) {
 		auto &video = mVideos[mVideoSelected];
@@ -162,6 +160,10 @@ void VideoTestApp::update()
 
 void VideoTestApp::draw()
 {
+	// Perform test events.
+	if( mEnableTest )
+		test();
+
 	gl::clear();
 	gl::color( 1, 1, 1 );
 
@@ -300,6 +302,9 @@ void VideoTestApp::keyDown( KeyEvent event )
 		case KeyEvent::KEY_v:
 			gl::enableVerticalSync( !gl::isVerticalSyncEnabled() );
 			return;
+		case KeyEvent::KEY_t:
+			mEnableTest = !mEnableTest;
+			break;
 	}
 
 	if( mVideos.empty() )
@@ -473,7 +478,7 @@ void VideoTestApp::test()
 
 		// Create a list of available movies.
 		std::vector<fs::path> videos;
-		fs::path path = getAssetPath("");
+		fs::path path = getAssetPath( "" );
 		fs::directory_iterator end_itr; // default construction yields past-the-end
 		for( fs::directory_iterator itr( path ); itr != end_itr; ++itr ) {
 			if( fs::is_regular_file( *itr ) ) {
