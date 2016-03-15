@@ -334,6 +334,12 @@ void MovieGl::updateFrame()
 	} while( FALSE );
 
 	if( FAILED( hr ) ) {
+		// Close interop device. We'll open it again on the next successful frame.
+		if( mObj->mDeviceHandle ) {
+			BOOL closed = ::wglDXCloseDeviceNV( mObj->mDeviceHandle );
+			mObj->mDeviceHandle = NULL;
+		}
+
 		// Delete any generated texture ID.
 		if( textureID != 0 )
 			::glDeleteTextures( 1, &textureID );
