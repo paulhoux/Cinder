@@ -291,7 +291,7 @@ class __declspec( uuid( "5D1B744C-7145-431D-B62C-6BF08BB9E17C" ) ) Player : publ
 	IMFPresentationClock* m_pClock;
 	IMFRateControl*       m_pRateControl;
 	IMFRateSupport*       m_pRateSupport;
-	IMFAudioStreamVolume* m_pVolume;
+	IMFSimpleAudioVolume* m_pVolume;
 
 	IMFVideoDisplayControl* m_pVideoDisplayControl;
 

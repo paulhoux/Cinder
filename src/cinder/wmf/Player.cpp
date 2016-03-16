@@ -489,31 +489,20 @@ FLOAT Player::GetVolume() const
 {
 	HRESULT hr = S_OK;
 
-	float averageVolume = 0.0f;
+	float volume = 0.0f;
 
 	do {
 		BREAK_ON_NULL_MSG( m_pSession, E_POINTER, "Session not available." );
 
 		if( NULL == m_pVolume ) {
-			hr = ::MFGetService( m_pSession, MR_STREAM_VOLUME_SERVICE, __uuidof( IMFAudioStreamVolume ), (void**)&m_pVolume );
+			hr = ::MFGetService( m_pSession, MR_POLICY_VOLUME_SERVICE, __uuidof( IMFSimpleAudioVolume ), (void**)&m_pVolume );
 			BREAK_ON_FAIL( hr );
 		}
 
-		UINT32 nChannels;
-		m_pVolume->GetChannelCount( &nChannels );
-
-		if( nChannels > 0 ) {
-			for( UINT32 i = 0; i < nChannels; ++i ) {
-				float volume;
-				if( SUCCEEDED( m_pVolume->GetChannelVolume( i, &volume ) ) )
-					averageVolume += volume;
-			}
-
-			averageVolume /= nChannels;
-		}
+		hr = m_pVolume->GetMasterVolume( &volume );
 	} while( false );
 
-	return averageVolume;
+	return volume;
 }
 
 HRESULT Player::SetVolume( float volume )
@@ -524,16 +513,11 @@ HRESULT Player::SetVolume( float volume )
 		BREAK_ON_NULL_MSG( m_pSession, E_POINTER, "Session not available." );
 
 		if( NULL == m_pVolume ) {
-			hr = ::MFGetService( m_pSession, MR_STREAM_VOLUME_SERVICE, __uuidof( IMFAudioStreamVolume ), (void**)&m_pVolume );
+			hr = ::MFGetService( m_pSession, MR_POLICY_VOLUME_SERVICE, __uuidof( IMFSimpleAudioVolume ), (void**)&m_pVolume );
 			BREAK_ON_FAIL( hr );
 		}
 
-		UINT32 nChannels;
-		m_pVolume->GetChannelCount( &nChannels );
-
-		for( UINT32 i = 0; i < nChannels; ++i ) {
-			m_pVolume->SetChannelVolume( i, volume );
-		}
+		hr = m_pVolume->SetMasterVolume( volume );
 	} while( false );
 
 	return hr;
