@@ -332,6 +332,18 @@ void VideoTestApp::keyDown( KeyEvent event )
 		case KeyEvent::KEY_RIGHTBRACKET:
 			// video->seekToTime( 110.0f );
 			break;
+
+		case KeyEvent::KEY_PLUS:
+		case KeyEvent::KEY_KP_PLUS:
+			video->setVolume( 1.0f );
+			CI_LOG_V( "Audio level set to: " << video->getVolume() );
+			break;
+
+		case KeyEvent::KEY_MINUS:
+		case KeyEvent::KEY_KP_MINUS:
+			video->setVolume( 0.25f );
+			CI_LOG_V( "Audio level set to: " << video->getVolume() );
+			break;
 	}
 }
 

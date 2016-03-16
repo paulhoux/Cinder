@@ -111,6 +111,18 @@ void MovieGl::seekToEnd()
 	mObj->mPlayerPtr->SetPosition( t );
 }
 
+void MovieGl::setVolume( float volume )
+{
+	CI_ASSERT( mObj && mObj->mPlayerPtr );
+	mObj->mPlayerPtr->SetVolume( volume );
+}
+
+float MovieGl::getVolume() const
+{
+	CI_ASSERT( mObj && mObj->mPlayerPtr );
+	return mObj->mPlayerPtr->GetVolume();
+}
+
 void MovieGl::setScrubbing( bool enabled )
 {
 	CI_ASSERT( mObj && mObj->mPlayerPtr );

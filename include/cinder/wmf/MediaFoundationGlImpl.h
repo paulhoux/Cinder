@@ -57,6 +57,11 @@ class MovieGl : public MovieBase {
 	//! Sets the video time to its end.
 	void seekToEnd();
 
+	//! Sets the audio playback volume ranging from [0 - 1.0].
+	void setVolume( float volume ) override;
+	//! Gets the audio playback volume ranging from [0 - 1.0].
+	float getVolume() const override;
+
 	//! Enable or disable looping.
 	void setLoop( bool enabled = true ) override;
 

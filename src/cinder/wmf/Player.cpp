@@ -109,6 +109,7 @@ Player::Player( const MFOptions &options )
 	, m_pRateControl( NULL )
 	, m_pRateSupport( NULL )
 	, m_pVideoDisplayControl( NULL )
+	, m_pVolume( NULL )
 	, m_options( options )
 {
 	m_hCloseEvent = ::CreateEventA( NULL, FALSE, FALSE, NULL );
@@ -137,6 +138,7 @@ HRESULT Player::Clear()
 	SafeRelease( m_pClock );
 	SafeRelease( m_pRateControl );
 	SafeRelease( m_pRateSupport );
+	SafeRelease( m_pVolume );
 
 	ZeroMemory( &m_state, sizeof( m_state ) );
 	m_state.command = CmdNone;
@@ -483,9 +485,62 @@ HRESULT Player::SetPosition( MFTIME position )
 	return hr;
 }
 
+FLOAT Player::GetVolume() const
+{
+	HRESULT hr = S_OK;
+
+	float averageVolume = 0.0f;
+
+	do {
+		BREAK_ON_NULL_MSG( m_pSession, E_POINTER, "Session not available." );
+
+		if( NULL == m_pVolume ) {
+			hr = ::MFGetService( m_pSession, MR_STREAM_VOLUME_SERVICE, __uuidof( IMFAudioStreamVolume ), (void**)&m_pVolume );
+			BREAK_ON_FAIL( hr );
+		}
+
+		UINT32 nChannels;
+		m_pVolume->GetChannelCount( &nChannels );
+
+		if( nChannels > 0 ) {
+			for( UINT32 i = 0; i < nChannels; ++i ) {
+				float volume;
+				if( SUCCEEDED( m_pVolume->GetChannelVolume( i, &volume ) ) )
+					averageVolume += volume;
+			}
+
+			averageVolume /= nChannels;
+		}
+	} while( false );
+
+	return averageVolume;
+}
+
+HRESULT Player::SetVolume( float volume )
+{
+	HRESULT hr = S_OK;
+
+	do {
+		BREAK_ON_NULL_MSG( m_pSession, E_POINTER, "Session not available." );
+
+		if( NULL == m_pVolume ) {
+			hr = ::MFGetService( m_pSession, MR_STREAM_VOLUME_SERVICE, __uuidof( IMFAudioStreamVolume ), (void**)&m_pVolume );
+			BREAK_ON_FAIL( hr );
+		}
+
+		UINT32 nChannels;
+		m_pVolume->GetChannelCount( &nChannels );
+
+		for( UINT32 i = 0; i < nChannels; ++i ) {
+			m_pVolume->SetChannelVolume( i, volume );
+		}
+	} while( false );
+
+	return hr;
+}
+
 HRESULT Player::OnSessionStart( HRESULT hrStatus )
 {
-
 	HRESULT hr = S_OK;
 
 	if( FAILED( hrStatus ) ) {
@@ -872,6 +927,7 @@ HRESULT Player::CloseSession()
 	SafeRelease( m_pVideoDisplayControl );
 	SafeRelease( m_pRateSupport );
 	SafeRelease( m_pRateControl );
+	SafeRelease( m_pVolume );
 	SafeRelease( m_pClock );
 	SafeRelease( m_pSource );
 	SafeRelease( m_pSession );
