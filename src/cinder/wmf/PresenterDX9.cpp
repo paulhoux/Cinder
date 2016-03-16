@@ -906,7 +906,7 @@ HRESULT PresenterDX9::CreateDXVA2ManagerAndDevice( D3D_DRIVER_TYPE DriverType )
 		pPresentParams.BackBufferFormat = D3DFMT_UNKNOWN;
 		pPresentParams.hDeviceWindow = NULL; //  m_hwndVideo;
 		pPresentParams.Flags = D3DPRESENTFLAG_VIDEO;
-		pPresentParams.PresentationInterval = D3DPRESENT_INTERVAL_DEFAULT;
+		pPresentParams.PresentationInterval = D3DPRESENT_INTERVAL_IMMEDIATE;// D3DPRESENT_INTERVAL_DEFAULT;
 
 		// Create the device. The interop definition states D3DCREATE_MULTITHREADED is required, but it may vary by vendor.
 		hr = m_pD3D9->CreateDeviceEx( m_ConnectionGUID, D3DDEVTYPE_HAL, pPresentParams.hDeviceWindow,
@@ -1138,7 +1138,7 @@ HRESULT PresenterDX9::UpdateDX9SwapChain( void )
 	pPresentParams.BackBufferFormat = D3DFMT_UNKNOWN;
 	pPresentParams.hDeviceWindow = m_hwndVideo;
 	pPresentParams.Flags = D3DPRESENTFLAG_VIDEO;
-	pPresentParams.PresentationInterval = D3DPRESENT_INTERVAL_DEFAULT;
+	pPresentParams.PresentationInterval = D3DPRESENT_INTERVAL_IMMEDIATE; // D3DPRESENT_INTERVAL_DEFAULT;
 
 	do {
 		SafeRelease( m_pSwapChain );
