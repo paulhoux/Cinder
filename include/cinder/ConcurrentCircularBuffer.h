@@ -64,6 +64,7 @@ class ConcurrentCircularBuffer : private Noncopyable {
 		if( mCanceled )
 			return;
 		*pItem = mContainer[--mNumUnread];
+		mContainer.pop_back();
 		mNotFullCond.notify_one();
 	}
 
@@ -85,6 +86,7 @@ class ConcurrentCircularBuffer : private Noncopyable {
 		if( ! is_not_empty_impl() )
 			return false;
 		*pItem = mContainer[--mNumUnread];
+		mContainer.pop_back();
 		mNotFullCond.notify_one();
 		return true;
 	}
