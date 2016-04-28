@@ -56,6 +56,7 @@ class CaptureImplAvFoundationDevice : public Capture::Device {
 	cinder::Capture::DeviceRef		mDevice;
 	bool							mHasNewFrame;
 	bool							mIsCapturing;
+	bool							mIsPhoto;
 	int32_t							mWidth, mHeight;
 	int32_t							mSurfaceChannelOrderCode;
 	int32_t							mExposedFrameBytesPerRow;
@@ -70,6 +71,8 @@ class CaptureImplAvFoundationDevice : public Capture::Device {
 - (void)startCapture;
 - (void)stopCapture;
 - (bool)isCapturing;
+- (bool)isPhoto;
+- (void)enablePhoto:(bool)enabled;
 - (cinder::Surface8uRef)getCurrentFrame;
 - (bool)checkNewFrame;
 - (const cinder::Capture::DeviceRef)getDevice;

@@ -35,6 +35,7 @@ CaptureImplAvFoundationDevice::CaptureImplAvFoundationDevice( AVCaptureDevice *d
 	mName = cocoa::convertNsString( [device localizedName] );
 	mNativeDevice = [device retain];
 	mFrontFacing = device.position == AVCaptureDevicePositionFront;
+	mIsPhoto = false;
 }
 
 CaptureImplAvFoundationDevice::~CaptureImplAvFoundationDevice()
@@ -155,6 +156,8 @@ static BOOL sDevicesEnumerated = false;
 		mSession.sessionPreset = AVCaptureSessionPreset640x480;
 	else if( cinder::ivec2( mWidth, mHeight ) == cinder::ivec2( 1280, 720 ) )
 		mSession.sessionPreset = AVCaptureSessionPreset1280x720;
+	else if( mIsPhoto )
+		mSession.sessionPreset = AVCaptureSessionPresetPhoto;
 	else
 		mSession.sessionPreset = AVCaptureSessionPresetMedium;
 	[mSession commitConfiguration];
@@ -236,6 +239,16 @@ static BOOL sDevicesEnumerated = false;
 - (bool)isCapturing
 {
 	return mIsCapturing;
+}
+
+- (bool)isPhoto
+{
+	return mIsPhoto;
+}
+
+- (void)enablePhoto:(bool)enabled
+{
+	mIsPhoto = enabled;
 }
 
 // Called initially when the camera is instantiated and then again (hypothetically) if the resolution ever changes
