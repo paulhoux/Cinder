@@ -35,7 +35,6 @@ CaptureImplAvFoundationDevice::CaptureImplAvFoundationDevice( AVCaptureDevice *d
 	mName = cocoa::convertNsString( [device localizedName] );
 	mNativeDevice = [device retain];
 	mFrontFacing = device.position == AVCaptureDevicePositionFront;
-	mIsPhoto = false;
 }
 
 CaptureImplAvFoundationDevice::~CaptureImplAvFoundationDevice()
@@ -99,6 +98,7 @@ static BOOL sDevicesEnumerated = false;
 		[mDeviceUniqueId retain];
 		
 		mIsCapturing = false;
+		mIsPhoto = false;
 		mWidth = width;
 		mHeight = height;
 		mHasNewFrame = false;
