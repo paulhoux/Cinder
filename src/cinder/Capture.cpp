@@ -112,6 +112,22 @@ bool Capture::isCapturing()
 	return mImpl->isCapturing();
 #endif
 }
+	
+bool Capture::isPhoto()
+{
+#if defined( CINDER_COCOA )
+	return [mImpl isPhoto];
+#else
+	return false; // mImpl->isPhoto();
+#endif
+}
+	
+void Capture::enablePhoto( bool enabled )
+{
+#if defined( CINDER_COCOA )
+	[mImpl enablePhoto:enabled];
+#endif
+}
 
 bool Capture::checkNewFrame() const
 {

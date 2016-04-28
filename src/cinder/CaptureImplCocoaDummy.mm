@@ -70,6 +70,15 @@ using namespace std;
 	return mCapturing;
 }
 
+- (bool)isPhoto
+{
+	return false;
+}
+
+- (void)enablePhoto:(bool)enabled
+{	
+}
+
 - (cinder::Surface8uRef)getCurrentFrame
 {
 	return mSurface;

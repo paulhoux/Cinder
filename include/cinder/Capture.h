@@ -65,7 +65,11 @@ class Capture {
 	//! Stop capturing video
 	void		stop();
 	//! Is the device capturing video
-	bool		isCapturing();
+    bool		isCapturing();
+    //! Is the device setup to capture photo's
+    bool		isPhoto();
+    //! Enable/disable the capture of hires photo's. Call before start.
+    void        enablePhoto( bool enabled = true );
 
 	//! Returns whether there is a new video frame available since the last call to checkNewFrame()
 	bool		checkNewFrame() const;
