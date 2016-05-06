@@ -43,7 +43,7 @@ struct SchedulerCallback {
 
 class __declspec( uuid( "9D28C5FA-DD8B-4758-B828-EB254AC707EA" ) ) Scheduler : public msw::ComObject {
   public:
-	Scheduler( const BOOL *quitFlag, msw::CriticalSection& critSec );
+	Scheduler( const bool *quitFlag, msw::CriticalSection& critSec );
 	virtual ~Scheduler( void );
 
 	void SetCallback( SchedulerCallback* pCB ) { m_pCB = pCB; }
@@ -81,7 +81,7 @@ class __declspec( uuid( "9D28C5FA-DD8B-4758-B828-EB254AC707EA" ) ) Scheduler : p
 	MFTIME                          m_PerFrameInterval; // Duration of each frame.
 	LONGLONG                        m_PerFrame_1_4th;   // 1/4th of the frame duration.
 	MFWORKITEM_KEY                  m_keyTimer;
-	const BOOL*						m_quitFlag;
+	const bool*						m_quitFlag;
 };
 
 } // namespace wmf

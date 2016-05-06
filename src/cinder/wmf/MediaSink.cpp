@@ -29,7 +29,7 @@ CriticalSection MediaSink::s_csStreamSinkAndScheduler;
 // Description: Creates an instance of the DX11 Video Renderer sink object.
 //-------------------------------------------------------------------
 
-/* static */ HRESULT MediaSink::CreateInstance( _In_ REFIID iid, _COM_Outptr_ void** ppSink, const BOOL *quitFlag, const MFOptions &options )
+/* static */ HRESULT MediaSink::CreateInstance( _In_ REFIID iid, _COM_Outptr_ void** ppSink, const bool *quitFlag, const MFOptions &options )
 {
 	if( ppSink == NULL ) {
 		return E_POINTER;
@@ -630,7 +630,7 @@ STDMETHODIMP MediaSink::NotifyPreroll( MFTIME hnsUpcomingStartTime )
 // MediaSink constructor.
 //-------------------------------------------------------------------
 
-MediaSink::MediaSink( const BOOL *quitFlag, const MFOptions &options )
+MediaSink::MediaSink( const bool *quitFlag, const MFOptions &options )
 	: STREAM_ID( 0 )
 	, m_nRefCount( 1 )
 	, m_csMediaSink() // default ctor

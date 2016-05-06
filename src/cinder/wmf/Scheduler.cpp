@@ -11,7 +11,7 @@ using namespace cinder::msw;
 namespace cinder {
 namespace wmf {
 
-Scheduler::Scheduler( const BOOL *quitFlag, CriticalSection& critSec ) :
+Scheduler::Scheduler( const bool *quitFlag, CriticalSection& critSec ) :
 	m_critSec( critSec ),
 	m_pCB( NULL ),
 	m_ScheduledSamples(), // default ctor

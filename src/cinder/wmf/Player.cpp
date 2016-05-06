@@ -881,7 +881,7 @@ HRESULT Player::CloseSession()
 
 	// First close the media session.
 	if( m_pSession ) {
-		m_stopping = TRUE;
+		m_stopping = true;
 		m_state.command = CmdClose;
 
 		hr = m_pSession->Close();

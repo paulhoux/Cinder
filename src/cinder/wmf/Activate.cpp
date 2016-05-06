@@ -9,7 +9,7 @@ using namespace cinder::msw;
 namespace cinder {
 namespace wmf {
 
-HRESULT Activate::CreateInstance( HWND hwnd, IMFActivate** ppActivate, const BOOL *quitFlag, const MFOptions &options )
+HRESULT Activate::CreateInstance( HWND hwnd, IMFActivate** ppActivate, const bool *quitFlag, const MFOptions &options )
 {
 	if( ppActivate == NULL ) {
 		return E_POINTER;
@@ -168,7 +168,7 @@ HRESULT Activate::GetClassID( __RPC__out CLSID* pClassID )
 }
 
 // ctor
-Activate::Activate( const BOOL *quitFlag, const MFOptions &options )
+Activate::Activate( const bool *quitFlag, const MFOptions &options )
 	: m_lRefCount( 0 )
 	, m_pMediaSink( NULL )
 	, m_hwnd( NULL )

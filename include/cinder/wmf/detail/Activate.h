@@ -9,7 +9,7 @@ namespace wmf {
 
 class __declspec( uuid( "30212DC8-9CE6-4CEF-BF26-4CA034A3476F" ) ) Activate : public MFAttributesImpl<IMFActivate>, public IPersistStream {
   public:
-	static HRESULT CreateInstance( HWND hwnd, IMFActivate** ppActivate, const BOOL *quitFlag, const MFOptions& options = MFOptions() );
+	static HRESULT CreateInstance( HWND hwnd, IMFActivate** ppActivate, const bool *quitFlag, const MFOptions& options = MFOptions() );
 
 	// IUnknown
 	STDMETHODIMP_( ULONG ) AddRef( void );
@@ -31,14 +31,14 @@ class __declspec( uuid( "30212DC8-9CE6-4CEF-BF26-4CA034A3476F" ) ) Activate : pu
 	STDMETHODIMP GetClassID( __RPC__out CLSID* pClassID );
 
   private:
-	Activate( const BOOL *quitFlag, const MFOptions& options );
+	Activate( const bool *quitFlag, const MFOptions& options );
 	~Activate( void );
 
 	long          m_lRefCount;
 	IMFMediaSink* m_pMediaSink;
 	HWND          m_hwnd;
 
-	const BOOL*	m_quitFlag;
+	const bool*	m_quitFlag;
 	MFOptions	m_options;
 };
 
