@@ -11,7 +11,7 @@ using namespace cinder::msw;
 namespace cinder {
 namespace wmf {
 
-Scheduler::Scheduler( CriticalSection& critSec ) :
+Scheduler::Scheduler( const BOOL *quitFlag, CriticalSection& critSec ) :
 	m_critSec( critSec ),
 	m_pCB( NULL ),
 	m_ScheduledSamples(), // default ctor
@@ -21,7 +21,8 @@ Scheduler::Scheduler( CriticalSection& critSec ) :
 	m_LastSampleTime( 0 ),
 	m_PerFrameInterval( 0 ),
 	m_PerFrame_1_4th( 0 ),
-	m_keyTimer( 0 )
+	m_keyTimer( 0 ),
+	m_quitFlag( quitFlag )
 {
 }
 
@@ -349,7 +350,8 @@ HRESULT Scheduler::OnTimer( __RPC__in_opt IMFAsyncResult *pResult )
 
 	// if we have a pending frame, process it
 	// it's possible that we don't have a frame at this point if the pending frame was cancelled
-	hr = StartProcessSample();
+	if( ! *m_quitFlag )
+		hr = StartProcessSample();
 
 	return hr;
 }

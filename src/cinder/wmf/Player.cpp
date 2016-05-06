@@ -110,6 +110,7 @@ Player::Player( const MFOptions &options )
 	, m_pRateSupport( NULL )
 	, m_pVideoDisplayControl( NULL )
 	, m_pVolume( NULL )
+	, m_stopping( FALSE )
 	, m_options( options )
 {
 	m_hCloseEvent = ::CreateEventA( NULL, FALSE, FALSE, NULL );
@@ -880,6 +881,7 @@ HRESULT Player::CloseSession()
 
 	// First close the media session.
 	if( m_pSession ) {
+		m_stopping = TRUE;
 		m_state.command = CmdClose;
 
 		hr = m_pSession->Close();
@@ -1474,7 +1476,7 @@ HRESULT Player::CreateMediaSinkActivate( IMFStreamDescriptor *pSourceSD, HWND hV
 		else if( MFMediaType_Video == guidMajorType ) {
 			// Create our own Presenter.
 			ScopedComPtr<IMFActivate> pActivate;
-			hr = Activate::CreateInstance( hVideoWindow, &pActivate, m_options );
+			hr = Activate::CreateInstance( hVideoWindow, &pActivate, &m_stopping, m_options );
 
 			if( FAILED( hr ) ) {
 				CI_LOG_E( "Failed to create custom Activate, falling back to default." );

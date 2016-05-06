@@ -298,7 +298,8 @@ class __declspec( uuid( "5D1B744C-7145-431D-B62C-6BF08BB9E17C" ) ) Player : publ
 	//! Allows control over the created window.
 	ci::app::Window::Format m_windowFormat;
 
-	MFOptions m_options;
+	BOOL		m_stopping;
+	MFOptions	m_options;
 };
 }
 } // namespace ci::wmf

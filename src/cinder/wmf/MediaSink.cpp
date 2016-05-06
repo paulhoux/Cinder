@@ -29,7 +29,7 @@ CriticalSection MediaSink::s_csStreamSinkAndScheduler;
 // Description: Creates an instance of the DX11 Video Renderer sink object.
 //-------------------------------------------------------------------
 
-/* static */ HRESULT MediaSink::CreateInstance( _In_ REFIID iid, _COM_Outptr_ void** ppSink, const MFOptions &options )
+/* static */ HRESULT MediaSink::CreateInstance( _In_ REFIID iid, _COM_Outptr_ void** ppSink, const BOOL *quitFlag, const MFOptions &options )
 {
 	if( ppSink == NULL ) {
 		return E_POINTER;
@@ -38,7 +38,7 @@ CriticalSection MediaSink::s_csStreamSinkAndScheduler;
 	*ppSink = NULL;
 
 	HRESULT hr = S_OK;
-	MediaSink* pSink = new MediaSink( options ); // Created with ref count = 1.
+	MediaSink* pSink = new MediaSink( quitFlag, options ); // Created with ref count = 1.
 
 	if( pSink == NULL ) {
 		hr = E_OUTOFMEMORY;
@@ -630,7 +630,7 @@ STDMETHODIMP MediaSink::NotifyPreroll( MFTIME hnsUpcomingStartTime )
 // MediaSink constructor.
 //-------------------------------------------------------------------
 
-MediaSink::MediaSink( const MFOptions &options )
+MediaSink::MediaSink( const BOOL *quitFlag, const MFOptions &options )
 	: STREAM_ID( 0 )
 	, m_nRefCount( 1 )
 	, m_csMediaSink() // default ctor
@@ -639,6 +639,7 @@ MediaSink::MediaSink( const MFOptions &options )
 	, m_pClock( NULL )
 	, m_pScheduler( NULL )
 	, m_pPresenter( NULL )
+	, m_quitFlag( quitFlag )
 	, m_options( options )
 {
 }
@@ -674,7 +675,7 @@ HRESULT MediaSink::Initialize( void )
 	HRESULT hr = S_OK;
 
 	do {
-		m_pScheduler = new Scheduler( s_csStreamSinkAndScheduler );
+		m_pScheduler = new Scheduler( m_quitFlag, s_csStreamSinkAndScheduler );
 		BREAK_ON_NULL( m_pScheduler, E_OUTOFMEMORY );
 
 		m_pStream = new StreamSink( STREAM_ID, s_csStreamSinkAndScheduler, m_pScheduler );

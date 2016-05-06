@@ -15,7 +15,7 @@ class __declspec( uuid( "2083AAAE-A8A1-4AE7-8F21-F43B7AC15A97" ) ) MediaSink : p
                                                                                public IMFMediaSinkPreroll {
   public:
 	// Static method to create the object.
-	static HRESULT CreateInstance( _In_ REFIID iid, _COM_Outptr_ void** ppSink, const MFOptions& options = MFOptions() );
+	static HRESULT CreateInstance( _In_ REFIID iid, _COM_Outptr_ void** ppSink, const BOOL *quitFlag, const MFOptions& options = MFOptions() );
 
 	// IUnknown
 	STDMETHODIMP_( ULONG ) AddRef( void );
@@ -55,7 +55,7 @@ class __declspec( uuid( "2083AAAE-A8A1-4AE7-8F21-F43B7AC15A97" ) ) MediaSink : p
 	// Critical section for thread safety, used for StreamSink and Scheduler.
 	static msw::CriticalSection s_csStreamSinkAndScheduler;
 
-	MediaSink( const MFOptions& options );
+	MediaSink( const BOOL *quitFlag, const MFOptions& options );
 	virtual ~MediaSink( void );
 
 	HRESULT CheckShutdown( void ) const;
@@ -70,7 +70,8 @@ class __declspec( uuid( "2083AAAE-A8A1-4AE7-8F21-F43B7AC15A97" ) ) MediaSink : p
 	Scheduler*            m_pScheduler;  // Manages scheduling of samples.
 	Presenter*            m_pPresenter;
 
-	MFOptions m_options;
+	const BOOL*	m_quitFlag;
+	MFOptions	m_options;
 };
 
 } // namespace wmf

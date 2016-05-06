@@ -9,13 +9,13 @@ using namespace cinder::msw;
 namespace cinder {
 namespace wmf {
 
-HRESULT Activate::CreateInstance( HWND hwnd, IMFActivate** ppActivate, const MFOptions &options )
+HRESULT Activate::CreateInstance( HWND hwnd, IMFActivate** ppActivate, const BOOL *quitFlag, const MFOptions &options )
 {
 	if( ppActivate == NULL ) {
 		return E_POINTER;
 	}
 
-	Activate* pActivate = new Activate( options );
+	Activate* pActivate = new Activate( quitFlag, options );
 	if( pActivate == NULL ) {
 		return E_OUTOFMEMORY;
 	}
@@ -91,7 +91,7 @@ HRESULT Activate::ActivateObject( __RPC__in REFIID riid, __RPC__deref_out_opt vo
 
 	do {
 		if( m_pMediaSink == NULL ) {
-			hr = MediaSink::CreateInstance( IID_PPV_ARGS( &m_pMediaSink ), m_options );
+			hr = MediaSink::CreateInstance( IID_PPV_ARGS( &m_pMediaSink ), m_quitFlag, m_options );
 			BREAK_ON_FAIL_MSG( hr, "Failed to create media sink." );
 
 			ScopedComPtr<IMFGetService> pSinkGetService;
@@ -168,10 +168,11 @@ HRESULT Activate::GetClassID( __RPC__out CLSID* pClassID )
 }
 
 // ctor
-Activate::Activate( const MFOptions &options )
+Activate::Activate( const BOOL *quitFlag, const MFOptions &options )
 	: m_lRefCount( 0 )
 	, m_pMediaSink( NULL )
 	, m_hwnd( NULL )
+	, m_quitFlag( quitFlag )
 	, m_options( options )
 {
 }

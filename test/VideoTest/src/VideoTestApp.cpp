@@ -484,7 +484,7 @@ void VideoTestApp::test()
 	Rand::randSeed( (uint32_t)seed.QuadPart );
 	static uint32_t rnd = 0;
 
-	if( rnd < 10 ) {
+	if( rnd < 10000 ) {
 		// Close current and open another movie.
 		mVideos.clear();
 
