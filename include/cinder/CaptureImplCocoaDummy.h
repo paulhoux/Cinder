@@ -66,7 +66,7 @@ class CaptureImplCocoaDummyDevice : public Capture::Device {
 - (void)stopCapture;
 - (bool)isCapturing;
 - (bool)isPhoto;
-- (void)enablePhoto:(bool)enabled
+- (void)enablePhoto:(bool)enabled;
 - (cinder::Surface8uRef)getCurrentFrame;
 - (bool)checkNewFrame;
 - (const cinder::Capture::DeviceRef)getDevice;
