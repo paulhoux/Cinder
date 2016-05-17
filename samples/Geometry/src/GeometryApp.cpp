@@ -23,7 +23,7 @@ class GeometryApp : public App {
 public:
 	GeometryApp();
 
-	enum Primitive { CAPSULE, CONE, CUBE, CYLINDER, HELIX, ICOSAHEDRON, ICOSPHERE, SPHERE, TEAPOT, TORUS, TORUSKNOT, PLANE, RECT, ROUNDEDRECT, CIRCLE, RING, PRIMITIVE_COUNT };
+	enum Primitive { CAPSULE, CONE, CUBE, CYLINDER, HELIX, ICOSAHEDRON, ICOSPHERE, SPHERE, SUPERELLIPSOID, TEAPOT, TORUS, TORUSKNOT, PLANE, RECT, ROUNDEDRECT, CIRCLE, RING, PRIMITIVE_COUNT };
 	enum Quality { LOW, DEFAULT, HIGH };
 	enum ViewMode { SHADED, WIREFRAME };
 	enum TexturingMode { NONE, PROCEDURAL, SAMPLER };
@@ -105,6 +105,10 @@ private:
 	float				mTorusKnotRadius;
 	vec3				mTorusKnotScale;
 
+	int					mSuperellipsoidSubdivision;
+	float				mSuperellipsoidPowerTheta;
+	float				mSuperellipsoidPowerPhi;
+
 #if ! defined( CINDER_GL_ES )
 	params::InterfaceGlRef	mParams;
 
@@ -129,6 +133,7 @@ GeometryApp::GeometryApp()
 	, mRoundedRectRadius( 0.2f )
 	, mTorusTwist( 0 ), mTorusOffset( 0 ), mTorusRatio( 0.25 )
 	, mTorusKnotP( 2 ), mTorusKnotQ( 5 ), mTorusKnotRadius( 0.15f ), mTorusKnotScale( 1, 0.2, 1 )
+	, mSuperellipsoidSubdivision( 64 ), mSuperellipsoidPowerTheta( 0.25f ), mSuperellipsoidPowerPhi( 0.25f )
 {
 }
 
@@ -363,7 +368,7 @@ void GeometryApp::fileDrop( FileDropEvent event )
 void GeometryApp::createParams()
 {
 #if ! defined( CINDER_GL_ES )
-	vector<string> primitives = { "Capsule", "Cone", "Cube", "Cylinder", "Helix", "Icosahedron", "Icosphere", "Sphere", "Teapot", "Torus", "Torus Knot", "Plane", "Rectangle", "Rounded Rectangle", "Circle", "Ring" };
+	vector<string> primitives = { "Capsule", "Cone", "Cube", "Cylinder", "Helix", "Icosahedron", "Icosphere", "Sphere", "Superellipsoid", "Teapot", "Torus", "Torus Knot", "Plane", "Rectangle", "Rounded Rectangle", "Circle", "Ring" };
 	vector<string> qualities = { "Low", "Default", "High" };
 	vector<string> viewModes = { "Shaded", "Wireframe" };
 	vector<string> texturingModes = { "None", "Procedural", "Sampler" };
@@ -425,6 +430,11 @@ void GeometryApp::createParams()
 	mPrimitiveParams[TORUSKNOT].push_back( mParams->addParam( "Torus Knot: Scale Y", &mTorusKnotScale.y ).step( 0.1f ).updateFn( [this] { createGeometry(); } ) );
 	mPrimitiveParams[TORUSKNOT].push_back( mParams->addParam( "Torus Knot: Scale Z", &mTorusKnotScale.z ).step( 0.1f ).updateFn( [this] { createGeometry(); } ) );
 	mPrimitiveParams[TORUSKNOT].push_back( mParams->addParam( "Torus Knot: Radius", &mTorusKnotRadius ).step( 0.05f ).updateFn( [this] { createGeometry(); } ) );
+
+	// Superellipsoid
+	mPrimitiveParams[SUPERELLIPSOID].push_back( mParams->addParam( "Superellipsoid: Subdivision", &mSuperellipsoidSubdivision ).min(4).step( 1 ).updateFn( [this] { createGeometry(); } ) );
+	mPrimitiveParams[SUPERELLIPSOID].push_back( mParams->addParam( "Superellipsoid: Power Theta", &mSuperellipsoidPowerTheta ).min(0.01f).max(4.0f).step(0.01f).updateFn( [this] { createGeometry(); } ) );
+	mPrimitiveParams[SUPERELLIPSOID].push_back( mParams->addParam( "Superellipsoid: Power Phi", &mSuperellipsoidPowerPhi ).min( 0.01f ).max( 4.0f ).step( 0.01f ).updateFn( [this] { createGeometry(); } ) );
 
 	updateParams();
 #endif
@@ -517,6 +527,9 @@ void GeometryApp::createGeometry()
 				case LOW:		loadGeomSource( geom::Sphere().subdivisions( 6 ), geom::WireSphere() ); break;
 				case HIGH:		loadGeomSource( geom::Sphere().subdivisions( 60 ), geom::WireSphere() ); break;
 			}
+			break;
+		case SUPERELLIPSOID:
+			loadGeomSource( geom::Superellipsoid().subdivision( mSuperellipsoidSubdivision ).power( mSuperellipsoidPowerTheta, mSuperellipsoidPowerPhi ), geom::WireCube() );
 			break;
 		case TEAPOT:
 			switch( mQualityCurrent ) {

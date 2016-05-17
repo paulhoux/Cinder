@@ -364,6 +364,34 @@ class Icosphere : public Source {
 	mutable std::vector<uint32_t>	mIndices;
 };
 
+class Superellipsoid : public Source {
+public:
+	Superellipsoid();
+
+	// Enables colors. Disabled by default.
+	Superellipsoid&	subdivision( int resolution ) { mSubdivision = resolution; mCalculationsCached = false;  return *this; }
+	Superellipsoid&	power( float power ) { mPowerTheta = mPowerPhi = power; mCalculationsCached = false; return *this; }
+	Superellipsoid&	power( float theta, float phi ) { mPowerTheta = theta; mPowerPhi = phi; mCalculationsCached = false; return *this; }
+	Superellipsoid&	colors( bool enable = true ) { mHasColors = enable; mCalculationsCached = false; return *this; }
+
+	size_t			getNumVertices() const override;
+	size_t			getNumIndices() const override;
+	Primitive		getPrimitive() const override { return Primitive::TRIANGLES; }
+	uint8_t			getAttribDims( Attrib attr ) const override;
+	AttribSet		getAvailableAttribs() const override;
+	void			loadInto( Target *target, const AttribSet &requestedAttribs ) const override;
+	Superellipsoid*	clone() const override { return new Superellipsoid( *this ); }
+
+protected:
+	int								mSubdivision;
+	float							mPowerTheta, mPowerPhi;
+	bool							mHasColors;
+	mutable bool					mCalculationsCached;
+	mutable std::vector<vec3>		mPositions, mNormals, mColors;
+	mutable std::vector<vec2>		mTexCoords;
+	mutable std::vector<uint32_t>	mIndices;
+};
+
 class Teapot : public Source {
   public:
 	Teapot();

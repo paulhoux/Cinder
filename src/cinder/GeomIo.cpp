@@ -1350,6 +1350,137 @@ void Icosphere::loadInto( Target *target, const AttribSet &requestedAttribs ) co
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
+// Superellipsoid
+Superellipsoid::Superellipsoid()
+    : mSubdivision( 64 )
+    , mPowerTheta( 0.25f )
+	, mPowerPhi( 0.25f )
+	, mCalculationsCached( false )
+    , mHasColors( false )
+{
+}
+
+size_t Superellipsoid::getNumVertices() const
+{
+	return ( mSubdivision + 1 ) * ( mSubdivision / 2 + 1 );
+}
+
+size_t Superellipsoid::getNumIndices() const
+{
+	return mSubdivision * mSubdivision * 3;
+}
+
+uint8_t Superellipsoid::getAttribDims( Attrib attr ) const
+{
+	switch( attr ) {
+	case Attrib::POSITION:
+		return 3;
+	case Attrib::NORMAL:
+		return 3;
+	case Attrib::TANGENT:
+		return 3;
+	case Attrib::TEX_COORD_0:
+		return 2;
+	case Attrib::COLOR:
+		return mHasColors ? 3 : 0;
+	default:
+		return 0;
+	}
+}
+
+AttribSet Superellipsoid::getAvailableAttribs() const
+{
+	return { Attrib::POSITION, Attrib::NORMAL, Attrib::TEX_COORD_0, Attrib::COLOR, Attrib::TANGENT };
+}
+
+void Superellipsoid::loadInto( Target *target, const AttribSet &requestedAttribs ) const
+{
+	if( ! mCalculationsCached ) {
+		mPositions.resize( getNumVertices() );
+		mNormals.resize( getNumVertices() );
+		mTexCoords.resize( getNumVertices() );
+
+		//
+		auto absPower = []( float v, float n ) -> float {
+			if( v >= 0 )
+				return ( glm::pow( v, n ) );
+			else
+				return ( -glm::pow( -v, n ) );
+		};
+
+		for( int j = 0; j <= mSubdivision / 2; j++ ) {
+				float thetaIncr = 1.0f / (float)( mSubdivision );
+			for( int i = 0; i <= mSubdivision; i++ ) {
+				float phiIncr = 1.0f / (float)( mSubdivision / 2 );
+
+				int   index = j * ( mSubdivision + 1 ) + i;
+				float theta = float( i * 2 * M_PI ) / mSubdivision;
+				float phi = float( -0.5 * M_PI ) + float( M_PI * j ) / ( mSubdivision / 2 );
+
+				mPositions[index].x = 0.5f * absPower( glm::cos( phi ), mPowerPhi ) * absPower( glm::cos( theta ), mPowerTheta );
+				mPositions[index].y = 0.5f * absPower( glm::sin( phi ), mPowerPhi );
+				mPositions[index].z = 0.5f * absPower( glm::cos( phi ), mPowerPhi ) * absPower( glm::sin( theta ), mPowerTheta );
+
+				mNormals[index].x = absPower( glm::cos( phi ), 2.0f - mPowerPhi ) * absPower( glm::cos( theta ), 2.0f - mPowerTheta );
+				mNormals[index].y = absPower( glm::sin( phi ), 2.0f - mPowerPhi );
+				mNormals[index].z = absPower( glm::cos( phi ), 2.0f - mPowerPhi ) * absPower( glm::sin( theta ), 2.0f - mPowerTheta );
+				
+				mTexCoords[index].x = i * thetaIncr;
+				mTexCoords[index].y = j * phiIncr;
+
+				if( j == 0 ) {
+					mPositions[index].x = 0;
+					mPositions[index].z = 0;
+					mPositions[index].y = -0.5f;
+				}
+				if( j == mSubdivision / 2 ) {
+					mPositions[index].x = 0;
+					mPositions[index].z = 0;
+					mPositions[index].y = 0.5f;
+				}
+				if( i == mSubdivision ) {
+					mPositions[index].x = mPositions[j * ( mSubdivision + 1 ) + i - mSubdivision].x;
+					mPositions[index].z = mPositions[j * ( mSubdivision + 1 ) + i - mSubdivision].z;
+				}
+			}
+		}
+
+		mIndices.resize( getNumIndices() );
+
+		int index = 0;
+		for( int j = 0; j < mSubdivision / 2; j++ ) {
+			for( int i = 0; i < mSubdivision; i++ ) {
+				uint32_t i1 = j * ( mSubdivision + 1 ) + i;
+				uint32_t i2 = j * ( mSubdivision + 1 ) + ( i + 1 );
+				uint32_t i3 = ( j + 1 ) * ( mSubdivision + 1 ) + ( i + 1 );
+				uint32_t i4 = ( j + 1 ) * ( mSubdivision + 1 ) + i;
+
+				mIndices[index++] = i1;
+				mIndices[index++] = i3;
+				mIndices[index++] = i2;
+				mIndices[index++] = i1;
+				mIndices[index++] = i4;
+				mIndices[index++] = i3;
+			}
+		}
+
+		mCalculationsCached = true;
+	}
+
+	//
+	target->copyAttrib( Attrib::POSITION, 3, 0, value_ptr( *mPositions.data() ), mPositions.size() );
+	target->copyAttrib( Attrib::NORMAL, 3, 0, value_ptr( *mNormals.data() ), mNormals.size() );
+	target->copyAttrib( Attrib::TEX_COORD_0, 2, 0, value_ptr( *mTexCoords.data() ), mTexCoords.size() );
+	target->copyAttrib( Attrib::COLOR, 3, 0, value_ptr( *mColors.data() ), mColors.size() );
+
+	if( requestedAttribs.count( Attrib::TANGENT ) ) {
+		vector<vec3> tangents;
+		calculateTangents( mIndices.size(), mIndices.data(), mPositions.size(), mPositions.data(), mNormals.data(), mTexCoords.data(), &tangents, nullptr );
+		target->copyAttrib( Attrib::TANGENT, 3, 0, value_ptr( *tangents.data() ), tangents.size() );
+	}
+
+	target->copyIndices( Primitive::TRIANGLES, mIndices.data(), mIndices.size(), 4 );
+}
 // Teapot
 const uint8_t Teapot::sPatchIndices[][16] = {
 	// rim
