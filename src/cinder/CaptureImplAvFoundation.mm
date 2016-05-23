@@ -114,6 +114,18 @@ static BOOL sDevicesEnumerated = false;
 	if( mIsCapturing ) {
 		[self stopCapture];
 	}
+
+	if( mWorkingPixelBuffer ) {
+		::CVBufferRelease( mWorkingPixelBuffer );
+		mWorkingPixelBuffer = nullptr;
+	}
+	
+	if( mSession ) {	
+		[mSession release];
+		mSession = nil;
+	}
+	
+	mCurrentFrame.reset();	
 	
 	[mDeviceUniqueId release];
 	
@@ -221,18 +233,18 @@ static BOOL sDevicesEnumerated = false;
 	@synchronized( self ) {
 		[mSession stopRunning];
 
-		if( mWorkingPixelBuffer ) {
-			::CVBufferRelease( mWorkingPixelBuffer );
-			mWorkingPixelBuffer = nullptr;
-		}
+		//if( mWorkingPixelBuffer ) {
+		//	::CVBufferRelease( mWorkingPixelBuffer );
+		//	mWorkingPixelBuffer = nullptr;
+		//}
 		
-		[mSession release];
-		mSession = nil;
+		//[mSession release];
+		//mSession = nil;
 
 		mIsCapturing = false;
 		mHasNewFrame = false;
 		
-		mCurrentFrame.reset();		
+		//mCurrentFrame.reset();		
 	}
 }
 
