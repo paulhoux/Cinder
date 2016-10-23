@@ -518,8 +518,8 @@ Rectf Font::getGlyphBoundingBox( Glyph glyphIndex ) const
     if( bytesGlyph == GDI_ERROR )
 		throw FontGlyphFailureExc();
 
-	return Rectf( metrics.gmptGlyphOrigin.x, metrics.gmptGlyphOrigin.y,
-			metrics.gmptGlyphOrigin.x + metrics.gmBlackBoxX, metrics.gmptGlyphOrigin.y + (int)metrics.gmBlackBoxY );
+	return Rectf( metrics.gmptGlyphOrigin.x, metrics.gmptGlyphOrigin.y - (LONG)metrics.gmBlackBoxY,
+			metrics.gmptGlyphOrigin.x + (LONG)metrics.gmBlackBoxX, metrics.gmptGlyphOrigin.y );
 }
 
 #elif defined( CINDER_WINRT )

@@ -27,6 +27,7 @@
 #include "cinder/Path2d.h"
 
 #include <algorithm>
+#include <set>
 
 using std::vector;
 
@@ -346,6 +347,7 @@ void Path2d::reverse()
             std::reverse( mSegments.begin() + 1, mSegments.end() );
     }
 
+	mBounds.clear();
 }
 
 void Path2d::removeSegment( size_t segment )
@@ -358,6 +360,7 @@ void Path2d::removeSegment( size_t segment )
 	mPoints.erase( mPoints.begin() + firstPoint, mPoints.begin() + firstPoint + pointCount );
 	
 	mSegments.erase( mSegments.begin() + segment );
+	mBounds.erase( mBounds.begin() + segment );
 }
 
 void Path2d::getSegmentRelativeT( float t, size_t *segment, float *relativeT ) const
@@ -821,17 +824,34 @@ Rectf Path2d::calcPreciseBoundingBox() const
 		return Rectf( mPoints[0], mPoints[0] );
 	else if( mPoints.size() == 2 )
 		return Rectf( mPoints[0], mPoints[1] );
-	
+
 	Rectf result( mPoints[0], mPoints[0] );
+
 	size_t firstPoint = 0;
 	for( size_t s = 0; s < mSegments.size(); ++s ) {
-		switch( mSegments[s] ) {
+		result.include( calcPreciseBoundingBox( s, firstPoint ) );
+		firstPoint += sSegmentTypePointCounts[mSegments[s]];
+	}
+
+	return result;
+}
+
+Rectf Path2d::calcPreciseBoundingBox( size_t segment, size_t firstPoint ) const
+{
+	if( firstPoint == 0 ) {
+		for( size_t s = 0; s < mBounds.size(); ++s )
+			firstPoint += sSegmentTypePointCounts[mSegments[s]];
+	}
+
+	while( mBounds.size() <= segment ) {
+		Rectf result( mPoints[firstPoint], mPoints[firstPoint] );
+		switch( mSegments[mBounds.size()] ) {
 			case CUBICTO: {
 				float monotoneT[4];
 				int monotoneCnt = calcCubicBezierMonotoneRegions( &(mPoints[firstPoint]), monotoneT );
 				for( int monotoneIdx = 0; monotoneIdx < monotoneCnt; ++monotoneIdx )
 					result.include( calcCubicBezierPos( &(mPoints[firstPoint]), monotoneT[monotoneIdx] ) );
-				result.include( mPoints[firstPoint+0] );
+				//result.include( mPoints[firstPoint+0] );
 				result.include( mPoints[firstPoint+3] );
 			}
 			break;
@@ -840,24 +860,27 @@ Rectf Path2d::calcPreciseBoundingBox() const
 				int monotoneCnt = calcQuadraticBezierMonotoneRegions( &(mPoints[firstPoint]), monotoneT );
 				for( int monotoneIdx = 0; monotoneIdx < monotoneCnt; ++monotoneIdx )
 					result.include( calcQuadraticBezierPos( &(mPoints[firstPoint]), monotoneT[monotoneIdx] ) );
-				result.include( mPoints[firstPoint+0] );
+				//result.include( mPoints[firstPoint+0] );
 				result.include( mPoints[firstPoint+2] );
 			}
 			break;
 			case LINETO:
-				result.include( mPoints[firstPoint] );
+				//result.include( mPoints[firstPoint+0] );
 				result.include( mPoints[firstPoint+1] );
 			break;
 			case CLOSE:
+				//result.include( mPoints[firstPoint+0] );
+				result.include( mPoints[0] );
 			break;
 			default:
 				throw Path2dExc();
 		}
-		
-		firstPoint += sSegmentTypePointCounts[mSegments[s]];
+		firstPoint += sSegmentTypePointCounts[mSegments[mBounds.size()]];
+
+		mBounds.push_back( result );
 	}
 	
-	return result;
+	return mBounds[segment];
 }
 
 // contains() helper routines
@@ -998,17 +1021,51 @@ float Path2d::calcDistance( const vec2 &pt, size_t segment, size_t firstPoint ) 
 vec2 Path2d::calcClosestPoint( const vec2 &pt ) const
 {
 	vec2 result;
-	float distance2 = FLT_MAX;
+
+	// Calculate bounds for each segment.
+	if( mBounds.size() != mSegments.size() )
+		calcPreciseBoundingBox( mSegments.size() - 1 );
+
+	/*std::vector<Rectf> bounds( mSegments.size() );
 
 	size_t firstPoint = 0;
 	for( size_t s = 0; s < mSegments.size(); ++s ) {
-		vec2 p = calcClosestPoint( pt, s, firstPoint );
+		bounds[s] = calcPreciseBoundingBox( s, firstPoint );
+		firstPoint += sSegmentTypePointCounts[mSegments[s]];
+	}*/
+
+	// Calculate occlusion.
+	std::set<size_t> visible;
+
+	float min, max;
+	for( size_t s = 0; s < mSegments.size(); ++s ) {
+		auto corners = mBounds[s].corners();
+		for( auto &corner : corners ){
+			auto direction = corner - pt;
+		
+			float distance = FLT_MAX;
+			size_t closest = 0;
+			for( size_t t = 0; t < mSegments.size(); ++t ) {
+				auto count = mBounds[t].intersect( pt, pt + direction, &min, &max );
+				if( count > 0 && min < distance ) {
+					distance = min;
+					closest = t;
+				}
+			}
+			visible.insert( closest );
+		}
+	}
+
+	// Calculate distance to visible segments.
+	float distance2 = FLT_MAX;
+
+	for( auto s : visible ) {
+		vec2 p = calcClosestPoint( pt, s, 0 );
 		float d = glm::distance2( pt, p );
 		if( d < distance2 ) {
 			result = p;
 			distance2 = d;
 		}
-		firstPoint += sSegmentTypePointCounts[mSegments[s]];
 	}
 
 	return result;

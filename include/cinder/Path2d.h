@@ -60,7 +60,7 @@ class Path2d {
     void	reverse();
 	
 	bool	empty() const { return mPoints.empty(); }
-	void	clear() { mSegments.clear(); mPoints.clear(); }
+	void	clear() { mSegments.clear(); mPoints.clear(); mBounds.clear(); }
 	size_t	getNumSegments() const { return mSegments.size(); }
 	size_t	getNumPoints() const { return mPoints.size(); }
 
@@ -107,7 +107,9 @@ class Path2d {
 	//! Returns the bounding box around all control points. As with Shape2d, note this is not necessarily the bounding box of the Path's shape.
 	Rectf	calcBoundingBox() const;
 	//! Returns the precise bounding box around the curve itself. Slower to calculate than calcBoundingBox().
-	Rectf	calcPreciseBoundingBox() const;	
+	Rectf	calcPreciseBoundingBox() const;
+	//! Returns the precise bounding box around the curve \a segment. Slower to calculate than calcBoundingBox().
+	Rectf	calcPreciseBoundingBox( size_t segment ) const { return calcPreciseBoundingBox( segment, 0 ); }
 
 	//! Returns whether the point \a pt is contained within the boundaries of the path
 	bool	contains( const vec2 &pt ) const;
@@ -156,9 +158,13 @@ class Path2d {
 
 	//! Returns the point on segment \a segment that is closest to \a pt. The \a firstPoint parameter can be used as an optimization if known, otherwise pass 0.
 	vec2	calcClosestPoint( const vec2 &pt, size_t segment, size_t firstPoint ) const;
+
+	//! Returns the precise bounding box around the curve \a segment. Slower to calculate than calcBoundingBox(). The \a firstPoint parameter can be used as an optimization if known, otherwise pass 0.
+	Rectf	calcPreciseBoundingBox( size_t segment, size_t firstPoint ) const;
 	
 	std::vector<vec2>			mPoints;
 	std::vector<SegmentType>	mSegments;
+	mutable std::vector<Rectf>	mBounds; // Precise bounding box per segment.
 };
 
 inline std::ostream& operator<<( std::ostream &out, const Path2d &p )

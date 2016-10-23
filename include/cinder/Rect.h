@@ -50,6 +50,12 @@ class RectT {
 	T		getAspectRatio() const { return getWidth() / getHeight(); }
 	T		calcArea() const { return getWidth() * getHeight(); }
 
+	//! Returns the corner of the rectangle with the smallest x and y coordinates.
+	Vec2T getMin() const { return Vec2T( glm::min( x1, x2 ), glm::min( y1, y2 ) ); }
+
+	//! Returns the corner of the rectangle with the largest x and y coordinates.
+	Vec2T getMax() const { return Vec2T( glm::max( x1, x2 ), glm::max( y1, y2 ) ); }
+
 	void		canonicalize(); // return rect w/ properly ordered coordinates
 	RectT		canonicalized() const; // return rect w/ properly ordered coordinates
 	
@@ -82,12 +88,41 @@ class RectT {
 	//! Returns a copy of the Rect transformed by \a matrix. Represents the bounding box of the transformed Rect when \a matrix expresses non-scale/translate operations.
 	RectT		transformed( const Mat3T &matrix ) const;
 
+	std::vector<Vec2T>	corners() const { return{ getUpperLeft(), getUpperRight(),getLowerRight(),getLowerLeft() }; }
+
 	//! Is a point \a pt inside the rectangle
 	template<typename Y>
 	bool		contains( const glm::tvec2<Y, glm::defaultp> &pt ) const		{ return ( pt.x >= x1 ) && ( pt.x <= x2 ) && ( pt.y >= y1 ) && ( pt.y <= y2 ); }
 	bool		contains( const Vec2T &pt ) const								{ return ( pt.x >= x1 ) && ( pt.x <= x2 ) && ( pt.y >= y1 ) && ( pt.y <= y2 ); }
 	//! Returns whether \a rect intersects with this
 	bool		intersects( const RectT &rect ) const;
+
+	//! Performs intersections with line from \a p0 to \a p1 and returns the number of intersections (0, 1 or 2). Returns \a min and \a max distance from \a p0.
+	int intersect( const Vec2T &p0, const Vec2T &p1, float *min, float *max ) const
+	{
+		Vec2T direction = p1 - p0;
+
+		if( glm::length2( direction ) < std::numeric_limits<T>::epsilon() )
+			return 0;
+
+		Vec2T _min = ( getMin() - p0 ) / direction;
+		Vec2T _max = ( getMax() - p0 ) / direction;
+
+		T fmin = glm::max( glm::min( _min.x, _max.x ), glm::min( _min.y, _max.y ) );
+		T fmax = glm::min( glm::max( _min.x, _max.x ), glm::max( _min.y, _max.y ) );
+
+		if( fmax >= fmin ) {
+			*min = fmin;
+			*max = fmax;
+
+			if( fmax > fmin )
+				return 2;
+			else
+				return 1;
+		}
+
+		return 0;
+	}
 
 	//! Returns the distance between the point \a pt and the rectangle. Points inside the rectangle return \c 0.
 	T		distance( const Vec2T &pt ) const;
