@@ -95,8 +95,9 @@ DataSourceRef Platform::loadAsset( const fs::path &relativePath )
 	fs::path assetPath = getAssetPath( relativePath );
 	if( ! assetPath.empty() )
 		return DataSourcePath::create( assetPath.string() );
-	else
-		throw AssetLoadExc( relativePath );
+	//else
+	//	throw AssetLoadExc( relativePath );
+	return nullptr;
 }
 
 fs::path Platform::getAssetPath( const fs::path &relativePath ) const
