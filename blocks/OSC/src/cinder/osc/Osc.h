@@ -29,6 +29,10 @@
  */
 
 #pragma once
+#if ! defined( _CRT_SECURE_NO_WARNINGS )
+#define _CRT_SECURE_NO_WARNINGS
+#endif
+
 #if ! defined( ASIO_STANDALONE )
 #define ASIO_STANDALONE 1
 #endif
@@ -57,8 +61,8 @@ using UdpSocketRef = std::shared_ptr<asio::ip::udp::socket>;
 using TcpSocketRef = std::shared_ptr<asio::ip::tcp::socket>;
 using AcceptorRef = std::shared_ptr<asio::ip::tcp::acceptor>;
 	
-template<size_t size>
-using ByteArray = std::array<uint8_t, size>;
+template<size_t Size>
+using ByteArray = std::array<uint8_t, Size>;
 using ByteBuffer = std::vector<uint8_t>;
 using ByteBufferRef = std::shared_ptr<ByteBuffer>;
 	
@@ -286,7 +290,7 @@ class Message {
 	//! Helper to calculate how many zeros to buffer to create a 4 byte
 	static uint8_t getTrailingZeros( size_t bufferSize ) { return 4 - ( bufferSize % 4 ); }
 	//! Helper to get current offset into the buffer.
-	size_t getCurrentOffset() { return mDataBuffer.size(); }
+	size_t getCurrentOffset() const { return mDataBuffer.size(); }
 	//! Helper to retrieve the data view of an Argument. Checks the type provided and
 	//! throws ExcNonConvertible if data view cannot convert the type.
 	template<typename T>
@@ -664,7 +668,7 @@ public:
 	//! Decodes an individual message. \a timetag is ignored within the below implementations.
 	bool decodeMessage( uint8_t *data, uint32_t size, std::vector<Message> &messages, uint64_t timetag = 0 ) const;
 	//! Matches the addresses of messages based on the OSC spec.
-	bool patternMatch( const std::string &lhs, const std::string &rhs ) const;
+	static bool patternMatch( const std::string &lhs, const std::string &rhs );
 	
 	//! Abstract bind implementation function.
 	virtual void bindImpl() = 0;
@@ -707,7 +711,7 @@ class ReceiverUdp : public ReceiverBase {
 	//! Sets the amount of bytes to reserve for the datagrams being received.
 	void setAmountToReceive( uint32_t amountToReceive );
 	//! Returns the local udp::endpoint of the underlying socket.
-	asio::ip::udp::endpoint getLocalEndpoint() { return mSocket->local_endpoint(); }
+	asio::ip::udp::endpoint getLocalEndpoint() const { return mSocket->local_endpoint(); }
 	
   protected:
 	//! Opens and Binds the underlying UDP socket to the protocol and localEndpoint respectively. If an error occurs,

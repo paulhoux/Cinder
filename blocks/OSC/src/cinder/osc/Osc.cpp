@@ -31,10 +31,8 @@
 #include "Osc.h"
 #include "cinder/Log.h"
 
-using namespace std;
 using namespace asio;
 using namespace asio::ip;
-using namespace std::placeholders;
 
 // Following code snippets were taken from
 // http://www.jbox.dk/sanos/source/include/net/inet.h.html
@@ -66,13 +64,13 @@ namespace cinder {
 namespace osc {
 	
 /// Convert 32-bit float to a big-endian network format
-inline int32_t htonf( float x ) { return (int32_t) htonl( *(int32_t*) &x ); }
+inline int32_t htonf( float x ) { return int32_t(htonl( *(int32_t*) &x )); }
 /// Convert 64-bit float (double) to a big-endian network format
-inline int64_t htond( double x ) { return (int64_t) htonll( *(int64_t*) &x ); }
+inline int64_t htond( double x ) { return int64_t(htonll( *(int64_t*) &x )); }
 /// Convert 32-bit big-endian network format to float
-inline double ntohf( int32_t x ) { x = ntohl( x ); return *(float*) &x; }
+inline double ntohf( int32_t x ) { x = ntohl( x ); return *reinterpret_cast<float*>(&x); }
 /// Convert 64-bit big-endian network format to double
-inline double ntohd( int64_t x ) { return (double) ntohll( x ); }
+inline double ntohd( int64_t x ) { return double(ntohll( x )); }
 	
 ////////////////////////////////////////////////////////////////////////////////////////
 //// MESSAGE
@@ -88,9 +86,9 @@ Message::Message( const std::string& address )
 }
 	
 Message::Message( Message &&message ) NOEXCEPT
-: mAddress( move( message.mAddress ) ), mDataBuffer( move( message.mDataBuffer ) ),
-	mDataViews( move( message.mDataViews ) ), mIsCached( message.mIsCached ),
-	mCache( move( message.mCache ) ), mSenderIpAddress( move( message.mSenderIpAddress ) )
+: mAddress( std::move( message.mAddress ) ), mDataBuffer( std::move( message.mDataBuffer ) ),
+	mDataViews( std::move( message.mDataViews ) ), mIsCached( message.mIsCached ),
+	mCache( std::move( message.mCache ) ), mSenderIpAddress( std::move( message.mSenderIpAddress ) )
 {
 	for( auto & dataView : mDataViews ) {
 		dataView.mOwner = this;
@@ -100,12 +98,12 @@ Message::Message( Message &&message ) NOEXCEPT
 Message& Message::operator=( Message &&message ) NOEXCEPT
 {
 	if( this != &message ) {
-		mAddress = move( message.mAddress );
-		mDataBuffer = move( message.mDataBuffer );
-		mDataViews = move( message.mDataViews );
+		mAddress = std::move( message.mAddress );
+		mDataBuffer = std::move( message.mDataBuffer );
+		mDataViews = std::move( message.mDataViews );
 		mIsCached = message.mIsCached;
-		mCache = move( message.mCache );
-		mSenderIpAddress = move( message.mSenderIpAddress );
+		mCache = std::move( message.mCache );
+		mSenderIpAddress = std::move( message.mSenderIpAddress );
 		for( auto & dataView : mDataViews ) {
 			dataView.mOwner = this;
 		}
@@ -143,7 +141,7 @@ Message& Message::operator=( const Message &message )
 using Argument = Message::Argument;
 
 Argument::Argument()
-: mOwner( nullptr ), mType( ArgType::NULL_T ), mSize( 0 ), mOffset( -1 )
+: mOwner( nullptr ), mType( ArgType::NULL_T ), mOffset( -1 ), mSize( 0 ), mNeedsEndianSwapForTransmit( false )
 {
 }
 
@@ -199,20 +197,20 @@ bool Argument::operator==(const Argument &arg ) const
 const char* Message::Argument::argTypeToString( ArgType type )
 {
 	switch ( type ) {
-		case ArgType::INTEGER_32: return "INTEGER_32"; break;
-		case ArgType::FLOAT: return "FLOAT"; break;
-		case ArgType::DOUBLE: return "DOUBLE"; break;
-		case ArgType::STRING: return "STRING"; break;
-		case ArgType::BLOB: return "BLOB"; break;
-		case ArgType::MIDI: return "MIDI"; break;
-		case ArgType::TIME_TAG: return "TIME_TAG"; break;
-		case ArgType::INTEGER_64: return "INTEGER_64"; break;
-		case ArgType::BOOL_T: return "BOOL_T"; break;
-		case ArgType::BOOL_F: return "BOOL_F"; break;
-		case ArgType::CHAR: return "CHAR"; break;
-		case ArgType::NULL_T: return "NULL_T"; break;
-		case ArgType::IMPULSE: return "IMPULSE"; break;
-		default: return "Unknown ArgType"; break;
+		case ArgType::INTEGER_32: return "INTEGER_32";
+		case ArgType::FLOAT: return "FLOAT";
+		case ArgType::DOUBLE: return "DOUBLE";
+		case ArgType::STRING: return "STRING";
+		case ArgType::BLOB: return "BLOB";
+		case ArgType::MIDI: return "MIDI";
+		case ArgType::TIME_TAG: return "TIME_TAG";
+		case ArgType::INTEGER_64: return "INTEGER_64";
+		case ArgType::BOOL_T: return "BOOL_T";
+		case ArgType::BOOL_F: return "BOOL_F";
+		case ArgType::CHAR: return "CHAR";
+		case ArgType::NULL_T: return "NULL_T";
+		case ArgType::IMPULSE: return "IMPULSE";
+		default: return "Unknown ArgType";
 	}
 }
 
@@ -269,12 +267,12 @@ void Argument::outputValueToStream( std::ostream &ostream ) const
 		case ArgType::TIME_TAG: ostream << *reinterpret_cast<int64_t*>( &mOwner->mDataBuffer[mOffset] ); break;
 		case ArgType::DOUBLE: ostream << *reinterpret_cast<double*>( &mOwner->mDataBuffer[mOffset] ); break;
 		case ArgType::CHAR: {
-			char v = *reinterpret_cast<char*>( &mOwner->mDataBuffer[mOffset] );
+			const char v = *reinterpret_cast<char*>( &mOwner->mDataBuffer[mOffset] );
 			ostream << int(v);
 		}
 			break;
 		case ArgType::MIDI: {
-			auto ptr = &mOwner->mDataBuffer[mOffset];
+			const auto ptr = &mOwner->mDataBuffer[mOffset];
 			ostream <<	" Port: "	<< int( *( ptr + 0 ) ) <<
 						" Status: " << int( *( ptr + 1 ) ) <<
 						" Data1: "  << int( *( ptr + 2 ) ) <<
@@ -306,7 +304,7 @@ void Message::append( float v )
 void Message::append( const std::string& v )
 {
 	mIsCached = false;
-	auto trailingZeros = getTrailingZeros( v.size() );
+	const auto trailingZeros = getTrailingZeros( v.size() );
 	auto size = v.size() + trailingZeros;
 	mDataViews.emplace_back( this, ArgType::STRING, getCurrentOffset(), size );
 	appendDataBuffer( v.data(), v.size(), trailingZeros );
@@ -315,8 +313,8 @@ void Message::append( const std::string& v )
 void Message::append( const char *v )
 {
 	mIsCached = false;
-	auto stringLength = strlen( v );
-	auto trailingZeros = getTrailingZeros( stringLength );
+	const auto stringLength = strlen( v );
+	const auto trailingZeros = getTrailingZeros( stringLength );
 	auto size = stringLength + trailingZeros;
 	mDataViews.emplace_back( this, ArgType::STRING, getCurrentOffset(), size );
 	appendDataBuffer( v, stringLength, trailingZeros );
@@ -325,7 +323,7 @@ void Message::append( const char *v )
 void Message::appendBlob( void* blob, uint32_t size )
 {
 	mIsCached = false;
-	auto trailingZeros = getTrailingZeros( size );
+	const auto trailingZeros = getTrailingZeros( size );
 	mDataViews.emplace_back( this, ArgType::BLOB, getCurrentOffset(), size, true );
 	appendDataBuffer( &size, sizeof(uint32_t) );
 	appendDataBuffer( blob, size, trailingZeros );
@@ -333,7 +331,7 @@ void Message::appendBlob( void* blob, uint32_t size )
 
 void Message::append( const ci::Buffer &buffer )
 {
-	appendBlob( (void*)buffer.getData(), buffer.getSize() );
+	appendBlob( const_cast<void*>( buffer.getData() ), buffer.getSize() );
 }
 
 void Message::appendTimeTag( uint64_t v )
@@ -398,10 +396,10 @@ void Message::createCache() const
 	// Check for debug to allow for Default Constructing.
 	CI_ASSERT_MSG( mAddress.size() > 0 && mAddress[0] == '/',
 				  "All OSC Address Patterns must at least start with '/' (forward slash)" );
-	
-	size_t addressLen = mAddress.size() + getTrailingZeros( mAddress.size() );
+
+	const size_t addressLen = mAddress.size() + getTrailingZeros( mAddress.size() );
 	// adding one for ',' character, which was the sourc of a particularly ugly bug
-	auto typesSize = mDataViews.size() + 1;
+	const auto typesSize = mDataViews.size() + 1;
 	std::vector<char> typesArray( typesSize + getTrailingZeros( typesSize ) , 0 );
 	
 	typesArray[0] = ',';
@@ -410,9 +408,9 @@ void Message::createCache() const
 		typesArray[i++] = Argument::translateArgTypeToCharType( dataView.getType() );
 	
 	if( ! mCache )
-		mCache = ByteBufferRef( new ByteBuffer() );
-	
-	size_t typesArrayLen = typesArray.size();
+		mCache = std::make_shared<ByteBuffer>();
+
+	const size_t typesArrayLen = typesArray.size();
 	ByteArray<4> sizeArray;
 	int32_t messageSize = addressLen + typesArrayLen + mDataBuffer.size();
 	auto endianSize = htonl( messageSize );
@@ -426,7 +424,7 @@ void Message::createCache() const
 	std::copy( mDataBuffer.begin(),	mDataBuffer.end(),	mCache->begin() + 4 + addressLen + typesArrayLen );
 	
 	// Now that cached (transportable) buffer is created, swap endian for transmit.
-	auto dataPtr = mCache->data() + 4 + addressLen + typesArrayLen;
+	const auto dataPtr = mCache->data() + 4 + addressLen + typesArrayLen;
 	for( auto & dataView : mDataViews ) {
 		if( dataView.needsEndianSwapForTransmit() )
 			dataView.swapEndianForTransmit( dataPtr );
@@ -453,7 +451,7 @@ const Argument& Message::getDataView( uint32_t index ) const
 	
 void Message::appendDataBuffer( const void *begin, uint32_t size, uint32_t trailingZeros )
 {
-	auto ptr = reinterpret_cast<const uint8_t*>( begin );
+	const auto ptr = reinterpret_cast<const uint8_t*>( begin );
 	mDataBuffer.insert( mDataBuffer.end(), ptr, ptr + size );
 	if( trailingZeros != 0 )
 		mDataBuffer.resize( mDataBuffer.size() + trailingZeros, 0 );
@@ -469,23 +467,23 @@ const Argument& Message::operator[]( uint32_t index ) const
 	
 bool Message::operator==( const Message &message ) const
 {
-	auto sameAddress = message.mAddress == mAddress;
+	const auto sameAddress = message.mAddress == mAddress;
 	if( ! sameAddress )
 		return false;
-	
-	auto sameDataViewSize = message.mDataViews.size() == mDataViews.size();
+
+	const auto sameDataViewSize = message.mDataViews.size() == mDataViews.size();
 	if( ! sameDataViewSize )
 		return false;
 	for( size_t i = 0; i < mDataViews.size(); i++ ) {
-		auto sameDataView = message.mDataViews[i] == mDataViews[i];
+		const auto sameDataView = message.mDataViews[i] == mDataViews[i];
 		if( ! sameDataView )
 			return false;
 	}
-	
-	auto sameDataBufferSize = mDataBuffer.size() == message.mDataBuffer.size();
+
+	const auto sameDataBufferSize = mDataBuffer.size() == message.mDataBuffer.size();
 	if( ! sameDataBufferSize )
 		return false;
-	auto sameDataBuffer = ! memcmp( mDataBuffer.data(), message.mDataBuffer.data(), mDataBuffer.size() );
+	const auto sameDataBuffer = ! memcmp( mDataBuffer.data(), message.mDataBuffer.data(), mDataBuffer.size() );
 	if( ! sameDataBuffer )
 		return false;
 	
@@ -551,8 +549,8 @@ void Argument::midi( uint8_t *port, uint8_t *status, uint8_t *data1, uint8_t *da
 {
 	if( ! convertible<int32_t>() )
 		throw ExcNonConvertible( mOwner->getAddress(), ArgType::MIDI, getType() );
-	
-	int32_t midiVal = *reinterpret_cast<const int32_t*>(&mOwner->mDataBuffer[getOffset()]);
+
+	const int32_t midiVal = *reinterpret_cast<const int32_t*>(&mOwner->mDataBuffer[getOffset()]);
 	*port = midiVal;
 	*status = midiVal >> 8;
 	*data1 = midiVal >> 16;
@@ -711,19 +709,19 @@ void Message::getArgBlobData( uint32_t index, const void **dataPtr, size_t *size
 
 bool Message::bufferCache( uint8_t *data, size_t size )
 {
-	uint8_t *head, *tail;
+	uint8_t *tail;
 	uint32_t i = 0;
 	size_t remain = size;
 	
 	// extract address
-	head = tail = data;
+	uint8_t *head = tail = data;
 	while( tail[i] != '\0' && ++i < remain );
 	if( i == remain ) {
 		CI_LOG_E( "Problem Parsing Message: No address." );
 		return false;
 	}
 	
-	mAddress.insert( 0, (char*)head, i );
+	mAddress.insert( 0, reinterpret_cast<char*>( head ), i );
 	
 	head += i + getTrailingZeros( i );
 	remain = size - ( head - data );
@@ -1001,7 +999,7 @@ void SenderUdp::closeImpl()
 ////////////////////////////////////////////////////////////////////////////////////////
 //// SenderTcp
 
-SenderTcp::SenderTcp( uint16_t localPort, const string &destinationHost, uint16_t destinationPort, const protocol &protocol, io_service &service, PacketFramingRef packetFraming )
+SenderTcp::SenderTcp( uint16_t localPort, const std::string &destinationHost, uint16_t destinationPort, const protocol &protocol, io_service &service, PacketFramingRef packetFraming )
 : mSocket( new tcp::socket( service ) ), mPacketFraming( packetFraming ), mLocalEndpoint( protocol, localPort ),
 	mRemoteEndpoint( tcp::endpoint( address::from_string( destinationHost ), destinationPort ) )
 {
@@ -1199,15 +1197,14 @@ bool ReceiverBase::decodeMessage( uint8_t *data, uint32_t size, std::vector<Mess
 	return true;
 }
 
-bool ReceiverBase::patternMatch( const std::string& lhs, const std::string& rhs ) const
+bool ReceiverBase::patternMatch( const std::string& lhs, const std::string& rhs )
 {
 	bool negate = false;
 	bool mismatched = false;
-	std::string::const_iterator seq_tmp;
 	std::string::const_iterator seq = lhs.begin();
-	std::string::const_iterator seq_end = lhs.end();
+	const std::string::const_iterator seq_end = lhs.end();
 	std::string::const_iterator pattern = rhs.begin();
-	std::string::const_iterator pattern_end = rhs.end();
+	const std::string::const_iterator pattern_end = rhs.end();
 	while( seq != seq_end && pattern != pattern_end ) {
 		switch( *pattern ) {
 			case '?':
@@ -1235,7 +1232,7 @@ bool ReceiverBase::patternMatch( const std::string& lhs, const std::string& rhs 
 					//assert(*pattern == ']');
 					// swap c_start and c_end if c_start is larger
 					if( c_start > c_end ) {
-						char tmp = c_start;
+						const char tmp = c_start;
 						c_end = c_start;
 						c_start = tmp;
 					}
@@ -1257,7 +1254,7 @@ bool ReceiverBase::patternMatch( const std::string& lhs, const std::string& rhs 
 			}
 				break;
 			case '{': {
-				seq_tmp = seq;
+				const std::string::const_iterator seq_tmp = seq;
 				mismatched = true;
 				while( *( ++pattern ) != '}' ) {
 					// this assumes that there's no sequence like "{,a}" where ',' is
@@ -1334,8 +1331,8 @@ void ReceiverUdp::listen( OnSocketErrorFn onSocketErrorFn )
 {
 	if ( ! mSocket->is_open() )
 		return;
-	
-	uint32_t prepareAmount = mAmountToReceive.load();
+
+	const uint32_t prepareAmount = mAmountToReceive.load();
 	auto tempBuffer = mBuffer.prepare( prepareAmount );
 	auto uniqueEndpoint = std::make_shared<asio::ip::udp::endpoint>();
 	mSocket->async_receive_from( tempBuffer, *uniqueEndpoint,
@@ -1356,7 +1353,7 @@ void ReceiverUdp::listen( OnSocketErrorFn onSocketErrorFn )
 			mBuffer.commit( bytesTransferred );
 			auto data = std::unique_ptr<uint8_t[]>( new uint8_t[ bytesTransferred + 1 ] );
 			data[ bytesTransferred ] = 0;
-			istream stream( &mBuffer );
+			std::istream stream( &mBuffer );
 			stream.read( reinterpret_cast<char*>( data.get() ), bytesTransferred );
 			dispatchMethods( data.get(), bytesTransferred, uniqueEndpoint->address() );
 		}
@@ -1381,7 +1378,7 @@ ReceiverTcp::~ReceiverTcp()
 }
 
 ReceiverTcp::Connection::Connection( TcpSocketRef socket, ReceiverTcp *receiver, uint64_t identifier )
-: mSocket( socket ), mReceiver( receiver ), mIdentifier( identifier ), mIsConnected( true )
+: mSocket( socket ), mReceiver( receiver ), mIsConnected( true ), mIdentifier( identifier )
 {
 }
 
@@ -1404,9 +1401,9 @@ asio::error_code ReceiverTcp::Connection::shutdown( asio::socket_base::shutdown_
 	return ec;
 }
 	
-using iterator = asio::buffers_iterator<asio::streambuf::const_buffers_type>;
+using Iterator = asio::buffers_iterator<asio::streambuf::const_buffers_type>;
 	
-std::pair<iterator, bool> ReceiverTcp::Connection::readMatchCondition( iterator begin, iterator end )
+std::pair<Iterator, bool> ReceiverTcp::Connection::readMatchCondition( iterator begin, iterator end )
 {
 	iterator i = begin;
 	ByteArray<4> data;
@@ -1446,8 +1443,8 @@ void ReceiverTcp::Connection::read()
 			receiver->closeConnection( mIdentifier );
 		}
 		else {
-			ByteBufferRef data = ByteBufferRef( new ByteBuffer( bytesTransferred ) );
-			istream stream( &mBuffer );
+			ByteBufferRef data = std::make_shared<ByteBuffer>(bytesTransferred);
+			std::istream stream( &mBuffer );
 			stream.read( reinterpret_cast<char*>( data->data() ), bytesTransferred );
 			
 			uint8_t *dataPtr = nullptr;
@@ -1483,16 +1480,16 @@ ReceiverTcp::ReceiverTcp( const protocol::endpoint &localEndpoint, asio::io_serv
 }
 	
 ReceiverTcp::ReceiverTcp( AcceptorRef acceptor, PacketFramingRef packetFraming )
-: mAcceptor( acceptor ), mLocalEndpoint( mAcceptor->local_endpoint() ), mPacketFraming( packetFraming ),
+: mAcceptor( acceptor ), mPacketFraming( packetFraming ), mLocalEndpoint( mAcceptor->local_endpoint() ),
 	mConnectionIdentifiers( 0 ), mIsShuttingDown( false )
 {
 }
 	
 ReceiverTcp::ReceiverTcp( TcpSocketRef socket, PacketFramingRef packetFraming )
-: mAcceptor( nullptr ), mLocalEndpoint( socket->local_endpoint() ), mPacketFraming( packetFraming ),
+: mAcceptor( nullptr ), mPacketFraming( packetFraming ), mLocalEndpoint( socket->local_endpoint() ),
 	mConnectionIdentifiers( 0 ), mIsShuttingDown( false )
 {
-	auto identifier = mConnectionIdentifiers++;
+	const auto identifier = mConnectionIdentifiers++;
 	std::lock_guard<std::mutex> lock( mConnectionMutex );
 	mConnections.emplace_back( new Connection( socket, this, identifier ) );
 	mConnections.back()->read();
@@ -1557,7 +1554,7 @@ void ReceiverTcp::accept( OnAcceptErrorFn onAcceptErrorFn, OnAcceptFn onAcceptFn
 		}
 		
 		accept( onAcceptErrorFn, onAcceptFn );
-	}, socket, _1 ) );
+	}, socket, std::placeholders::_1 ) );
 }
 	
 void ReceiverTcp::setConnectionErrorFn( ConnectionErrorFn errorFn )
@@ -1614,9 +1611,9 @@ asio::error_code ReceiverTcp::closeConnection( uint64_t connectionIdentifier, as
 ByteBufferRef SLIPPacketFraming::encode( ByteBufferRef bufferToEncode )
 {
 	// buffers in this system begin with the size, which will be removed in the case of Packet Framing.
-	auto maxEncodedSize = 2 * (bufferToEncode->size() - 4) + 2;
-	auto encodeBuffer = ByteBufferRef( new ByteBuffer( maxEncodedSize ) );
-	auto finalEncodedSize = encode( bufferToEncode->data() + 4, bufferToEncode->size() - 4, encodeBuffer->data() );
+	const auto maxEncodedSize = 2 * ( bufferToEncode->size() - 4 ) + 2;
+	auto encodeBuffer = std::make_shared<ByteBuffer>(maxEncodedSize);
+	const auto finalEncodedSize = encode( bufferToEncode->data() + 4, bufferToEncode->size() - 4, encodeBuffer->data() );
 	encodeBuffer->resize( finalEncodedSize );
 	return encodeBuffer;
 }
@@ -1624,80 +1621,82 @@ ByteBufferRef SLIPPacketFraming::encode( ByteBufferRef bufferToEncode )
 ByteBufferRef SLIPPacketFraming::decode( ByteBufferRef bufferToDecode )
 {
 	// should not assume double-ENDed variant
-	auto maxDecodedSize = bufferToDecode->size() - 1;
-	auto decodeBuffer = ByteBufferRef( new ByteBuffer( maxDecodedSize ) );
-	auto finalDecodedSize = decode( bufferToDecode->data(), bufferToDecode->size(), decodeBuffer->data() );
+	const auto maxDecodedSize = bufferToDecode->size() - 1;
+	auto decodeBuffer = std::make_shared<ByteBuffer>(maxDecodedSize);
+	const auto finalDecodedSize = decode( bufferToDecode->data(), bufferToDecode->size(), decodeBuffer->data() );
 	decodeBuffer->resize( finalDecodedSize );
 	return decodeBuffer;
 }
 	
-std::pair<iterator, bool> SLIPPacketFraming::messageComplete( iterator begin, iterator end )
+std::pair<Iterator, bool> SLIPPacketFraming::messageComplete( iterator begin, iterator end )
 {
 	iterator i = begin;
 	while( i != end ) {
-		if( i != begin && (uint8_t)*i == SLIP_END ) {
+		if( i != begin && uint8_t( *i ) == SLIP_END ) {
 			// Send back 1 past finding SLIP_END, which in this case will either
 			// be iterator end or the next SLIP_END, beginning the next message
 			return { i + 1, true };
 		}
-		i++;
+		++i;
 	}
 	return { begin, false };
 }
 
 size_t SLIPPacketFraming::encode( const uint8_t* data, size_t size, uint8_t* encodedData )
 {
-	size_t readIDX = 0, writeIDX = 0;
-	
+	size_t readIdx = 0;
+	size_t writeIdx = 0;
+
 	// double-ENDed variant, will flush any accumulated line noise
-	encodedData[writeIDX++] = SLIP_END;
+	encodedData[writeIdx++] = SLIP_END;
 	
-	while (readIDX < size) {
-		uint8_t value = data[readIDX++];
+	while (readIdx < size) {
+	    const uint8_t value = data[readIdx++];
 		
 		if (value == SLIP_END) {
-			encodedData[writeIDX++] = SLIP_ESC;
-			encodedData[writeIDX++] = SLIP_ESC_END;
+			encodedData[writeIdx++] = SLIP_ESC;
+			encodedData[writeIdx++] = SLIP_ESC_END;
 		}
 		else if (value == SLIP_ESC) {
-			encodedData[writeIDX++] = SLIP_ESC;
-			encodedData[writeIDX++] = SLIP_ESC_ESC;
+			encodedData[writeIdx++] = SLIP_ESC;
+			encodedData[writeIdx++] = SLIP_ESC_ESC;
 		}
 		else
-			encodedData[writeIDX++] = value;
+			encodedData[writeIdx++] = value;
 	}
-	encodedData[writeIDX++] = SLIP_END;
+	encodedData[writeIdx++] = SLIP_END;
 	
-	return writeIDX;
+	return writeIdx;
 }
 
 size_t SLIPPacketFraming::decode(const uint8_t* data, size_t size, uint8_t* decodedData)
 {
-	size_t readIDX = 0, writeIDX = 0;
-	
-	while (readIDX < size) {
-		uint8_t value = data[readIDX++];
+	size_t readIdx = 0;
+	size_t writeIdx = 0;
+
+	while ( readIdx < size ) {
+		uint8_t value = data[readIdx++];
 		
 		if (value == SLIP_END) {
 			// flush or done
 		}
 		else if (value == SLIP_ESC) {
-			value = data[readIDX++];
+			value = data[readIdx++];
 			if (value == SLIP_ESC_END) {
-				decodedData[writeIDX++] = SLIP_END;
+				decodedData[writeIdx++] = SLIP_END;
 			}
 			else if (value == SLIP_ESC_ESC) {
-				decodedData[writeIDX++] = SLIP_ESC;
+				decodedData[writeIdx++] = SLIP_ESC;
 			}
 			else {
 				// protocol violation
 			}
 		}
 		else {
-			decodedData[writeIDX++] = value;
+			decodedData[writeIdx++] = value;
 		}
 	}
-	return writeIDX;
+	return writeIdx;
 }
 
 namespace time {
@@ -1705,15 +1704,15 @@ namespace time {
 uint64_t get_current_ntp_time( milliseconds offsetMillis )
 {
 	auto now = std::chrono::system_clock::now() + offsetMillis;
-	auto sec = std::chrono::duration_cast<std::chrono::seconds>( now.time_since_epoch() ).count() + 0x83AA7E80;
-	auto usec = std::chrono::duration_cast<std::chrono::microseconds>( now.time_since_epoch() ).count() + 0x7D91048BCA000;
+	const auto sec = std::chrono::duration_cast<std::chrono::seconds>( now.time_since_epoch() ).count() + 0x83AA7E80;
+	const auto usec = std::chrono::duration_cast<std::chrono::microseconds>( now.time_since_epoch() ).count() + 0x7D91048BCA000;
 	
 	return ( sec << 32 ) + ( usec % 1000000L );
 }
 	
 uint64_t getFutureClockWithOffset( milliseconds offsetFuture, int64_t localOffsetSecs, int64_t localOffsetUSecs )
 {
-	uint64_t ntp_time = get_current_ntp_time( offsetFuture );
+	const uint64_t ntp_time = get_current_ntp_time( offsetFuture );
 	
 	uint64_t secs = ( ntp_time >> 32 ) + localOffsetSecs;
 	int64_t usecs = ( ntp_time & uint32_t( ~0 ) ) + localOffsetUSecs;
@@ -1734,8 +1733,8 @@ void getDate( uint64_t ntpTime, uint32_t *year, uint32_t *month, uint32_t *day, 
 {
 	// Convert to unix timestamp.
 	std::time_t sec_since_epoch = ( ntpTime - ( uint64_t( 0x83AA7E80 ) << 32 ) ) >> 32;
-	
-	auto tm = std::localtime( &sec_since_epoch );
+
+	const auto tm = std::localtime( &sec_since_epoch );
 	if( year ) *year = tm->tm_year + 1900;
 	if( month ) *month = tm->tm_mon + 1;
 	if( day ) *day = tm->tm_mday;
