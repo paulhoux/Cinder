@@ -383,7 +383,20 @@ class CI_API Context {
 	//! Returns the current polygon rasterization mode. \a face must be \c GL_FRONT_AND_BACK.
 	GLenum		getPolygonMode( GLenum face );
 #endif
-	
+
+	//! Allows full control over the origin (GL_LOWER_LEFT or GL_UPPER_LEFT) and depth range (GL_NEGATIVE_ONE_TO_ONE or GL_ZERO_TO_ONE). This is an OpenGL 4.5 feature.
+	void		clipControl( GLenum origin, GLenum depth );
+	//! Pushes the current clip mode. Allows full control over the origin (GL_LOWER_LEFT or GL_UPPER_LEFT) and depth range (GL_NEGATIVE_ONE_TO_ONE or GL_ZERO_TO_ONE). This is an OpenGL 4.5 feature.
+	void		pushClipControl( GLenum origin, GLenum depth );
+	//! Pops the current clip mode. Allows full control over the origin (GL_LOWER_LEFT or GL_UPPER_LEFT) and depth range (GL_NEGATIVE_ONE_TO_ONE or GL_ZERO_TO_ONE). This is an OpenGL 4.5 feature.
+	void		popClipControl( bool forceRefresh = false );
+	//! Returns the current clip mode as a pair of origin and depth mode values. Default is (GL_LOWER_LEFT, GL_NEGATIVE_ONE_TO_ONE). This is an OpenGL 4.5 feature.
+	std::pair<GLenum, GLenum>	getClipMode();
+	//! Returns whether the current clip mode origin is GL_UPPER_LEFT or GL_LOWER_LEFT. Default is GL_LOWER_LEFT. This is an OpenGL 4.5 feature.
+	bool		isClipOriginUpperLeft() const;
+	//! Returns whether the current clip mode depth is GL_ZERO_TO_ONE or GL_NEGATIVE_ONE_TO_ONE. Default is GL_NEGATIVE_ONE_TO_ONE. This is an OpenGL 4.5 feature.
+	bool		isClipDepthZeroToOne() const;
+
 	void		sanityCheck();
 	void		printState( std::ostream &os ) const;
 	
@@ -534,7 +547,9 @@ class CI_API Context {
 
 	std::vector<GLboolean>		mDepthMaskStack;
 	std::vector<GLenum>			mDepthFuncStack;
-	
+
+	std::vector<std::pair<GLenum, GLenum>> mClipControlStack;
+
 	std::map<GLenum,std::vector<GLboolean>>	mBoolStateStack;
 	// map<TextureUnit,map<TextureTarget,vector<Binding ID Stack>>>
 	std::map<uint8_t,std::map<GLenum,std::vector<GLint>>>	mTextureBindingStack;

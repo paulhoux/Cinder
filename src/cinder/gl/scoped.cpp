@@ -425,6 +425,20 @@ ScopedDepthWrite::~ScopedDepthWrite()
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////
+// ScopedClipControl
+
+ScopedClipControl::ScopedClipControl( GLenum origin, GLenum depth )
+	: mCtx( gl::context() )
+{
+	mCtx->pushClipControl( origin, depth );
+}
+
+ScopedClipControl::~ScopedClipControl()
+{
+	mCtx->popClipControl();
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////
 // ScopedRenderbuffer
 ScopedRenderbuffer::ScopedRenderbuffer( const RenderbufferRef &renderBuffer )
 	: mCtx( gl::context() )

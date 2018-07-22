@@ -302,6 +302,16 @@ void CameraPersp::setPerspective( float verticalFovDegrees, float aspectRatio, f
 	mProjectionCached = false;
 }
 
+void CameraPersp::setInfinitePerspective( float verticalFovDegrees, float aspectRatio, float nearPlane )
+{
+	mFov = verticalFovDegrees;
+	mAspectRatio = aspectRatio;
+	mNearClip = nearPlane;
+	mInfiniteFarClip = true;
+
+	mProjectionCached = false;
+}
+
 Ray CameraPersp::calcRay( float uPos, float vPos, float imagePlaneApectRatio ) const
 {
 	calcMatrices();
@@ -343,13 +353,66 @@ void CameraPersp::calcProjection() const
 
 	p[0][2] =  0.0f;
 	p[1][2] =  0.0f;
-	p[2][2] = -( mFarClip + mNearClip ) / ( mFarClip - mNearClip );
-	p[3][2] = -2.0f * mFarClip * mNearClip / ( mFarClip - mNearClip );
+	if( mClipZeroToOne ) {
+		if( mInfiniteFarClip ) {
+			if( mReverseZ ) {
+				// Reversed infinite right-handed perspective projection, one to zero.
+				p[2][2] = 0.0f;
+				p[3][2] = mNearClip;
+			}
+			else {
+				// Infinite right-handed perspective projection, zero to one.
+				p[2][2] = -1.0f;
+				p[3][2] = -mNearClip;
+			}
+		}
+		else {
+			if( mReverseZ ) {
+				// Reversed right-handed perspective projection, one to zero.
+				p[2][2] = mNearClip / ( mFarClip - mNearClip );
+				p[3][2] = ( mFarClip * mNearClip ) / ( mFarClip - mNearClip );
+			}
+			else {
+				// Right-handed perspective projection, zero to one.
+				p[2][2] = mFarClip / ( mNearClip - mFarClip );
+				p[3][2] = -( mFarClip * mNearClip ) / ( mFarClip - mNearClip );
+			}
+		}
+	}
+	else {
+		if( mInfiniteFarClip ) {
+			if( mReverseZ ) {
+				// Reversed infinite right-handed perspective projection, negative one to one.
+				p[2][2] = 1.0f;
+				p[3][2] = 2.0f * mNearClip;
+			}
+			else {
+				// Infinite right-handed perspective projection, negative one to one.
+				p[2][2] = -1.0f;
+				p[3][2] = -2.0f * mNearClip;
+			}
+		}
+		else {
+			if( mReverseZ ) {
+				// Reversed right-handed perspective projection, negative one to one.
+				p[2][2] = ( mFarClip + mNearClip ) / ( mFarClip - mNearClip );
+				p[3][2] = 2.0f * mFarClip * mNearClip / ( mFarClip - mNearClip );
+			}
+			else {
+				// Default right-handed perspective projection, negative one to one.
+				p[2][2] = -( mFarClip + mNearClip ) / ( mFarClip - mNearClip );
+				p[3][2] = -2.0f * mFarClip * mNearClip / ( mFarClip - mNearClip );
+			}
+		}
+	}
 
 	p[0][3] =  0.0f;
 	p[1][3] =  0.0f;
 	p[2][3] = -1.0f;
 	p[3][3] =  0.0f;
+
+	// A huge thank you is due to https://www.wolframalpha.com for inverting the matrices while preserving the formulas.
+	// Example: inverse {{2n/(r-l),0,(r+l)/(r-l),0},{0,2n/(t-b),(t+b)/(t-b),0},{0,0,-(f+n)/(f-n),-2fn/(f-n)},{0,0,-1,0}}
 
 	mat4 &m = mInverseProjectionMatrix;
 	m[0][0] =  ( mFrustumRight - mFrustumLeft ) / ( 2.0f * mNearClip );
@@ -369,8 +432,58 @@ void CameraPersp::calcProjection() const
 
 	m[0][3] =  0.0f;
 	m[1][3] =  0.0f;
-	m[2][3] = -( mFarClip - mNearClip ) / ( 2.0f * mFarClip*mNearClip );
-	m[3][3] =  ( mFarClip + mNearClip ) / ( 2.0f * mFarClip*mNearClip );
+	if( mClipZeroToOne ) {
+		if( mInfiniteFarClip ) {
+			if( mReverseZ ) {
+				// Reversed infinite right-handed perspective projection, one to zero.
+				m[2][3] = 1.0f / mNearClip;
+				m[3][3] = 0.0f;
+			}
+			else {
+				// Infinite right-handed perspective projection, zero to one.
+				m[2][3] = -1.0f / mNearClip;
+				m[3][3] = 1.0f / mNearClip;
+			}
+		}
+		else {
+			if( mReverseZ ) {
+				// Reversed right-handed perspective projection, one to zero.
+				m[2][3] = ( mFarClip - mNearClip ) / ( mFarClip * mNearClip );
+				m[3][3] = 1.0f / mFarClip;
+			}
+			else {
+				// Right-handed perspective projection, zero to one.
+				m[2][3] = ( mNearClip - mFarClip ) / ( mFarClip * mNearClip );
+				m[3][3] = 1.0f / mNearClip;
+			}
+		}
+	}
+	else {
+		if( mInfiniteFarClip ) {
+			if( mReverseZ ) {
+				// Reversed infinite right-handed perspective projection, negative one to one.
+				m[2][3] = 1.0f / ( 2.0f * mNearClip );
+				m[3][3] = 1.0f / ( 2.0f * mNearClip );
+			}
+			else {
+				// Infinite right-handed perspective projection, negative one to one.
+				m[2][3] = -1.0f / ( 2.0f * mNearClip );
+				m[3][3] = 1.0f / ( 2.0f * mNearClip );
+			}
+		}
+		else {
+			if( mReverseZ ) {
+				// Reversed right-handed perspective projection, negative one to one.
+				m[2][3] = ( mFarClip - mNearClip ) / ( 2.0f * mFarClip * mNearClip );
+				m[3][3] = ( mFarClip + mNearClip ) / ( 2.0f * mFarClip * mNearClip );
+			}
+			else {
+				// Default right-handed perspective projection, negative one to one.
+				m[2][3] = ( mNearClip - mFarClip ) / ( 2.0f * mFarClip * mNearClip );
+				m[3][3] = ( mFarClip + mNearClip ) / ( 2.0f * mFarClip * mNearClip );
+			}
+		}
+	}
 
 	mProjectionCached = true;
 }

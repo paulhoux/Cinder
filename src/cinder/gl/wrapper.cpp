@@ -397,6 +397,36 @@ void disableStencilTest()
     gl::disable( GL_STENCIL_TEST );
 }
 
+void clipControl( GLenum origin, GLenum depth )
+{
+	auto ctx = gl::context();
+	ctx->clipControl( origin, depth );
+}
+
+void pushClipControl( GLenum origin, GLenum depth )
+{
+	auto ctx = gl::context();
+	ctx->pushClipControl( origin, depth );
+}
+
+void popClipControl()
+{
+	auto ctx = gl::context();
+	ctx->popClipControl();
+}
+
+bool isClipOriginUpperLeft()
+{
+	auto ctx = gl::context();
+	return ctx->isClipOriginUpperLeft();
+}
+
+bool isClipDepthZeroToOne()
+{
+	auto ctx = gl::context();
+	return ctx->isClipDepthZeroToOne();
+}
+
 void setMatrices( const ci::Camera& cam )
 {
 	auto ctx = context();

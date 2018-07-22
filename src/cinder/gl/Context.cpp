@@ -1599,6 +1599,62 @@ GLenum Context::getPolygonMode( GLenum face )
 	return mPolygonModeStack.back();
 }
 
+void Context::clipControl( GLenum origin, GLenum depth )
+{
+	if( setStackState( mClipControlStack, make_pair( origin, depth ) ) ) {
+		if( glClipControl )
+			glClipControl( origin, depth );
+		else
+			CI_LOG_E( "glClipControl is an OpenGL 4.5 feature and not supported on this system." );
+	}
+}
+
+void Context::pushClipControl( GLenum origin, GLenum depth )
+{
+	if( pushStackState( mClipControlStack, make_pair( origin, depth ) ) ) {
+		if( glClipControl )
+			glClipControl( origin, depth );
+		else
+			CI_LOG_E( "glClipControl is an OpenGL 4.5 feature and not supported on this system." );
+	}
+}
+
+void Context::popClipControl( bool forceRefresh )
+{
+	if( mClipControlStack.empty() )
+		CI_LOG_E( "Clip mode stack underflow" );
+	else if( popStackState( mClipControlStack ) || forceRefresh ) {
+		const auto clipMode = getClipMode();
+		if( glClipControl )
+			glClipControl( clipMode.first, clipMode.second );
+		else
+			CI_LOG_E( "glClipControl is an OpenGL 4.5 feature and not supported on this system." );
+	}
+}
+
+pair<GLenum, GLenum> Context::getClipMode()
+{
+	if( mClipControlStack.empty() ) {
+		mClipControlStack.emplace_back( GL_LOWER_LEFT, GL_NEGATIVE_ONE_TO_ONE );
+	}
+
+	return mClipControlStack.back();
+}
+
+bool Context::isClipOriginUpperLeft() const
+{
+	GLint origin;
+	glGetIntegerv( GL_CLIP_ORIGIN, &origin );
+	return origin == GL_UPPER_LEFT;
+}
+
+bool Context::isClipDepthZeroToOne() const
+{
+	GLint depth;
+	glGetIntegerv( GL_CLIP_DEPTH_MODE, &depth );
+	return depth == GL_ZERO_TO_ONE;
+}
+
 #endif // ! defined( CINDER_GL_ES )
 
 //////////////////////////////////////////////////////////////////////////////////////////

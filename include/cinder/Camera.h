@@ -96,6 +96,19 @@ class CI_API Camera {
 	//! Sets the distance along the view direction to the Far clipping plane.
 	void	setFarClip( float farClip ) { mFarClip = farClip; mProjectionCached = false; }
 
+	//! Returns whether the projection uses depth values between zero and one. Defaults to false.
+	bool	isClipZeroToOne() const { return mClipZeroToOne; }
+	//! Tells the camera to adjust the projection to use depth values between zero and one. Defaults to false.
+	void	setClipZeroToOne( bool enable = true ) { mClipZeroToOne = enable; mProjectionCached = false; }
+	//! Returns whether the Far clipping plane is set to an infinite distance.
+	bool	isInfiniteFarClip() const { return mInfiniteFarClip; }
+	//! Sets the Far clipping plane to an infinite distance.
+	void	setInfiniteFarClip( bool enable = true ) { mInfiniteFarClip = enable; mProjectionCached = false; }
+	//! Returns whether Reverse Z mode is enabled. Use this in combination with gl::clipControl( GL_LOWER_LEFT, GL_ZERO_TO_ONE ) to use the depth values of 1 (near) to 0 (far).
+	bool	isReverseDepthEnabled() const { return mReverseZ; }
+	//! Sets Reverse Z mode. Use this in combination with gl::clipControl( GL_LOWER_LEFT, GL_ZERO_TO_ONE ) to use the depth values of 1 (near) to 0 (far).
+	void	enableReverseDepth( bool enable = true ) { mReverseZ = enable;  mProjectionCached = false; }
+
 	//! Returns the four corners of the Camera's Near clipping plane, expressed in world-space
 	virtual void	getNearClipCoordinates( vec3 *topLeft, vec3 *topRight, vec3 *bottomLeft, vec3 *bottomRight ) const;
 	//! Returns the four corners of the Camera's Far clipping plane, expressed in world-space
@@ -108,6 +121,8 @@ class CI_API Camera {
 	
 	//! Returns the Camera's Projection matrix, which converts view-space into clip-space
 	virtual const mat4&	getProjectionMatrix() const { if( ! mProjectionCached ) calcProjection(); return mProjectionMatrix; }
+	//! Returns the Camera's Inverse Projection matrix, which converts clip-space into view-space
+	virtual const mat4&	getInverseProjectionMatrix() const { if( !mProjectionCached ) calcProjection(); return mInverseProjectionMatrix; }
 	//! Returns the Camera's View matrix, which converts world-space into view-space
 	virtual const mat4&	getViewMatrix() const { if( ! mModelViewCached ) calcViewMatrix(); return mViewMatrix; }
 	//! Returns the Camera's Inverse View matrix, which converts view-space into world-space
@@ -173,6 +188,10 @@ class CI_API Camera {
 	mutable bool	mInverseModelViewCached;
 	
 	mutable float	mFrustumLeft, mFrustumRight, mFrustumTop, mFrustumBottom;
+
+	bool			mClipZeroToOne = false;
+	bool			mInfiniteFarClip = false;
+	bool			mReverseZ = false;
 };
 
 //! A perspective Camera.
@@ -188,6 +207,9 @@ class CI_API CameraPersp : public Camera {
 	//! Configures the camera's projection according to the provided parameters.
 	void	setPerspective( float verticalFovDegrees, float aspectRatio, float nearPlane, float farPlane );
 	
+	//! Configures the camera's projection according to the provided parameters, with the Far clipping plane set to infinite distance.
+	void	setInfinitePerspective( float verticalFovDegrees, float aspectRatio, float nearPlane );
+
 	/** Returns both the horizontal and vertical lens shift. 
 		A horizontal lens shift of 1 (-1) will shift the view right (left) by half the width of the viewport.
 		A vertical lens shift of 1 (-1) will shift the view up (down) by half the height of the viewport. */
