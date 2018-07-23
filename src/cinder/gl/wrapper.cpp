@@ -218,7 +218,7 @@ void clear( const ColorA& color, bool clearDepthBuffer )
 
 void clear( GLbitfield mask )
 {
-    glClear( mask );
+	glClear( mask );
 }
 
 void clearColor( const ColorA &color )
@@ -237,7 +237,11 @@ void clearDepth( const double depth )
 
 void clearDepth( const float depth )
 {
-    glClearDepthf( depth );
+#if ! defined( CINDER_GL_ES )
+    glClearDepth( depth );
+#else
+	glClearDepthf( depth );
+#endif
 }
 
 void clearStencil( const int s )
@@ -381,6 +385,18 @@ void enableDepthWrite( bool enable )
 	ctx->depthMask( enable ? GL_TRUE : GL_FALSE );
 }
 
+bool isDepthReversedEnabled()
+{
+	const auto ctx = gl::context();
+	return ctx->isDepthReversedEnabled();
+}
+
+void enableDepthReversed( bool enable )
+{
+	auto ctx = gl::context();
+	return ctx->depthReversed( enable );
+}
+
 void disableDepthWrite()
 {
 	auto ctx = gl::context();
@@ -403,33 +419,23 @@ void clipControl( GLenum origin, GLenum depth )
 	ctx->clipControl( origin, depth );
 }
 
-void pushClipControl( GLenum origin, GLenum depth )
+GLenum getClipControlOrigin()
 {
-	auto ctx = gl::context();
-	ctx->pushClipControl( origin, depth );
+	const auto ctx = gl::context();
+	return ctx->getClipControlOrigin();
 }
 
-void popClipControl()
+GLenum getClipControlDepthMode()
 {
-	auto ctx = gl::context();
-	ctx->popClipControl();
-}
-
-bool isClipOriginUpperLeft()
-{
-	auto ctx = gl::context();
-	return ctx->isClipOriginUpperLeft();
-}
-
-bool isClipDepthZeroToOne()
-{
-	auto ctx = gl::context();
-	return ctx->isClipDepthZeroToOne();
+	const auto ctx = gl::context();
+	return ctx->getClipControlDepthMode();
 }
 
 void setMatrices( const ci::Camera& cam )
 {
 	auto ctx = context();
+	cam.enableDepthReversed( ctx->isDepthReversedEnabled() );
+	cam.setClipZeroToOne( ctx->getClipControlDepthMode() == GL_ZERO_TO_ONE );
 	ctx->getViewMatrixStack().back() = cam.getViewMatrix();
 	ctx->getProjectionMatrixStack().back() = cam.getProjectionMatrix();
 	ctx->getModelMatrixStack().back() = mat4();

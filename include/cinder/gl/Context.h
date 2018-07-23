@@ -384,18 +384,19 @@ class CI_API Context {
 	GLenum		getPolygonMode( GLenum face );
 #endif
 
-	//! Allows full control over the origin (GL_LOWER_LEFT or GL_UPPER_LEFT) and depth range (GL_NEGATIVE_ONE_TO_ONE or GL_ZERO_TO_ONE). This is an OpenGL 4.5 feature.
+	//! Returns whether clip control is supported on this system. This technique requires the GL_ARB_clip_control extension or OpenGL version 4.5 or greater.
+	bool		isClipControlSupported() const;
+	//! Allows full control over the origin (GL_LOWER_LEFT or GL_UPPER_LEFT) and depth range (GL_NEGATIVE_ONE_TO_ONE or GL_ZERO_TO_ONE).
 	void		clipControl( GLenum origin, GLenum depth );
-	//! Pushes the current clip mode. Allows full control over the origin (GL_LOWER_LEFT or GL_UPPER_LEFT) and depth range (GL_NEGATIVE_ONE_TO_ONE or GL_ZERO_TO_ONE). This is an OpenGL 4.5 feature.
-	void		pushClipControl( GLenum origin, GLenum depth );
-	//! Pops the current clip mode. Allows full control over the origin (GL_LOWER_LEFT or GL_UPPER_LEFT) and depth range (GL_NEGATIVE_ONE_TO_ONE or GL_ZERO_TO_ONE). This is an OpenGL 4.5 feature.
-	void		popClipControl( bool forceRefresh = false );
-	//! Returns the current clip mode as a pair of origin and depth mode values. Default is (GL_LOWER_LEFT, GL_NEGATIVE_ONE_TO_ONE). This is an OpenGL 4.5 feature.
-	std::pair<GLenum, GLenum>	getClipMode();
-	//! Returns whether the current clip mode origin is GL_UPPER_LEFT or GL_LOWER_LEFT. Default is GL_LOWER_LEFT. This is an OpenGL 4.5 feature.
-	bool		isClipOriginUpperLeft() const;
-	//! Returns whether the current clip mode depth is GL_ZERO_TO_ONE or GL_NEGATIVE_ONE_TO_ONE. Default is GL_NEGATIVE_ONE_TO_ONE. This is an OpenGL 4.5 feature.
-	bool		isClipDepthZeroToOne() const;
+	//! Returns whether the current clip control origin is GL_UPPER_LEFT or GL_LOWER_LEFT. Default is GL_LOWER_LEFT.
+	GLenum		getClipControlOrigin() const;
+	//! Returns whether the current clip control depth mode is GL_ZERO_TO_ONE or GL_NEGATIVE_ONE_TO_ONE. Default is GL_NEGATIVE_ONE_TO_ONE.
+	GLenum		getClipControlDepthMode() const;
+
+	//! Returns whether so-called reversed depth (or reversed Z) is enabled. This technique requires the GL_ARB_clip_control extension.
+	bool		isDepthReversedEnabled() const;
+	//! Enables or disables so-called reversed depth (or reversed Z), where depth values range from 1 (near) to 0 (far) instead of the default -1 (near) to 1 (far).
+	void		depthReversed( bool enable = true );
 
 	void		sanityCheck();
 	void		printState( std::ostream &os ) const;
@@ -548,8 +549,6 @@ class CI_API Context {
 	std::vector<GLboolean>		mDepthMaskStack;
 	std::vector<GLenum>			mDepthFuncStack;
 
-	std::vector<std::pair<GLenum, GLenum>> mClipControlStack;
-
 	std::map<GLenum,std::vector<GLboolean>>	mBoolStateStack;
 	// map<TextureUnit,map<TextureTarget,vector<Binding ID Stack>>>
 	std::map<uint8_t,std::map<GLenum,std::vector<GLint>>>	mTextureBindingStack;
@@ -596,6 +595,13 @@ class CI_API Context {
 	std::set<const GlslProg*>		mLiveGlslProgs;
 	std::set<const Vao*>			mLiveVaos;
 	std::set<const Fbo*>			mLiveFbos;
+
+	// Clip control
+	GLenum							mClipControlOrigin;
+	GLenum							mClipControlDepthMode;
+
+	// Reversed depth
+	bool							mReversedDepthEnabled;
 
 	friend class				Environment;
 	

@@ -355,7 +355,7 @@ void CameraPersp::calcProjection() const
 	p[1][2] =  0.0f;
 	if( mClipZeroToOne ) {
 		if( mInfiniteFarClip ) {
-			if( mReverseZ ) {
+			if( mDepthReversed ) {
 				// Reversed infinite right-handed perspective projection, one to zero.
 				p[2][2] = 0.0f;
 				p[3][2] = mNearClip;
@@ -367,7 +367,7 @@ void CameraPersp::calcProjection() const
 			}
 		}
 		else {
-			if( mReverseZ ) {
+			if( mDepthReversed ) {
 				// Reversed right-handed perspective projection, one to zero.
 				p[2][2] = mNearClip / ( mFarClip - mNearClip );
 				p[3][2] = ( mFarClip * mNearClip ) / ( mFarClip - mNearClip );
@@ -381,7 +381,7 @@ void CameraPersp::calcProjection() const
 	}
 	else {
 		if( mInfiniteFarClip ) {
-			if( mReverseZ ) {
+			if( mDepthReversed ) {
 				// Reversed infinite right-handed perspective projection, negative one to one.
 				p[2][2] = 1.0f;
 				p[3][2] = 2.0f * mNearClip;
@@ -393,7 +393,7 @@ void CameraPersp::calcProjection() const
 			}
 		}
 		else {
-			if( mReverseZ ) {
+			if( mDepthReversed ) {
 				// Reversed right-handed perspective projection, negative one to one.
 				p[2][2] = ( mFarClip + mNearClip ) / ( mFarClip - mNearClip );
 				p[3][2] = 2.0f * mFarClip * mNearClip / ( mFarClip - mNearClip );
@@ -434,7 +434,7 @@ void CameraPersp::calcProjection() const
 	m[1][3] =  0.0f;
 	if( mClipZeroToOne ) {
 		if( mInfiniteFarClip ) {
-			if( mReverseZ ) {
+			if( mDepthReversed ) {
 				// Reversed infinite right-handed perspective projection, one to zero.
 				m[2][3] = 1.0f / mNearClip;
 				m[3][3] = 0.0f;
@@ -446,7 +446,7 @@ void CameraPersp::calcProjection() const
 			}
 		}
 		else {
-			if( mReverseZ ) {
+			if( mDepthReversed ) {
 				// Reversed right-handed perspective projection, one to zero.
 				m[2][3] = ( mFarClip - mNearClip ) / ( mFarClip * mNearClip );
 				m[3][3] = 1.0f / mFarClip;
@@ -460,7 +460,7 @@ void CameraPersp::calcProjection() const
 	}
 	else {
 		if( mInfiniteFarClip ) {
-			if( mReverseZ ) {
+			if( mDepthReversed ) {
 				// Reversed infinite right-handed perspective projection, negative one to one.
 				m[2][3] = 1.0f / ( 2.0f * mNearClip );
 				m[3][3] = 1.0f / ( 2.0f * mNearClip );
@@ -472,7 +472,7 @@ void CameraPersp::calcProjection() const
 			}
 		}
 		else {
-			if( mReverseZ ) {
+			if( mDepthReversed ) {
 				// Reversed right-handed perspective projection, negative one to one.
 				m[2][3] = ( mFarClip - mNearClip ) / ( 2.0f * mFarClip * mNearClip );
 				m[3][3] = ( mFarClip + mNearClip ) / ( 2.0f * mFarClip * mNearClip );

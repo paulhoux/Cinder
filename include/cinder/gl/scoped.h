@@ -297,17 +297,6 @@ struct CI_API ScopedDepthWrite : private Noncopyable {
 	Context		*mCtx;
 };
 
-//! Scopes state to control clip mode. See information on `glClipControl()`. This is an OpenGL 4.5 feature.
-struct CI_API ScopedClipControl : private Noncopyable {
-	//! Enables control over the clip origin and depth. This is an OpenGL 4.5 feature.
-	ScopedClipControl( GLenum origin, GLenum depth );
-	//!  Destructor returns state to how it was before this object was constructed.
-	~ScopedClipControl();
-
-  private:
-	Context		*mCtx;
-};
-
 //! Scopes state of Renderbuffer binding
 struct CI_API ScopedRenderbuffer : private Noncopyable {
 	ScopedRenderbuffer( const RenderbufferRef &renderBuffer );

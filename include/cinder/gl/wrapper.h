@@ -159,21 +159,25 @@ CI_API void enableDepthWrite( bool enable = true );
 //! Enables or disables writing to and reading / testing from depth buffer
 CI_API inline void enableDepth( bool enable = true ) { enableDepthRead( enable ); enableDepthWrite( enable ); }
 
+//! Returns whether so-called reversed depth (or reversed Z) is enabled. Will return \c FALSE if `enableDepthReversed( true );` was called but reversed depth is not supported by the system.
+CI_API bool isDepthReversedEnabled();
+//! Enables or disables so-called reversed depth (or reversed Z), where depth values range from 1 (near) to 0 (far) instead of the default -1 (near) to 1 (far).
+//! Use this in combination with a floating point depth buffer to greatly reduce an effect called "pixel fighting" (or Z-fighting). Requires OpenGL 4.5 or the GL_ARB_clip_control extension.
+CI_API void enableDepthReversed( bool enable = true );
+//! Disables so-called reversed depth (or reversed Z). Analogous to `enableDepthReversed( false );`
+CI_API inline void disableDepthReversed() { enableDepthReversed( false ); }
+
 //! Enables or disables the stencil test operation, which controls reading and writing to the stencil buffer. Analagous to `glEnable( GL_STENCIL_TEST, enable );`
 CI_API void enableStencilTest( bool enable = true );
 //! Disables the stencil test operation. Analagous to `glEnable( GL_STENCIL_TEST, false );`
 CI_API void disableStencilTest();
 
-//! Allows full control over the origin (GL_LOWER_LEFT or GL_UPPER_LEFT) and depth range (GL_NEGATIVE_ONE_TO_ONE or GL_ZERO_TO_ONE). This is an OpenGL 4.5 feature.
+//! Allows full control over the origin (GL_LOWER_LEFT or GL_UPPER_LEFT) and depth range (GL_NEGATIVE_ONE_TO_ONE or GL_ZERO_TO_ONE). Analogous to `glClipControl( origin, depth )`. Requires OpenGL 4.5 or the GL_ARB_clip_control extension.
 CI_API void clipControl( GLenum origin, GLenum depth );
-//! Pushes the current clip mode. Allows full control over the origin (GL_LOWER_LEFT or GL_UPPER_LEFT) and depth range (GL_NEGATIVE_ONE_TO_ONE or GL_ZERO_TO_ONE). This is an OpenGL 4.5 feature.
-CI_API void pushClipControl( GLenum origin, GLenum depth );
-//! Pops the current clip mode. Allows full control over the origin (GL_LOWER_LEFT or GL_UPPER_LEFT) and depth range (GL_NEGATIVE_ONE_TO_ONE or GL_ZERO_TO_ONE). This is an OpenGL 4.5 feature.
-CI_API void popClipControl();
-//! Returns whether the current clip mode origin is GL_UPPER_LEFT or GL_LOWER_LEFT. Default is GL_LOWER_LEFT.
-CI_API bool isClipOriginUpperLeft();
-//! Returns whether the current clip mode depth is GL_ZERO_TO_ONE or GL_NEGATIVE_ONE_TO_ONE. Default is GL_NEGATIVE_ONE_TO_ONE.
-CI_API bool isClipDepthZeroToOne();
+//! Returns whether the current clip control origin is GL_UPPER_LEFT or GL_LOWER_LEFT. Default is GL_LOWER_LEFT.
+CI_API GLenum getClipControlOrigin();
+//! Returns whether the current clip control depth mode is GL_ZERO_TO_ONE or GL_NEGATIVE_ONE_TO_ONE. Default is GL_NEGATIVE_ONE_TO_ONE.
+CI_API GLenum getClipControlDepthMode();
  
 //! Sets the View and Projection matrices based on a Camera
 CI_API void setMatrices( const ci::Camera &cam );

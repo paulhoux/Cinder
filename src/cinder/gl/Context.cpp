@@ -59,7 +59,10 @@ namespace cinder { namespace gl {
 Context::Context( const std::shared_ptr<PlatformData> &platformData )
 	: mPlatformData( platformData ),
 	mColor( ColorAf::white() ),
-	mObjectTrackingEnabled( platformData->mObjectTracking )
+	mObjectTrackingEnabled( platformData->mObjectTracking ),
+	mClipControlOrigin( GL_LOWER_LEFT),
+	mClipControlDepthMode( GL_NEGATIVE_ONE_TO_ONE ),
+	mReversedDepthEnabled( false )
 {
 	// set thread's active Context to 'this' in case anything calls gl::context() (like the GlslProg constructor)
 	auto prevCtx = Context::getCurrent();
@@ -1599,60 +1602,42 @@ GLenum Context::getPolygonMode( GLenum face )
 	return mPolygonModeStack.back();
 }
 
+bool Context::isClipControlSupported() const
+{
+	return ( glClipControl != 0 );
+}
+
 void Context::clipControl( GLenum origin, GLenum depth )
 {
-	if( setStackState( mClipControlStack, make_pair( origin, depth ) ) ) {
-		if( glClipControl )
-			glClipControl( origin, depth );
-		else
-			CI_LOG_E( "glClipControl is an OpenGL 4.5 feature and not supported on this system." );
+	if( isClipControlSupported() &&  ( mClipControlOrigin != origin || mClipControlDepthMode != depth ) ) {
+		mClipControlOrigin = origin;
+		mClipControlDepthMode = depth;
+		glClipControl( origin, depth );
 	}
 }
 
-void Context::pushClipControl( GLenum origin, GLenum depth )
+GLenum Context::getClipControlOrigin() const
 {
-	if( pushStackState( mClipControlStack, make_pair( origin, depth ) ) ) {
-		if( glClipControl )
-			glClipControl( origin, depth );
-		else
-			CI_LOG_E( "glClipControl is an OpenGL 4.5 feature and not supported on this system." );
-	}
+	return mClipControlOrigin;
 }
 
-void Context::popClipControl( bool forceRefresh )
+GLenum Context::getClipControlDepthMode() const
 {
-	if( mClipControlStack.empty() )
-		CI_LOG_E( "Clip mode stack underflow" );
-	else if( popStackState( mClipControlStack ) || forceRefresh ) {
-		const auto clipMode = getClipMode();
-		if( glClipControl )
-			glClipControl( clipMode.first, clipMode.second );
-		else
-			CI_LOG_E( "glClipControl is an OpenGL 4.5 feature and not supported on this system." );
-	}
+	return mClipControlDepthMode;
 }
 
-pair<GLenum, GLenum> Context::getClipMode()
+bool Context::isDepthReversedEnabled() const
 {
-	if( mClipControlStack.empty() ) {
-		mClipControlStack.emplace_back( GL_LOWER_LEFT, GL_NEGATIVE_ONE_TO_ONE );
-	}
-
-	return mClipControlStack.back();
+	return mReversedDepthEnabled && getClipControlDepthMode() == GL_ZERO_TO_ONE;
 }
 
-bool Context::isClipOriginUpperLeft() const
+void Context::depthReversed( bool enable )
 {
-	GLint origin;
-	glGetIntegerv( GL_CLIP_ORIGIN, &origin );
-	return origin == GL_UPPER_LEFT;
-}
+	mReversedDepthEnabled = enable;
 
-bool Context::isClipDepthZeroToOne() const
-{
-	GLint depth;
-	glGetIntegerv( GL_CLIP_DEPTH_MODE, &depth );
-	return depth == GL_ZERO_TO_ONE;
+	clipControl( GL_LOWER_LEFT, enable ? GL_ZERO_TO_ONE : GL_NEGATIVE_ONE_TO_ONE );
+	depthFunc( isDepthReversedEnabled() ? GL_GREATER : GL_LESS );
+	clearDepth( isDepthReversedEnabled() ? 0.0 : 1.0 );
 }
 
 #endif // ! defined( CINDER_GL_ES )
