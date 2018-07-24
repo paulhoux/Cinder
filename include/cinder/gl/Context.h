@@ -386,6 +386,7 @@ class CI_API Context {
 
 	//! Returns whether clip control is supported on this system. This technique requires the GL_ARB_clip_control extension or OpenGL version 4.5 or greater.
 	bool		isClipControlSupported() const;
+#if ! defined( CINDER_GL_ES )
 	//! Allows full control over the origin (GL_LOWER_LEFT or GL_UPPER_LEFT) and depth range (GL_NEGATIVE_ONE_TO_ONE or GL_ZERO_TO_ONE).
 	void		clipControl( GLenum origin, GLenum depth );
 	//! Returns whether the current clip control origin is GL_UPPER_LEFT or GL_LOWER_LEFT. Default is GL_LOWER_LEFT.
@@ -397,6 +398,7 @@ class CI_API Context {
 	bool		isDepthReversedEnabled() const;
 	//! Enables or disables so-called reversed depth (or reversed Z), where depth values range from 1 (near) to 0 (far) instead of the default -1 (near) to 1 (far).
 	void		depthReversed( bool enable = true );
+#endif // ! defined( CINDER_GL_ES )
 
 	void		sanityCheck();
 	void		printState( std::ostream &os ) const;
@@ -596,9 +598,11 @@ class CI_API Context {
 	std::set<const Vao*>			mLiveVaos;
 	std::set<const Fbo*>			mLiveFbos;
 
+#if ! defined( CINDER_GL_ES )
 	// Clip control
 	GLenum							mClipControlOrigin;
 	GLenum							mClipControlDepthMode;
+#endif
 
 	// Reversed depth
 	bool							mReversedDepthEnabled;

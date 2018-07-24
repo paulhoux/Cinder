@@ -60,8 +60,10 @@ Context::Context( const std::shared_ptr<PlatformData> &platformData )
 	: mPlatformData( platformData ),
 	mColor( ColorAf::white() ),
 	mObjectTrackingEnabled( platformData->mObjectTracking ),
+#if ! defined( CINDER_GL_ES )
 	mClipControlOrigin( GL_LOWER_LEFT),
 	mClipControlDepthMode( GL_NEGATIVE_ONE_TO_ONE ),
+#endif // ! defined( CINDER_GL_ES )
 	mReversedDepthEnabled( false )
 {
 	// set thread's active Context to 'this' in case anything calls gl::context() (like the GlslProg constructor)
@@ -1601,12 +1603,18 @@ GLenum Context::getPolygonMode( GLenum face )
 
 	return mPolygonModeStack.back();
 }
+#endif // ! defined( CINDER_GL_ES )
 
 bool Context::isClipControlSupported() const
 {
+#if ! defined( CINDER_GL_ES )
 	return ( glClipControl != 0 );
+#else
+	return false;
+#endif // ! defined( CINDER_GL_ES )
 }
 
+#if ! defined( CINDER_GL_ES )
 void Context::clipControl( GLenum origin, GLenum depth )
 {
 	if( isClipControlSupported() &&  ( mClipControlOrigin != origin || mClipControlDepthMode != depth ) ) {

@@ -159,6 +159,7 @@ CI_API void enableDepthWrite( bool enable = true );
 //! Enables or disables writing to and reading / testing from depth buffer
 CI_API inline void enableDepth( bool enable = true ) { enableDepthRead( enable ); enableDepthWrite( enable ); }
 
+#if ! defined( CINDER_GL_ES )
 //! Returns whether so-called reversed depth (or reversed Z) is enabled. Will return \c FALSE if `enableDepthReversed( true );` was called but reversed depth is not supported by the system.
 CI_API bool isDepthReversedEnabled();
 //! Enables or disables so-called reversed depth (or reversed Z), where depth values range from 1 (near) to 0 (far) instead of the default -1 (near) to 1 (far).
@@ -166,6 +167,7 @@ CI_API bool isDepthReversedEnabled();
 CI_API void enableDepthReversed( bool enable = true );
 //! Disables so-called reversed depth (or reversed Z). Analogous to `enableDepthReversed( false );`
 CI_API inline void disableDepthReversed() { enableDepthReversed( false ); }
+#endif // ! defined( CINDER_GL_ES )
 
 //! Enables or disables the stencil test operation, which controls reading and writing to the stencil buffer. Analagous to `glEnable( GL_STENCIL_TEST, enable );`
 CI_API void enableStencilTest( bool enable = true );

@@ -101,6 +101,7 @@ class CI_API Camera {
 	//! Sets the Far clipping plane to an infinite distance.
 	void	setInfiniteFarClip( bool enable = true ) { mProjectionCached &= ( mInfiniteFarClip == enable ); mInfiniteFarClip = enable; }
 
+#if ! defined( CINDER_GL_ES )
 	//! Returns whether the projection uses depth values between zero and one. Defaults to false.
 	bool	isClipZeroToOne() const { return mClipZeroToOne; }
 	//! Tells the camera to adjust the projection to use depth values between zero and one. Defaults to false.
@@ -109,6 +110,7 @@ class CI_API Camera {
 	bool	isDepthReversedEnabled() const { return mDepthReversed; }
 	//! Sets Reverse Z mode. Use this in combination with gl::clipControl( GL_LOWER_LEFT, GL_ZERO_TO_ONE ) to use the depth values of 1 (near) to 0 (far).
 	void	enableDepthReversed( bool enable = true ) const { mProjectionCached &= ( mDepthReversed == enable ); mDepthReversed = enable; }
+#endif
 
 	//! Returns the four corners of the Camera's Near clipping plane, expressed in world-space
 	virtual void	getNearClipCoordinates( vec3 *topLeft, vec3 *topRight, vec3 *bottomLeft, vec3 *bottomRight ) const;
