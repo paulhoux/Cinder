@@ -141,6 +141,31 @@ class CI_API Context {
 	//! Returns a pair<ivec2,ivec2> representing the position of the lower-left corner and the size, respectively of the scissor box
 	std::pair<ivec2, ivec2>	getScissor();
 
+	//! Returns a tuple<GLenum,GLint,GLuint> representing the stencil function, reference and mask
+	std::tuple<GLenum, GLint, GLuint> getStencilFunc();
+	//! Sets the stencil function, reference and mask
+	void setStencilFunc( GLenum func, GLint ref, GLuint mask );
+	//! Pushes the stencil function, reference and mask
+	void pushStencilFunc( GLenum func, GLint ref, GLuint mask );
+	//! Pops the stencil function, reference and mask
+	void popStencilFunc( bool forceRestore = false );
+	//! Returns a tuple<GLenum,GLenum,GLenum> representing the stencil operations fail, zfail and zpass
+	std::tuple<GLenum, GLenum, GLenum> getStencilOp();
+	//! Sets the stencil operations fail, zfail and zpass
+	void setStencilOp( GLenum fail, GLenum zfail, GLenum zpass );
+	//! Pushes the stencil operations fail, zfail and zpass
+	void pushStencilOp( GLenum fail, GLenum zfail, GLenum zpass );
+	//! Pops the stencil operations.
+	void popStencilOp( bool forceRestore = false );
+	//! Returns the stencil mask
+	GLuint getStencilMask();
+	//! Sets the stencil mask
+	void setStencilMask( GLuint mask );
+	//! Pushes the stencil mask
+	void pushStencilMask( GLuint mask );
+	//! Pops the stencil mask
+	void popStencilMask( bool forceRestore = false );
+
 	//! Analogous to glCullFace( \a face ). Valid arguments are \c GL_FRONT and \c GL_BACK.
 	void					cullFace( GLenum face );
 	//! Pushes the cull face \a face. Valid arguments are \c GL_FRONT and \c GL_BACK.
@@ -560,6 +585,10 @@ class CI_API Context {
 	
 	std::vector<std::pair<ivec2,ivec2>>		mViewportStack;
 	std::vector<std::pair<ivec2,ivec2>>		mScissorStack;
+
+	std::vector<std::tuple<GLenum, GLint, GLuint>>  mStencilFuncStack;
+	std::vector<std::tuple<GLenum, GLenum, GLenum>> mStencilOpStack;
+	std::vector<GLuint>								mStencilMaskStack;
 
 	VaoRef						mImmVao; // Immediate-mode VAO
 	VboRef						mImmVbo; // Immediate-mode VBO

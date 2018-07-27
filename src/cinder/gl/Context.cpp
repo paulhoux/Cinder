@@ -389,6 +389,121 @@ std::pair<ivec2, ivec2> Context::getScissor()
 }
 
 //////////////////////////////////////////////////////////////////
+// Stencil Buffer
+std::tuple<GLenum, GLint, GLuint> Context::getStencilFunc()
+{
+	if( mStencilFuncStack.empty() ) {
+		GLint func;
+		GLint ref;
+		GLint mask;
+		glGetIntegerv( GL_STENCIL_FUNC, &func );
+		glGetIntegerv( GL_STENCIL_REF, &ref );
+		glGetIntegerv( GL_STENCIL_VALUE_MASK, &mask );
+		// push twice in anticipation of later pop
+		mStencilFuncStack.push_back( std::make_tuple( GLenum( func ), ref, GLuint( mask ) ) );
+		mStencilFuncStack.push_back( std::make_tuple( GLenum( func ), ref, GLuint( mask ) ) );
+	}
+
+	return mStencilFuncStack.back();
+}
+
+void Context::setStencilFunc( GLenum func, GLint ref, GLuint mask )
+{
+	if( setStackState( mStencilFuncStack, std::make_tuple( func, ref, mask ) ) )
+		glStencilFunc( func, ref, mask );
+}
+
+void Context::pushStencilFunc( GLenum func, GLint ref, GLuint mask )
+{
+	if( pushStackState( mStencilFuncStack, std::make_tuple( func, ref, mask ) ) )
+		glStencilFunc( func, ref, mask );
+}
+
+void Context::popStencilFunc( bool forceRestore )
+{
+	if( mStencilFuncStack.empty() )
+		CI_LOG_E( "Stencil func stack underflow" );
+	else if( popStackState( mStencilFuncStack ) || forceRestore ) {
+		auto stencilFunc = getStencilFunc();
+		glStencilFunc( std::get<0>( stencilFunc ), std::get<1>( stencilFunc ), std::get<2>( stencilFunc ) );
+	}
+}
+
+std::tuple<GLenum, GLenum, GLenum> Context::getStencilOp()
+{
+	if( mStencilOpStack.empty() ) {
+		GLint fail;
+		GLint zfail;
+		GLint zpass;
+		glGetIntegerv( GL_STENCIL_FAIL, &fail );
+		glGetIntegerv( GL_STENCIL_PASS_DEPTH_FAIL, &zfail );
+		glGetIntegerv( GL_STENCIL_PASS_DEPTH_PASS, &zpass );
+		// push twice in anticipation of later pop
+		mStencilOpStack.push_back( std::make_tuple( GLenum( fail ), GLenum( zfail ), GLenum( zpass ) ) );
+		mStencilOpStack.push_back( std::make_tuple( GLenum( fail ), GLenum( zfail ), GLenum( zpass ) ) );
+	}
+
+	return mStencilOpStack.back();
+}
+
+void Context::setStencilOp( GLenum fail, GLenum zfail, GLenum zpass )
+{
+	if( setStackState( mStencilOpStack, std::make_tuple( fail, zfail, zpass ) ) )
+		glStencilOp( fail, zfail, zpass );
+}
+
+void Context::pushStencilOp( GLenum fail, GLenum zfail, GLenum zpass )
+{
+	if( pushStackState( mStencilOpStack, std::make_tuple( fail, zfail, zpass ) ) )
+		glStencilOp( fail, zfail, zpass );
+}
+
+void Context::popStencilOp( bool forceRestore )
+{
+	if( mStencilOpStack.empty() )
+		CI_LOG_E( "Stencil op stack underflow" );
+	else if( popStackState( mStencilOpStack ) || forceRestore ) {
+		auto stencilOp = getStencilOp();
+		glStencilFunc( std::get<0>( stencilOp ), std::get<1>( stencilOp ), std::get<2>( stencilOp ) );
+	}
+}
+
+GLuint Context::getStencilMask()
+{
+	if( mStencilMaskStack.empty() ) {
+		GLint mask;
+		glGetIntegerv( GL_STENCIL_WRITEMASK, &mask );
+		// push twice in anticipation of later pop
+		mStencilMaskStack.push_back( GLuint( mask ) );
+		mStencilMaskStack.push_back( GLuint( mask ) );
+	}
+
+	return mStencilMaskStack.back();
+}
+
+void Context::setStencilMask( GLuint mask )
+{
+	if( setStackState( mStencilMaskStack, mask ) )
+		glStencilMask( mask );
+}
+
+void Context::pushStencilMask( GLuint mask )
+{
+	if( pushStackState( mStencilMaskStack, mask ) )
+		glStencilMask( mask );
+}
+
+void Context::popStencilMask( bool forceRestore )
+{
+	if( mStencilMaskStack.empty() )
+		CI_LOG_E( "Stencil mask stack underflow" );
+	else if( popStackState( mStencilMaskStack ) || forceRestore ) {
+		auto mask = getStencilMask();
+		glStencilMask( mask );
+	}
+}
+
+//////////////////////////////////////////////////////////////////
 // Face Culling
 void Context::cullFace( GLenum face )
 {

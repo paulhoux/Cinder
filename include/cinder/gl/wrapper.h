@@ -102,6 +102,12 @@ CI_API void depthMask( GLboolean flag );
 CI_API void stencilFunc( GLenum func, GLint ref, GLuint mask );
 CI_API void stencilOp( GLenum fail, GLenum zfail, GLenum zpass );
 CI_API void stencilMask( GLuint mask );
+CI_API void pushStencilFunc( GLenum func, GLint ref, GLuint mask );
+CI_API void pushStencilOp( GLenum fail, GLenum zfail, GLenum zpass );
+CI_API void pushStencilMask( GLuint mask );
+CI_API void popStencilFunc();
+CI_API void popStencilOp();
+CI_API void popStencilMask();
 
 CI_API std::pair<ivec2, ivec2> getViewport();
 CI_API void viewport( const std::pair<ivec2, ivec2> positionAndSize );

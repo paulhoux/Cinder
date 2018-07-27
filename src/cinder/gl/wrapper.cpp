@@ -258,17 +258,56 @@ void depthMask( GLboolean flag )
 
 void stencilFunc( GLenum func, GLint ref, GLuint mask )
 {
-    glStencilFunc( func, ref, mask );
+	auto ctx = gl::context();
+	ctx->setStencilFunc( func, ref, mask );
 }
 
 void stencilOp( GLenum fail, GLenum zfail, GLenum zpass )
 {
-    glStencilOp( fail, zfail, zpass );
+	auto ctx = gl::context();
+	ctx->setStencilOp( fail, zfail, zpass );
 }
 
 void stencilMask( GLuint mask )
 {
-	glStencilMask( mask );
+	auto ctx = gl::context();
+	ctx->setStencilMask( mask );
+}
+
+void pushStencilFunc( GLenum func, GLint ref, GLuint mask )
+{
+	auto ctx = gl::context();
+	ctx->pushStencilFunc( func, ref, mask );
+}
+
+void pushStencilOp( GLenum fail, GLenum zfail, GLenum zpass )
+{
+	auto ctx = gl::context();
+	ctx->pushStencilOp( fail, zfail, zpass );
+}
+
+void pushStencilMask( GLuint mask )
+{
+	auto ctx = gl::context();
+	ctx->pushStencilMask( mask );
+}
+
+void popStencilFunc()
+{
+	auto ctx = gl::context();
+	ctx->popStencilFunc();
+}
+
+void popStencilOp()
+{
+	auto ctx = gl::context();
+	ctx->popStencilOp();
+}
+
+void popStencilMask()
+{
+	auto ctx = gl::context();
+	ctx->popStencilMask();
 }
 
 std::pair<ivec2, ivec2> getViewport()
