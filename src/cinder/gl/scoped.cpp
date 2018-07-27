@@ -320,6 +320,25 @@ ScopedScissor::~ScopedScissor()
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////
+// ScopedStencil
+ScopedStencil::ScopedStencil( GLenum func, GLint ref, GLuint bits, GLenum fail, GLenum zfail, GLenum zpass, GLuint mask )
+	: mCtx( gl::context() )
+{
+	mCtx->pushBoolState( GL_STENCIL_TEST, GL_TRUE );
+	mCtx->pushStencilFunc( func, ref, bits );
+	mCtx->pushStencilOp( fail, zfail, zpass );
+	mCtx->pushStencilMask( mask );
+}
+
+ScopedStencil::~ScopedStencil()
+{
+	mCtx->popStencilMask();
+	mCtx->popStencilOp();
+	mCtx->popStencilFunc();
+	mCtx->popBoolState( GL_STENCIL_TEST );
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////
 // ScopedFaceCulling
 ScopedFaceCulling::ScopedFaceCulling( bool cull )
 	: mCtx( gl::context() ), mSaveFace( false )

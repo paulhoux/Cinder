@@ -197,6 +197,16 @@ struct CI_API ScopedScissor : private Noncopyable {
 	Context					*mCtx;
 };
 
+struct CI_API ScopedStencil : private Noncopyable {
+	//! Implicitly enables stencil test. The \a bits parameter is used as mask in the glStencilFunc() call.
+	//! The \a mask parameter is used for the glStencilMask() call.
+	ScopedStencil( GLenum func, GLint ref, GLuint bits, GLenum fail, GLenum zfail, GLenum zpass, GLuint mask );
+	~ScopedStencil();
+
+  private:
+	Context					*mCtx;
+};
+
 struct CI_API ScopedViewport : private Noncopyable {
 	ScopedViewport( const ivec2 &lowerLeftPosition, const ivec2 &dimension );
 	ScopedViewport( const ivec2 &size );
