@@ -29,6 +29,7 @@
 #include "cinder/gl/Context.h"
 #include "cinder/gl/Vao.h"
 #include "cinder/gl/Texture.h"
+#include "cinder/Utilities.h"
 
 #if ! defined( CINDER_GL_ES )
 
@@ -318,6 +319,9 @@ std::string	EnvironmentCore::generateFragmentShader( const ShaderDef &shader )
 		s +=	" * vec4( vec3( lambert ), 1.0 )";
 
 	s +=	";\n";
+
+	if( shader.mGamma != 1.0f && shader.mGamma > 0.0f )
+		s +=	"	oColor.rgb = pow( oColor.rgb, vec3( " + toString( 1.0f / shader.mGamma ) + " ) );\n";
 	
 	s +=	"}";
 	

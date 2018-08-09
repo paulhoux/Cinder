@@ -41,6 +41,7 @@ class CI_API ShaderDef {
 	ShaderDef&		texture( const TextureRef &tex = TextureRef() );
 	ShaderDef&		texture( GLenum target );
 	ShaderDef&		lambert();
+	ShaderDef&		gamma( float gamma = 2.2f );
 	// Used by draw(TextureRef&) stock shader; scales ciPosition and ciTexCoord according to
 	// uniform "uPositionScale", "uPositionOffset", "uTexCoord0Scale", "uTexCoord0Offset"
 	ShaderDef&		uniformBasedPosAndTexCoord();
@@ -61,6 +62,8 @@ class CI_API ShaderDef {
 
 	bool					mColor;
 	bool					mLambert;
+
+	float					mGamma;
 	
 	friend class EnvironmentCore;
 	friend class EnvironmentEs;
