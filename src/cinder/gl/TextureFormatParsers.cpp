@@ -23,11 +23,6 @@
 
 #include "cinder/gl/TextureFormatParsers.h"
 
-#if defined( CINDER_GL_ANGLE )
-#define GL_COMPRESSED_RGBA_S3TC_DXT3_EXT	GL_COMPRESSED_RGBA_S3TC_DXT3_ANGLE
-#define GL_COMPRESSED_RGBA_S3TC_DXT5_EXT	GL_COMPRESSED_RGBA_S3TC_DXT5_ANGLE
-#endif
-
 namespace cinder { namespace gl {
 
 void parseKtx( const DataSourceRef &dataSource, TextureData *resultData )

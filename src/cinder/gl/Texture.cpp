@@ -93,11 +93,6 @@ using namespace std;
 
 namespace cinder { namespace gl {
 
-#if defined( CINDER_GL_ANGLE )
-	#define GL_COMPRESSED_RGBA_S3TC_DXT3_EXT	GL_COMPRESSED_RGBA_S3TC_DXT3_ANGLE
-	#define GL_COMPRESSED_RGBA_S3TC_DXT5_EXT	GL_COMPRESSED_RGBA_S3TC_DXT5_ANGLE
-#endif
-
 class ImageSourceTexture;
 class ImageTargetTexture;
 

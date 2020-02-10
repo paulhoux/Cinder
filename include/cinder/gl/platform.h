@@ -41,13 +41,15 @@
 	#if defined( CINDER_GL_ES_2 )
 		//#include "GLES2/gl2.h"
 		//#include "GLES2/gl2ext.h"
-		#include "glad/glad_es.h"
+        #include <windows.h> // Prevents `APIENTRY macro redefinition` warnings.
+		#include <glad/glad_es.h>
  		#define CINDER_GL_ES_VERSION CINDER_GL_ES_VERSION_2
 	#else
 		//#include "GLES3/gl3.h"
 		//#include "GLES3/gl3ext.h"
 		//#include "GLES2/gl2ext.h"
-		#include "glad/glad_es.h"
+        #include <windows.h> // Prevents `APIENTRY macro redefinition` warnings.
+		#include <glad/glad_es.h>
 		#define CINDER_GL_ES_3
  		#define CINDER_GL_ES_VERSION CINDER_GL_ES_VERSION_3
 	#endif
@@ -110,14 +112,17 @@
  		#define CINDER_GL_ES
 		#define CINDER_GL_ES_VERSION CINDER_GL_ES_VERSION_3_2
 	#else
-		#include "glad/glad.h"
+		#include <glad/glad.h>
 	#endif
 #elif ! defined( CINDER_COCOA_TOUCH ) // OS X
 	#if defined( __clang__ )
 		#pragma clang diagnostic push
 		#pragma clang diagnostic ignored "-Wtypedef-redefinition"
 	#endif
-	#include "glad/glad.h"
+    #if defined( CINDER_MSW )
+        #include <windows.h> // Prevents `APIENTRY macro redefinition` warnings.
+    #endif
+	#include <glad/glad.h>
 	#if defined( __clang__ )
 		#pragma clang diagnostic pop
 	#endif
@@ -218,14 +223,6 @@
 #if defined( CINDER_MSW_DESKTOP )
 	// both ANGLE and desktop have FBO Multisampling
 	#define CINDER_GL_HAS_FBO_MULTISAMPLING
-	// platform-specific synonyms
-	#if defined( CINDER_GL_ANGLE ) && ! defined( CINDER_GL_ES_3 )
-		#define GL_READ_FRAMEBUFFER					GL_READ_FRAMEBUFFER_ANGLE
-		#define GL_DRAW_FRAMEBUFFER					GL_DRAW_FRAMEBUFFER_ANGLE
-		#define GL_READ_FRAMEBUFFER_BINDING			GL_READ_FRAMEBUFFER_BINDING_ANGLE
-		#define GL_DRAW_FRAMEBUFFER_BINDING			GL_DRAW_FRAMEBUFFER_BINDING_ANGLE
-		#define glRenderbufferStorageMultisample	glRenderbufferStorageMultisampleANGLE
-	#endif
 #endif // defined( CINDER_MSW_DESKTOP )
 
 #if defined( GL_EXT_debug_label )

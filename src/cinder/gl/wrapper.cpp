@@ -28,7 +28,7 @@
 #include "cinder/Log.h"
 
 #if defined( CINDER_MSW )
-	#include "glad/glad_wgl.h"
+	#include <glad/glad_wgl.h>
 #elif defined( CINDER_MAC )
 	#include <OpenGL/OpenGL.h>
 #elif defined( CINDER_LINUX )
@@ -228,7 +228,7 @@ void clearColor( const ColorA &color )
 
 void clearDepth( const double depth )
 {
-#if ! defined( CINDER_GL_ES )
+#if ! defined( glClearDepthf )
     glClearDepth( depth );
 #else
 	glClearDepthf( depth );
@@ -237,7 +237,11 @@ void clearDepth( const double depth )
 
 void clearDepth( const float depth )
 {
-    glClearDepthf( depth );
+#if ! defined( glClearDepthf )
+    glClearDepth( depth );
+#else
+	glClearDepthf( depth );
+#endif
 }
 
 void clearStencil( const int s )

@@ -28,10 +28,11 @@
 #include "cinder/app/RendererGl.h"
 #include "cinder/gl/Context.h"
 #include "cinder/gl/Environment.h"
-#include "glad/glad_wgl.h"
 #include "cinder/app/AppBase.h"
 #include "cinder/Camera.h"
 #include "cinder/Log.h"
+
+#include <glad/glad_wgl.h>
 #include <windowsx.h>
 
 namespace cinder { namespace app {

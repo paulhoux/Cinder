@@ -176,10 +176,10 @@ void VaoImplCore::vertexAttribDivisorImpl( GLuint index, GLuint divisor )
 	}
   #endif	
 #else
-	if( glVertexAttribDivisor )
-		glVertexAttribDivisor( index, divisor );
-	else if( glVertexAttribDivisorARB )
-		glVertexAttribDivisorARB( index, divisor );
+    if( GLAD_GL_VERSION_3_3 )
+        glVertexAttribDivisor( index, divisor );
+    else if( isExtensionAvailable( "GL_ARB_instanced_arrays" ) )
+        glVertexAttribDivisorARB( index, divisor );
 #endif
 
 /*
