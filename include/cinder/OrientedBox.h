@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2010-2015, The Cinder Project: http://libcinder.org
+ Copyright (c) 2010-2020, The Cinder Project: http://libcinder.org
  All rights reserved.
 
  Redistribution and use in source and binary forms, with or without modification, are permitted provided that
@@ -22,6 +22,7 @@
 
 #pragma once
 
+#include "AxisAlignedBox.h"
 #include "cinder/Matrix.h"
 #include "cinder/Ray.h"
 #include "cinder/Sphere.h"
@@ -29,31 +30,60 @@
 
 namespace cinder {
 
-class CI_API AxisAlignedBox {
+class CI_API OrientedBox {
 public:
-	AxisAlignedBox() : mCenter( 0 ), mExtents( 0 ) {}
-	AxisAlignedBox( const vec3 &min, const vec3 &max ) { set( min, max ); }
+	OrientedBox() : mCenter( 0 ), mExtentsX( 0 ), mExtentsY( 0 ), mExtentsZ( 0 ), mSize( 0 ) {}
+	OrientedBox( const vec3 &min, const vec3 &max ) { set( min, max ); }
+	OrientedBox( const mat4 &m ) : mCenter( m[3] ), mExtentsX( m[0] ), mExtentsY( m[1] ), mExtentsZ( m[2] )
+	{
+		mSize = 2.0f * vec3( glm::length( mExtentsX ), glm::length( mExtentsY ), glm::length( mExtentsZ ) );
+	}
+	explicit OrientedBox( const AxisAlignedBox &aabb )
+	{
+		mCenter = aabb.getCenter();
+		mExtentsX = vec3( aabb.getExtents().x, 0, 0 );
+		mExtentsY = vec3( 0, aabb.getExtents().y, 0 );
+		mExtentsZ = vec3( 0, 0, aabb.getExtents().z );
+		mSize = 2.0f * vec3( glm::length( mExtentsX ), glm::length( mExtentsY ), glm::length( mExtentsZ ) );
+	}
 
 	//! Returns the center of the axis-aligned box.
 	const vec3& getCenter() const { return mCenter; }
 
-	//! Returns the extents of the axis-aligned box.
-	const vec3& getExtents() const { return mExtents; }
+	//! Returns the X-axis extents of the box.
+	const vec3& getExtentsX() const { return mExtentsX; }
+	//! Returns the Y-axis extents of the box.
+	const vec3& getExtentsY() const { return mExtentsY; }
+	//! Returns the Z-axis extents of the box.
+	const vec3& getExtentsZ() const { return mExtentsZ; }
 
-	//! Returns the size of the axis-aligned box. 
-	vec3 getSize() const { return 2.0f * mExtents; }
+	//! Returns the size of the box.
+	const vec3& getSize() const { return mSize; }
 
-	//! Returns the corner of the axis-aligned box with the smallest x, y and z coordinates.
-	vec3 getMin() const { return mCenter - mExtents; }
+	//! Returns the corner of the oriented box with the smallest x, y and z coordinates.
+	vec3 getMin() const { return mCenter - mExtentsX - mExtentsY - mExtentsZ; }
 
-	//! Returns the corner of the axis-aligned box with the largest x, y and z coordinates.
-	vec3 getMax() const { return mCenter + mExtents; }
+	//! Returns the corner of the oriented box with the largest x, y and z coordinates.
+	vec3 getMax() const { return mCenter + mExtentsX + mExtentsY + mExtentsZ; }
 
-	//! Construct an axis-aligned box by specifying two opposite corners.
+	//! Construct an oriented box by specifying two opposite corners.
 	void set( const vec3 &min, const vec3 &max )
 	{
+		const vec3 e = 0.5f * ( max - min );
 		mCenter = 0.5f * ( min + max );
-		mExtents = glm::abs( max - mCenter );
+		mExtentsX = vec3( glm::max( e.x, FLT_MIN ), 0, 0 );
+		mExtentsY = vec3( 0, glm::max( e.y, FLT_MIN ), 0 );
+		mExtentsZ = vec3( 0, 0, glm::max( e.z, FLT_MIN ) );
+		mSize = 2.0f * vec3( glm::length( mExtentsX ), glm::length( mExtentsY ), glm::length( mExtentsZ ) );
+	}
+	//! Construct an oriented box from the given matrix.
+	void set( const mat4 &m )
+	{
+		mCenter = vec3( m[3] );
+		mExtentsX = vec3( m[0] );
+		mExtentsY = vec3( m[1] );
+		mExtentsZ = vec3( m[2] );
+		mSize = 2.0f * vec3( glm::length( mExtentsX ), glm::length( mExtentsY ), glm::length( mExtentsZ ) );
 	}
 
 	//! Expands the box so that it contains \a point.
@@ -69,6 +99,23 @@ public:
 	{
 		vec3 min = glm::min( getMin(), box.getMin() );
 		vec3 max = glm::max( getMax(), box.getMax() );
+		set( min, max );
+	}
+
+	//! Expands the box so that it contains \a box.
+	void include( const OrientedBox &box )
+	{
+		vec3 min = glm::min( getMin(), box.getMin() );
+		vec3 max = glm::max( getMax(), box.getMax() );
+		set( min, max );
+	}
+
+	//! Expands the box so that it contains \a sphere.
+	void include( const Sphere &sphere )
+	{
+		const vec3 extents = sphere.getRadius() * glm::normalize( glm::abs( mExtentsX + mExtentsY + mExtentsZ ) );
+		const vec3 min = glm::min( getMin(), sphere.getCenter() - extents );
+		const vec3 max = glm::max( getMax(), sphere.getCenter() + extents );
 		set( min, max );
 	}
 
@@ -117,13 +164,39 @@ public:
 	//! Returns \c true if the axis-aligned box contains \a point.
 	bool contains( const vec3 &point ) const
 	{
-		return glm::all( glm::lessThanEqual( glm::abs( point - mCenter ), mExtents ) );
+		const vec3 pos = point - mCenter;
+
+		vec3 dst;
+		dst.x = glm::abs( glm::dot( pos, mExtentsX ) );
+		dst.y = glm::abs( glm::dot( pos, mExtentsY ) );
+		dst.z = glm::abs( glm::dot( pos, mExtentsZ ) );
+
+		return glm::all( glm::lessThanEqual( dst, vec3( 1 ) ) );
 	}
 
-	//! Returns \c true if the axis-aligned boxes intersect.
+	//! Returns \c true if the boxes intersect.
 	bool intersects( const AxisAlignedBox &box ) const
 	{
-		return glm::all( glm::lessThanEqual( glm::abs( box.mCenter - mCenter ), box.mExtents + mExtents ) );
+		return intersects( OrientedBox( box ) );
+	}
+
+	//! Returns \c true if the boxes intersect.
+	bool intersects( const OrientedBox &box ) const
+	{
+		const auto xSq = glm::length2( box.getExtentsX() );
+		const auto ySq = glm::length2( box.getExtentsY() );
+		const auto zSq = glm::length2( box.getExtentsZ() );
+
+		const auto pos = mCenter - box.getCenter();
+		const auto x = glm::clamp( glm::dot( pos, box.getExtentsX() ), -xSq, xSq );
+		const auto y = glm::clamp( glm::dot( pos, box.getExtentsY() ), -ySq, ySq );
+		const auto z = glm::clamp( glm::dot( pos, box.getExtentsZ() ), -zSq, zSq );
+
+		const auto closest = ( x / glm::max( xSq, FLT_MIN ) ) * box.getExtentsX() + ( y / glm::max( ySq, FLT_MIN ) ) * box.getExtentsY() + ( z / glm::max( zSq, FLT_MIN ) ) * box.getExtentsZ();
+
+		const auto distanceSq = glm::length2( pos - closest );
+		const auto aRadiusSq = glm::length2( mExtentsX + mExtentsY + mExtentsZ );
+		return distanceSq < aRadiusSq;
 	}
 
 	//! Returns \c true if the axis-aligned box intersects \a sphere.
@@ -175,10 +248,10 @@ public:
 	//! Given a plane through the origin with \a normal, returns the minimum and maximum distance to the axis-aligned box.
 	void project( const vec3 &normal, float *min, float *max ) const
 	{
-		float p = glm::dot( normal, mCenter );
-		float d = glm::dot( glm::abs( normal ), mExtents );
-		*min = p - d;
-		*max = p + d;
+		const float c = glm::dot( mCenter, normal );
+		const float x = glm::abs( glm::dot( mExtentsX, normal ) ) + glm::abs( glm::dot( mExtentsY, normal ) ) + glm::abs( glm::dot( mExtentsZ, normal ) );
+		*min = c - x;
+		*max = c + x;
 	}
 
 	//! Given a plane through the origin with \a normal, returns the corner closest to the plane.
@@ -217,36 +290,36 @@ public:
 		return result;
 	}
 
-	//! Converts axis-aligned box to another coordinate space.
+	//! Converts oriented box to another coordinate space.
 	void transform( const mat4 &transform )
 	{
-		mat3 m = mat3( transform );
-		vec3 x = m * vec3( mExtents.x, 0, 0 );
-		vec3 y = m * vec3( 0, mExtents.y, 0 );
-		vec3 z = m * vec3( 0, 0, mExtents.z );
-
-		mExtents = glm::abs( x ) + glm::abs( y ) + glm::abs( z );
 		mCenter = vec3( transform * vec4( mCenter, 1 ) );
+		const mat3 m{ transform };
+		mExtentsX = m * mExtentsX;
+		mExtentsY = m * mExtentsY;
+		mExtentsZ = m * mExtentsZ;
+		mSize = 2.0f * vec3( glm::length( mExtentsX ), glm::length( mExtentsY ), glm::length( mExtentsZ ) );
 	}
 
-	//! Converts axis-aligned box to another coordinate space.
-	AxisAlignedBox transformed( const mat4 &transform ) const
+	//! Converts oriented box to another coordinate space.
+	OrientedBox transformed( const mat4 &transform ) const
 	{
-		mat3 m = mat3( transform );
-		vec3 x = m * vec3( mExtents.x, 0, 0 );
-		vec3 y = m * vec3( 0, mExtents.y, 0 );
-		vec3 z = m * vec3( 0, 0, mExtents.z );
-
-		AxisAlignedBox result;
-		result.mExtents = glm::abs( x ) + glm::abs( y ) + glm::abs( z );
+		OrientedBox result;
 		result.mCenter = vec3( transform * vec4( mCenter, 1 ) );
-
+		const mat3 m{ transform };
+		result.mExtentsX = m * mExtentsX;
+		result.mExtentsY = m * mExtentsY;
+		result.mExtentsZ = m * mExtentsZ;
+		result.mSize = 2.0f * vec3( glm::length( result.mExtentsX ), glm::length( result.mExtentsY ), glm::length( result.mExtentsZ ) );
 		return result;
 	}
 
 protected:
 	vec3  mCenter;
-	vec3  mExtents;
+	vec3  mExtentsX;
+	vec3  mExtentsY;
+	vec3  mExtentsZ;
+	vec3  mSize;
 };
 
 } // namespace cinder

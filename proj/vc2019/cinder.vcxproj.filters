@@ -744,7 +744,6 @@
     <ClCompile Include="..\..\src\cinder\gl\VboMesh.cpp">
       <Filter>Source Files\gl</Filter>
     </ClCompile>
-
     <ClCompile Include="..\..\src\cinder\GeomIo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -2197,6 +2196,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\include\cinder\FileWatcher.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\cinder\OrientedBox.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

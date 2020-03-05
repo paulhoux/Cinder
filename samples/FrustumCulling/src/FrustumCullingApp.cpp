@@ -26,11 +26,11 @@
 #include "cinder/gl/gl.h"
 
 #include "cinder/AxisAlignedBox.h"
-#include "cinder/Frustum.h"
 #include "cinder/CameraUi.h"
+#include "cinder/Frustum.h"
 #include "cinder/ObjLoader.h"
-#include "cinder/Text.h"
 #include "cinder/Rand.h"
+#include "cinder/Text.h"
 #include "cinder/Timeline.h"
 #include "cinder/Utilities.h"
 
@@ -39,60 +39,63 @@
 const int NUM_OBJECTS = 1600;
 
 using namespace ci;
-using namespace ci::app;
+using namespace app;
 using namespace std;
 
-class FrustumCullingReduxApp : public App {
-public:
+class FrustumCullingReduxApp final : public App {
+  public:
 	static void prepareSettings( Settings *settings );
 
-	void setup();
-	void update();
-	void draw();
+	void setup() override;
+	void update() override;
+	void draw() override;
 
 	void toggleCullableFov();
-	void drawCullableFov();
+	void drawCullableFov() const;
 
-	void keyDown( KeyEvent event );
+	void keyDown( KeyEvent event ) override;
 
 	void resize() override;
 
-protected:
+  protected:
 	//! Load the heart shaped mesh.
 	void loadObject();
 	//! Renders the help menu.
 	void renderHelpToTexture();
 
-protected:
+  protected:
 	// keep track of time
-	double  mCurrentSeconds;
+	double mCurrentSeconds = 0.0;
 
 	// flags
-	bool  mPerformCulling;
-	bool  mCullWithSpheres;
-	bool  mDrawWorldSpaceBounds;
-	bool  mDrawObjectSpaceBounds;
-	bool  mShowRevealingFov;
-	bool  mShowHelp;
+	bool mPerformCulling = true;
+	bool mCullWithSpheres = true;
+	bool mDrawWorldSpaceBounds = false;
+	bool mDrawObjectSpaceBounds = true;
+	bool mShowRevealingFov = true;
+	bool mShowHelp = true;
 
-	Anim<float>                     mCullingFov;
+	Anim<float> mCullingFov;
 
-	ci::TriMeshRef                  mTriMesh;
-	gl::BatchRef                    mBatch, mSphereBatch, mBoxBatch, mGridBatch;
+	TriMeshRef   mTriMesh;
+	gl::BatchRef mBatch;
+	gl::BatchRef mSphereBatch;
+	gl::BatchRef mBoxBatch;
+	gl::BatchRef mGridBatch;
 
 	// caches the heart's bounding box and sphere in object space coordinates
-	AxisAlignedBox                mObjectBoundingBox;
-	Sphere                          mObjectBoundingSphere;
+	AxisAlignedBox mObjectBoundingBox;
+	Sphere         mObjectBoundingSphere;
 
 	// objects
-	std::vector<CullableObjectRef>  mObjects;
+	std::vector<CullableObjectRef> mObjects;
 
 	// camera
-	CameraUi                        mCamUi;
-	CameraPersp                     mRenderCam;
+	CameraUi    mCamUi;
+	CameraPersp mRenderCam;
 
 	// help text
-	gl::Texture2dRef                mHelp;
+	gl::Texture2dRef mHelp;
 };
 
 void FrustumCullingReduxApp::prepareSettings( Settings *settings )
@@ -107,14 +110,6 @@ void FrustumCullingReduxApp::setup()
 	// in frame rate if culling is enabled.
 	gl::enableVerticalSync( false );
 
-	// Intialize settings.
-	mPerformCulling = true;
-	mCullWithSpheres = true;
-	mDrawWorldSpaceBounds = false;
-	mDrawObjectSpaceBounds = true;
-	mShowRevealingFov = true;
-	mShowHelp = true;
-
 	// Render help texture.
 	renderHelpToTexture();
 
@@ -122,26 +117,26 @@ void FrustumCullingReduxApp::setup()
 	loadObject();
 
 	// Create a few hearts.
-	int sz = (int) math<double>::sqrt( NUM_OBJECTS );
+	const auto sz = int( math<double>::sqrt( NUM_OBJECTS ) );
 
 	Rand::randomize();
 	mObjects.resize( NUM_OBJECTS );
-	for( int i = 0; i < NUM_OBJECTS; ++i ) {
-		vec3 pos = 100.0f * vec3( i % sz - sz / 2, 0, i / sz - sz / 2 );
-		vec3 rot = vec3( 0, Rand::randFloat( -360, 360 ), 0 );
-		float scale = 50.0f;
+	for( auto i = 0; i < NUM_OBJECTS; ++i ) {
+		auto       pos = 100.0f * vec3( i % sz - sz / 2, 0, i / sz - sz / 2 );
+		auto       rot = vec3( 0, Rand::randFloat( -360, 360 ), 0 );
+		const auto scale = 50.0f;
 
 		auto &obj = mObjects[i];
-		obj = CullableObjectRef( new CullableObject( mBatch ) );
+		obj = std::make_shared<CullableObject>( mBatch );
 		obj->setTransform( pos, rot, scale );
 	}
 
 	// Create bounding box and sphere representations.
-	mSphereBatch = gl::Batch::create( geom::WireSphere(), gl::getStockShader( gl::ShaderDef().color() ) );
-	mBoxBatch = gl::Batch::create( geom::WireCube(), gl::getStockShader( gl::ShaderDef().color() ) );
+	mSphereBatch = gl::Batch::create( geom::WireSphere(), getStockShader( gl::ShaderDef().color() ) );
+	mBoxBatch = gl::Batch::create( geom::WireCube(), getStockShader( gl::ShaderDef().color() ) );
 
 	// Create grid.
-	mGridBatch = gl::Batch::create( geom::WirePlane().size( vec2( 4000 ) ).subdivisions( ivec2( 80, 80 ) ), gl::getStockShader( gl::ShaderDef().color() ) );
+	mGridBatch = gl::Batch::create( geom::WirePlane().size( vec2( 4000 ) ).subdivisions( ivec2( 80, 80 ) ), getStockShader( gl::ShaderDef().color() ) );
 
 	// Setup the camera.
 	mCullingFov = 45.0f;
@@ -157,23 +152,23 @@ void FrustumCullingReduxApp::setup()
 void FrustumCullingReduxApp::update()
 {
 	// Calculate elapsed time.
-	double elapsed = getElapsedSeconds() - mCurrentSeconds;
+	const auto elapsed = getElapsedSeconds() - mCurrentSeconds;
 	mCurrentSeconds += elapsed;
 
 	// perform frustum culling **********************************************************************************
 
-	// Save the current culling field of view. If mShowRevealingFov = true, 
+	// Save the current culling field of view. If mShowRevealingFov = true,
 	// this will narrow the camera's FOV so that you can see the culling effect.
-	float originalFov = mRenderCam.getFov();
+	const auto originalFov = mRenderCam.getFov();
 	mRenderCam.setFov( mCullingFov );
 
 	// Obtain the camera's view frustum, allowing us to perform frustum culling.
-	Frustumf visibleWorld( mRenderCam );
+	const Frustumf visibleWorld( mRenderCam );
 
 	// Restore FOV to original
 	mRenderCam.setFov( originalFov );
 
-	for( auto & obj : mObjects ) {
+	for( auto &obj : mObjects ) {
 		// Update object (so it rotates slowly around its axis).
 		obj->update( elapsed );
 
@@ -200,7 +195,7 @@ void FrustumCullingReduxApp::update()
 
 	// Update window title.
 	if( getElapsedFrames() % 60 == 0 )
-		getWindow()->setTitle( "Frustum Culling Redux - " + toString( (int) getAverageFps() ) + " FPS" );
+		getWindow()->setTitle( "Frustum Culling Redux - " + toString( int( getAverageFps() ) ) + " FPS" );
 }
 
 void FrustumCullingReduxApp::draw()
@@ -218,12 +213,12 @@ void FrustumCullingReduxApp::draw()
 		gl::enableDepthWrite();
 
 		// Draw all objects.
-		for( auto & obj : mObjects )
+		for( auto &obj : mObjects )
 			obj->draw();
 
 		// Draw bounding volumes.
 		if( mDrawWorldSpaceBounds ) {
-			for( auto & obj : mObjects ) {
+			for( auto &obj : mObjects ) {
 				// Use cyan bounds if not culled, orange bounds if culled.
 				if( !obj->isCulled() )
 					gl::color( Color( 0, 1, 1 ) );
@@ -339,6 +334,8 @@ void FrustumCullingReduxApp::keyDown( KeyEvent event )
 	case KeyEvent::KEY_SPACE:
 		toggleCullableFov();
 		break;
+	default:
+		break;
 	}
 
 	// Update help menu.
@@ -360,12 +357,12 @@ void FrustumCullingReduxApp::toggleCullableFov()
 	timeline().apply( &mCullingFov, mShowRevealingFov ? 45.0f : 60.0f, 0.6f, EaseInOutCubic() );
 }
 
-void FrustumCullingReduxApp::drawCullableFov()
+void FrustumCullingReduxApp::drawCullableFov() const
 {
 	// Visualize the camera's field of view as a rectangle.
 	gl::ScopedColor color( Color( 1, 1, 1 ) );
 
-	float cullable = mCullingFov / 60.0f;
+	const auto cullable = mCullingFov / 60.0f;
 	if( cullable >= 1.0f )
 		return;
 
@@ -379,15 +376,15 @@ void FrustumCullingReduxApp::drawCullableFov()
 void FrustumCullingReduxApp::loadObject()
 {
 	try {
-		// We first convert our obj to a trimesh, so we can calculate the bounding box and sphere.
+		// We first convert our obj to a TriMesh, so we can calculate the bounding box and sphere.
 		mTriMesh = TriMesh::create( ObjLoader( loadAsset( "models/heart.obj" ) ) );
 
-		// We then use trimesh to calculate the bounding box and sphere.
+		// We then use TriMesh to calculate the bounding box and sphere.
 		mObjectBoundingBox = mTriMesh->calcBoundingBox();
 		mObjectBoundingSphere = Sphere::calculateBoundingSphere( mTriMesh->getPositions<3>(), mTriMesh->getNumVertices() );
 
-		// Then use our trimesh and a shader to create a batch.
-		auto shader = gl::GlslProg::create( loadAsset( "shaders/phong.vert" ), loadAsset( "shaders/phong.frag" ) );
+		// Then use our TriMesh and a shader to create a batch.
+		const auto shader = gl::GlslProg::create( loadAsset( "shaders/phong.vert" ), loadAsset( "shaders/phong.frag" ) );
 		mBatch = gl::Batch::create( *mTriMesh, shader );
 	}
 	catch( const std::exception &e ) {
