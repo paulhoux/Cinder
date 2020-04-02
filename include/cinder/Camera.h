@@ -37,7 +37,12 @@ class Sphere;
 //! Base Camera class, which manages the projection and view matrices for a 3-dimensional scene, as well as providing mapping functionality.
 class CI_API Camera {
   public:
-	virtual ~Camera() {}
+	virtual ~Camera() = default;
+
+	Camera( const Camera & ) = default;
+	Camera( Camera && ) = default;
+	Camera &operator=( const Camera & ) = default;
+	Camera &operator=( Camera && ) = default;
 
 	//! Returns the position in world-space from which the Camera is viewing
 	vec3		getEyePoint() const { return mEyePoint; }
@@ -70,9 +75,9 @@ class CI_API Camera {
 	//! Sets the camera's vertical field of view measured in degrees.
 	void	setFov( float verticalFov ) { mFov = verticalFov;  mProjectionCached = false; }
 	//! Returns the camera's horizontal field of view measured in degrees.
-	float	getFovHorizontal() const { return toDegrees( 2.0f * math<float>::atan( math<float>::tan( toRadians(mFov) * 0.5f ) * mAspectRatio ) ); }
+	float	getFovHorizontal() const { return toDegrees( 2.0f * glm::atan( glm::tan( toRadians(mFov) * 0.5f ) * mAspectRatio ) ); }
 	//! Sets the camera's horizontal field of view measured in degrees.
-	void	setFovHorizontal( float horizontalFov ) { mFov = toDegrees( 2.0f * math<float>::atan( math<float>::tan( toRadians( horizontalFov ) * 0.5f ) / mAspectRatio ) );  mProjectionCached = false; }
+	void	setFovHorizontal( float horizontalFov ) { mFov = toDegrees( 2.0f * glm::atan( glm::tan( toRadians( horizontalFov ) * 0.5f ) / mAspectRatio ) );  mProjectionCached = false; }
 	//! Returns the camera's focal length, calculating it based on the field of view.
 	float	getFocalLength() const;
 
@@ -122,8 +127,12 @@ class CI_API Camera {
 
 	//! Converts a world-space coordinate \a worldCoord to screen coordinates as viewed by the camera, based on a screen which is \a screenWidth x \a screenHeight pixels.
 	vec2 worldToScreen( const vec3 &worldCoord, float screenWidth, float screenHeight ) const;
+	//! Converts a world-space coordinate \a worldCoord to screen coordinates as viewed by the camera, based on a screen which is \a screenWidth x \a screenHeight pixels.
+	vec2 worldToScreen( const vec3 &worldCoord, const vec2 &screenSizePixels ) const { return worldToScreen( worldCoord, screenSizePixels.x, screenSizePixels. y ); };
 	//! Converts a eye-space coordinate \a eyeCoord to screen coordinates as viewed by the camera
-	vec2 eyeToScreen( const vec3 &eyeCoord, const vec2 &screenSizePixels ) const;
+	vec2 eyeToScreen( const vec3 &eyeCoord, float screenWidth, float screenHeight ) const;
+	//! Converts a eye-space coordinate \a eyeCoord to screen coordinates as viewed by the camera
+	vec2 eyeToScreen( const vec3 &eyeCoord, const vec2 &screenSizePixels ) const { return eyeToScreen( eyeCoord, screenSizePixels.x, screenSizePixels. y ); }
 	//! Converts a world-space coordinate \a worldCoord to eye-space, also known as camera-space. -Z is along the view direction.
 	vec3 worldToEye( const vec3 &worldCoord ) const	{ return vec3( getViewMatrix() * vec4( worldCoord, 1 ) ); }
 	//! Converts a world-space coordinate \a worldCoord to the z axis of eye-space, also known as camera-space. -Z is along the view direction. Suitable for depth sorting.
@@ -185,9 +194,9 @@ class CI_API CameraPersp : public Camera {
 	//! Creates a default camera with eyePoint at ( 28, 21, 28 ), looking at the origin, 35deg vertical field-of-view and a 1.333 aspect ratio.
 	CameraPersp();
 	//! Constructs screen-aligned camera
-	CameraPersp( int pixelWidth, int pixelHeight, float fov );
+	CameraPersp( int pixelWidth, int pixelHeight, float fovDegrees );
 	//! Constructs screen-aligned camera
-	CameraPersp( int pixelWidth, int pixelHeight, float fov, float nearPlane, float farPlane );
+	CameraPersp( int pixelWidth, int pixelHeight, float fovDegrees, float nearPlane, float farPlane );
 
 	//! Configures the camera's projection according to the provided parameters.
 	void	setPerspective( float verticalFovDegrees, float aspectRatio, float nearPlane, float farPlane );
@@ -224,13 +233,13 @@ class CI_API CameraPersp : public Camera {
 	//! Returns a Camera whose eyePoint is positioned to exactly frame \a worldSpaceSphere but is equivalent in other parameters (including orientation). Sets the result's pivotDistance to be the distance to \a worldSpaceSphere's center.
 	CameraPersp		calcFraming( const Sphere &worldSpaceSphere ) const;
 
-	//! Returns a subdivided portion of this camera's view frustrum as a new CameraPersp; useful for multi-gpu or tiled-rendering for instance.
+	//! Returns a subdivided portion of this camera's view frustum as a new CameraPersp; useful for multi-gpu or tiled-rendering for instance.
 	CameraPersp		subdivide( const glm::uvec2& gridSize, const glm::uvec2& gridIndex ) const;
   protected:
 	vec2	mLensShift;
 
 	void	calcProjection() const override;
-	Ray		calcRay( float u, float v, float imagePlaneAspectRatio ) const override;
+	Ray		calcRay( float uPos, float vPos, float imagePlaneAspectRatio ) const override;
 };
 
 //! An orthographic Camera.
@@ -248,20 +257,20 @@ class CI_API CameraOrtho : public Camera {
 
   protected:
 	void	calcProjection() const override;
-	Ray		calcRay( float u, float v, float imagePlaneAspectRatio ) const override;
+	Ray		calcRay( float uPos, float vPos, float imagePlaneAspectRatio ) const override;
 };
 
 //! A Camera used for stereoscopic displays.
 class CI_API CameraStereo : public CameraPersp {
   public:
 	CameraStereo() 
-		: mConvergence( 1.0f ), mEyeSeparation( 0.05f ), mIsStereo( false ), mIsLeft( true ) {}
+		: mIsStereo( false ), mIsLeft( true ), mConvergence( 1.0f ), mEyeSeparation( 0.05f ) {}
 	CameraStereo( int pixelWidth, int pixelHeight, float fov )
 		: CameraPersp( pixelWidth, pixelHeight, fov ), 
-		mConvergence( 1.0f ), mEyeSeparation( 0.05f ), mIsStereo( false ), mIsLeft( true ) {} // constructs screen-aligned camera
+		mIsStereo( false ), mIsLeft( true ), mConvergence( 1.0f ), mEyeSeparation( 0.05f ) {} // constructs screen-aligned camera
 	CameraStereo( int pixelWidth, int pixelHeight, float fov, float nearPlane, float farPlane )
 		: CameraPersp( pixelWidth, pixelHeight, fov, nearPlane, farPlane ), 
-		mConvergence( 1.0f ), mEyeSeparation( 0.05f ), mIsStereo( false ), mIsLeft( true ) {} // constructs screen-aligned camera
+		mIsStereo( false ), mIsLeft( true ), mConvergence( 1.0f ), mEyeSeparation( 0.05f ) {} // constructs screen-aligned camera
 
 	//! Returns the current convergence, which is the distance at which there is no parallax.
 	float			getConvergence() const { return mConvergence; }

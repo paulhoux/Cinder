@@ -28,13 +28,11 @@
 #include "cinder/Frustum.h"
 
 #include "cinder/CinderMath.h"
-#include "cinder/Matrix33.h"
 
 #include "glm/glm.hpp"
 #include "glm/gtc/quaternion.hpp"
 #include "glm/gtx/quaternion.hpp"
 #include "glm/gtc/matrix_access.hpp"
-#include "glm/gtc/matrix_transform.hpp"
 
 #include <algorithm>
 
@@ -90,10 +88,10 @@ void Camera::lookAt( const vec3 &eyePoint, const vec3 &target )
 	mModelViewCached = false;
 }
 
-void Camera::lookAt( const vec3 &eyePoint, const vec3 &target, const vec3 &aWorldUp )
+void Camera::lookAt( const vec3 &eyePoint, const vec3 &target, const vec3 &up )
 {
 	mEyePoint = eyePoint;
-	mWorldUp = normalize( aWorldUp );
+	mWorldUp = normalize( up );
 	mViewDirection = normalize( target - mEyePoint );
 	mOrientation = glm::toQuat( alignZAxisWithTarget( -mViewDirection, mWorldUp ) );
 	mPivotDistance = distance( target, mEyePoint );
@@ -120,23 +118,14 @@ void Camera::getBillboardVectors( vec3 *right, vec3 *up ) const
 
 vec2 Camera::worldToScreen( const vec3 &worldCoord, float screenWidth, float screenHeight ) const
 {
-	vec4 eyeCoord = getViewMatrix() * vec4( worldCoord, 1 );
-	vec4 ndc = getProjectionMatrix() * eyeCoord;
-	ndc.x /= ndc.w;
-	ndc.y /= ndc.w;
-	ndc.z /= ndc.w;
-
-	return vec2( ( ndc.x + 1.0f ) / 2.0f * screenWidth, ( 1.0f - ( ndc.y + 1.0f ) / 2.0f ) * screenHeight );
+	const vec4 eyeCoord = getViewMatrix() * vec4( worldCoord, 1 );
+	return eyeToScreen( eyeCoord, screenWidth, screenHeight );
 }
 
-vec2 Camera::eyeToScreen( const vec3 &eyeCoord, const vec2 &screenSizePixels ) const
+vec2 Camera::eyeToScreen( const vec3 &eyeCoord, float screenWidth, float screenHeight ) const
 {
-	vec4 ndc = getProjectionMatrix() * vec4( eyeCoord, 1 );
-	ndc.x /= ndc.w;
-	ndc.y /= ndc.w;
-	ndc.z /= ndc.w;
-
-	return vec2( ( ndc.x + 1.0f ) / 2.0f * screenSizePixels.x, ( 1.0f - ( ndc.y + 1.0f ) / 2.0f ) * screenSizePixels.y );
+	const vec4 ndc = getProjectionMatrix() * vec4( eyeCoord, 1 );
+	return vec2( ( ndc.x / ndc.w + 1.0f ) / 2.0f * screenWidth, ( 1.0f - ( ndc.y / ndc.w + 1.0f ) / 2.0f ) * screenHeight );
 }
 
 float Camera::worldToEyeDepth( const vec3 &worldCoord ) const
@@ -148,23 +137,22 @@ float Camera::worldToEyeDepth( const vec3 &worldCoord ) const
 			m[3][2];
 }
 
-
 vec3 Camera::worldToNdc( const vec3 &worldCoord ) const
 {
-	vec4 eye = getViewMatrix() * vec4( worldCoord, 1 );
-	vec4 unproj = getProjectionMatrix() * eye;
-	return vec3( unproj.x / unproj.w, unproj.y / unproj.w, unproj.z / unproj.w );
+	const vec4 eye = getViewMatrix() * vec4( worldCoord, 1 );
+	const vec4 projected = getProjectionMatrix() * eye;
+	return vec3( projected.x / projected.w, projected.y / projected.w, projected.z / projected.w );
 }
 
 float Camera::calcScreenArea( const Sphere &sphere, const vec2 &screenSizePixels ) const
 {
-	Sphere camSpaceSphere( vec3( getViewMatrix()*vec4(sphere.getCenter(), 1.0f) ), sphere.getRadius() );
+	const Sphere camSpaceSphere( vec3( getViewMatrix()*vec4(sphere.getCenter(), 1.0f) ), sphere.getRadius() );
 	return camSpaceSphere.calcProjectedArea( getFocalLength(), screenSizePixels );
 }
 
 void Camera::calcScreenProjection( const Sphere &sphere, const vec2 &screenSizePixels, vec2 *outCenter, vec2 *outAxisA, vec2 *outAxisB ) const
 {
-	auto toScreenPixels = [=] ( vec2 v, const vec2 &windowSize ) {
+	auto toScreenPixels = [=] ( const vec2 &v, const vec2 &windowSize ) {
 		vec2 result = v;
 		result.x *= 1 / ( windowSize.x / windowSize.y );
 		result += vec2( 0.5f );
@@ -172,7 +160,7 @@ void Camera::calcScreenProjection( const Sphere &sphere, const vec2 &screenSizeP
 		return result;
 	};
 
-	Sphere camSpaceSphere( vec3( getViewMatrix()*vec4(sphere.getCenter(), 1.0f) ), sphere.getRadius() );
+	const Sphere camSpaceSphere( vec3( getViewMatrix()*vec4(sphere.getCenter(), 1.0f) ), sphere.getRadius() );
 	vec2 center, axisA, axisB;
 	camSpaceSphere.calcProjection( getFocalLength(), &center, &axisA, &axisB );
 	if( outCenter )
@@ -194,8 +182,8 @@ void Camera::calcViewMatrix() const
 	mW = - normalize( mViewDirection );
 	mU = glm::rotate( mOrientation, glm::vec3( 1, 0, 0 ) );
 	mV = glm::rotate( mOrientation, glm::vec3( 0, 1, 0 ) );
-	
-	vec3 d( - dot( mEyePoint, mU ), - dot( mEyePoint, mV ), - dot( mEyePoint, mW ) );
+
+	const vec3 d( - dot( mEyePoint, mU ), - dot( mEyePoint, mV ), - dot( mEyePoint, mW ) );
 
 	mat4 &m = mViewMatrix;
 	m[0][0] = mU.x; m[1][0] = mU.y; m[2][0] = mU.z; m[3][0] =  d.x;
@@ -238,14 +226,14 @@ CameraPersp::CameraPersp()
 
 CameraPersp::CameraPersp( int pixelWidth, int pixelHeight, float fovDegrees )
 {
-	float eyeX 		= pixelWidth / 2.0f;
-	float eyeY 		= pixelHeight / 2.0f;
-	float halfFov 	= 3.14159f * fovDegrees / 360.0f;
-	float theTan 	= cinder::math<float>::tan( halfFov );
-	float dist 		= eyeY / theTan;
-	float nearDist 	= dist / 10.0f;	// near / far clip plane
-	float farDist 	= dist * 10.0f;
-	float aspect 	= pixelWidth / (float)pixelHeight;
+	const float eyeX = float( pixelWidth ) * 0.5f;
+	const float eyeY = float( pixelHeight ) * 0.5f;
+	const float halfFov = 3.14159f * fovDegrees / 360.0f;
+	const float theTan = glm::tan( halfFov );
+	const float dist = eyeY / theTan;
+	const float nearDist = dist / 10.0f; // near / far clip plane
+	const float farDist = dist * 10.0f;
+	const float aspect = float( pixelWidth ) / float( pixelHeight );
 
 	setPerspective( fovDegrees, aspect, nearDist, farDist );
 	lookAt( vec3( eyeX, eyeY, dist ), vec3( eyeX, eyeY, 0.0f ) );
@@ -253,14 +241,12 @@ CameraPersp::CameraPersp( int pixelWidth, int pixelHeight, float fovDegrees )
 
 CameraPersp::CameraPersp( int pixelWidth, int pixelHeight, float fovDegrees, float nearPlane, float farPlane )
 {
-	float halfFov, theTan, aspect;
-
-	float eyeX 		= pixelWidth / 2.0f;
-	float eyeY 		= pixelHeight / 2.0f;
-	halfFov 		= 3.14159f * fovDegrees / 360.0f;
-	theTan 			= cinder::math<float>::tan( halfFov );
-	float dist 		= eyeY / theTan;
-	aspect 			= pixelWidth / (float)pixelHeight;
+	const float eyeX = float( pixelWidth ) * 0.5f;
+	const float eyeY = float( pixelHeight ) * 0.5f;
+	const float halfFov = 3.14159f * fovDegrees / 360.0f;
+	const float theTan = glm::tan( halfFov );
+	const float dist = eyeY / theTan;
+	const float aspect = float( pixelWidth ) / float( pixelHeight );
 
 	setPerspective( fovDegrees, aspect, nearPlane, farPlane );
 	lookAt( vec3( eyeX, eyeY, dist ), vec3( eyeX, eyeY, 0.0f ) );
@@ -280,15 +266,15 @@ Ray CameraPersp::calcRay( float uPos, float vPos, float imagePlaneAspectRatio ) 
 {
 	calcMatrices();
 
-	float s = ( uPos - 0.5f + 0.5f * mLensShift.x ) * imagePlaneAspectRatio;
-	float t = ( vPos - 0.5f + 0.5f * mLensShift.y );
-	float viewDistance = imagePlaneAspectRatio / math<float>::abs( mFrustumRight - mFrustumLeft ) * mNearClip;
+	const float s = ( uPos - 0.5f + 0.5f * mLensShift.x ) * imagePlaneAspectRatio;
+	const float t = ( vPos - 0.5f + 0.5f * mLensShift.y );
+	const float viewDistance = imagePlaneAspectRatio / math<float>::abs( mFrustumRight - mFrustumLeft ) * mNearClip;
 	return Ray( mEyePoint, normalize( mU * s + mV * t - ( mW * viewDistance ) ) );
 }
 
 void CameraPersp::calcProjection() const
 {
-	mFrustumTop		=  mNearClip * math<float>::tan( (float)M_PI / 180.0f * mFov * 0.5f );
+	mFrustumTop		=  mNearClip * math<float>::tan( float( M_PI ) / 180.0f * mFov * 0.5f );
 	mFrustumBottom	= -mFrustumTop;
 	mFrustumRight	=  mFrustumTop * mAspectRatio;
 	mFrustumLeft	= -mFrustumRight;
@@ -307,12 +293,12 @@ void CameraPersp::calcProjection() const
 	mat4 &p = mProjectionMatrix;
 	p[0][0] =  2.0f * mNearClip / ( mFrustumRight - mFrustumLeft );
 	p[1][0] =  0.0f;
-	p[2][0] =  ( mFrustumRight + mFrustumLeft ) / ( mFrustumRight - mFrustumLeft );
+	p[2][0] =  mLensShift.x;
 	p[3][0] =  0.0f;
 
 	p[0][1] =  0.0f;
 	p[1][1] =  2.0f * mNearClip / ( mFrustumTop - mFrustumBottom );
-	p[2][1] =  ( mFrustumTop + mFrustumBottom ) / ( mFrustumTop - mFrustumBottom );
+	p[2][1] =  mLensShift.y;
 	p[3][1] =  0.0f;
 
 	p[0][2] =  0.0f;
@@ -343,8 +329,8 @@ void CameraPersp::calcProjection() const
 
 	m[0][3] =  0.0f;
 	m[1][3] =  0.0f;
-	m[2][3] = -( mFarClip - mNearClip ) / ( 2.0f * mFarClip*mNearClip );
-	m[3][3] =  ( mFarClip + mNearClip ) / ( 2.0f * mFarClip*mNearClip );
+	m[2][3] = -( mFarClip - mNearClip ) / ( 2.0f * mFarClip * mNearClip );
+	m[3][3] =  ( mFarClip + mNearClip ) / ( 2.0f * mFarClip * mNearClip );
 
 	mProjectionCached = true;
 }
@@ -360,8 +346,8 @@ void CameraPersp::setLensShift(float horizontal, float vertical)
 CameraPersp	CameraPersp::calcFraming( const Sphere &worldSpaceSphere ) const
 {
 	CameraPersp result = *this;
-	float xDistance = worldSpaceSphere.getRadius() / sin( toRadians( getFovHorizontal() * 0.5f ) );
-	float yDistance = worldSpaceSphere.getRadius() / sin( toRadians( getFov() * 0.5f ) );
+	const float xDistance = worldSpaceSphere.getRadius() / sin( toRadians( getFovHorizontal() * 0.5f ) );
+	const float yDistance = worldSpaceSphere.getRadius() / sin( toRadians( getFov() * 0.5f ) );
 	result.setEyePoint( worldSpaceSphere.getCenter() - result.mViewDirection * std::max( xDistance, yDistance ) );
 	result.mPivotDistance = distance( result.mEyePoint, worldSpaceSphere.getCenter() );
 	return result;
@@ -460,9 +446,9 @@ Ray CameraOrtho::calcRay( float uPos, float vPos, float imagePlaneAspectRatio ) 
 {
 	calcMatrices();
 
-	float s = ( uPos - 0.5f ) * imagePlaneAspectRatio;
-	float t = ( vPos - 0.5f );
-	vec3  eyePoint = mEyePoint + mU * s * ( mFrustumRight - mFrustumLeft ) + mV * t * ( mFrustumTop - mFrustumBottom );
+	const float s = ( uPos - 0.5f ) * imagePlaneAspectRatio;
+	const float t = ( vPos - 0.5f );
+	const vec3  eyePoint = mEyePoint + mU * s * ( mFrustumRight - mFrustumLeft ) + mV * t * ( mFrustumTop - mFrustumBottom );
 	return Ray( eyePoint, -mW );
 }
 
