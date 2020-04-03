@@ -7,6 +7,8 @@
  Portions of this code based on the excellent article by Martin Roberts:
  http://extremelearning.com.au/unreasonable-effectiveness-of-quasirandom-sequences/
 
+ Portions of this code (c) 2015, 2016 Ben Deane, used with permission.
+
  Redistribution and use in source and binary forms, with or without modification, are permitted provided that
  the following conditions are met:
 
@@ -41,7 +43,7 @@ class CI_API QuasiRandT {
   public:
 	QuasiRandT() = default;
 
-	QuasiRandT( uint32_t seed )
+	explicit QuasiRandT( uint32_t seed )
 		: mSeed( seed )
 	{
 	}
@@ -52,7 +54,7 @@ class CI_API QuasiRandT {
 	//! Returns a quasi-random float in the range [0.0f,1.0f).
 	T nextFloat()
 	{
-		static T sIrrational = T{ 1 } / phi( 1 );
+		constexpr T sIrrational = T{ 1 } / phi( 1 );
 		return recurrence( T{ 0.5 }, sIrrational, ++sSeed );
 	}
 
@@ -75,8 +77,8 @@ class CI_API QuasiRandT {
 	//! Returns two corresponding quasi-random floats in the range [0.0f,1.0f).
 	void nextFloats( T &a, T &b )
 	{
-		static T sIrrationalA = T{ 1 } / phi( 2 );
-		static T sIrrationalB = T{ 1 } / ( phi( 2 ) * phi( 2 ) );
+		constexpr T sIrrationalA = T{ 1 } / phi( 2 );
+		constexpr T sIrrationalB = T{ 1 } / ( phi( 2 ) * phi( 2 ) );
 		++sSeed;
 		a = recurrence( T{ 0.5 }, sIrrationalA, sSeed );
 		b = recurrence( T{ 0.5 }, sIrrationalB, sSeed );
@@ -85,9 +87,9 @@ class CI_API QuasiRandT {
 	//! Returns three corresponding quasi-random floats in the range [0.0f,1.0f).
 	void nextFloats( T &a, T &b, T &c )
 	{
-		static T sIrrationalA = T{ 1 } / phi( 3 );
-		static T sIrrationalB = T{ 1 } / ( phi( 3 ) * phi( 3 ) );
-		static T sIrrationalC = T{ 1 } / ( phi( 3 ) * phi( 3 ) * phi( 3 ) );
+		constexpr T sIrrationalA = T{ 1 } / phi( 3 );
+		constexpr T sIrrationalB = T{ 1 } / ( phi( 3 ) * phi( 3 ) );
+		constexpr T sIrrationalC = T{ 1 } / ( phi( 3 ) * phi( 3 ) * phi( 3 ) );
 		++sSeed;
 		a = recurrence( T{ 0.5 }, sIrrationalA, sSeed );
 		b = recurrence( T{ 0.5 }, sIrrationalB, sSeed );
@@ -124,15 +126,15 @@ class CI_API QuasiRandT {
 	//! Returns a quasi-random float in the range [0.0f,1.0f).
 	static T randFloat()
 	{
-		static T sIrrational = T{ 1 } / phi( 1 );
+		constexpr T sIrrational = T{ 1 } / phi( 1 );
 		return recurrence( T{ 0.5 }, sIrrational, ++sSeed );
 	}
 
 	//! Returns two corresponding quasi-random floats in the range [0.0f,1.0f).
 	static void randFloats( T &a, T &b )
 	{
-		static T sIrrationalA = T{ 1 } / phi( 2 );
-		static T sIrrationalB = T{ 1 } / ( phi( 2 ) * phi( 2 ) );
+		constexpr T sIrrationalA = T{ 1 } / phi( 2 );
+		constexpr T sIrrationalB = T{ 1 } / ( phi( 2 ) * phi( 2 ) );
 		++sSeed;
 		a = recurrence( T{ 0.5 }, sIrrationalA, sSeed );
 		b = recurrence( T{ 0.5 }, sIrrationalB, sSeed );
@@ -141,9 +143,9 @@ class CI_API QuasiRandT {
 	//! Returns three corresponding quasi-random floats in the range [0.0f,1.0f).
 	static void randFloats( T &a, T &b, T &c )
 	{
-		static T sIrrationalA = T{ 1 } / phi( 3 );
-		static T sIrrationalB = T{ 1 } / ( phi( 3 ) * phi( 3 ) );
-		static T sIrrationalC = T{ 1 } / ( phi( 3 ) * phi( 3 ) * phi( 3 ) );
+		constexpr T sIrrationalA = T{ 1 } / phi( 3 );
+		constexpr T sIrrationalB = T{ 1 } / ( phi( 3 ) * phi( 3 ) );
+		constexpr T sIrrationalC = T{ 1 } / ( phi( 3 ) * phi( 3 ) * phi( 3 ) );
 		++sSeed;
 		a = recurrence( T{ 0.5 }, sIrrationalA, sSeed );
 		b = recurrence( T{ 0.5 }, sIrrationalB, sSeed );
@@ -174,26 +176,39 @@ class CI_API QuasiRandT {
 		return glm::vec<3, T, glm::defaultp>( x, y, z );
 	}
 
-  private:
 	//! Returns the fractional part of \a value.
-	static T fract( T value )
+	static T fractional( T value )
 	{
 		static T integral;
 		return modf( value, &integral );
 	}
 
+	//! Helper function. Returns the n-th value in a recurrence sequence based on \a irrational.
+	static T recurrence( T base, T irrational, uint32_t n ) { return fractional( base + n * irrational ); }
+
 	//! Returns a quasi-random compatible irrational number. For d=1, this is the golden ratio.
-	static T phi( uint32_t d )
+	static constexpr T phi( uint32_t d )
 	{
 		T x{ 2 };
-		for( int i = 0; i < 10; ++i )
+		for( int i = 0; i < 100; ++i )
 			x = pow( T{ 1 } + x, T{ 1 } / ( d + 1 ) );
 		return x;
 	}
 
-	//! Helper function. Returns the n-th value in a recurrence sequence based on \a irrational.
-	static T recurrence( T base, T irrational, uint32_t n ) { return fract( base + n * irrational ); }
+  private:
+	// Constexpr math functions, see: https://github.com/elbeno/constexpr
+	static constexpr long double e() { return 2.718281828459045235361; }
 
+	static constexpr T abs( T x ) { return x >= T{ 0 } ? x : x < 0 ? -x : throw; }
+	static constexpr T feq( T x, T y ) { return abs( x - y ) <= std::numeric_limits<T>::epsilon(); }
+	static constexpr T exp( T x, T sum, T n, int i, T t ) { return feq( sum, sum + t / n ) ? sum : exp( x, sum + t / n, n * i, i + 1, t * x ); }
+	static constexpr T exp( T x ) { return exp( x, T{ 1 }, T{ 1 }, 2, x ); }
+	static constexpr T logIteration( T x, T y ) { return y + T{ 2 } * ( x - exp( y ) ) / ( x + exp( y ) ); }
+	static constexpr T log( T x, T y ) { return feq( y, logIteration( x, y ) ) ? y : log( x, logIteration( x, y ) ); }
+	static constexpr T logGreaterThan( T x ) { return x > T{ 0.25 } ? log( x, T{ 0 } ) : logGreaterThan( x * T{ e() * e() * e() * e() * e() } ) - T{ 5 }; }
+	static constexpr T logLessThan( T x ) { return x < T{ 1024 } ? log( x, T{ 0 } ) : logLessThan( x / T{ e() * e() * e() * e() * e() } ) + T{ 5 }; }
+	static constexpr T log( T x ) { return x < T{ 0 } ? throw : x >= T{ 1024 } ? logLessThan( x ) : logGreaterThan( x ); }
+	static constexpr T pow( T x, T y ) { return exp( log( x ) * y ); }
 
 	uint32_t mSeed = 0;
 
