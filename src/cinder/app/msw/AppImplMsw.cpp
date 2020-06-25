@@ -300,6 +300,7 @@ WindowImplMsw::WindowImplMsw( const Window::Format &format, RendererRef sharedRe
 	mResizable = format.isResizable();
 	mAlwaysOnTop = format.isAlwaysOnTop();
 	mBorderless = format.isBorderless();
+	mHidden = format.isHidden();
 
 	if( ! mDisplay )
 		mDisplay = Display::getMainDisplay();
@@ -424,9 +425,11 @@ void WindowImplMsw::completeCreation()
 	if( mAppImpl->mApp->isMultiTouchEnabled() )
 		enableMultiTouch();
 
-	::ShowWindow( mWnd, SW_SHOW );
-	::SetForegroundWindow( mWnd );
-	::SetFocus( mWnd );
+	if( ! mHidden ) {
+	    ::ShowWindow( mWnd, SW_SHOW );
+	    ::SetForegroundWindow( mWnd );
+	    ::SetFocus( mWnd );
+	}
 }
 
 void WindowImplMsw::registerWindowClass()

@@ -149,7 +149,7 @@ class CI_API Window : public std::enable_shared_from_this<Window> {
 		Format( RendererRef renderer = RendererRef(), DisplayRef display = DisplayRef(), bool fullScreen = false, ivec2 size = ivec2( 640, 480 ), ivec2 pos = ivec2() )
 			: mRenderer( renderer ), mFullScreen( fullScreen ), mDisplay( display ), mSize( size ), mPos( pos ), mPosSpecified( false ),
 			mResizable( true ), mBorderless( false ), mAlwaysOnTop( false ), mFullScreenButtonEnabled( false ),
-			mTitleSpecified( false ), mTitle( "" )
+			mTitleSpecified( false ), mTitle( "" ), mHidden( false )
 #if defined( CINDER_COCOA_TOUCH )
 			, mRootViewController( NULL )
 #endif
@@ -237,6 +237,10 @@ class CI_API Window : public std::enable_shared_from_this<Window> {
 		Format&		fullScreenButton( bool enabled = true ) { mFullScreenButtonEnabled = enabled; return *this; }
 		//! On Mac OS X returns whether the native full screen toggle button is displayed. Defaults to \c false.
 		bool		isFullScreenButtonEnabled() const { return mFullScreenButtonEnabled; }
+		//! Sets whether the Window is hidden on creation.
+		Format&		hide( bool hidden = true ) { mHidden = hidden; return *this; }
+		//! Returns whether the Window is hidden on creation.
+		bool		isHidden() const { return mHidden; }
 
 		//! Returns the title of the Window as a UTF-8 string.
 		std::string getTitle() const { return mTitle; }
@@ -260,6 +264,7 @@ class CI_API Window : public std::enable_shared_from_this<Window> {
 		bool					mResizable, mBorderless, mAlwaysOnTop, mFullScreenButtonEnabled;
 		std::string				mTitle;
 		bool					mTitleSpecified;
+		bool					mHidden;
 
 #if defined( CINDER_COCOA_TOUCH )
 		__unsafe_unretained UIViewController *mRootViewController;
