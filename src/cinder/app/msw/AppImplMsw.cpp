@@ -940,6 +940,12 @@ LRESULT CALLBACK WndProc(	HWND	mWnd,			// Handle For This Window
 		}
 		break;
 		case WM_SIZE:
+            // all of our Windows will have marked this as true if the user has unplugged, plugged or modified a Monitor
+            if( impl->getAppImpl()->mNeedsToRefreshDisplays ) {
+                impl->getAppImpl()->mNeedsToRefreshDisplays = false;
+                PlatformMsw::get()->refreshDisplays();
+            }
+
 			impl->mWindowWidthPx = LOWORD(lParam);
 			impl->mWindowHeightPx = HIWORD(lParam);
 			if( impl->getWindow() && impl->mAppImpl->setupHasBeenCalled() ) {
