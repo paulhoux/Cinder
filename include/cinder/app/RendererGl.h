@@ -82,6 +82,7 @@ class CI_API RendererGl : public Renderer {
 			mMultiGpuModeNV = MultiGpuModeNV::SINGLE;
 #endif
 			mObjectTracking = false;
+			mPixelType = PixelType::RGBA;
 			mStencil = false;
 			mDepthBufferBits = 24;
 			mColorBpc = 8;
@@ -150,10 +151,17 @@ class CI_API RendererGl : public Renderer {
 		//! Enables or disables a stencil buffer. Default is \c false
 		void		setStencil( bool createStencil = true ) { mStencil = createStencil; }
 
-		//! Sets the number of bits per color channel. Default is \c 8 but can be \c 10 on professional GPUs (Quadro/FireGL)
+		//! Sets the number of bits per color channel. Default is \c 8 but can be \c 10 on professional GPUs (Quadro/FireGL). Floating point pixel types can have 16 or 32 bits.
 		Options&	colorChannelDepth( int colorBitsPerChannel ) { mColorBpc = colorBitsPerChannel; return *this; }
-		//! Returns the number of bits per color channel. Default is \c 8 but can be \c 10 on professional GPUs (Quadro/FireGL)
+		//! Returns the number of bits per color channel. Default is \c 8 but can be \c 10 on professional GPUs (Quadro/FireGL). Floating point pixel types can have 16 or 32 bits.
 		int			getColorChannelDepth() const { return mColorBpc; }
+				
+		enum class PixelType { COLOR_INDEX, RGBA, RGBA_FLOAT };
+		
+		//! Sets the pixel type of the buffer. Use RGBA_FLOAT to render to HDR displays. Defaults to \c RGBA.
+		Options&	pixelType( PixelType type ) { mPixelType = type; return *this; }
+		//! Sets the pixel type of the buffer. Use RGBA_FLOAT to render to HDR displays. Defaults to \c RGBA.
+		PixelType getPixelType() const { return mPixelType; }
 
 	  protected:
 		bool					mCoreProfile;
@@ -169,6 +177,7 @@ class CI_API RendererGl : public Renderer {
 		MultiGpuModeNV			mMultiGpuModeNV;
 #endif
 		bool					mObjectTracking;
+		PixelType				mPixelType;
 	};
 
 
