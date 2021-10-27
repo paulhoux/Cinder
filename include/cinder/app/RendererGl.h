@@ -50,6 +50,11 @@
 	typedef struct GLFWwindow	GLFWwindow;
 #endif
 
+namespace cinder {
+	//! Describes the pixel type of the default render buffer.
+	enum class PixelType { COLOR_INDEX, RGBA, RGBA_FLOAT };
+}
+
 namespace cinder { namespace gl {
 
 class Context;
@@ -155,8 +160,6 @@ class CI_API RendererGl : public Renderer {
 		Options&	colorChannelDepth( int colorBitsPerChannel ) { mColorBpc = colorBitsPerChannel; return *this; }
 		//! Returns the number of bits per color channel. Default is \c 8 but can be \c 10 on professional GPUs (Quadro/FireGL). Floating point pixel types can have 16 or 32 bits.
 		int			getColorChannelDepth() const { return mColorBpc; }
-				
-		enum class PixelType { COLOR_INDEX, RGBA, RGBA_FLOAT };
 		
 		//! Sets the pixel type of the buffer. Use RGBA_FLOAT to render to HDR displays. Defaults to \c RGBA.
 		Options&	pixelType( PixelType type ) { mPixelType = type; return *this; }

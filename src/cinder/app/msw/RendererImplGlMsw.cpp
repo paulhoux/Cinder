@@ -242,7 +242,7 @@ bool testPixelFormat( HDC dc, int colorSamples, int depthDepth, int msaaSamples,
 
 bool setPixelFormat( HDC dc, const RendererGl::Options &options )
 {
-	int pixelType = options.getPixelType() == RendererGl::Options::PixelType::COLOR_INDEX ? WGL_TYPE_COLORINDEX_ARB : options.getPixelType() == RendererGl::Options::PixelType::RGBA_FLOAT ? WGL_TYPE_RGBA_FLOAT_ARB : WGL_TYPE_RGBA_ARB;
+	int pixelType = options.getPixelType() == PixelType::COLOR_INDEX ? WGL_TYPE_COLORINDEX_ARB : options.getPixelType() == PixelType::RGBA_FLOAT ? WGL_TYPE_RGBA_FLOAT_ARB : WGL_TYPE_RGBA_ARB;
 	
 	int format;
 	for( int colorDepth = options.getColorChannelDepth(); colorDepth >= 8; colorDepth -= 2 ) {
