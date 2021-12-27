@@ -73,9 +73,6 @@
     <Filter Include="Header Files\svg">
       <UniqueIdentifier>{93ad9a5c-9ccb-4f98-8d4c-bf21a522208f}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Source Files\linebreak">
-      <UniqueIdentifier>{32843c15-443f-4fa7-ab9c-be6125f164f3}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Header Files\dx">
       <UniqueIdentifier>{1a305511-2204-4100-81d9-aecef552ae09}</UniqueIdentifier>
     </Filter>
@@ -250,6 +247,24 @@
     <Filter Include="Header Files\gl\nv">
       <UniqueIdentifier>{7ff32b0d-8190-49b2-ab18-187db6196a2b}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Header Files\text">
+      <UniqueIdentifier>{2ceb0fbc-c2b6-43a5-95fc-361c54669268}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\text">
+      <UniqueIdentifier>{43a8e5eb-e597-459a-90dd-f0832826d38d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\freetype\sdf">
+      <UniqueIdentifier>{8d4b409c-e2f5-425b-892c-18a30eb61aac}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\libunibreak">
+      <UniqueIdentifier>{9702dea7-50d2-41da-8054-fa782cc8279a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\libunibreak">
+      <UniqueIdentifier>{6e55bf2d-c249-4f7a-ae6d-61c97255075c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\harfbuzz">
+      <UniqueIdentifier>{ba777c45-0631-4b62-b679-33beafe4f382}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\src\cinder\Area.cpp">
@@ -292,9 +307,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\cinder\Exception.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\cinder\Font.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\cinder\ImageIo.cpp">
@@ -346,9 +358,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\cinder\System.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\cinder\Text.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\cinder\Timer.cpp">
@@ -497,15 +506,6 @@
     </ClCompile>
     <ClCompile Include="..\..\src\cinder\svg\Svg.cpp">
       <Filter>Source Files\svg</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\linebreak\linebreak.c">
-      <Filter>Source Files\linebreak</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\linebreak\linebreakdata.c">
-      <Filter>Source Files\linebreak</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\linebreak\linebreakdef.c">
-      <Filter>Source Files\linebreak</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\cinder\Unicode.cpp">
       <Filter>Source Files</Filter>
@@ -729,9 +729,6 @@
     <ClCompile Include="..\..\src\cinder\gl\Texture.cpp">
       <Filter>Source Files\gl</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\cinder\gl\TextureFont.cpp">
-      <Filter>Source Files\gl</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\src\cinder\gl\TextureFormatParsers.cpp">
       <Filter>Source Files\gl</Filter>
     </ClCompile>
@@ -942,63 +939,6 @@
     <ClCompile Include="..\..\src\freetype\base\ftbase.c">
       <Filter>Source Files\freetype\base</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\freetype\base\ftbbox.c">
-      <Filter>Source Files\freetype\base</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\freetype\base\ftbdf.c">
-      <Filter>Source Files\freetype\base</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\freetype\base\ftbitmap.c">
-      <Filter>Source Files\freetype\base</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\freetype\base\ftcid.c">
-      <Filter>Source Files\freetype\base</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\freetype\base\ftdebug.c">
-      <Filter>Source Files\freetype\base</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\freetype\base\ftfstype.c">
-      <Filter>Source Files\freetype\base</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\freetype\base\ftgasp.c">
-      <Filter>Source Files\freetype\base</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\freetype\base\ftglyph.c">
-      <Filter>Source Files\freetype\base</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\freetype\base\ftgxval.c">
-      <Filter>Source Files\freetype\base</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\freetype\base\ftinit.c">
-      <Filter>Source Files\freetype\base</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\freetype\base\ftmm.c">
-      <Filter>Source Files\freetype\base</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\freetype\base\ftotval.c">
-      <Filter>Source Files\freetype\base</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\freetype\base\ftpatent.c">
-      <Filter>Source Files\freetype\base</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\freetype\base\ftpfr.c">
-      <Filter>Source Files\freetype\base</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\freetype\base\ftstroke.c">
-      <Filter>Source Files\freetype\base</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\freetype\base\ftsynth.c">
-      <Filter>Source Files\freetype\base</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\freetype\base\ftsystem.c">
-      <Filter>Source Files\freetype\base</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\freetype\base\fttype1.c">
-      <Filter>Source Files\freetype\base</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\freetype\base\ftwinfnt.c">
-      <Filter>Source Files\freetype\base</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\src\freetype\raster\raster.c">
       <Filter>Source Files\freetype\raster</Filter>
     </ClCompile>
@@ -1082,6 +1022,117 @@
     </ClCompile>
     <ClCompile Include="..\..\src\cinder\MediaTime.cpp">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\cinder\text\Face.cpp">
+      <Filter>Source Files\text</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\cinder\text\Font.cpp">
+      <Filter>Source Files\text</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\cinder\text\SystemFonts.cpp">
+      <Filter>Source Files\text</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\cinder\text\Text.cpp">
+      <Filter>Source Files\text</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\cinder\text\AttrString.cpp">
+      <Filter>Source Files\text</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\freetype\sdf\sdf.c">
+      <Filter>Source Files\freetype\sdf</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\libunibreak\linebreak.c">
+      <Filter>Source Files\libunibreak</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\libunibreak\linebreakdata.c">
+      <Filter>Source Files\libunibreak</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\libunibreak\unibreakbase.c">
+      <Filter>Source Files\libunibreak</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\libunibreak\wordbreak.c">
+      <Filter>Source Files\libunibreak</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\libunibreak\wordbreakdata.c">
+      <Filter>Source Files\libunibreak</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\libunibreak\graphemebreak.c">
+      <Filter>Source Files\libunibreak</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\libunibreak\graphemebreakdata.c">
+      <Filter>Source Files\libunibreak</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\libunibreak\linebreakdef.c">
+      <Filter>Source Files\libunibreak</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\libunibreak\unibreakdef.c">
+      <Filter>Source Files\libunibreak</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\harfbuzz\harfbuzz.cc">
+      <Filter>Source Files\harfbuzz</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\freetype\base\ftbbox.c">
+      <Filter>Source Files\freetype\base</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\freetype\base\ftbdf.c">
+      <Filter>Source Files\freetype\base</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\freetype\base\ftbitmap.c">
+      <Filter>Source Files\freetype\base</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\freetype\base\ftcid.c">
+      <Filter>Source Files\freetype\base</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\freetype\base\ftdebug.c">
+      <Filter>Source Files\freetype\base</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\freetype\base\ftfstype.c">
+      <Filter>Source Files\freetype\base</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\freetype\base\ftgasp.c">
+      <Filter>Source Files\freetype\base</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\freetype\base\ftglyph.c">
+      <Filter>Source Files\freetype\base</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\freetype\base\ftgxval.c">
+      <Filter>Source Files\freetype\base</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\freetype\base\ftinit.c">
+      <Filter>Source Files\freetype\base</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\freetype\base\ftmm.c">
+      <Filter>Source Files\freetype\base</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\freetype\base\ftotval.c">
+      <Filter>Source Files\freetype\base</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\freetype\base\ftpatent.c">
+      <Filter>Source Files\freetype\base</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\freetype\base\ftpfr.c">
+      <Filter>Source Files\freetype\base</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\freetype\base\ftstroke.c">
+      <Filter>Source Files\freetype\base</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\freetype\base\ftsynth.c">
+      <Filter>Source Files\freetype\base</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\freetype\base\ftsystem.c">
+      <Filter>Source Files\freetype\base</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\freetype\base\fttype1.c">
+      <Filter>Source Files\freetype\base</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\freetype\base\ftwinfnt.c">
+      <Filter>Source Files\freetype\base</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\freetype\base\md5.c">
+      <Filter>Source Files\freetype\base</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\libunibreak\emojidef.c">
+      <Filter>Source Files\libunibreak</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -1178,9 +1229,6 @@
     <ClInclude Include="..\..\include\cinder\Filter.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\include\cinder\Font.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\include\cinder\ImageIo.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -1239,9 +1287,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\include\cinder\System.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\include\cinder\Text.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\include\cinder\Thread.h">
@@ -1970,9 +2015,6 @@
     <ClInclude Include="..\..\include\freetype\ftadvanc.h">
       <Filter>Header Files\freetype</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\include\freetype\ftautoh.h">
-      <Filter>Header Files\freetype</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\include\freetype\ftbbox.h">
       <Filter>Header Files\freetype</Filter>
     </ClInclude>
@@ -1986,9 +2028,6 @@
       <Filter>Header Files\freetype</Filter>
     </ClInclude>
     <ClInclude Include="..\..\include\freetype\ftcache.h">
-      <Filter>Header Files\freetype</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\include\freetype\ftcffdrv.h">
       <Filter>Header Files\freetype</Filter>
     </ClInclude>
     <ClInclude Include="..\..\include\freetype\ftchapters.h">
@@ -2075,9 +2114,6 @@
     <ClInclude Include="..\..\include\freetype\fttrigon.h">
       <Filter>Header Files\freetype</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\include\freetype\ftttdrv.h">
-      <Filter>Header Files\freetype</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\include\freetype\fttypes.h">
       <Filter>Header Files\freetype</Filter>
     </ClInclude>
@@ -2094,9 +2130,6 @@
       <Filter>Header Files\freetype</Filter>
     </ClInclude>
     <ClInclude Include="..\..\include\freetype\tttags.h">
-      <Filter>Header Files\freetype</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\include\freetype\ttunpat.h">
       <Filter>Header Files\freetype</Filter>
     </ClInclude>
     <ClInclude Include="..\..\include\freetype\internal\autohint.h">
@@ -2275,6 +2308,33 @@
     </ClInclude>
     <ClInclude Include="..\..\include\cinder\MediaTime.h">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\cinder\text\AttrString.h">
+      <Filter>Header Files\text</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\cinder\text\Face.h">
+      <Filter>Header Files\text</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\cinder\text\Font.h">
+      <Filter>Header Files\text</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\cinder\text\Text.h">
+      <Filter>Header Files\text</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\cinder\text\SystemFonts.h">
+      <Filter>Header Files\text</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\libunibreak\linebreak.h">
+      <Filter>Header Files\libunibreak</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\libunibreak\unibreakbase.h">
+      <Filter>Header Files\libunibreak</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\libunibreak\wordbreak.h">
+      <Filter>Header Files\libunibreak</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\libunibreak\linebreakdef.h">
+      <Filter>Header Files\libunibreak</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

@@ -330,8 +330,8 @@
     <ClCompile>
       <AdditionalOptions>/MP %(AdditionalOptions)</AdditionalOptions>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>$(SolutionDir);..\..\include;..\..\include\imgui;..\..\include\msw\png;..\..\include\msw;..\..\include\oggvorbis;..\..\src\AntTweakBar;..\..\src\libtess2;..\..\src\linebreak;..\..\src\r8brain;..\..\include\ANGLE;..\..\include\tinyexr;..\..\src\zlib;..\..\include\freetype;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>WIN32;_DEBUG;_LIB;NOMINMAX;_WIN32_WINNT=0x0601;_CRT_SECURE_NO_WARNINGS;_SCL_SECURE_NO_WARNINGS;%(PreprocessorDefinitions);FT2_BUILD_LIBRARY=1;FT_DEBUG_LEVEL_TRACE=1</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(SolutionDir);..\..\include;..\..\include\imgui;..\..\include\msw\png;..\..\include\msw;..\..\include\oggvorbis;..\..\src\AntTweakBar;..\..\src\libtess2;..\..\src\linebreak;..\..\src\r8brain;..\..\include\ANGLE;..\..\include\tinyexr;..\..\src\zlib;..\..\include\freetype;..\..\src\harfbuzz;..\..\src\libunibreak;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>FT2_BUILD_LIBRARY=1;HAVE_FREETYPE=1;WIN32;_DEBUG;_LIB;NOMINMAX;_WIN32_WINNT=0x0601;_CRT_SECURE_NO_WARNINGS;_SCL_SECURE_NO_WARNINGS;%(PreprocessorDefinitions);FT2_BUILD_LIBRARY=1;FT_DEBUG_LEVEL_TRACE=1</PreprocessorDefinitions>
       <MinimalRebuild>false</MinimalRebuild>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
@@ -358,8 +358,8 @@
     <ClCompile>
       <AdditionalOptions>/MP %(AdditionalOptions)</AdditionalOptions>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>$(SolutionDir);..\..\include;..\..\include\imgui;..\..\include\msw\png;..\..\include\msw;..\..\include\oggvorbis;..\..\src\AntTweakBar;..\..\src\libtess2;..\..\src\linebreak;..\..\src\r8brain;..\..\include\ANGLE;..\..\include\tinyexr;..\..\src\zlib;..\..\include\freetype;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>CINDER_SHARED_BUILD;JSON_DLL_BUILD;WIN32;_DEBUG;_LIB;NOMINMAX;_WIN32_WINNT=0x0601;_CRT_SECURE_NO_WARNINGS;_SCL_SECURE_NO_WARNINGS;%(PreprocessorDefinitions);FT2_BUILD_LIBRARY=1;FT_DEBUG_LEVEL_TRACE=1</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(SolutionDir);..\..\include;..\..\include\imgui;..\..\include\msw\png;..\..\include\msw;..\..\include\oggvorbis;..\..\src\AntTweakBar;..\..\src\libtess2;..\..\src\linebreak;..\..\src\r8brain;..\..\include\ANGLE;..\..\include\tinyexr;..\..\src\zlib;..\..\include\freetype;..\..\src\harfbuzz;..\..\src\libunibreak;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>FT2_BUILD_LIBRARY=1;HAVE_FREETYPE=1;CINDER_SHARED_BUILD;JSON_DLL_BUILD;WIN32;_DEBUG;_LIB;NOMINMAX;_WIN32_WINNT=0x0601;_CRT_SECURE_NO_WARNINGS;_SCL_SECURE_NO_WARNINGS;%(PreprocessorDefinitions);FT2_BUILD_LIBRARY=1;FT_DEBUG_LEVEL_TRACE=1</PreprocessorDefinitions>
       <MinimalRebuild>false</MinimalRebuild>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
@@ -391,8 +391,8 @@
     <ClCompile>
       <AdditionalOptions>/MP %(AdditionalOptions)</AdditionalOptions>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>$(SolutionDir);..\..\include;..\..\include\imgui;..\..\include\msw\png;..\..\include\msw;..\..\include\oggvorbis;..\..\src\AntTweakBar;..\..\src\libtess2;..\..\src\linebreak;..\..\src\r8brain;..\..\include\ANGLE;..\..\include\tinyexr;..\..\src\zlib;..\..\include\freetype;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>WIN32;_DEBUG;_LIB;NOMINMAX;_WIN32_WINNT=0x0601;_CRT_SECURE_NO_WARNINGS;_SCL_SECURE_NO_WARNINGS;CINDER_GL_ANGLE;%(PreprocessorDefinitions);FT2_BUILD_LIBRARY=1;FT_DEBUG_LEVEL_TRACE=1</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(SolutionDir);..\..\include;..\..\include\imgui;..\..\include\msw\png;..\..\include\msw;..\..\include\oggvorbis;..\..\src\AntTweakBar;..\..\src\libtess2;..\..\src\linebreak;..\..\src\r8brain;..\..\include\ANGLE;..\..\include\tinyexr;..\..\src\zlib;..\..\include\freetype;..\..\src\harfbuzz;..\..\src\libunibreak;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>FT2_BUILD_LIBRARY=1;HAVE_FREETYPE=1;WIN32;_DEBUG;_LIB;NOMINMAX;_WIN32_WINNT=0x0601;_CRT_SECURE_NO_WARNINGS;_SCL_SECURE_NO_WARNINGS;CINDER_GL_ANGLE;%(PreprocessorDefinitions);FT2_BUILD_LIBRARY=1;FT_DEBUG_LEVEL_TRACE=1</PreprocessorDefinitions>
       <MinimalRebuild>false</MinimalRebuild>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
@@ -517,8 +517,8 @@
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <WholeProgramOptimization>false</WholeProgramOptimization>
-      <AdditionalIncludeDirectories>$(SolutionDir);..\..\include;..\..\include\imgui;..\..\include\msw\png;..\..\include\msw;..\..\include\oggvorbis;..\..\src\AntTweakBar;..\..\src\libtess2;..\..\src\linebreak;..\..\src\r8brain;..\..\include\ANGLE;..\..\include\tinyexr;..\..\src\zlib;..\..\include\freetype;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>WIN32;NDEBUG;_LIB;NOMINMAX;_WIN32_WINNT=0x0601;_CRT_SECURE_NO_WARNINGS;_SCL_SECURE_NO_WARNINGS;%(PreprocessorDefinitions);FT2_BUILD_LIBRARY=1;FT_DEBUG_LEVEL_TRACE=1</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(SolutionDir);..\..\include;..\..\include\imgui;..\..\include\msw\png;..\..\include\msw;..\..\include\oggvorbis;..\..\src\AntTweakBar;..\..\src\libtess2;..\..\src\linebreak;..\..\src\r8brain;..\..\include\ANGLE;..\..\include\tinyexr;..\..\src\zlib;..\..\include\freetype;..\..\src\harfbuzz;..\..\src\libunibreak;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>FT2_BUILD_LIBRARY=1;HAVE_FREETYPE=1;WIN32;NDEBUG;_LIB;NOMINMAX;_WIN32_WINNT=0x0601;_CRT_SECURE_NO_WARNINGS;_SCL_SECURE_NO_WARNINGS;%(PreprocessorDefinitions);FT2_BUILD_LIBRARY=1;FT_DEBUG_LEVEL_TRACE=1</PreprocessorDefinitions>
       <MinimalRebuild>false</MinimalRebuild>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <PrecompiledHeader>
@@ -547,8 +547,8 @@
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <WholeProgramOptimization>false</WholeProgramOptimization>
-      <AdditionalIncludeDirectories>$(SolutionDir);..\..\include;..\..\include\imgui;..\..\include\msw\png;..\..\include\msw;..\..\include\oggvorbis;..\..\src\AntTweakBar;..\..\src\libtess2;..\..\src\linebreak;..\..\src\r8brain;..\..\include\ANGLE;..\..\include\tinyexr;..\..\src\zlib;..\..\include\freetype;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>CINDER_SHARED_BUILD;JSON_DLL_BUILD;WIN32;NDEBUG;_LIB;NOMINMAX;_WIN32_WINNT=0x0601;_CRT_SECURE_NO_WARNINGS;_SCL_SECURE_NO_WARNINGS;%(PreprocessorDefinitions);FT2_BUILD_LIBRARY=1;FT_DEBUG_LEVEL_TRACE=1</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(SolutionDir);..\..\include;..\..\include\imgui;..\..\include\msw\png;..\..\include\msw;..\..\include\oggvorbis;..\..\src\AntTweakBar;..\..\src\libtess2;..\..\src\linebreak;..\..\src\r8brain;..\..\include\ANGLE;..\..\include\tinyexr;..\..\src\zlib;..\..\include\freetype;..\..\src\harfbuzz;..\..\src\libunibreak;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>FT2_BUILD_LIBRARY=1;HAVE_FREETYPE=1;CINDER_SHARED_BUILD;JSON_DLL_BUILD;WIN32;NDEBUG;_LIB;NOMINMAX;_WIN32_WINNT=0x0601;_CRT_SECURE_NO_WARNINGS;_SCL_SECURE_NO_WARNINGS;%(PreprocessorDefinitions);FT2_BUILD_LIBRARY=1;FT_DEBUG_LEVEL_TRACE=1</PreprocessorDefinitions>
       <MinimalRebuild>false</MinimalRebuild>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <PrecompiledHeader>
@@ -582,8 +582,8 @@
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <WholeProgramOptimization>false</WholeProgramOptimization>
-      <AdditionalIncludeDirectories>$(SolutionDir);..\..\include;..\..\include\imgui;..\..\include\msw\png;..\..\include\msw;..\..\include\oggvorbis;..\..\src\AntTweakBar;..\..\src\libtess2;..\..\src\linebreak;..\..\src\r8brain;..\..\include\ANGLE;..\..\include\tinyexr;..\..\src\zlib;..\..\include\freetype;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>WIN32;NDEBUG;_LIB;NOMINMAX;_WIN32_WINNT=0x0601;_CRT_SECURE_NO_WARNINGS;_SCL_SECURE_NO_WARNINGS;%(PreprocessorDefinitions);CINDER_GL_ANGLE;FT2_BUILD_LIBRARY=1;FT_DEBUG_LEVEL_TRACE=1</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(SolutionDir);..\..\include;..\..\include\imgui;..\..\include\msw\png;..\..\include\msw;..\..\include\oggvorbis;..\..\src\AntTweakBar;..\..\src\libtess2;..\..\src\linebreak;..\..\src\r8brain;..\..\include\ANGLE;..\..\include\tinyexr;..\..\src\zlib;..\..\include\freetype;..\..\src\harfbuzz;..\..\src\libunibreak;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>FT2_BUILD_LIBRARY=1;HAVE_FREETYPE=1;WIN32;NDEBUG;_LIB;NOMINMAX;_WIN32_WINNT=0x0601;_CRT_SECURE_NO_WARNINGS;_SCL_SECURE_NO_WARNINGS;%(PreprocessorDefinitions);CINDER_GL_ANGLE;FT2_BUILD_LIBRARY=1;FT_DEBUG_LEVEL_TRACE=1</PreprocessorDefinitions>
       <MinimalRebuild>false</MinimalRebuild>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <PrecompiledHeader>
@@ -766,7 +766,6 @@
     <ClCompile Include="..\..\src\cinder\Display.cpp" />
     <ClCompile Include="..\..\src\cinder\Exception.cpp" />
     <ClCompile Include="..\..\src\cinder\FileWatcher.cpp" />
-    <ClCompile Include="..\..\src\cinder\Font.cpp" />
     <ClCompile Include="..\..\src\cinder\Frustum.cpp" />
     <ClCompile Include="..\..\src\cinder\GeomIo.cpp" />
     <ClCompile Include="..\..\src\cinder\gl\Batch.cpp" />
@@ -789,7 +788,6 @@
     <ClCompile Include="..\..\src\cinder\gl\ShaderPreprocessor.cpp" />
     <ClCompile Include="..\..\src\cinder\gl\Sync.cpp" />
     <ClCompile Include="..\..\src\cinder\gl\Texture.cpp" />
-    <ClCompile Include="..\..\src\cinder\gl\TextureFont.cpp" />
     <ClCompile Include="..\..\src\cinder\gl\TextureFormatParsers.cpp" />
     <ClCompile Include="..\..\src\cinder\gl\TransformFeedbackObj.cpp" />
     <ClCompile Include="..\..\src\cinder\gl\Ubo.cpp" />
@@ -837,7 +835,11 @@
     <ClCompile Include="..\..\src\cinder\Surface.cpp" />
     <ClCompile Include="..\..\src\cinder\svg\Svg.cpp" />
     <ClCompile Include="..\..\src\cinder\System.cpp" />
-    <ClCompile Include="..\..\src\cinder\Text.cpp" />
+    <ClCompile Include="..\..\src\cinder\text\AttrString.cpp" />
+    <ClCompile Include="..\..\src\cinder\text\Face.cpp" />
+    <ClCompile Include="..\..\src\cinder\text\Font.cpp" />
+    <ClCompile Include="..\..\src\cinder\text\SystemFonts.cpp" />
+    <ClCompile Include="..\..\src\cinder\text\Text.cpp" />
     <ClCompile Include="..\..\src\cinder\Timeline.cpp" />
     <ClCompile Include="..\..\src\cinder\TimelineItem.cpp" />
     <ClCompile Include="..\..\src\cinder\Timer.cpp" />
@@ -892,6 +894,7 @@
     <ClCompile Include="..\..\src\freetype\base\ftsystem.c" />
     <ClCompile Include="..\..\src\freetype\base\fttype1.c" />
     <ClCompile Include="..\..\src\freetype\base\ftwinfnt.c" />
+    <ClCompile Include="..\..\src\freetype\base\md5.c" />
     <ClCompile Include="..\..\src\freetype\bdf\bdf.c" />
     <ClCompile Include="..\..\src\freetype\bdf\bdflib.c" />
     <ClCompile Include="..\..\src\freetype\bzip2\ftbzip2.c" />
@@ -908,6 +911,7 @@
     <ClCompile Include="..\..\src\freetype\pshinter\pshinter.c" />
     <ClCompile Include="..\..\src\freetype\psnames\psnames.c" />
     <ClCompile Include="..\..\src\freetype\raster\raster.c" />
+    <ClCompile Include="..\..\src\freetype\sdf\sdf.c" />
     <ClCompile Include="..\..\src\freetype\sfnt\sfnt.c" />
     <ClCompile Include="..\..\src\freetype\smooth\smooth.c" />
     <ClCompile Include="..\..\src\freetype\truetype\truetype.c" />
@@ -927,6 +931,7 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release_ANGLE|x64'">true</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="..\..\src\glad\glad_wgl.c" />
+    <ClCompile Include="..\..\src\harfbuzz\harfbuzz.cc" />
     <ClCompile Include="..\..\src\imgui\imgui.cpp" />
     <ClCompile Include="..\..\src\imgui\imgui_demo.cpp" />
     <ClCompile Include="..\..\src\imgui\imgui_draw.cpp" />
@@ -942,9 +947,16 @@
     <ClCompile Include="..\..\src\libtess2\priorityq.c" />
     <ClCompile Include="..\..\src\libtess2\sweep.c" />
     <ClCompile Include="..\..\src\libtess2\tess.c" />
-    <ClCompile Include="..\..\src\linebreak\linebreak.c" />
-    <ClCompile Include="..\..\src\linebreak\linebreakdata.c" />
-    <ClCompile Include="..\..\src\linebreak\linebreakdef.c" />
+    <ClCompile Include="..\..\src\libunibreak\emojidef.c" />
+    <ClCompile Include="..\..\src\libunibreak\graphemebreak.c" />
+    <ClCompile Include="..\..\src\libunibreak\graphemebreakdata.c" />
+    <ClCompile Include="..\..\src\libunibreak\linebreak.c" />
+    <ClCompile Include="..\..\src\libunibreak\linebreakdata.c" />
+    <ClCompile Include="..\..\src\libunibreak\linebreakdef.c" />
+    <ClCompile Include="..\..\src\libunibreak\unibreakbase.c" />
+    <ClCompile Include="..\..\src\libunibreak\unibreakdef.c" />
+    <ClCompile Include="..\..\src\libunibreak\wordbreak.c" />
+    <ClCompile Include="..\..\src\libunibreak\wordbreakdata.c" />
     <ClCompile Include="..\..\src\oggvorbis\ogg\bitwise.c" />
     <ClCompile Include="..\..\src\oggvorbis\ogg\framing.c" />
     <ClCompile Include="..\..\src\oggvorbis\vorbis\analysis.c" />
@@ -1140,6 +1152,11 @@
     <ClInclude Include="..\..\include\cinder\Signals.h" />
     <ClInclude Include="..\..\include\cinder\svg\Svg.h" />
     <ClInclude Include="..\..\include\cinder\svg\SvgGl.h" />
+    <ClInclude Include="..\..\include\cinder\text\AttrString.h" />
+    <ClInclude Include="..\..\include\cinder\text\Face.h" />
+    <ClInclude Include="..\..\include\cinder\text\Font.h" />
+    <ClInclude Include="..\..\include\cinder\text\SystemFonts.h" />
+    <ClInclude Include="..\..\include\cinder\text\Text.h" />
     <ClInclude Include="..\..\include\cinder\Timeline.h" />
     <ClInclude Include="..\..\include\cinder\TimelineItem.h" />
     <ClInclude Include="..\..\include\cinder\Triangulate.h" />
@@ -1154,13 +1171,11 @@
     <ClInclude Include="..\..\include\freetype\freetype.h" />
     <ClInclude Include="..\..\include\freetype\ft2build.h" />
     <ClInclude Include="..\..\include\freetype\ftadvanc.h" />
-    <ClInclude Include="..\..\include\freetype\ftautoh.h" />
     <ClInclude Include="..\..\include\freetype\ftbbox.h" />
     <ClInclude Include="..\..\include\freetype\ftbdf.h" />
     <ClInclude Include="..\..\include\freetype\ftbitmap.h" />
     <ClInclude Include="..\..\include\freetype\ftbzip2.h" />
     <ClInclude Include="..\..\include\freetype\ftcache.h" />
-    <ClInclude Include="..\..\include\freetype\ftcffdrv.h" />
     <ClInclude Include="..\..\include\freetype\ftchapters.h" />
     <ClInclude Include="..\..\include\freetype\ftcid.h" />
     <ClInclude Include="..\..\include\freetype\fterrdef.h" />
@@ -1189,7 +1204,6 @@
     <ClInclude Include="..\..\include\freetype\ftsynth.h" />
     <ClInclude Include="..\..\include\freetype\ftsystem.h" />
     <ClInclude Include="..\..\include\freetype\fttrigon.h" />
-    <ClInclude Include="..\..\include\freetype\ftttdrv.h" />
     <ClInclude Include="..\..\include\freetype\fttypes.h" />
     <ClInclude Include="..\..\include\freetype\ftwinfnt.h" />
     <ClInclude Include="..\..\include\freetype\internal\autohint.h" />
@@ -1234,7 +1248,6 @@
     <ClInclude Include="..\..\include\freetype\ttnameid.h" />
     <ClInclude Include="..\..\include\freetype\tttables.h" />
     <ClInclude Include="..\..\include\freetype\tttags.h" />
-    <ClInclude Include="..\..\include\freetype\ttunpat.h" />
     <ClInclude Include="..\..\include\imgui\imconfig.h" />
     <ClInclude Include="..\..\include\imgui\imgui.h" />
     <ClInclude Include="..\..\include\imgui\imgui_freetype.h" />
@@ -1284,7 +1297,6 @@
     <ClInclude Include="..\..\include\cinder\Display.h" />
     <ClInclude Include="..\..\include\cinder\Exception.h" />
     <ClInclude Include="..\..\include\cinder\Filter.h" />
-    <ClInclude Include="..\..\include\cinder\Font.h" />
     <ClInclude Include="..\..\include\cinder\ImageIo.h" />
     <ClInclude Include="..\..\include\cinder\ImageSourceFileWic.h" />
     <ClInclude Include="..\..\include\cinder\ImageSourcePng.h" />
@@ -1305,7 +1317,6 @@
     <ClInclude Include="..\..\include\cinder\Stream.h" />
     <ClInclude Include="..\..\include\cinder\Surface.h" />
     <ClInclude Include="..\..\include\cinder\System.h" />
-    <ClInclude Include="..\..\include\cinder\Text.h" />
     <ClInclude Include="..\..\include\cinder\Thread.h" />
     <ClInclude Include="..\..\include\cinder\ConcurrentCircularBuffer.h" />
     <ClInclude Include="..\..\include\cinder\Timer.h" />
@@ -1336,6 +1347,10 @@
     <ClInclude Include="..\..\src\libtess2\sweep.h" />
     <ClInclude Include="..\..\src\libtess2\tess.h" />
     <ClInclude Include="..\..\src\libtess2\tesselator.h" />
+    <ClInclude Include="..\..\src\libunibreak\linebreak.h" />
+    <ClInclude Include="..\..\src\libunibreak\linebreakdef.h" />
+    <ClInclude Include="..\..\src\libunibreak\unibreakbase.h" />
+    <ClInclude Include="..\..\src\libunibreak\wordbreak.h" />
     <ClInclude Include="..\..\src\oggvorbis\vorbis\backends.h" />
     <ClInclude Include="..\..\src\oggvorbis\vorbis\bitrate.h" />
     <ClInclude Include="..\..\src\oggvorbis\vorbis\books\coupled\res_books_51.h" />
