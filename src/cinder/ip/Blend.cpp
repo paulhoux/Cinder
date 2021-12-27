@@ -235,4 +235,80 @@ void blend( Surface32f *background, const Surface32f &foreground, const Area &sr
 	}
 }
 
+void blend( Channel8u *background, const Channel8u &foreground, const Area &unclippedSrcArea, const ivec2 &dstRelativeOffset )
+{
+	const ptrdiff_t srcRowBytes = foreground.getRowBytes();
+	const uint8_t srcInc = foreground.getIncrement();
+	const ptrdiff_t dstRowBytes = background->getRowBytes();
+	const uint8_t dstInc = background->getIncrement();
+
+	pair<Area,ivec2> srcDst = clippedSrcDst( foreground.getBounds(), unclippedSrcArea, background->getBounds(), unclippedSrcArea.getUL() + dstRelativeOffset );
+	if( srcDst.first.getWidth() == 0 || srcDst.first.getHeight() == 0 )
+		return;
+	Area srcArea = srcDst.first;
+	ivec2 absOffset = srcDst.second;
+
+	for( int32_t y = 0; y < srcArea.getHeight(); ++y ) {
+		const uint8_t *src = reinterpret_cast<const uint8_t*>( reinterpret_cast<const uint8_t*>( foreground.getData() + srcArea.x1 * srcInc ) + ( srcArea.y1 + y ) * srcRowBytes );
+		uint8_t *dst = reinterpret_cast<uint8_t*>( reinterpret_cast<uint8_t*>( background->getData() + absOffset.x * dstInc ) + ( y + absOffset.y ) * dstRowBytes );
+		for( int32_t x = 0; x < srcArea.getWidth(); ++x ) {
+			if( *src )
+				*dst = 255 - (255 - *src) * (255 - *dst) / 255;
+			src += srcInc;
+			dst += dstInc;
+		}
+	}
+}
+
+void blendColor( Surface8u *background, const ColorAf &color, const Channel8u &foreground, Area unclippedSrcArea, const ivec2 &dstRelativeOffset )
+{
+	const ptrdiff_t srcRowBytes = foreground.getRowBytes();
+	const uint8_t srcInc = foreground.getIncrement();
+	const ptrdiff_t dstRowBytes = background->getRowBytes();
+	const uint8_t dR = background->getRedOffset();
+	const uint8_t dG = background->getGreenOffset();
+	const uint8_t dB = background->getBlueOffset();
+	const uint8_t dA = background->hasAlpha() ? (background->getChannelOrder().getAlphaOffset()) : 0;
+	const uint8_t dstInc = background->getPixelInc();
+
+	pair<Area,ivec2> srcDst = clippedSrcDst( foreground.getBounds(), unclippedSrcArea, background->getBounds(), unclippedSrcArea.getUL() + dstRelativeOffset );
+	if( srcDst.first.getWidth() == 0 || srcDst.first.getHeight() == 0 )
+		return;
+	Area srcArea = srcDst.first;
+	ivec2 absOffset = srcDst.second;
+
+	for( int32_t y = 0; y < srcArea.getHeight(); ++y ) {
+		const uint8_t *src = reinterpret_cast<const uint8_t*>( reinterpret_cast<const uint8_t*>( foreground.getData() + srcArea.x1 * srcInc ) + ( srcArea.y1 + y ) * srcRowBytes );
+		uint8_t *dst = reinterpret_cast<uint8_t*>( reinterpret_cast<uint8_t*>( background->getData() + absOffset.x * dstInc ) + ( y + absOffset.y ) * dstRowBytes );
+		for( int32_t x = 0; x < srcArea.getWidth(); ++x ) {
+			if( *src ) {
+				uint8_t srcA = static_cast<uint8_t>( color.a * *src );
+				uint8_t srcR = static_cast<uint8_t>( color.r * srcA );
+				uint8_t srcG = static_cast<uint8_t>( color.g * srcA );
+				uint8_t srcB = static_cast<uint8_t>( color.b * srcA );
+				if( background->hasAlpha() ) {
+					dst[dA] = 255 - (255 - srcA) * (255 - dst[dA]) / 255;
+				}
+				if( ! background->hasAlpha() ) { // none * premult -> none
+					dst[dR] = (255 - srcA) * dst[dR] / 255 + srcR;
+					dst[dG] = (255 - srcA) * dst[dG] / 255 + srcG;
+					dst[dB] = (255 - srcA) * dst[dB] / 255 + srcB;
+				}
+				else if( ! background->isPremultiplied() ) { // unpremult * premult -> unpremult
+					dst[dR] = ( (255 - srcA) * dst[dA] * dst[dR] / 255 + (255 - dst[dA]) * srcR + dst[dA] * srcR ) / dst[dA];
+					dst[dG] = ( (255 - srcA) * dst[dA] * dst[dG] / 255 + (255 - dst[dA]) * srcG + dst[dA] * srcG ) / dst[dA];
+					dst[dB] = ( (255 - srcA) * dst[dA] * dst[dB] / 255 + (255 - dst[dA]) * srcB + dst[dA] * srcB ) / dst[dA];
+				}
+				else { // premult * premult -> premult
+					dst[dR] = ( (255 - srcA) * dst[dR] + (255 - dst[dA]) * srcR + dst[dA] * srcR ) / 255;
+					dst[dG] = ( (255 - srcA) * dst[dG] + (255 - dst[dA]) * srcG + dst[dA] * srcG ) / 255;
+					dst[dB] = ( (255 - srcA) * dst[dB] + (255 - dst[dA]) * srcB + dst[dA] * srcB ) / 255;
+				}
+			}
+			src += srcInc;
+			dst += dstInc;
+		}
+	}
+}
+
 } } // namespace cinder::ip
