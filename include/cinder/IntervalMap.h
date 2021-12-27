@@ -7,6 +7,8 @@
 https://github.com/google/perf_data_converter/blob/master/src/intervalmap.h
  */
 
+ // The LICENSE file referenced above is included with Cinder in docs/licenses/intervalmap/LICENSE.txt
+
 #pragma once
 
 #include "cinder/Cinder.h"
