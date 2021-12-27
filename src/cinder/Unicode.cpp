@@ -161,7 +161,7 @@ uint32_t nextCharUtf8( const char *str, size_t *inOutByte, size_t lengthInBytes 
 {
 	if( lengthInBytes == 0 )
 		lengthInBytes = strlen( str );
-	return lb_get_next_char_utf8( (const utf8_t*)str, lengthInBytes, inOutByte );
+	return ub_get_next_char_utf8( (const utf8_t*)str, lengthInBytes, inOutByte );
 }
 
 size_t advanceCharUtf8( const char *str, size_t numChars, size_t lengthInBytes )
@@ -170,7 +170,7 @@ size_t advanceCharUtf8( const char *str, size_t numChars, size_t lengthInBytes )
 		lengthInBytes = strlen( str );
 	size_t nextByte = 0;
 	for( size_t curChar = 0; curChar < numChars; ++curChar ) {
-		if( lb_get_next_char_utf8( (const utf8_t*)str, lengthInBytes, &nextByte ) == 0xFFFF )
+		if( ub_get_next_char_utf8( (const utf8_t*)str, lengthInBytes, &nextByte ) == 0xFFFF )
 			break;
 	}
 	
