@@ -41,7 +41,6 @@
 #include "cinder/gl/Ssbo.h"
 #include "cinder/gl/Sync.h"
 #include "cinder/gl/Texture.h"
-#include "cinder/gl/TextureFont.h"
 #include "cinder/gl/TransformFeedbackObj.h"
 #include "cinder/gl/Ubo.h"
 #include "cinder/gl/Vao.h"

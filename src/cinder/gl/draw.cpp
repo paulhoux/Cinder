@@ -28,7 +28,7 @@
 #include "cinder/gl/scoped.h"
 #include "cinder/gl/Environment.h"
 #include "cinder/Log.h"
-#include "cinder/Text.h"
+#include "cinder/text/Text.h"
 #include "cinder/Triangulate.h"
 
 using namespace std;
@@ -1526,7 +1526,7 @@ void drawVector( const vec3& start, const vec3& end, float headLength, float hea
 }
 
 namespace {
-void drawStringHelper( const std::string &str, const vec2 &pos, const ColorA &color, Font font, int justification )
+void drawStringHelper( const std::string &str, const vec2 &pos, const ColorA &color, text::Font *font, int justification )
 {
 #if ! defined( CINDER_ANDROID )
 	
@@ -1536,11 +1536,9 @@ void drawStringHelper( const std::string &str, const vec2 &pos, const ColorA &co
 	// justification: { left = -1, center = 0, right = 1 }
 	ScopedColor colorScp( Color::white() );
 
-	static Font defaultFont = Font::getDefault();
-	if( ! font )
-		font = defaultFont;
-
 	float baselineOffset;
+	text::AttrString astr = text::AttrString() << font << color << str;
+
 #if defined( CINDER_COCOA_TOUCH )
 	ivec2 actualSize;
 	Surface8u pow2Surface( renderStringPow2( str, font, color, &actualSize, &baselineOffset ) );
@@ -1548,7 +1546,7 @@ void drawStringHelper( const std::string &str, const vec2 &pos, const ColorA &co
 	tex->setCleanBounds( Area( 0, 0, actualSize.x, actualSize.y ) );
 	baselineOffset += pow2Surface.getHeight();
 #else
-	gl::TextureRef tex = gl::Texture::create( renderString( str, font, color, &baselineOffset ) );
+	gl::TextureRef tex = gl::Texture::create( text::renderString( astr ) );
 #endif
 
 	if( justification == -1 ) // left
@@ -1562,17 +1560,17 @@ void drawStringHelper( const std::string &str, const vec2 &pos, const ColorA &co
 }
 } // anonymous namespace
 
-void drawString( const std::string &str, const vec2 &pos, const ColorA &color, Font font )
+void drawString( const std::string &str, const vec2 &pos, const ColorA &color, text::Font *font )
 {
 	drawStringHelper( str, pos, color, font, -1 );
 }
 
-void drawStringCentered( const std::string &str, const vec2 &pos, const ColorA &color, Font font )
+void drawStringCentered( const std::string &str, const vec2 &pos, const ColorA &color, text::Font *font )
 {
 	drawStringHelper( str, pos, color, font, 0 );
 }
 
-void drawStringRight( const std::string &str, const vec2 &pos, const ColorA &color, Font font )
+void drawStringRight( const std::string &str, const vec2 &pos, const ColorA &color, text::Font *font )
 {
 	drawStringHelper( str, pos, color, font, 1 );
 }

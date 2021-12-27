@@ -30,7 +30,7 @@
 #include "cinder/PolyLine.h"
 #include "cinder/Shape2d.h"
 #include "cinder/Camera.h"
-#include "cinder/Font.h"
+#include "cinder/text/Font.h"
 
 // forward declarations
 namespace cinder {
@@ -122,11 +122,11 @@ CI_API void drawStrokedCircle( const vec2 &center, float radius, float lineWidth
 CI_API void drawStrokedEllipse( const vec2 &center, float radiusX, float radiusY, int numSegments = -1 );
 
 //! Draws a string \a str with its lower left corner located at \a pos. Optional \a font and \a color affect the style.
-CI_API void drawString( const std::string &str, const vec2 &pos, const ColorA &color = ColorA( 1, 1, 1, 1 ), Font font = Font() );
+CI_API void drawString( const std::string &str, const vec2 &pos, const ColorA &color = ColorA( 1, 1, 1, 1 ), text::Font *font = nullptr );
 //! Draws a string \a str with the horizontal center of its baseline located at \a pos. Optional \a font and \a color affect the style
-CI_API void drawStringCentered( const std::string &str, const vec2 &pos, const ColorA &color = ColorA( 1, 1, 1, 1 ), Font font = Font() );
+CI_API void drawStringCentered( const std::string &str, const vec2 &pos, const ColorA &color = ColorA( 1, 1, 1, 1 ), text::Font *font = nullptr );
 //! Draws a right-justified string \a str with the center of its  located at \a pos. Optional \a font and \a color affect the style
-CI_API void drawStringRight( const std::string &str, const vec2 &pos, const ColorA &color = ColorA( 1, 1, 1, 1 ), Font font = Font() );
+CI_API void drawStringRight( const std::string &str, const vec2 &pos, const ColorA &color = ColorA( 1, 1, 1, 1 ), text::Font *font = nullptr );
 
 //! Renders a solid triangle.
 CI_API void drawSolidTriangle( const vec2 &pt0, const vec2 &pt1, const vec2 &pt2 );
