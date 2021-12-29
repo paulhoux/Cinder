@@ -712,6 +712,33 @@ Surface8u renderToSurface( const GlyphLayout &glyphLayout, const ivec2 &offset, 
 	return result;
 }
 
+void renderToChannel( const GlyphLayout &glyphLayout, Channel8u *channel, const ivec2 &offset )
+{
+	int32_t width = (int32_t)ceilf( glyphLayout.getMeasuredWidth() );
+	int32_t height = (int32_t)ceilf( glyphLayout.getMeasuredHeight() );
+
+	for( auto &line : glyphLayout.getLines() )
+		for( auto &run : line.getRuns() ) {
+			vec2 drawOffset = line.getDrawOffset() + run.getDrawOffset();
+			drawRun( run.getFont(), run.getLength(), run.getGlyphIndices(), run.getGlyphAdvances(), drawOffset.x, drawOffset.y, *channel );
+		}
+}
+
+Channel8u renderToChannel( const GlyphLayout &glyphLayout, const ivec2 &offset )
+{
+	int32_t width = (int32_t)ceilf( glyphLayout.getMeasuredWidth() );
+	int32_t height = (int32_t)ceilf( glyphLayout.getMeasuredHeight() );
+	Channel8u result( width, height );
+	ip::fill( &result, (uint8_t)0 );
+
+	for( auto &line : glyphLayout.getLines() )
+		for( auto &run : line.getRuns() ) {
+			vec2 drawOffset = line.getDrawOffset() + run.getDrawOffset();
+			drawRun( run.getFont(), run.getLength(), run.getGlyphIndices(), run.getGlyphAdvances(), drawOffset.x, drawOffset.y, result );
+		}
+	return result;
+}
+
 /*Channel8u Frame::renderToChannel() const
 {
 	int32_t width = (mWidth == Frame::GROW) ? (int32_t)ceilf( getMeasuredWidth() ) : mWidth;

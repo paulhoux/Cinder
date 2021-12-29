@@ -265,7 +265,10 @@ CI_API void				renderToSurface( const GlyphLayout &glyphLayout, Surface8u *surfa
 CI_API inline void		renderToSurface( const Typesetter &typesetter, Surface8u *surface, const ivec2 &offset = ivec2(0) ) { renderToSurface( typesetter.getGlyphLayout(), surface, offset ); }
 CI_API Surface8u		renderToSurface( const GlyphLayout &glyphLayout, const ivec2 &offset = ivec2(0), const ColorA8u &bgColor = ColorA8u(0, 0, 0, 0) );
 CI_API inline Surface8u	renderToSurface( const Typesetter &typesetter, const ivec2 &offset = ivec2(0), const ColorA8u &bgColor = ColorA8u(0, 0, 0, 0) ) { return renderToSurface( typesetter.getGlyphLayout(), offset, bgColor ); }
-CI_API Channel8u	renderToChannel( const AttrString &attrString );
+CI_API void				renderToChannel( const GlyphLayout &glyphLayout, Channel8u *channel, const ivec2 &offset = ivec2(0) );
+CI_API inline void		renderToChannel( const Typesetter &typesetter, Channel8u *channel, const ivec2 &offset = ivec2(0) ) { renderToChannel( typesetter.getGlyphLayout(), channel, offset ); }
+CI_API Channel8u		renderToChannel( const GlyphLayout &glyphLayout, const ivec2 &offset = ivec2(0) );
+CI_API inline Channel8u	renderToChannel( const Typesetter &typesetter, const ivec2 &offset = ivec2(0) ) { return renderToChannel( typesetter.getGlyphLayout(), offset ); }
 
 CI_API Channel8u	renderString( const Font *font, const char *utf8String, float tracking = 0 );
 CI_API Channel8u	renderString( const AttrString &attrString ); // renders on one line
@@ -282,6 +285,7 @@ CI_API void setWordBreaksUtf8( const char *str, size_t len, char *outBreaks );
 //! \a outBreaks size must be >= \a len, contains 0: must break, 1: cannot break
 CI_API void setWordBreaksUtf32( const char32_t *str, size_t len, char *outBreaks );
 
+//! Used by function typeset()
 class CI_API TypesetProcessor {
   public:
 	virtual ~TypesetProcessor() {}
