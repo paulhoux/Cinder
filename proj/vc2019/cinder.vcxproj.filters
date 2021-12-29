@@ -2336,5 +2336,8 @@
     <ClInclude Include="..\..\src\libunibreak\linebreakdef.h">
       <Filter>Header Files\libunibreak</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\include\cinder\IntervalMap.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

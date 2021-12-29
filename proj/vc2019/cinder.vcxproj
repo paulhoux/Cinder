@@ -1138,6 +1138,7 @@
     <ClInclude Include="..\..\include\cinder\ImageSourceFileRadiance.h" />
     <ClInclude Include="..\..\include\cinder\ImageSourceFileStbImage.h" />
     <ClInclude Include="..\..\include\cinder\ImageTargetFileStbImage.h" />
+    <ClInclude Include="..\..\include\cinder\IntervalMap.h" />
     <ClInclude Include="..\..\include\cinder\ip\Blend.h" />
     <ClInclude Include="..\..\include\cinder\ip\Blur.h" />
     <ClInclude Include="..\..\include\cinder\ip\Checkerboard.h" />
