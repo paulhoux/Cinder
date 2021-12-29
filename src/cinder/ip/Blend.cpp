@@ -260,7 +260,7 @@ void blend( Channel8u *background, const Channel8u &foreground, const Area &uncl
 	}
 }
 
-void blendColor( Surface8u *background, const ColorAf &color, const Channel8u &foreground, Area unclippedSrcArea, const ivec2 &dstRelativeOffset )
+void blendColor( Surface8u *background, const ColorAf &unpremultColor, const Channel8u &foreground, Area unclippedSrcArea, const ivec2 &dstRelativeOffset )
 {
 	const ptrdiff_t srcRowBytes = foreground.getRowBytes();
 	const uint8_t srcInc = foreground.getIncrement();
@@ -282,10 +282,10 @@ void blendColor( Surface8u *background, const ColorAf &color, const Channel8u &f
 		uint8_t *dst = reinterpret_cast<uint8_t*>( reinterpret_cast<uint8_t*>( background->getData() + absOffset.x * dstInc ) + ( y + absOffset.y ) * dstRowBytes );
 		for( int32_t x = 0; x < srcArea.getWidth(); ++x ) {
 			if( *src ) {
-				uint8_t srcA = static_cast<uint8_t>( color.a * *src );
-				uint8_t srcR = static_cast<uint8_t>( color.r * srcA );
-				uint8_t srcG = static_cast<uint8_t>( color.g * srcA );
-				uint8_t srcB = static_cast<uint8_t>( color.b * srcA );
+				uint8_t srcA = static_cast<uint8_t>( unpremultColor.a * *src );
+				uint8_t srcR = static_cast<uint8_t>( unpremultColor.r * srcA );
+				uint8_t srcG = static_cast<uint8_t>( unpremultColor.g * srcA );
+				uint8_t srcB = static_cast<uint8_t>( unpremultColor.b * srcA );
 				if( background->hasAlpha() ) {
 					dst[dA] = 255 - (255 - srcA) * (255 - dst[dA]) / 255;
 				}
@@ -295,9 +295,11 @@ void blendColor( Surface8u *background, const ColorAf &color, const Channel8u &f
 					dst[dB] = (255 - srcA) * dst[dB] / 255 + srcB;
 				}
 				else if( ! background->isPremultiplied() ) { // unpremult * premult -> unpremult
-					dst[dR] = ( (255 - srcA) * dst[dA] * dst[dR] / 255 + (255 - dst[dA]) * srcR + dst[dA] * srcR ) / dst[dA];
-					dst[dG] = ( (255 - srcA) * dst[dA] * dst[dG] / 255 + (255 - dst[dA]) * srcG + dst[dA] * srcG ) / dst[dA];
-					dst[dB] = ( (255 - srcA) * dst[dA] * dst[dB] / 255 + (255 - dst[dA]) * srcB + dst[dA] * srcB ) / dst[dA];
+					if( dst[dA] ) {
+						dst[dR] = ( (255 - srcA) * dst[dA] * dst[dR] / 255 + (255 - dst[dA]) * srcR + dst[dA] * srcR ) / dst[dA];
+						dst[dG] = ( (255 - srcA) * dst[dA] * dst[dG] / 255 + (255 - dst[dA]) * srcG + dst[dA] * srcG ) / dst[dA];
+						dst[dB] = ( (255 - srcA) * dst[dA] * dst[dB] / 255 + (255 - dst[dA]) * srcB + dst[dA] * srcB ) / dst[dA];
+					}
 				}
 				else { // premult * premult -> premult
 					dst[dR] = ( (255 - srcA) * dst[dR] + (255 - dst[dA]) * srcR + dst[dA] * srcR ) / 255;
