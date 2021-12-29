@@ -93,7 +93,7 @@ class CI_API Run {
 	const uint32_t*					getGlyphIndices() const { return mGlyphIndices.data(); }
 	const float*					getGlyphAdvances() const { return mGlyphAdvances.data(); }
 	const Font*						getFont() const { return mFont; }
-	//! Baseline-relative
+	//! Line-relative
 	cinder::vec2					getDrawOffset() const { return mDrawOffset; }
 	ColorAf							getColor() const { return mColor; }
 	float							getMeasuredWidth() const { return mMeasuredWidth; }
@@ -120,22 +120,23 @@ class CI_API Run {
 
 class CI_API Line {
    public:
-	Line( Alignment justification, float baseline, float ascender, float descender, float lineGap, float measuredWidth )
-		: mAlignment( justification ), mBaseline( baseline ), mAscender( ascender ), mDescender( descender ), mLineGap( lineGap ), mMeasuredWidth( measuredWidth ), mDrawOffset( 0 )
+	Line( Alignment justification, vec2 drawOffset, float ascender, float descender, float lineGap, float measuredWidth )
+		: mAlignment( justification ), mDrawOffset( drawOffset ), mAscender( ascender ), mDescender( descender ), mLineGap( lineGap ), mMeasuredWidth( measuredWidth )
 	{}
 
 	std::vector<Run>&			getRuns() { return mRuns; }
 	const std::vector<Run>&		getRuns() const { return mRuns; }
+	//! x-offset for Alignment and y-offset for baseline
 	cinder::vec2				getDrawOffset() const { return mDrawOffset; }
+	//! x-offset for Alignment and y-offset for baseline
+	void						setDrawOffset( const vec2& drawOffset ) { mDrawOffset = drawOffset; }
 
 	Alignment					getAlignment() const { return mAlignment; }
-	float						getBaseline() const { return mBaseline; }
 	float						getAscender() const { return mAscender; }
 	float						getDescender() const { return mDescender; }
 	float						getLineGap() const { return mLineGap; }
+	//! Excludes offset for Alignment
 	float						getMeasuredWidth() const { return mMeasuredWidth; }
-
-	void						setBaseline( float baseline ) { mBaseline = baseline; }
 
   private:
 	std::vector<Run>		mRuns;
@@ -143,7 +144,7 @@ class CI_API Line {
 	float					mMeasuredWidth;
 
 	Alignment			mAlignment;
-	float				mBaseline, mAscender, mDescender, mLineGap;
+	float				mAscender, mDescender, mLineGap;
 
 	friend class FrameConstructorTypesetProcessor;
 };
@@ -173,40 +174,76 @@ struct CI_API TypesetOptions {
 	const Font*		mDefaultFont; // = loadFont( systemDefaultFace(), 12 );
 };
 
-class CI_API Frame {
+//! 
+class CI_API GlyphLayout {
+  public:
+	float			getMeasuredWidth() const { return mMeasuredWidth; }
+	float			getMeasuredHeight() const { return mMeasuredHeight; }
+	float			getFirstBaseline() const { return mLines.empty() ? 0 : mLines[0].getDrawOffset().y; }
+
+	//! Modification of Lines requires a call to measure()
+	std::vector<Line>&			getLines() { return mLines; }
+	const std::vector<Line>&    getLines() const { return mLines; }
+
+	//! Recalculates measureWidth, measuredHeight, and the position of the first baseline if Lines are modified 
+	void						measure();
+
+	void						clear() { mLines.clear(); }
+
+  protected:
+	float					mMeasuredWidth = -1, mMeasuredHeight = -1;
+	std::vector<Line>       mLines;
+};
+
+class CI_API StaticGlyphLayout {
+};
+
+class CI_API Typesetter {
+  public:
+	virtual ~Typesetter() {}
+	//! Throws if requireStaticLayout() is \c true
+	virtual const GlyphLayout&		getGlyphLayout() const = 0;
+	virtual StaticGlyphLayout	getStaticGlyphLayout() const = 0;
+	//! Returns \c true if the Typesetter can only create StaticGlyphLayouts, i.e. due to requiring rotations
+	virtual bool				requiresStaticLayout() const = 0;
+};
+
+class CI_API Frame : public Typesetter {
   public:
 	static constexpr int GROW = -1;
 
 	Frame( const AttrString &attrString, int32_t width, int32_t height = GROW, const TypesetOptions &options = TypesetOptions() );
 
-	float						getFirstBaseline() const { return mLines.empty() ? 0 : mLines[0].getBaseline(); }
-	std::vector<Line>&			getLines() { return mLines; }
-	const std::vector<Line>&    getLines() const { return mLines; }
+	//! Returns pre-typesetting width. A measured width requires the generation of a GlyphLayout. May return \c -1, meaning \c GROW
+	int32_t				getWidth() const { return mWidth; }
+	//! Returns pre-typesetting width. A measured width requires the generation of a GlyphLayout. May return \c -1, meaning \c GROW
+	int32_t				getHeight() const { return mHeight; }
 
-	Channel8u				renderToChannel() const;
-	Surface8u				renderToSurface( bool alpha = true, const ColorA &background = ColorA( 0, 0, 0, 0 ) ) const;
+	TypesetOptions		getTypesetOptions() const { return mTypesetOptions; }
 
-	void					render( Surface8u *surface, const vec2 &drawOffset );
-
-	float					getMeasuredWidth() const { return mMeasuredWidth; }
-	float					getMeasuredHeight() const { return mMeasuredHeight; }
+	const GlyphLayout&		getGlyphLayout() const override;
+	StaticGlyphLayout		getStaticGlyphLayout() const override;
+	bool					requiresStaticLayout() const override { return false; }
 
 	//! Returns number of times a word was forced to break because it was too long for the line width
-	uint32_t				getNumForcedWordBreaks() const { return mNumForcedWordBreaks; }
+	uint32_t				getNumForcedWordBreaks() const;
 
   private:
+	void					updateGlyphLayout();
+
+	bool					mDirty;
+	GlyphLayout				mGlyphLayout;
 	AttrString				mAttrString;
+	TypesetOptions			mTypesetOptions;
 	int32_t					mWidth, mHeight;
-	float					mMeasuredWidth, mMeasuredHeight;
 	uint32_t				mNumForcedWordBreaks = 0;
-	std::vector<Line>       mLines;
 
 	friend class FrameConstructorTypesetProcessor;
 };
 
 CI_API std::ostream& operator<<( std::ostream& os, const Run& r );
 CI_API std::ostream& operator<<( std::ostream& os, const Line& l );
-CI_API std::ostream& operator<<( std::ostream& os, const Frame& f );
+CI_API std::ostream& operator<<( std::ostream& os, const GlyphLayout& f );
 
 //! Loads a system font based on its \a name. Returns \c nullptr if no suitable match is found
 CI_API inline Face*		loadSystemFace( const std::string &name ) { return Manager::get()->loadSystemFace( name ); }
@@ -223,6 +260,12 @@ CI_API Font*				font( const std::vector<std::pair<std::string,float>> &fonts );
 
 
 CI_API void measureString( const AttrString& attrString, float *resultWidth, float *resultHeight = nullptr, float *resultBaseline = nullptr );
+
+CI_API void				renderToSurface( const GlyphLayout &glyphLayout, Surface8u *surface, const ivec2 &offset = ivec2(0) );
+CI_API inline void		renderToSurface( const Typesetter &typesetter, Surface8u *surface, const ivec2 &offset = ivec2(0) ) { renderToSurface( typesetter.getGlyphLayout(), surface, offset ); }
+CI_API Surface8u		renderToSurface( const GlyphLayout &glyphLayout, const ivec2 &offset = ivec2(0), const ColorA8u &bgColor = ColorA8u(0, 0, 0, 0) );
+CI_API inline Surface8u	renderToSurface( const Typesetter &typesetter, const ivec2 &offset = ivec2(0), const ColorA8u &bgColor = ColorA8u(0, 0, 0, 0) ) { return renderToSurface( typesetter.getGlyphLayout(), offset, bgColor ); }
+CI_API Channel8u	renderToChannel( const AttrString &attrString );
 
 CI_API Channel8u	renderString( const Font *font, const char *utf8String, float tracking = 0 );
 CI_API Channel8u	renderString( const AttrString &attrString ); // renders on one line
@@ -243,9 +286,10 @@ class CI_API TypesetProcessor {
   public:
 	virtual ~TypesetProcessor() {}
 
-	virtual void	addLine( Alignment justification, float baseline, float ascender, float descender, float lineGap, float measuredWidth ) {}
+	virtual void	addLine( Alignment justification, vec2 drawOffset, float ascender, float descender, float lineGap, float measuredWidth ) {}
 	virtual void	addRun( const Font *font, size_t chStart, size_t chLen, const ColorAf &color, size_t len, const uint32_t glyphIndices[], const float glyphAdvances[], float penX, float measuredWidth ) {}
 	virtual void	finishLine() {}
+	virtual void	finish() {}
 
 	virtual void	incrementNumForcedWordBreaks() { ++mNumForcedWordBreaks; }
 

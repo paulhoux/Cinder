@@ -45,6 +45,8 @@
 
 using namespace std;
 
+static constexpr uint16_t SOFTWARE_RENDERER_ID = 0x01; 
+
 namespace cinder { namespace text {
 
 Manager* Manager::get()
@@ -391,10 +393,10 @@ void processLine( const vector<pair<vector<RunData>::iterator,SpanData>> &spans,
 		else if( justification == Alignment::CENTER ) justificationOffset = ( maxWidth - measuredLineWidth ) / 2.0f;
 	}
 
-	fn.addLine( justification, *baseline, maxAscent, maxDescent, maxLineGap, measuredLineWidth );
+	fn.addLine( justification, vec2( justificationOffset, *baseline ), maxAscent, maxDescent, maxLineGap, measuredLineWidth );
 	for( auto &span : spans ) {
 		if( span.first->len && span.second.glyphLen )
-			fn.addRun( span.first->font, span.second.chStart, span.second.chLen, span.first->color, span.second.glyphLen, &glyphIndices[span.second.glyphStart], &glyphAdvances[span.second.glyphStart], span.second.drawOffset + justificationOffset, span.second.measuredWidth );
+			fn.addRun( span.first->font, span.second.chStart, span.second.chLen, span.first->color, span.second.glyphLen, &glyphIndices[span.second.glyphStart], &glyphAdvances[span.second.glyphStart], span.second.drawOffset, span.second.measuredWidth );
 	}
 	fn.finishLine();
 }
@@ -422,16 +424,16 @@ Channel8u renderString( const AttrString &attrString )
 	return result;
 }
 
-class RenderStringChannelProcessor : public TypesetProcessor {
+/*class RenderStringChannelProcessor : public TypesetProcessor {
   public:
 	RenderStringChannelProcessor( Channel8u &channel ) : mChannel( channel ) {}
 
-	void	addLine( Alignment /*justification*/, float baseline, float ascender, float descender, float lineGap, float measuredWidth ) override {
+	void	addLine( Alignment justification, vec2 baseline, float ascender, float descender, float lineGap, float measuredWidth ) override {
 		mCurrentBaseline = baseline;
 		if( mFirstLine )
 			mFirstBaseline = mCurrentBaseline;
 	}
-	void	addRun( const Font *font, size_t chStart, size_t chLen, const ColorAf /*&color*/, size_t len, const uint32_t glyphIndices[], const float glyphAdvances[], float penX, float measuredWidth )  {
+	void	addRun( const Font *font, size_t chStart, size_t chLen, const ColorAf &color, size_t len, const uint32_t glyphIndices[], const float glyphAdvances[], float penX, float measuredWidth )  {
 		drawRun( font, len, glyphIndices, glyphAdvances, penX, mCurrentBaseline, mChannel );
 	}
 
@@ -453,7 +455,7 @@ Channel8u renderString( const AttrString &attrString, int32_t width, int32_t hei
 		*outBaseline = proc.mFirstBaseline;
 
 	return result;
-}
+}*/
 
 void typeset( const AttrString &attrString, int32_t width, int32_t height, TypesetProcessor &processor, const TypesetOptions &options )
 {
@@ -569,6 +571,8 @@ void typeset( const AttrString &attrString, int32_t width, int32_t height, Types
 
 		lineStartGlyph = lineEndGlyph;
 	}
+
+	processor.finish();
 }
 
 namespace {
@@ -609,48 +613,106 @@ TypesetOptions::TypesetOptions()
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////
-// Frame
-class FrameConstructorTypesetProcessor : public TypesetProcessor {
-  public:
-	FrameConstructorTypesetProcessor( Frame &frame ) : mFrame( frame ), mCurrentBaseline( 0 ) {}
-
-	void	addLine( Alignment justification, float baseline, float ascender, float descender, float lineGap, float measuredWidth ) override {
-		mCurrentBaseline = baseline;
-		mFrame.mLines.push_back( Line( justification, baseline, ascender, descender, lineGap, measuredWidth ) );
-	}
-	void	addRun( const Font *font, size_t chStart, size_t chLen, const ColorAf &color, size_t len, const uint32_t glyphIndices[], const float glyphAdvances[], float penX, float measuredWidth ) override {
-		mFrame.mLines.back().mRuns.push_back( Run( len, font, chStart, chLen, color, glyphIndices, glyphAdvances, penX, measuredWidth ) );
-	}
-
-  private:
-	Frame		&mFrame;
-	float		mCurrentBaseline;
-};
-
-Frame::Frame( const AttrString &attrString, int32_t width, int32_t height, const TypesetOptions &options )
-	: mAttrString( attrString), mWidth( width ), mHeight( height )
+// GlyphLayout
+void GlyphLayout::measure()
 {
-	FrameConstructorTypesetProcessor processor( *this );
-
-	typeset( attrString, width, height, processor, options );
-
 	mMeasuredWidth = 0;
 	if( mLines.empty() ) {
 		mMeasuredHeight = 0;
 	}
 	else {
 		for( auto &line : mLines )
-			mMeasuredWidth = std::max( mMeasuredWidth, line.getMeasuredWidth() );
-		mMeasuredHeight = mLines.back().getBaseline() + mLines.back().getDescender();
+			mMeasuredWidth = std::max( mMeasuredWidth, line.getDrawOffset().x + line.getMeasuredWidth() );
+		mMeasuredHeight = mLines.back().getDrawOffset().y + mLines.back().getDescender();
 	}
-
-	if( height == Frame::GROW )
-		mHeight = (int32_t)ceilf( mMeasuredHeight );
-
-	mNumForcedWordBreaks = processor.mNumForcedWordBreaks;
 }
 
-Channel8u Frame::renderToChannel() const
+////////////////////////////////////////////////////////////////////////////////////////////////
+// Frame
+class GlyphLayoutConstructorTypesetProcessor : public TypesetProcessor {
+  public:
+	  GlyphLayoutConstructorTypesetProcessor( GlyphLayout *glyphLayout ) : mGlyphLayout{ glyphLayout } {}
+
+	void	addLine( Alignment justification, vec2 drawOffset, float ascender, float descender, float lineGap, float measuredWidth ) override {
+		mGlyphLayout->getLines().push_back( Line( justification, drawOffset, ascender, descender, lineGap, measuredWidth ) );
+	}
+	void	addRun( const Font *font, size_t chStart, size_t chLen, const ColorAf &color, size_t len, const uint32_t glyphIndices[], const float glyphAdvances[], float penX, float measuredWidth ) override {
+		mGlyphLayout->getLines().back().getRuns().push_back( Run( len, font, chStart, chLen, color, glyphIndices, glyphAdvances, penX, measuredWidth ) );
+	}
+	void	finish() override {
+		mGlyphLayout->measure();
+	}
+
+  private:
+	GlyphLayout	*mGlyphLayout;
+};
+
+Frame::Frame( const AttrString &attrString, int32_t width, int32_t height, const TypesetOptions &options )
+	: mAttrString( attrString), mWidth( width ), mHeight( height ), mTypesetOptions( options ), mDirty( true )
+{
+}
+
+void Frame::updateGlyphLayout()
+{
+	mGlyphLayout.clear();
+	GlyphLayoutConstructorTypesetProcessor processor{ &mGlyphLayout };
+
+	typeset( mAttrString, mWidth, mHeight, processor, mTypesetOptions );
+
+	mNumForcedWordBreaks = processor.mNumForcedWordBreaks;
+
+	mDirty = false;
+}
+
+uint32_t Frame::getNumForcedWordBreaks() const
+{
+	if( mDirty )
+		const_cast<Frame*>( this )->updateGlyphLayout();
+
+	return mNumForcedWordBreaks;
+}
+
+const GlyphLayout& Frame::getGlyphLayout() const
+{
+	if( mDirty )
+		const_cast<Frame*>( this )->updateGlyphLayout();
+	
+	return mGlyphLayout;
+}
+
+StaticGlyphLayout Frame::getStaticGlyphLayout() const
+{
+	return StaticGlyphLayout();
+}
+
+void renderToSurface( const GlyphLayout &glyphLayout, Surface8u *surface, const ivec2 &offset )
+{
+	int32_t width = (int32_t)ceilf( glyphLayout.getMeasuredWidth() );
+	int32_t height = (int32_t)ceilf( glyphLayout.getMeasuredHeight() );
+
+	for( auto &line : glyphLayout.getLines() )
+		for( auto &run : line.getRuns() ) {
+			vec2 drawOffset = line.getDrawOffset() + run.getDrawOffset();
+			drawRun( run.getFont(), run.getColor(), run.getLength(), run.getGlyphIndices(), run.getGlyphAdvances(), drawOffset.x, drawOffset.y, *surface );
+		}
+}
+
+Surface8u renderToSurface( const GlyphLayout &glyphLayout, const ivec2 &offset, const ColorA8u &bgColor )
+{
+	int32_t width = (int32_t)ceilf( glyphLayout.getMeasuredWidth() );
+	int32_t height = (int32_t)ceilf( glyphLayout.getMeasuredHeight() );
+	Surface8u result( width, height, true );
+	ip::fill( &result, bgColor );
+
+	for( auto &line : glyphLayout.getLines() )
+		for( auto &run : line.getRuns() ) {
+			vec2 drawOffset = line.getDrawOffset() + run.getDrawOffset();
+			drawRun( run.getFont(), run.getColor(), run.getLength(), run.getGlyphIndices(), run.getGlyphAdvances(), drawOffset.x, drawOffset.y, result );
+		}
+	return result;
+}
+
+/*Channel8u Frame::renderToChannel() const
 {
 	int32_t width = (mWidth == Frame::GROW) ? (int32_t)ceilf( getMeasuredWidth() ) : mWidth;
 	int32_t height = (mHeight == Frame::GROW) ? (int32_t)ceilf( getMeasuredHeight() ) : mHeight;
@@ -686,7 +748,7 @@ void Frame::render( Surface8u *surface, const vec2 &drawOffset )
 	for( auto &line : mLines )
 		for( auto &run : line.getRuns() )
 			drawRun( run.getFont(), run.getColor(), run.getLength(), run.getGlyphIndices(), run.getGlyphAdvances(), drawOffset.x + run.getDrawOffset().x, drawOffset.y + run.getDrawOffset().y + line.getBaseline(), *surface );
-}
+}*/
 
 std::ostream& operator<<( std::ostream& os, const Run& r )
 {
@@ -703,14 +765,14 @@ const char* FreeTypeExc::what() const noexcept
 
 std::ostream& operator<<( std::ostream& os, const Line& l )
 {
-	os << "# runs: " << l.getRuns().size() << " Just: " << l.getAlignment() << " Base: " << l.getBaseline() << " A: " << l.getAscender() << " D: " << l.getDescender() << " G: " << l.getLineGap();
+	os << "# runs: " << l.getRuns().size() << " Just: " << l.getAlignment() << " Base: " << l.getDrawOffset().y << " A: " << l.getAscender() << " D: " << l.getDescender() << " G: " << l.getLineGap();
 
 	return os;
 }
 
-std::ostream& operator<<( std::ostream& os, const Frame& f )
+std::ostream& operator<<( std::ostream& os, const GlyphLayout& g )
 {
-	for( auto &line : f.getLines() ) {
+	for( auto &line : g.getLines() ) {
 		os << line << std::endl;
 		for( auto &run : line.getRuns() )
 			os << "   " << run << std::endl;

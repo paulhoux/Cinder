@@ -67,6 +67,7 @@ class CI_API Face {
 	void			lock() const {}
 	void			unlock() const {}
 	
+	//! This be empty if the Face was constructed from memory rather than disk
 	ci::fs::path	getFilePath() const{ return mFilePath; }
 	int				getFaceIndex() const { return mFaceIndex; }
 
@@ -81,7 +82,6 @@ class CI_API Face {
 		float			getDefault() const { return mDefault / 65536.0f; }
 		float			getMaximum() const { return mMax / 65536.0f; }
 		uint32_t		getTag() const { return mTag; }
-
 
 		std::string		mName;
 		int32_t			mMin, mDefault, mMax; // 16.16 fixed point

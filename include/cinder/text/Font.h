@@ -58,7 +58,7 @@ struct CI_API GlyphMetrics {
 
 class CI_API Font {
   public:
-	Font( Font &&rhs ) = default;
+//	Font( Font &&rhs ) = default;
 	virtual ~Font();
 
 	Face*		getFace() { return mFace; }
