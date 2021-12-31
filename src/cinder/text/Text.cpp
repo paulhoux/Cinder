@@ -424,39 +424,6 @@ Channel8u renderString( const AttrString &attrString )
 	return result;
 }
 
-/*class RenderStringChannelProcessor : public TypesetProcessor {
-  public:
-	RenderStringChannelProcessor( Channel8u &channel ) : mChannel( channel ) {}
-
-	void	addLine( Alignment justification, vec2 baseline, float ascender, float descender, float lineGap, float measuredWidth ) override {
-		mCurrentBaseline = baseline;
-		if( mFirstLine )
-			mFirstBaseline = mCurrentBaseline;
-	}
-	void	addRun( const Font *font, size_t chStart, size_t chLen, const ColorAf &color, size_t len, const uint32_t glyphIndices[], const float glyphAdvances[], float penX, float measuredWidth )  {
-		drawRun( font, len, glyphIndices, glyphAdvances, penX, mCurrentBaseline, mChannel );
-	}
-
-	Channel8u&		mChannel;
-	float			mCurrentBaseline = 0;
-	bool			mFirstLine = true;
-	float			mFirstBaseline = 0;
-};
-
-Channel8u renderString( const AttrString &attrString, int32_t width, int32_t height, const TypesetOptions &options, float *outBaseline )
-{
-	Channel8u result( width, height );
-	ip::fill( &result, (uint8_t)0 );
-
-	RenderStringChannelProcessor proc( result );
-	typeset( attrString, width, height, proc, options );
-
-	if( outBaseline )
-		*outBaseline = proc.mFirstBaseline;
-
-	return result;
-}*/
-
 void typeset( const AttrString &attrString, int32_t width, int32_t height, TypesetProcessor &processor, const TypesetOptions &options )
 {
 	std::vector<uint32_t> glyphIndices, clusters;
@@ -685,7 +652,59 @@ StaticGlyphLayout Frame::getStaticGlyphLayout() const
 	return StaticGlyphLayout();
 }
 
-void renderToSurface( const GlyphLayout &glyphLayout, Surface8u *surface, const ivec2 &offset )
+class SoftwareRenderFontData : public Font::Data {
+	struct BitmapInfo {
+		std::unique_ptr<Channel8u>		mChannel;
+		std::unique_ptr<Surface8u>		mSurface;
+		int16_t							mOffsetLeft, mOffsetTop;
+		float							mScale;
+	};
+
+	SoftwareRenderFontData( text::Font *font );
+	Channel8u			getGlyphChannel( uint32_t glyphIndex, int32_t *outOffsetLeft, int32_t *outOffsetTop );
+
+	text::Font							*mFont;
+	std::vector<BitmapInfo>		mBitmapCache;
+};
+
+SoftwareRenderFontData::SoftwareRenderFontData( text::Font *font )
+	: mFont( font )
+{
+	// create a cache with slots for every glyph, but initially empty
+	mBitmapCache = std::vector<SoftwareRenderFontData::BitmapInfo>( font->getFace()->getNumGlyphs() );
+}
+
+Channel8u SoftwareRenderFontData::getGlyphChannel( uint32_t glyphIndex, int32_t *outOffsetLeft, int32_t *outOffsetTop )
+{
+	auto &cached = mBitmapCache[glyphIndex];
+
+	if( ! cached.mChannel ) {
+		int32_t offsetLeft, offsetTop;
+		cached.mChannel = mFont->getGlyphBitmap( glyphIndex, &offsetLeft, &offsetTop );
+		mFont->lock();
+		if( FT_Error err = FT_Load_Glyph( mFace->getFtFace(), glyphIndex, FT_LOAD_DEFAULT ) )
+			throw text::FreeTypeExc( err );
+		if( FT_Error err = FT_Render_Glyph( mFace->getFtFace()->glyph, FT_RENDER_MODE_NORMAL ) )
+			throw text::FreeTypeExc( err );
+
+		const FT_Bitmap &ftBitmap = mFace->getFtFace()->glyph->bitmap; 
+		cached.mChannel = make_unique<Channel8u>( ftBitmap.width, ftBitmap.rows );
+		cached.mChannel->copyFrom( ci::Channel8u( ftBitmap.width, ftBitmap.rows, ftBitmap.pitch, 1, ftBitmap.buffer ), Area( 0, 0, ftBitmap.width, ftBitmap.rows ) );
+		cached.mOffsetLeft = mFace->getFtFace()->glyph->bitmap_left;
+		cached.mOffsetTop = mFace->getFtFace()->glyph->bitmap_top;
+
+		mFont->unlock();
+	}
+
+	if( outOffsetLeft )
+		*outOffsetLeft = cached.mOffsetLeft;
+	if( outOffsetTop )
+		*outOffsetTop = cached.mOffsetTop;
+
+	return ci::Channel8u( cached.mChannel->getWidth(), cached.mChannel->getHeight(), cached.mChannel->getRowBytes(), 1, cached.mChannel->getData() );
+}
+
+void render( const GlyphLayout &glyphLayout, Surface8u *surface, const ivec2 &offset )
 {
 	int32_t width = (int32_t)ceilf( glyphLayout.getMeasuredWidth() );
 	int32_t height = (int32_t)ceilf( glyphLayout.getMeasuredHeight() );
@@ -697,11 +716,12 @@ void renderToSurface( const GlyphLayout &glyphLayout, Surface8u *surface, const 
 		}
 }
 
-Surface8u renderToSurface( const GlyphLayout &glyphLayout, const ivec2 &offset, const ColorA8u &bgColor )
+Surface8u renderSurface( const GlyphLayout &glyphLayout, const ivec2 &offset, const ColorA8u &bgColor )
 {
 	int32_t width = (int32_t)ceilf( glyphLayout.getMeasuredWidth() );
 	int32_t height = (int32_t)ceilf( glyphLayout.getMeasuredHeight() );
 	Surface8u result( width, height, true );
+	result.setPremultiplied( true );
 	ip::fill( &result, bgColor );
 
 	for( auto &line : glyphLayout.getLines() )
@@ -712,7 +732,7 @@ Surface8u renderToSurface( const GlyphLayout &glyphLayout, const ivec2 &offset, 
 	return result;
 }
 
-void renderToChannel( const GlyphLayout &glyphLayout, Channel8u *channel, const ivec2 &offset )
+void render( const GlyphLayout &glyphLayout, Channel8u *channel, const ivec2 &offset )
 {
 	int32_t width = (int32_t)ceilf( glyphLayout.getMeasuredWidth() );
 	int32_t height = (int32_t)ceilf( glyphLayout.getMeasuredHeight() );
@@ -724,7 +744,7 @@ void renderToChannel( const GlyphLayout &glyphLayout, Channel8u *channel, const 
 		}
 }
 
-Channel8u renderToChannel( const GlyphLayout &glyphLayout, const ivec2 &offset )
+Channel8u renderChannel( const GlyphLayout &glyphLayout, const ivec2 &offset )
 {
 	int32_t width = (int32_t)ceilf( glyphLayout.getMeasuredWidth() );
 	int32_t height = (int32_t)ceilf( glyphLayout.getMeasuredHeight() );
@@ -738,44 +758,6 @@ Channel8u renderToChannel( const GlyphLayout &glyphLayout, const ivec2 &offset )
 		}
 	return result;
 }
-
-/*Channel8u Frame::renderToChannel() const
-{
-	int32_t width = (mWidth == Frame::GROW) ? (int32_t)ceilf( getMeasuredWidth() ) : mWidth;
-	int32_t height = (mHeight == Frame::GROW) ? (int32_t)ceilf( getMeasuredHeight() ) : mHeight;
-
-	Channel8u result( width, height );
-	ip::fill( &result, (uint8_t)0 );
-
-	for( auto &line : mLines )
-		for( auto &run : line.getRuns() )
-			drawRun( run.getFont(), run.getLength(), run.getGlyphIndices(), run.getGlyphAdvances(), run.getDrawOffset().x, run.getDrawOffset().y + line.getBaseline(), result );
-
-	return result;
-}
-
-Surface8u Frame::renderToSurface( bool alpha, const ColorA& background ) const
-{
-	int32_t width = (mWidth == Frame::GROW) ? (int32_t)ceilf( getMeasuredWidth() ) : mWidth;
-	int32_t height = (mHeight == Frame::GROW) ? (int32_t)ceilf( getMeasuredHeight() ) : mHeight;
-
-	Surface8u result( width, height, alpha );
-	result.setPremultiplied( true );
-	ip::fill( &result, ColorA8u( background ) );
-
-	for( auto &line : mLines )
-		for( auto &run : line.getRuns() )
-			drawRun( run.getFont(), run.getColor(), run.getLength(), run.getGlyphIndices(), run.getGlyphAdvances(), run.getDrawOffset().x, run.getDrawOffset().y + line.getBaseline(), result );
-
-	return result;
-}
-
-void Frame::render( Surface8u *surface, const vec2 &drawOffset )
-{
-	for( auto &line : mLines )
-		for( auto &run : line.getRuns() )
-			drawRun( run.getFont(), run.getColor(), run.getLength(), run.getGlyphIndices(), run.getGlyphAdvances(), drawOffset.x + run.getDrawOffset().x, drawOffset.y + run.getDrawOffset().y + line.getBaseline(), *surface );
-}*/
 
 std::ostream& operator<<( std::ostream& os, const Run& r )
 {
