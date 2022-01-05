@@ -131,6 +131,7 @@ class CI_API Line {
 
 	std::vector<Run>&			getRuns() { return mRuns; }
 	const std::vector<Run>&		getRuns() const { return mRuns; }
+	size_t						getNumRuns() const { return mRuns.size(); }
 	//! x-offset for Alignment and y-offset for baseline
 	cinder::vec2				getDrawOffset() const { return mDrawOffset; }
 	//! x-offset for Alignment and y-offset for baseline
@@ -142,15 +143,18 @@ class CI_API Line {
 	void						setOpacity( float opacity ) { for( auto &run : mRuns ) run.setOpacity( opacity ); }
 
 	Alignment					getAlignment() const { return mAlignment; }
+	//! Potentially invalidated by changes to Runs
 	float						getAscender() const { return mAscender; }
+	//! Potentially invalidated by changes to Runs
 	float						getDescender() const { return mDescender; }
+	//! Potentially invalidated by changes to Runs
 	float						getLineGap() const { return mLineGap; }
-	//! Excludes offset for Alignment
+	//! Potentially invalidated by changes to Runs. Excludes draw offset for Alignment
 	float						getMeasuredWidth() const { return mMeasuredWidth; }
 
 	//! Convenience, sum of all child Runs' glyph counts
 	size_t						getNumGlyphs() const { size_t total = 0; for( auto &run : mRuns ) total += run.getNumGlyphs(); return total; }
-	//! Breaks all Runs into a single Run per glyph (for animation purposes)
+	//! Breaks all Runs into a single Run per glyph (for animation or other custom rendering purposes)
 	void						breakGlyphsIntoRuns();
 
   private:
@@ -198,7 +202,8 @@ class CI_API GlyphLayout {
 
 	//! Modification of Lines requires a call to measure()
 	std::vector<Line>&			getLines() { return mLines; }
-	const std::vector<Line>&    getLines() const { return mLines; }
+	const std::vector<Line>&	getLines() const { return mLines; }
+	size_t						getNumLines() const { return mLines.size(); }
 
 	//! Recalculates measureWidth, measuredHeight, and the position of the first baseline if Lines are modified 
 	void						measure();

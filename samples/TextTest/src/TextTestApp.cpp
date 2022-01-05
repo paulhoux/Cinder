@@ -325,16 +325,14 @@ void TextTestApp::updateAnimatedTest()
 			line.setOpacity( 0 );
 		else {
 			double lineRelativeT = (t - lineStartTime) / lineAnimationDuration; // 0-1
-			size_t lineNumGlyphs = line.getNumGlyphs();
-			for( size_t runIdx = 0; runIdx < line.getRuns().size(); ++runIdx ) {
-				double glyphRelativeAnimDuration = 0.2;
-				double glyphRelative = runIdx / (float)lineNumGlyphs;
+			for( size_t runIdx = 0; runIdx < line.getNumRuns(); ++runIdx ) {
+				double glyphRelativeAnimDuration = 0.2; // in normalized 0-1 range, duration of a glyph fade+translate
+				double glyphRelative = runIdx / (float)line.getNumGlyphs();
 				auto &run = line.getRuns()[runIdx];
-				float offset = ci::clamp<double>( (lineRelativeT - glyphRelative ) / glyphRelativeAnimDuration, 0.0, 1.0 );
-				run.setDrawOffset( run.getDrawOffset() + vec2( 0, glyphCascadeHeight * ci::easeInCubic(1.0 - offset) ) );
-				run.setOpacity( offset );
+				float glyphRelativeT = ci::clamp<double>( (lineRelativeT - glyphRelative ) / glyphRelativeAnimDuration, 0.0, 1.0 );
+				run.setDrawOffset( run.getDrawOffset() + vec2( 0, glyphCascadeHeight * ci::easeInCubic(1.0 - glyphRelativeT) ) );
+				run.setOpacity( glyphRelativeT );
 			}
-
 		}
 	}
 
