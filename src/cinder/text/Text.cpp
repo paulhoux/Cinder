@@ -45,8 +45,6 @@
 
 using namespace std;
 
-static constexpr uint16_t SOFTWARE_RENDERER_ID = 0x01; 
-
 namespace cinder { namespace text {
 
 Manager* Manager::get()
@@ -231,11 +229,6 @@ Font* font( const std::vector<std::pair<std::string,float>> &fonts )
 		return loadFont( systemDefaultFace(), fonts.front().second );
 }
 
-Channel8u renderString( const Font *font, const char *utf8String, float tracking )
-{ 
-	return font->renderString( utf8String, tracking );
-}
-
 void measureString( const AttrString& attrString, float *resultWidth, float *resultHeight, float *resultBaseline )
 {
 	ShapingOptions defaultShapingOptions{};
@@ -256,47 +249,6 @@ void measureString( const AttrString& attrString, float *resultWidth, float *res
 		*resultHeight = measuredHeight;
 	if( resultBaseline )
 		*resultBaseline = measuredBaseline;
-}
-
-void drawRun( const Font *font, size_t len, const uint32_t glyphIndices[], const float glyphAdvances[], float penX, float baseline, Channel8u &channel )
-{
-	font->lock();
-	for( size_t i = 0; i < len; ++i ) {
-		try {
-			int32_t offsetLeft, offsetTop;
-			Channel8u glyph = font->getGlyphBitmap( glyphIndices[i], &offsetLeft, &offsetTop );
-			ip::blend( &channel, glyph, glyph.getBounds(), ivec2( penX, baseline - offsetTop ) - ivec2( -offsetLeft, 0 ) );
-		}
-		catch( ... ) { // getGlyphBitmap() will throw on missing glyph
-		}
-		penX += glyphAdvances[i];
-	}
-	font->unlock();
-}
-
-void drawRun( const Font *font, const ColorAf &color, size_t len, const uint32_t glyphIndices[], const float glyphAdvances[], float penX, float baseline, Surface8u &surface )
-{
-	font->lock();
-	for( size_t i = 0; i < len; ++i ) {
-		try {
-			int32_t offsetLeft, offsetTop;
-			if( ! font->getFace()->hasColor() ) {
-				Channel8u glyph = font->getGlyphBitmap( glyphIndices[i], &offsetLeft, &offsetTop );
-				ip::blendColor( &surface, color, glyph, glyph.getBounds(), ivec2( penX, baseline - offsetTop ) - ivec2( -offsetLeft, 0 ) );
-				penX += glyphAdvances[i];
-			}
-			else {
-				float scale;
-				Surface8u glyph = font->getGlyphBitmapColor( glyphIndices[i], &offsetLeft, &offsetTop, &scale );
-				ip::blend( &surface, glyph, glyph.getBounds(), ivec2( penX, baseline - glyph.getHeight()/*offsetTop*/ ) - ivec2( -offsetLeft, 0 ) );
-				//surface.copyFrom( glyph, glyph.getBounds(), ivec2( penX, baseline - glyph.getHeight()/*offsetTop*/ ) - ivec2( -offsetLeft, 0 ) );
-				penX += glyphAdvances[i] * scale;
-			}
-		}
-		catch ( ... ) { // getGlyphBitmap() will throw on missing glyph
-		}
-	}
-	font->unlock();
 }
 
 bool mustBreak( const char breaks[], size_t offset )
@@ -418,7 +370,7 @@ Channel8u renderString( const AttrString &attrString )
 	float penX = 0, runWidth;
 	while( runIt.nextRun() ) {
 		runIt.shape( runIt.getShapingOptions( ShapingOptions() ), &glyphIndices, nullptr, nullptr, &glyphAdvances, nullptr, &runWidth );
-		drawRun( runIt.getFont(), runIt.getLengthCh(), glyphIndices.data(), glyphAdvances.data(), penX, baseline, result );
+		runIt.getFont()->drawGlyphs( runIt.getLengthCh(), glyphIndices.data(), glyphAdvances.data(), penX, baseline, result ); 
 		penX += runWidth;
 	}
 	return result;
@@ -580,6 +532,24 @@ TypesetOptions::TypesetOptions()
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////
+// Line
+void Line::breakGlyphsIntoRuns()
+{
+	std::vector<Run> runs;
+	
+	for( auto &run : mRuns ) {
+		double penX = run.getDrawOffset().x;
+		for( size_t glyphIdx = 0; glyphIdx < run.getNumGlyphs(); ++glyphIdx ) {
+			//Run( const Font* font, size_t startChar, size_t lengthChar, const ColorAf &color, size_t glyph, float drawOffsetX, float measuredWidth )
+			runs.emplace_back( run.getFont(), 0, 0, run.getColor(), run.getGlyphIndices()[glyphIdx], penX, 0 );
+			penX += (double)run.getGlyphAdvances()[glyphIdx];
+		}
+	}
+
+	mRuns = runs;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////
 // GlyphLayout
 void GlyphLayout::measure()
 {
@@ -652,74 +622,25 @@ StaticGlyphLayout Frame::getStaticGlyphLayout() const
 	return StaticGlyphLayout();
 }
 
-class SoftwareRenderFontData : public Font::Data {
-	struct BitmapInfo {
-		std::unique_ptr<Channel8u>		mChannel;
-		std::unique_ptr<Surface8u>		mSurface;
-		int16_t							mOffsetLeft, mOffsetTop;
-		float							mScale;
-	};
-
-	SoftwareRenderFontData( text::Font *font );
-	Channel8u			getGlyphChannel( uint32_t glyphIndex, int32_t *outOffsetLeft, int32_t *outOffsetTop );
-
-	text::Font							*mFont;
-	std::vector<BitmapInfo>		mBitmapCache;
-};
-
-SoftwareRenderFontData::SoftwareRenderFontData( text::Font *font )
-	: mFont( font )
+void render( const GlyphLayout &glyphLayout, Surface8u *surface, const vec2 &offset, bool precise )
 {
-	// create a cache with slots for every glyph, but initially empty
-	mBitmapCache = std::vector<SoftwareRenderFontData::BitmapInfo>( font->getFace()->getNumGlyphs() );
-}
-
-Channel8u SoftwareRenderFontData::getGlyphChannel( uint32_t glyphIndex, int32_t *outOffsetLeft, int32_t *outOffsetTop )
-{
-	auto &cached = mBitmapCache[glyphIndex];
-
-	if( ! cached.mChannel ) {
-		int32_t offsetLeft, offsetTop;
-		cached.mChannel = mFont->getGlyphBitmap( glyphIndex, &offsetLeft, &offsetTop );
-		mFont->lock();
-		if( FT_Error err = FT_Load_Glyph( mFace->getFtFace(), glyphIndex, FT_LOAD_DEFAULT ) )
-			throw text::FreeTypeExc( err );
-		if( FT_Error err = FT_Render_Glyph( mFace->getFtFace()->glyph, FT_RENDER_MODE_NORMAL ) )
-			throw text::FreeTypeExc( err );
-
-		const FT_Bitmap &ftBitmap = mFace->getFtFace()->glyph->bitmap; 
-		cached.mChannel = make_unique<Channel8u>( ftBitmap.width, ftBitmap.rows );
-		cached.mChannel->copyFrom( ci::Channel8u( ftBitmap.width, ftBitmap.rows, ftBitmap.pitch, 1, ftBitmap.buffer ), Area( 0, 0, ftBitmap.width, ftBitmap.rows ) );
-		cached.mOffsetLeft = mFace->getFtFace()->glyph->bitmap_left;
-		cached.mOffsetTop = mFace->getFtFace()->glyph->bitmap_top;
-
-		mFont->unlock();
-	}
-
-	if( outOffsetLeft )
-		*outOffsetLeft = cached.mOffsetLeft;
-	if( outOffsetTop )
-		*outOffsetTop = cached.mOffsetTop;
-
-	return ci::Channel8u( cached.mChannel->getWidth(), cached.mChannel->getHeight(), cached.mChannel->getRowBytes(), 1, cached.mChannel->getData() );
-}
-
-void render( const GlyphLayout &glyphLayout, Surface8u *surface, const ivec2 &offset )
-{
-	int32_t width = (int32_t)ceilf( glyphLayout.getMeasuredWidth() );
-	int32_t height = (int32_t)ceilf( glyphLayout.getMeasuredHeight() );
+	int32_t width = (int32_t)ceilf( glyphLayout.getMeasuredWidth() + offset.x );
+	int32_t height = (int32_t)ceilf( glyphLayout.getMeasuredHeight() + offset.y );
 
 	for( auto &line : glyphLayout.getLines() )
 		for( auto &run : line.getRuns() ) {
 			vec2 drawOffset = line.getDrawOffset() + run.getDrawOffset();
-			drawRun( run.getFont(), run.getColor(), run.getLength(), run.getGlyphIndices(), run.getGlyphAdvances(), drawOffset.x, drawOffset.y, *surface );
+			if( precise )
+				run.getFont()->drawGlyphsPrecise( run.getColor(), run.getNumGlyphs(), run.getGlyphIndices(), run.getGlyphAdvances(), offset.x + drawOffset.x, offset.y + drawOffset.y, *surface );
+			else
+				run.getFont()->drawGlyphs( run.getColor(), run.getNumGlyphs(), run.getGlyphIndices(), run.getGlyphAdvances(), offset.x + drawOffset.x, offset.y + drawOffset.y, *surface );
 		}
 }
 
-Surface8u renderSurface( const GlyphLayout &glyphLayout, const ivec2 &offset, const ColorA8u &bgColor )
+Surface8u renderSurface( const GlyphLayout &glyphLayout, const vec2 &offset, const ColorA8u &bgColor, bool precise )
 {
-	int32_t width = (int32_t)ceilf( glyphLayout.getMeasuredWidth() );
-	int32_t height = (int32_t)ceilf( glyphLayout.getMeasuredHeight() );
+	int32_t width = (int32_t)ceilf( glyphLayout.getMeasuredWidth() + offset.x );
+	int32_t height = (int32_t)ceilf( glyphLayout.getMeasuredHeight() + offset.y );
 	Surface8u result( width, height, true );
 	result.setPremultiplied( true );
 	ip::fill( &result, bgColor );
@@ -727,41 +648,44 @@ Surface8u renderSurface( const GlyphLayout &glyphLayout, const ivec2 &offset, co
 	for( auto &line : glyphLayout.getLines() )
 		for( auto &run : line.getRuns() ) {
 			vec2 drawOffset = line.getDrawOffset() + run.getDrawOffset();
-			drawRun( run.getFont(), run.getColor(), run.getLength(), run.getGlyphIndices(), run.getGlyphAdvances(), drawOffset.x, drawOffset.y, result );
+			if( precise )
+				run.getFont()->drawGlyphsPrecise( run.getColor(), run.getNumGlyphs(), run.getGlyphIndices(), run.getGlyphAdvances(), offset.x + drawOffset.x, offset.y + drawOffset.y, result );
+			else
+				run.getFont()->drawGlyphs( run.getColor(), run.getNumGlyphs(), run.getGlyphIndices(), run.getGlyphAdvances(), offset.x + drawOffset.x, offset.y + drawOffset.y, result );
 		}
 	return result;
 }
 
-void render( const GlyphLayout &glyphLayout, Channel8u *channel, const ivec2 &offset )
+void render( const GlyphLayout &glyphLayout, Channel8u *channel, const vec2 &offset )
 {
-	int32_t width = (int32_t)ceilf( glyphLayout.getMeasuredWidth() );
-	int32_t height = (int32_t)ceilf( glyphLayout.getMeasuredHeight() );
+	int32_t width = (int32_t)ceilf( glyphLayout.getMeasuredWidth() + offset.x );
+	int32_t height = (int32_t)ceilf( glyphLayout.getMeasuredHeight() + offset.y );
 
 	for( auto &line : glyphLayout.getLines() )
 		for( auto &run : line.getRuns() ) {
 			vec2 drawOffset = line.getDrawOffset() + run.getDrawOffset();
-			drawRun( run.getFont(), run.getLength(), run.getGlyphIndices(), run.getGlyphAdvances(), drawOffset.x, drawOffset.y, *channel );
+			run.getFont()->drawGlyphs( run.getNumGlyphs(), run.getGlyphIndices(), run.getGlyphAdvances(), offset.x + drawOffset.x, offset.y + drawOffset.y, *channel );
 		}
 }
 
-Channel8u renderChannel( const GlyphLayout &glyphLayout, const ivec2 &offset )
+Channel8u renderChannel( const GlyphLayout &glyphLayout, const vec2 &offset )
 {
-	int32_t width = (int32_t)ceilf( glyphLayout.getMeasuredWidth() );
-	int32_t height = (int32_t)ceilf( glyphLayout.getMeasuredHeight() );
+	int32_t width = (int32_t)ceilf( glyphLayout.getMeasuredWidth() + offset.x );
+	int32_t height = (int32_t)ceilf( glyphLayout.getMeasuredHeight() + offset.y );
 	Channel8u result( width, height );
 	ip::fill( &result, (uint8_t)0 );
 
 	for( auto &line : glyphLayout.getLines() )
 		for( auto &run : line.getRuns() ) {
 			vec2 drawOffset = line.getDrawOffset() + run.getDrawOffset();
-			drawRun( run.getFont(), run.getLength(), run.getGlyphIndices(), run.getGlyphAdvances(), drawOffset.x, drawOffset.y, result );
+			run.getFont()->drawGlyphs( run.getNumGlyphs(), run.getGlyphIndices(), run.getGlyphAdvances(), offset.x + drawOffset.x, offset.y + drawOffset.y, result );
 		}
 	return result;
 }
 
 std::ostream& operator<<( std::ostream& os, const Run& r )
 {
-	os << "# glyphs: " << r.getLength() <<  " Font: " << *r.getFont() << " Offset: " << r.getDrawOffset();
+	os << "# glyphs: " << r.getNumGlyphs() <<  " Font: " << *r.getFont() << " Offset: " << r.getDrawOffset();
 
 	return os;
 }

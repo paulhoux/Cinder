@@ -26,6 +26,7 @@
 
 #include "cinder/Cinder.h"
 #include "cinder/text/Face.h"
+#include "cinder/Color.h"
 #include <iosfwd>
 
 typedef struct FT_FaceRec_		*FT_Face;
@@ -101,7 +102,10 @@ class CI_API Font {
 									std::vector<uint32_t> *outGlyphIndices, std::vector<uint32_t> *outClusters = nullptr, std::vector<float> *outGlyphPositions = nullptr, std::vector<float> *outGlyphAdvances = nullptr,
 									std::vector<float> *outMaxXs = nullptr, float *outPixelWidth = nullptr ) const;
 //	void 			shapeString( const char32_t *utf32String, size_t length, float tracking, uint32_t *outGlyphIndices, float *outGlyphPositions = nullptr, float *outGlyphAdvances = nullptr, float *outPixelWidth = nullptr ) const;
-	Channel8u		renderString( const char *utf8String, float tracking = 0 ) const;
+	void			drawGlyphs( size_t len, const uint32_t glyphIndices[], const float glyphAdvances[], float penX, float baseline, Channel8u &channel ) const;
+	void			drawGlyphs( const ColorAf &color, size_t len, const uint32_t glyphIndices[], const float glyphAdvances[], float penX, float baseline, Surface8u &surface ) const;
+	//! thread-safe but not thread-efficient
+	void			drawGlyphsPrecise( const ColorAf &color, size_t len, const uint32_t glyphIndices[], const float glyphAdvances[], float penX, float baseline, Surface8u &surface ) const;
 
 	virtual GlyphMetrics	getGlyphMetrics( uint32_t glyphIndex ) const { return mGlyphMetrics[glyphIndex]; }
 	virtual float			getGlyphMaxX( uint32_t glyphIndex ) const { return mGlyphMetrics[glyphIndex].horizontalBearingX + mGlyphMetrics[glyphIndex].width; }

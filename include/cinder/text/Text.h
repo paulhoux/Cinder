@@ -87,15 +87,21 @@ class CI_API Run {
 		: mFont( font ), mColor( color ), mStartChar( startChar ), mLengthChar( lengthChar ), 
 			mGlyphIndices( glyphIndices, glyphIndices + len ), mGlyphAdvances( glyphAdvances, glyphAdvances + len ), mDrawOffset( drawOffsetX, 0 ), mMeasuredWidth( measuredWidth )
 	{}
+	Run( const Font* font, size_t startChar, size_t lengthChar, const ColorAf &color, size_t glyph, float drawOffsetX, float measuredWidth )
+		: mFont( font ), mColor( color ), mStartChar( startChar ), mLengthChar( lengthChar ), 
+		mGlyphIndices( &glyph, &glyph + 1 ), mGlyphAdvances( { 0 } ), mDrawOffset( drawOffsetX, 0 ), mMeasuredWidth( measuredWidth )
+	{}
 
 	//! Length in glyphs
-	size_t							getLength() const { return mGlyphIndices.size(); }
+	size_t							getNumGlyphs() const { return mGlyphIndices.size(); }
 	const uint32_t*					getGlyphIndices() const { return mGlyphIndices.data(); }
 	const float*					getGlyphAdvances() const { return mGlyphAdvances.data(); }
 	const Font*						getFont() const { return mFont; }
 	//! Line-relative
 	cinder::vec2					getDrawOffset() const { return mDrawOffset; }
 	ColorAf							getColor() const { return mColor; }
+	void							setColor( const ColorAf &color ) { mColor = color; }
+	void							setOpacity( const float opacity ) { mColor.a = opacity; }
 	float							getMeasuredWidth() const { return mMeasuredWidth; }
 
 	//! Index into the original AttrString
@@ -103,7 +109,6 @@ class CI_API Run {
 	//! Length in characters
 	size_t							getLengthChar() const { return mLengthChar; }
 
-	void							setColor( const ColorAf &color ) { mColor = color; }
 	void							setDrawOffset( const cinder::vec2 &drawOffset ) { mDrawOffset = drawOffset; }
 
   private:
@@ -131,12 +136,22 @@ class CI_API Line {
 	//! x-offset for Alignment and y-offset for baseline
 	void						setDrawOffset( const vec2& drawOffset ) { mDrawOffset = drawOffset; }
 
+	//! Convenience to set color of all Runs in the Line
+	void						setColor( const ColorAf &color ) { for( auto &run : mRuns ) run.setColor( color ); }
+	//! Convenience to set opacity of all Runs in the Line
+	void						setOpacity( float opacity ) { for( auto &run : mRuns ) run.setOpacity( opacity ); }
+
 	Alignment					getAlignment() const { return mAlignment; }
 	float						getAscender() const { return mAscender; }
 	float						getDescender() const { return mDescender; }
 	float						getLineGap() const { return mLineGap; }
 	//! Excludes offset for Alignment
 	float						getMeasuredWidth() const { return mMeasuredWidth; }
+
+	//! Convenience, sum of all child Runs' glyph counts
+	size_t						getNumGlyphs() const { size_t total = 0; for( auto &run : mRuns ) total += run.getNumGlyphs(); return total; }
+	//! Breaks all Runs into a single Run per glyph (for animation purposes)
+	void						breakGlyphsIntoRuns();
 
   private:
 	std::vector<Run>		mRuns;
@@ -190,6 +205,9 @@ class CI_API GlyphLayout {
 
 	void						clear() { mLines.clear(); }
 
+	//! Breaks all Runs into a single Run per glyph (for animation purposes)
+	void						breakGlyphsIntoRuns() { for( auto &line : mLines ) line.breakGlyphsIntoRuns(); }
+
   protected:
 	float					mMeasuredWidth = -1, mMeasuredHeight = -1;
 	std::vector<Line>       mLines;
@@ -212,6 +230,7 @@ class CI_API Frame : public Typesetter {
   public:
 	static constexpr int GROW = -1;
 
+	Frame() : mWidth( 0 ), mHeight( 0 ) {}
 	Frame( const AttrString &attrString, int32_t width, int32_t height = GROW, const TypesetOptions &options = TypesetOptions() );
 
 	//! Returns pre-typesetting width. A measured width requires the generation of a GlyphLayout. May return \c -1, meaning \c GROW
@@ -261,20 +280,20 @@ CI_API Font*				font( const std::vector<std::pair<std::string,float>> &fonts );
 
 CI_API void measureString( const AttrString& attrString, float *resultWidth, float *resultHeight = nullptr, float *resultBaseline = nullptr );
 
-CI_API void				render( const GlyphLayout &glyphLayout, Surface8u *surface, const ivec2 &offset = ivec2(0) );
-CI_API inline void		render( const Typesetter &typesetter, Surface8u *surface, const ivec2 &offset = ivec2(0) ) { render( typesetter.getGlyphLayout(), surface, offset ); }
+CI_API void				render( const GlyphLayout &glyphLayout, Surface8u *surface, const vec2 &offset = vec2(0), bool precise = false );
+CI_API inline void		render( const Typesetter &typesetter, Surface8u *surface, const vec2 &offset = vec2(0), bool precise = false ) { render( typesetter.getGlyphLayout(), surface, offset, precise ); }
 //! Creates a premultiplied Surface8u
-CI_API Surface8u		renderSurface( const GlyphLayout &glyphLayout, const ivec2 &offset = ivec2(0), const ColorA8u &bgColor = ColorA8u(0, 0, 0, 0) );
+CI_API Surface8u		renderSurface( const GlyphLayout &glyphLayout, const vec2 &offset = vec2(0), const ColorA8u &bgColor = ColorA8u(0, 0, 0, 0), bool precise = false );
 //! Creates a premultiplied Surface8u
-CI_API inline Surface8u	renderSurface( const Typesetter &typesetter, const ivec2 &offset = ivec2(0), const ColorA8u &bgColor = ColorA8u(0, 0, 0, 0) ) { return renderSurface( typesetter.getGlyphLayout(), offset, bgColor ); }
-CI_API void				render( const GlyphLayout &glyphLayout, Channel8u *channel, const ivec2 &offset = ivec2(0) );
-CI_API inline void		render( const Typesetter &typesetter, Channel8u *channel, const ivec2 &offset = ivec2(0) ) { render( typesetter.getGlyphLayout(), channel, offset ); }
-CI_API Channel8u		renderChannel( const GlyphLayout &glyphLayout, const ivec2 &offset = ivec2(0) );
-CI_API inline Channel8u	renderChannel( const Typesetter &typesetter, const ivec2 &offset = ivec2(0) ) { return renderChannel( typesetter.getGlyphLayout(), offset ); }
+CI_API inline Surface8u	renderSurface( const Typesetter &typesetter, const vec2 &offset = vec2(0), const ColorA8u &bgColor = ColorA8u(0, 0, 0, 0), bool precise = false ) { return renderSurface( typesetter.getGlyphLayout(), offset, bgColor, precise ); }
+CI_API void				render( const GlyphLayout &glyphLayout, Channel8u *channel, const vec2 &offset = vec2(0) );
+CI_API inline void		render( const Typesetter &typesetter, Channel8u *channel, const vec2 &offset = vec2(0) ) { render( typesetter.getGlyphLayout(), channel, offset ); }
+CI_API Channel8u		renderChannel( const GlyphLayout &glyphLayout, const vec2 &offset = vec2(0) );
+CI_API inline Channel8u	renderChannel( const Typesetter &typesetter, const vec2 &offset = vec2(0) ) { return renderChannel( typesetter.getGlyphLayout(), offset ); }
 
-CI_API Channel8u	renderString( const Font *font, const char *utf8String, float tracking = 0 );
+/*CI_API Channel8u	renderString( const Font *font, const char *utf8String, float tracking = 0 );
 CI_API Channel8u	renderString( const AttrString &attrString ); // renders on one line
-CI_API Channel8u	renderString( const AttrString &attrString, int32_t width, int32_t height, const TypesetOptions &options = TypesetOptions(), float *outBaseline = nullptr );
+CI_API Channel8u	renderString( const AttrString &attrString, int32_t width, int32_t height, const TypesetOptions &options = TypesetOptions(), float *outBaseline = nullptr );*/
 
 
 //! \a outBreaks size must be >= \a len, contains 0: must break, 1: allow break, 2: cannot break, 3: inside utf8/utf16 sequence, 4: indeterminate

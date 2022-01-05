@@ -1528,6 +1528,7 @@ void drawVector( const vec3& start, const vec3& end, float headLength, float hea
 namespace {
 void drawStringHelper( const std::string &str, const vec2 &pos, const ColorA &color, text::Font *font, int justification )
 {
+/*
 #if ! defined( CINDER_ANDROID )
 	
 	if( str.empty() )
@@ -1557,6 +1558,7 @@ void drawStringHelper( const std::string &str, const vec2 &pos, const ColorA &co
 		draw( tex, pos - vec2( (float)tex->getWidth(), baselineOffset ) );
 
 #endif // ! defined( CINDER_ANDROID )
+*/
 }
 } // anonymous namespace
 

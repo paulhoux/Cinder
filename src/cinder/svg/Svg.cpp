@@ -28,7 +28,7 @@
 #include "cinder/Utilities.h"
 #include "cinder/ImageIo.h"
 #include "cinder/Base64.h"
-#include "cinder/Text.h"
+#include "cinder/text/Text.h"
 #include "cinder/Log.h"
 #include "cinder/Unicode.h"
 

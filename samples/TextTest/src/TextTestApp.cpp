@@ -6,9 +6,11 @@
 #include "cinder/Utilities.h"
 #include "cinder/ImageIo.h"
 #include "cinder/GeomIo.h"
+#include "cinder/Log.h"
 #include "cinder/ip/Fill.h"
 #include "cinder/Rand.h"
 #include "cinder/text/SystemFonts.h"
+#include "cinder/Easing.h"
 #include "Resources.h"
 
 using namespace ci;
@@ -25,6 +27,8 @@ class TextTestApp : public App {
 	void resize() override;
 	void renderTexture( int width, int height );
 	void updateExtremeTest();
+	void animate( const text::Frame &frame );
+	void updateAnimatedTest();
 
 	text::Face		*mFace, *mEmojiFace;
 	const text::Font		*mFontSmall, *mEmojiFont, *mFontMedium, *mFontLarge;
@@ -35,6 +39,11 @@ class TextTestApp : public App {
 	Surface8u					mSurface;
 	bool			mDrawLines = false;
 	bool			mExtremeTesting = false;
+	bool			mPreciseRendering = false;
+
+	bool			mAnimatedTesting = false;
+	double			mAnimatedTestStartTime;
+	text::Frame		mAnimatedTestFrame;
 };
 
 void printFontNames()
@@ -218,20 +227,21 @@ void TextTestApp::renderTexture( int width, int height )
 #endif
 
 	auto frame = text::Frame( str, width, height, text::TypesetOptions().ignoreLineMetrics( false ).defaultAlignment( text::Alignment::LEFT ).defaultShapingOptions( text::ShapingOptions().ignoreMissingGlyphs(true) ) );
+	if( mAnimatedTesting )
+		animate( frame );
+	else {
+		mSurface = Surface8u( width, height, true );
+		mSurface.setPremultiplied( true );
+		ip::fill( &mSurface, ColorA8u( 0, 0, 0, 0 ) );
+		if( mBackgroundSurface )
+			mSurface.copyFrom( *mBackgroundSurface, mBackgroundSurface->getBounds() );
+		//text::renderToSurface( frame, &mSurface );
+		mSurface = text::renderSurface( frame, vec2(0), ColorA8u::black(), mPreciseRendering );
+		if( mDrawLines )
+			drawFrameLines( frame.getGlyphLayout(), &mSurface );
 
-	mSurface = Surface8u( width, height, true );
-	mSurface.setPremultiplied( true );
-	ip::fill( &mSurface, ColorA8u( 0, 0, 0, 0 ) );
-	if( mBackgroundSurface )
-		mSurface.copyFrom( *mBackgroundSurface, mBackgroundSurface->getBounds() );
-	//text::renderToSurface( frame, &mSurface );
-	mSurface = text::renderSurface( frame );
-	if( mDrawLines )
-		drawFrameLines( frame.getGlyphLayout(), &mSurface );
-
-	mTex = gl::Texture::create( mSurface );
-
-//	console() << frame << std::endl;
+		mTex = gl::Texture::create( mSurface );
+	}
 }
 
 void TextTestApp::updateExtremeTest()
@@ -289,6 +299,56 @@ void TextTestApp::updateExtremeTest()
 	}
 }
 
+void TextTestApp::animate( const text::Frame &frame )
+{
+	mAnimatedTesting = true;
+	mAnimatedTestFrame = frame;
+	mAnimatedTestFrame;
+	mAnimatedTestStartTime = getElapsedSeconds();
+}
+
+void TextTestApp::updateAnimatedTest()
+{
+	const double lineAnimationDuration = 1.0; // fade + char cascade
+	const double perLineOffsetTime = 0.3; // line animation start = perLineOffsetTime * lineNum
+	double t = getElapsedSeconds() - mAnimatedTestStartTime;
+	const float glyphCascadeHeight = 12;
+	text::GlyphLayout layout = mAnimatedTestFrame.getGlyphLayout();
+	layout.breakGlyphsIntoRuns();
+	if( t >= (perLineOffsetTime + lineAnimationDuration) * layout.getLines().size() )
+		return;
+
+	for( size_t lineIdx = 0; lineIdx < layout.getLines().size(); ++lineIdx ) {
+		double lineStartTime = lineIdx * perLineOffsetTime;
+		auto &line = layout.getLines()[lineIdx];
+		if( t < lineStartTime )
+			line.setOpacity( 0 );
+		else {
+			double lineRelativeT = (t - lineStartTime) / lineAnimationDuration; // 0-1
+			size_t lineNumGlyphs = line.getNumGlyphs();
+			for( size_t runIdx = 0; runIdx < line.getRuns().size(); ++runIdx ) {
+				double glyphRelativeAnimDuration = 0.2;
+				double glyphRelative = runIdx / (float)lineNumGlyphs;
+				auto &run = line.getRuns()[runIdx];
+				float offset = ci::clamp<double>( (lineRelativeT - glyphRelative ) / glyphRelativeAnimDuration, 0.0, 1.0 );
+				run.setDrawOffset( run.getDrawOffset() + vec2( 0, glyphCascadeHeight * ci::easeInCubic(1.0 - offset) ) );
+				run.setOpacity( offset );
+			}
+
+		}
+	}
+
+	mSurface = Surface8u( getWindowWidth(), getWindowHeight(), true );
+	mSurface.setPremultiplied( true );
+	ip::fill( &mSurface, ColorA8u( 0, 0, 0, 0 ) );
+	if( mBackgroundSurface )
+		mSurface.copyFrom( *mBackgroundSurface, mBackgroundSurface->getBounds() );
+	//text::renderToSurface( frame, &mSurface );
+	mSurface = text::renderSurface( layout, vec2(0), ColorA8u::black(), mPreciseRendering );
+
+	mTex = gl::Texture::create( mSurface );
+}
+
 void TextTestApp::resize()
 {
 	renderTexture( getWindowWidth(), getWindowHeight() );
@@ -329,6 +389,14 @@ void TextTestApp::keyDown( KeyEvent event )
 	else if( event.getChar() == 'x' ) {
 		mExtremeTesting = ! mExtremeTesting;
 	}
+	else if( event.getChar() == 'p' ) {
+		mPreciseRendering = ! mPreciseRendering;
+		CI_LOG_I( "Precise rendering: " << string(( mPreciseRendering ? "true" : "false" )) );
+	}
+	else if( event.getChar() == 'a' ) {
+		mAnimatedTesting = ! mAnimatedTesting;
+		renderTexture( getWindowWidth(), getWindowHeight() );
+	}
 }
 
 void TextTestApp::draw()
@@ -341,6 +409,8 @@ void TextTestApp::draw()
 	gl::color( Color::white() );
 	if( mExtremeTesting )
 		updateExtremeTest();
+	else if( mAnimatedTesting )
+		updateAnimatedTest();
 	gl::draw( mTex );
 	gl::color( Color8u( 255, 128, 64 ) );
 }

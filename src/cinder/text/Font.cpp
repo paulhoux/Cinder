@@ -33,6 +33,7 @@
 #include "cinder/Shape2d.h"
 #include "cinder/ip/Fill.h"
 #include "cinder/ip/Resize.h"
+#include "cinder/ip/Blend.h"
 
 #include <string>
 
@@ -146,6 +147,7 @@ cinder::Channel8u Font::getGlyphBitmap( uint32_t glyphIndex, int32_t *outOffsetL
 
 	if( ! cached.mChannel ) {
 		mFace->lock();
+		lock();
 		FT_Activate_Size( mFtSize );
 		if( FT_Error err = FT_Load_Glyph( mFace->getFtFace(), glyphIndex, FT_LOAD_DEFAULT ) )
 			throw text::FreeTypeExc( err );
@@ -157,7 +159,7 @@ cinder::Channel8u Font::getGlyphBitmap( uint32_t glyphIndex, int32_t *outOffsetL
 		cached.mChannel->copyFrom( ci::Channel8u( ftBitmap.width, ftBitmap.rows, ftBitmap.pitch, 1, ftBitmap.buffer ), Area( 0, 0, ftBitmap.width, ftBitmap.rows ) );
 		cached.mOffsetLeft = mFace->getFtFace()->glyph->bitmap_left;
 		cached.mOffsetTop = mFace->getFtFace()->glyph->bitmap_top;
-
+		unlock();
 		mFace->unlock();
 	}
 
@@ -426,42 +428,67 @@ size_t Font::shapeBuffer( hb_buffer_t *buf, const vector<hb_feature_t> &features
 	return result;
 }
 
-Channel8u Font::renderString( const char *utf8String, float tracking ) const
+void Font::drawGlyphs( size_t len, const uint32_t glyphIndices[], const float glyphAdvances[], float penX, float baseline, Channel8u &channel ) const
 {
-	vector<uint32_t> glyphIndices;
-	vector<float> glyphPositions;
-	float glyphsWidth;
-	u32string utf32String = toUtf32( utf8String );
-	shapeString( ShapingOptions(), utf32String.data(), utf32String.size(), tracking, &glyphIndices, nullptr, &glyphPositions, nullptr, nullptr, &glyphsWidth );
-	
-	Channel8u result( (int32_t)ceilf( glyphsWidth ), (int32_t)ceilf( getHeight() ) );
-	ip::fill( &result, (uint8_t)0 );
+	for( size_t i = 0; i < len; ++i ) {
+		try {
+			int32_t offsetLeft, offsetTop;
+			Channel8u glyph = getGlyphBitmap( glyphIndices[i], &offsetLeft, &offsetTop );
+			ip::blend( &channel, glyph, glyph.getBounds(), ivec2( penX, baseline - offsetTop ) - ivec2( -offsetLeft, 0 ) );
+		}
+		catch( ... ) { // getGlyphBitmap() will throw on missing glyph
+		}
+		penX += glyphAdvances[i];
+	}
+}
 
-	float ascender = getAscender();
+void Font::drawGlyphs( const ColorAf &color, size_t len, const uint32_t glyphIndices[], const float glyphAdvances[], float penX, float baseline, Surface8u &surface ) const
+{
+	for( size_t i = 0; i < len; ++i ) {
+		try {
+			int32_t offsetLeft, offsetTop;
+			if( ! getFace()->hasColor() ) {
+				Channel8u glyph = getGlyphBitmap( glyphIndices[i], &offsetLeft, &offsetTop );
+				ip::blendColor( &surface, color, glyph, glyph.getBounds(), ivec2( penX, baseline - offsetTop ) - ivec2( -offsetLeft, 0 ) );
+				penX += glyphAdvances[i];
+			}
+			else {
+				float scale;
+				Surface8u glyph = getGlyphBitmapColor( glyphIndices[i], &offsetLeft, &offsetTop, &scale );
+				ip::blend( &surface, glyph, glyph.getBounds(), ivec2( penX, baseline - glyph.getHeight()/*offsetTop*/ ) - ivec2( -offsetLeft, 0 ) );
+				//surface.copyFrom( glyph, glyph.getBounds(), ivec2( penX, baseline - glyph.getHeight()/*offsetTop*/ ) - ivec2( -offsetLeft, 0 ) );
+				penX += glyphAdvances[i] * scale;
+			}
+		}
+		catch ( ... ) { // getGlyphBitmap() will throw on missing glyph
+		}
+	}
+}
 
+void Font::drawGlyphsPrecise( const ColorAf &color, size_t len, const uint32_t glyphIndices[], const float glyphAdvances[], float penX, float baseline, Surface8u &surface ) const
+{
+	mFace->lock();
 	lock();
-	for( size_t i = 0; i < glyphIndices.size(); ++i ) {
+	FT_Activate_Size( mFtSize );
+	float intBaseline;
+	float fracY = modff( baseline, &intBaseline );
+	for( size_t i = 0; i < len; ++i ) {
+		float intPenX;
+		float fracX = modff( penX, &intPenX );
+		FT_Vector offset = { (int)(fracX * 64), (int)(-fracY * 64) };
+		FT_Set_Transform( mFace->getFtFace(), nullptr, &offset );
 		if( FT_Error err = FT_Load_Glyph( mFace->getFtFace(), glyphIndices[i], FT_LOAD_DEFAULT ) )
 			throw text::FreeTypeExc( err );
 		if( FT_Error err = FT_Render_Glyph( mFace->getFtFace()->glyph, FT_RENDER_MODE_NORMAL ) )
 			throw text::FreeTypeExc( err );
 
-		const FT_Bitmap &ftBitmap = mFace->getFtFace()->glyph->bitmap;
-		if( mFace->getFtFace()->glyph->format == FT_GLYPH_FORMAT_BITMAP ) {
-			const FT_BitmapGlyph bitmapGlyph = reinterpret_cast<FT_BitmapGlyph>( &mFace->getFtFace()->glyph );
-			//Channel8u result( ftBitmap.width - mFace->getFtFace()->glyph->bitmap_left, ftBitmap.rows - mFace->getFtFace()->glyph->bitmap_top );  
-			//result.copyFrom( wrapBitmap( ftBitmap ), result.getBounds(), ivec2( mFace->getFtFace()->glyph->bitmap_left, mFace->getFtFace()->glyph->bitmap_top ) );
-			Channel8u glyph( ftBitmap.width, ftBitmap.rows );
-			//				ci::ip::blend( mSurface.get(), s, channel.getBounds(), vec2( glyph.penX + glyph.offset.x + bg->left, line.y - glyph.offset.y - bg->top ) );
-			glyph.copyFrom( ci::Channel8u( ftBitmap.width, ftBitmap.rows, ftBitmap.pitch, 1, ftBitmap.buffer ), glyph.getBounds() );
-			auto offsetLeft = mFace->getFtFace()->glyph->bitmap_left;
-			auto offsetTop = mFace->getFtFace()->glyph->bitmap_top;
-			result.copyFrom( glyph, glyph.getBounds(), ivec2( (int32_t)glyphPositions[i], ascender - offsetTop ) - ivec2( -offsetLeft, 0 ) );
-		}
+		auto channel = wrapBitmap( mFace->getFtFace()->glyph->bitmap );
+		ip::blendColor( &surface, color, channel, channel.getBounds(), ivec2( (int32_t)intPenX, (int32_t)intBaseline - mFace->getFtFace()->glyph->bitmap_top ) - ivec2( -mFace->getFtFace()->glyph->bitmap_left, 0 ) );
+		penX += glyphAdvances[i];
 	}
+	FT_Set_Transform( mFace->getFtFace(), nullptr, nullptr ); // reset transform
 	unlock();
-	
-	return result;
+	mFace->unlock();
 }
 
 void Font::setRendererData( uint16_t rendererId, Font::Data *data ) const

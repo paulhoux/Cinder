@@ -833,7 +833,6 @@
     <ClCompile Include="..\..\src\cinder\Sphere.cpp" />
     <ClCompile Include="..\..\src\cinder\Stream.cpp" />
     <ClCompile Include="..\..\src\cinder\Surface.cpp" />
-    <ClCompile Include="..\..\src\cinder\svg\Svg.cpp" />
     <ClCompile Include="..\..\src\cinder\System.cpp" />
     <ClCompile Include="..\..\src\cinder\text\AttrString.cpp" />
     <ClCompile Include="..\..\src\cinder\text\Face.cpp" />
