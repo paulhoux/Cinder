@@ -34,6 +34,7 @@
 #include "cinder/Channel.h"
 #include "cinder/Surface.h"
 #include "cinder/DataSource.h"
+#include "cinder/Unicode.h"
 
 #include <mutex>
 #include <vector>
@@ -83,12 +84,12 @@ class CI_API Manager {
 
 class CI_API Run {
   public:
-	Run( size_t len, const Font* font, size_t startChar, size_t lengthChar, const ColorAf &color, const uint32_t *glyphIndices, const float *glyphAdvances, float drawOffsetX, float measuredWidth )
-		: mFont( font ), mColor( color ), mStartChar( startChar ), mLengthChar( lengthChar ), 
+	Run( size_t len, const Font* font, const char32_t *utf32Text, size_t textLength, const std::vector<uint32_t> &clusters, const ColorAf &color, const uint32_t *glyphIndices, const float *glyphAdvances, float drawOffsetX, float measuredWidth )
+		: mFont( font ), mColor( color ), mText( utf32Text, textLength ), mClusters( clusters ),
 			mGlyphIndices( glyphIndices, glyphIndices + len ), mGlyphAdvances( glyphAdvances, glyphAdvances + len ), mDrawOffset( drawOffsetX, 0 ), mMeasuredWidth( measuredWidth )
 	{}
-	Run( const Font* font, size_t startChar, size_t lengthChar, const ColorAf &color, size_t glyph, float drawOffsetX, float measuredWidth )
-		: mFont( font ), mColor( color ), mStartChar( startChar ), mLengthChar( lengthChar ), 
+	Run( const Font* font, const char32_t *utf32Text, size_t textLength, const std::vector<uint32_t> &clusters, const ColorAf &color, uint32_t glyph, float drawOffsetX, float measuredWidth )
+		: mFont( font ), mColor( color ), mText( utf32Text, textLength ), mClusters( clusters ),
 		mGlyphIndices( &glyph, &glyph + 1 ), mGlyphAdvances( { 0 } ), mDrawOffset( drawOffsetX, 0 ), mMeasuredWidth( measuredWidth )
 	{}
 
@@ -104,16 +105,21 @@ class CI_API Run {
 	void							setOpacity( const float opacity ) { mColor.a = opacity; }
 	float							getMeasuredWidth() const { return mMeasuredWidth; }
 
-	//! Index into the original AttrString
-	size_t							getStartChar() const  { return mStartChar; }
-	//! Length in characters
-	size_t							getLengthChar() const { return mLengthChar; }
+	//! Returns Run-relative glyph bounds for glyph index \a g. Must be in the range [0, getNumGlyphs())
+	Rectf							getGlyphBounds( size_t g ) const;
+
+	//! UTF-32 string represented by the Run. Doesn't require conversion
+	std::u32string					getTextUtf32() const { return mText; }
+	//! UTF-8 string represented by the Run. Requires conversion from UTF-32
+	std::string						getTextUtf8() const { ci::toUtf8( mText ); }
+	const std::vector<uint32_t>&	getClusters() const { return mClusters; }
 
 	void							setDrawOffset( const cinder::vec2 &drawOffset ) { mDrawOffset = drawOffset; }
 
   private:
 	const Font*				mFont;
-	size_t					mStartChar, mLengthChar;
+	std::u32string			mText;
+	std::vector<uint32_t>	mClusters;
 	std::vector<uint32_t>	mGlyphIndices;
 	std::vector<float>		mGlyphAdvances;
 	cinder::vec2			mDrawOffset;
@@ -235,7 +241,7 @@ class CI_API Frame : public Typesetter {
   public:
 	static constexpr int GROW = -1;
 
-	Frame() : mWidth( 0 ), mHeight( 0 ) {}
+	Frame() : mWidth( 0 ), mHeight( 0 ), mDirty( false ) {}
 	Frame( const AttrString &attrString, int32_t width, int32_t height = GROW, const TypesetOptions &options = TypesetOptions() );
 
 	//! Returns pre-typesetting width. A measured width requires the generation of a GlyphLayout. May return \c -1, meaning \c GROW
@@ -317,7 +323,7 @@ class CI_API TypesetProcessor {
 	virtual ~TypesetProcessor() {}
 
 	virtual void	addLine( Alignment justification, vec2 drawOffset, float ascender, float descender, float lineGap, float measuredWidth ) {}
-	virtual void	addRun( const Font *font, size_t chStart, size_t chLen, const ColorAf &color, size_t len, const uint32_t glyphIndices[], const float glyphAdvances[], float penX, float measuredWidth ) {}
+	virtual void	addRun( const Font *font, const char32_t *utf32Str, size_t chLen, const std::vector<uint32_t> &clusters, const ColorAf &color, size_t len, const uint32_t glyphIndices[], const float glyphAdvances[], float penX, float measuredWidth ) {}
 	virtual void	finishLine() {}
 	virtual void	finish() {}
 
