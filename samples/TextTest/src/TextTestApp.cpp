@@ -398,6 +398,7 @@ void TextTestApp::keyDown( KeyEvent event )
 	}
 	else if( event.getChar() == 'p' ) {
 		mPreciseRendering = ! mPreciseRendering;
+		renderTexture( getWindowWidth(), getWindowHeight() );
 		CI_LOG_I( "Precise rendering: " << string(( mPreciseRendering ? "true" : "false" )) );
 	}
 	else if( event.getChar() == 'a' ) {

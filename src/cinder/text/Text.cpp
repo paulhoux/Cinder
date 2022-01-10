@@ -565,7 +565,7 @@ Rectf Run::getGlyphBounds( size_t g ) const
 	double penX = 0;
 	for( size_t g2 = 0; g2 < g; ++g2 )
 		penX += mGlyphAdvances[g2];
-	return Rectf( (float)(penX + metrics.horizontalBearingX), -metrics.horizontalBearingY, penX + metrics.horizontalBearingX + metrics.width, -metrics.horizontalBearingY + metrics.height );
+	return Rectf( (float)(penX + metrics.horizontalBearingX), -metrics.horizontalBearingY, (float)(penX + metrics.horizontalBearingX + metrics.width), -metrics.horizontalBearingY + metrics.height );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////

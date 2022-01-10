@@ -434,7 +434,7 @@ void Font::drawGlyphs( size_t len, const uint32_t glyphIndices[], const float gl
 		try {
 			int32_t offsetLeft, offsetTop;
 			Channel8u glyph = getGlyphBitmap( glyphIndices[i], &offsetLeft, &offsetTop );
-			ip::blend( &channel, glyph, glyph.getBounds(), ivec2( penX, baseline - offsetTop ) - ivec2( -offsetLeft, 0 ) );
+			ip::blend( &channel, glyph, glyph.getBounds(), ivec2( (int32_t)(penX + 0.5f), (int32_t)(baseline - offsetTop + 0.5f) ) - ivec2( -offsetLeft, 0 ) );
 		}
 		catch( ... ) { // getGlyphBitmap() will throw on missing glyph
 		}
@@ -449,7 +449,7 @@ void Font::drawGlyphs( const ColorAf &color, size_t len, const uint32_t glyphInd
 			int32_t offsetLeft, offsetTop;
 			if( ! getFace()->hasColor() ) {
 				Channel8u glyph = getGlyphBitmap( glyphIndices[i], &offsetLeft, &offsetTop );
-				ip::blendColor( &surface, color, glyph, glyph.getBounds(), ivec2( penX, baseline - offsetTop ) - ivec2( -offsetLeft, 0 ) );
+				ip::blendColor( &surface, color, glyph, glyph.getBounds(), ivec2( (int32_t)(penX + 0.5f), (int32_t)(baseline - offsetTop + 0.5f) ) - ivec2( -offsetLeft, 0 ) );
 				penX += glyphAdvances[i];
 			}
 			else {
