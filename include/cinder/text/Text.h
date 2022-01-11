@@ -84,19 +84,20 @@ class CI_API Manager {
 
 class CI_API Run {
   public:
-	Run( size_t len, const Font* font, const char32_t *utf32Text, size_t textLength, const std::vector<uint32_t> &clusters, const ColorAf &color, const uint32_t *glyphIndices, const float *glyphAdvances, float drawOffsetX, float measuredWidth )
+	Run( size_t len, const Font* font, const char32_t *utf32Text, size_t textLength, const std::vector<uint32_t> &clusters, const ColorAf &color, const uint32_t *glyphIndices, const vec2 *glyphPositions, float drawOffsetX, float measuredWidth )
 		: mFont( font ), mColor( color ), mText( utf32Text, textLength ), mClusters( clusters ),
-			mGlyphIndices( glyphIndices, glyphIndices + len ), mGlyphAdvances( glyphAdvances, glyphAdvances + len ), mDrawOffset( drawOffsetX, 0 ), mMeasuredWidth( measuredWidth )
+			mGlyphIndices( glyphIndices, glyphIndices + len ), mGlyphPositions( glyphPositions, glyphPositions + len ), mDrawOffset( drawOffsetX, 0 ), mMeasuredWidth( measuredWidth )
 	{}
-	Run( const Font* font, const char32_t *utf32Text, size_t textLength, const std::vector<uint32_t> &clusters, const ColorAf &color, uint32_t glyph, float drawOffsetX, float measuredWidth )
+	//! Single-glyph Run
+	Run( const Font* font, const char32_t *utf32Text, size_t textLength, const std::vector<uint32_t> &clusters, const ColorAf &color, uint32_t glyph, const vec2 &glyphPosition, float drawOffsetX, float measuredWidth )
 		: mFont( font ), mColor( color ), mText( utf32Text, textLength ), mClusters( clusters ),
-		mGlyphIndices( &glyph, &glyph + 1 ), mGlyphAdvances( { 0 } ), mDrawOffset( drawOffsetX, 0 ), mMeasuredWidth( measuredWidth )
+		mGlyphIndices( &glyph, &glyph + 1 ), mGlyphPositions( { glyphPosition } ), mDrawOffset( drawOffsetX, 0 ), mMeasuredWidth( measuredWidth )
 	{}
 
 	//! Length in glyphs
 	size_t							getNumGlyphs() const { return mGlyphIndices.size(); }
 	const uint32_t*					getGlyphIndices() const { return mGlyphIndices.data(); }
-	const float*					getGlyphAdvances() const { return mGlyphAdvances.data(); }
+	const vec2*						getGlyphPositions() const { return mGlyphPositions.data(); }
 	const Font*						getFont() const { return mFont; }
 	//! Line-relative
 	cinder::vec2					getDrawOffset() const { return mDrawOffset; }
@@ -121,7 +122,7 @@ class CI_API Run {
 	std::u32string			mText;
 	std::vector<uint32_t>	mClusters;
 	std::vector<uint32_t>	mGlyphIndices;
-	std::vector<float>		mGlyphAdvances;
+	std::vector<vec2>		mGlyphPositions;
 	cinder::vec2			mDrawOffset;
 	float					mMeasuredWidth;
 	ColorAf					mColor; // alpha < 0 -> default color
@@ -323,7 +324,7 @@ class CI_API TypesetProcessor {
 	virtual ~TypesetProcessor() {}
 
 	virtual void	addLine( Alignment justification, vec2 drawOffset, float ascender, float descender, float lineGap, float measuredWidth ) {}
-	virtual void	addRun( const Font *font, const char32_t *utf32Str, size_t chLen, const std::vector<uint32_t> &clusters, const ColorAf &color, size_t len, const uint32_t glyphIndices[], const float glyphAdvances[], float penX, float measuredWidth ) {}
+	virtual void	addRun( const Font *font, const char32_t *utf32Str, size_t chLen, const std::vector<uint32_t> &clusters, const ColorAf &color, size_t len, const uint32_t glyphIndices[], const vec2 glyphPositions[], float penX, float measuredWidth ) {}
 	virtual void	finishLine() {}
 	virtual void	finish() {}
 

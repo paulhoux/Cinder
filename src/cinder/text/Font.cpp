@@ -352,17 +352,17 @@ std::vector<size_t> findHardBreaks( const char32_t *utf32String, size_t length )
 	shapeBuffer( buf.get(), features, options.getIgnoreMissingGlyphs(), tracking, outGlyphIndices, outClusters, outGlyphPositions, outGlyphAdvances, outMaxXs, outPixelWidth );
 }*/
 
-size_t Font::shapeString( const ShapingOptions &options, const char32_t *utf32String, size_t length, float tracking, vector<uint32_t> *outGlyphIndices, std::vector<uint32_t> *outClusters, vector<float> *outGlyphPositions, vector<float> *outGlyphAdvances, vector<float> *outMaxXs, float *outPixelWidth ) const
+size_t Font::shapeString( const ShapingOptions &options, const char32_t *utf32String, size_t length, float tracking, vector<uint32_t> *outGlyphIndices, std::vector<uint32_t> *outClusters, vector<vec2> *outGlyphPositions, vector<float> *outGlyphXAdvances, vector<float> *outMaxXs, float *outPixelWidth ) const
 {
 	auto buf = createBuffer( options );
 	auto features = createFeatures( options );
 	vector<size_t> hardBreakIndices = options.getIgnoreMissingGlyphs() ? findHardBreaks( utf32String, length ) : std::vector<size_t>();
 	hb_buffer_add_utf32( buf.get(), (const uint32_t*)utf32String, (int)length, 0, -1 );
-	return shapeBuffer( buf.get(), features, options.getIgnoreMissingGlyphs(), hardBreakIndices, tracking, outGlyphIndices, outClusters, outGlyphPositions, outGlyphAdvances, outMaxXs, outPixelWidth );
+	return shapeBuffer( buf.get(), features, options.getIgnoreMissingGlyphs(), hardBreakIndices, tracking, outGlyphIndices, outClusters, outGlyphPositions, outGlyphXAdvances, outMaxXs, outPixelWidth );
 }
 
 size_t Font::shapeBuffer( hb_buffer_t *buf, const vector<hb_feature_t> &features, bool ignoreMissing, const vector<size_t> &hardBreakIndices, float tracking,
-							vector<uint32_t> *outGlyphIndices, vector<uint32_t> *outClusters, vector<float> *outGlyphPositions, vector<float> *outGlyphAdvances, vector<float> *outMaxXs, float *outPixelWidth ) const
+							vector<uint32_t> *outGlyphIndices, vector<uint32_t> *outClusters, vector<vec2> *outGlyphPositions, vector<float> *outGlyphXAdvances, vector<float> *outMaxXs, float *outPixelWidth ) const
 {
 	lock();
 	//FT_Activate_Size( mFtSize );
@@ -397,9 +397,9 @@ size_t Font::shapeBuffer( hb_buffer_t *buf, const vector<hb_feature_t> &features
 	} 
 
 	hardBreakIndicesIdx = 0;
-	if( outGlyphPositions || outGlyphAdvances || outPixelWidth ) {
+	if( outGlyphPositions || outGlyphXAdvances || outPixelWidth ) {
 		const hb_glyph_position_t *glyph_positions = hb_buffer_get_glyph_positions( buf, nullptr );
-		double offset = 0;
+		double penX = 0, penY = 0;
 		for( unsigned int g = 0; g < glyphCount; ++g ) {
 			bool missing = ignoreMissing && glyph_infos[g].codepoint == missingGlyph;
 			if( missing && hardBreakIndicesIdx < hardBreakIndices.size() && hardBreakIndices[hardBreakIndicesIdx] == glyph_infos[g].cluster ) {
@@ -408,19 +408,20 @@ size_t Font::shapeBuffer( hb_buffer_t *buf, const vector<hb_feature_t> &features
 			}
 			if( outGlyphPositions )
 				if( ! missing )
-					(*outGlyphPositions).push_back( (float)offset + glyph_positions[g].x_offset / 64.0f );
-			if( outGlyphAdvances )
+					(*outGlyphPositions).emplace_back( (float)penX + glyph_positions[g].x_offset / 64.0f, (float)penY + glyph_positions[g].y_offset / 64.0f );
+			if( outGlyphXAdvances )
 				if( ! missing )
-					(*outGlyphAdvances).push_back( glyph_positions[g].x_advance / 64.0f + tracking );
+					(*outGlyphXAdvances).push_back( glyph_positions[g].x_advance / 64.0f + tracking );
 			if( ! missing ) {
-				offset += glyph_positions[g].x_advance / 64.0;
-				offset += (double)tracking;
+				penX += glyph_positions[g].x_advance / 64.0;
+				penX += (double)tracking;
+				penY += glyph_positions[g].y_advance / 64.0;
 			}
 		}
-		offset -= ( glyphCount > 1 ) ? tracking : 0;
+		penX -= ( glyphCount > 1 ) ? tracking : 0;
 		
 		if( outPixelWidth )
-			*outPixelWidth = (float)offset;
+			*outPixelWidth = (float)penX;
 	}
 
 	unlock();
@@ -428,36 +429,33 @@ size_t Font::shapeBuffer( hb_buffer_t *buf, const vector<hb_feature_t> &features
 	return result;
 }
 
-void Font::drawGlyphs( size_t len, const uint32_t glyphIndices[], const float glyphAdvances[], float penX, float baseline, Channel8u &channel ) const
+void Font::drawGlyphs( size_t len, const uint32_t glyphIndices[], const vec2 glyphPositions[], float penX, float baseline, Channel8u &channel ) const
 {
 	for( size_t i = 0; i < len; ++i ) {
 		try {
 			int32_t offsetLeft, offsetTop;
 			Channel8u glyph = getGlyphBitmap( glyphIndices[i], &offsetLeft, &offsetTop );
-			ip::blend( &channel, glyph, glyph.getBounds(), ivec2( (int32_t)(penX + 0.5f), (int32_t)(baseline - offsetTop + 0.5f) ) - ivec2( -offsetLeft, 0 ) );
+			ip::blend( &channel, glyph, glyph.getBounds(), ivec2( (int32_t)(penX + glyphPositions[i].x + 0.5f), (int32_t)(glyphPositions[i].y + baseline - offsetTop + 0.5f) ) - ivec2( -offsetLeft, 0 ) );
 		}
 		catch( ... ) { // getGlyphBitmap() will throw on missing glyph
 		}
-		penX += glyphAdvances[i];
 	}
 }
 
-void Font::drawGlyphs( const ColorAf &color, size_t len, const uint32_t glyphIndices[], const float glyphAdvances[], float penX, float baseline, Surface8u &surface ) const
+void Font::drawGlyphs( const ColorAf &color, size_t len, const uint32_t glyphIndices[], const vec2 glyphPositions[], float penX, float baseline, Surface8u &surface ) const
 {
 	for( size_t i = 0; i < len; ++i ) {
 		try {
 			int32_t offsetLeft, offsetTop;
 			if( ! getFace()->hasColor() ) {
 				Channel8u glyph = getGlyphBitmap( glyphIndices[i], &offsetLeft, &offsetTop );
-				ip::blendColor( &surface, color, glyph, glyph.getBounds(), ivec2( (int32_t)(penX + 0.5f), (int32_t)(baseline - offsetTop + 0.5f) ) - ivec2( -offsetLeft, 0 ) );
-				penX += glyphAdvances[i];
+				ip::blendColor( &surface, color, glyph, glyph.getBounds(), ivec2( (int32_t)(penX + glyphPositions[i].x + 0.5f), (int32_t)(baseline + glyphPositions[i].y - offsetTop + 0.5f) ) - ivec2( -offsetLeft, 0 ) );
 			}
 			else {
 				float scale;
 				Surface8u glyph = getGlyphBitmapColor( glyphIndices[i], &offsetLeft, &offsetTop, &scale );
-				ip::blend( &surface, glyph, glyph.getBounds(), ivec2( penX, baseline - glyph.getHeight()/*offsetTop*/ ) - ivec2( -offsetLeft, 0 ) );
+				ip::blend( &surface, glyph, glyph.getBounds(), ivec2( (int32_t)(penX + glyphPositions[i].x + 0.5f), (int32_t)(baseline + glyphPositions[i].y - offsetTop + 0.5f) ) - ivec2( -offsetLeft, 0 ) );
 				//surface.copyFrom( glyph, glyph.getBounds(), ivec2( penX, baseline - glyph.getHeight()/*offsetTop*/ ) - ivec2( -offsetLeft, 0 ) );
-				penX += glyphAdvances[i] * scale;
 			}
 		}
 		catch ( ... ) { // getGlyphBitmap() will throw on missing glyph
@@ -465,16 +463,16 @@ void Font::drawGlyphs( const ColorAf &color, size_t len, const uint32_t glyphInd
 	}
 }
 
-void Font::drawGlyphsPrecise( const ColorAf &color, size_t len, const uint32_t glyphIndices[], const float glyphAdvances[], float penX, float baseline, Surface8u &surface ) const
+void Font::drawGlyphsPrecise( const ColorAf &color, size_t len, const uint32_t glyphIndices[], const vec2 glyphPositions[], float penX, float baseline, Surface8u &surface ) const
 {
 	mFace->lock();
 	lock();
 	FT_Activate_Size( mFtSize );
-	float intBaseline;
-	float fracY = modff( baseline, &intBaseline );
 	for( size_t i = 0; i < len; ++i ) {
 		float intPenX;
-		float fracX = modff( penX, &intPenX );
+		float fracX = modff( penX + glyphPositions[i].x, &intPenX );
+		float intBaseline;
+		float fracY = modff( baseline + glyphPositions[i].y, &intBaseline );
 		FT_Vector offset = { (int)(fracX * 64), (int)(-fracY * 64) };
 		FT_Set_Transform( mFace->getFtFace(), nullptr, &offset );
 		if( FT_Error err = FT_Load_Glyph( mFace->getFtFace(), glyphIndices[i], FT_LOAD_DEFAULT ) )
@@ -484,7 +482,6 @@ void Font::drawGlyphsPrecise( const ColorAf &color, size_t len, const uint32_t g
 
 		auto channel = wrapBitmap( mFace->getFtFace()->glyph->bitmap );
 		ip::blendColor( &surface, color, channel, channel.getBounds(), ivec2( (int32_t)intPenX, (int32_t)intBaseline - mFace->getFtFace()->glyph->bitmap_top ) - ivec2( -mFace->getFtFace()->glyph->bitmap_left, 0 ) );
-		penX += glyphAdvances[i];
 	}
 	FT_Set_Transform( mFace->getFtFace(), nullptr, nullptr ); // reset transform
 	unlock();

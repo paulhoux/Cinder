@@ -455,12 +455,12 @@ bool AttrStringIter::nextRun()
 	return true;
 }
 
-size_t AttrStringIter::shape( const ShapingOptions &shapingOptions, vector<uint32_t> *outGlyphIndices, vector<uint32_t> *outClusters, vector<float> *outGlyphPositions, vector<float> *outGlyphAdvances, vector<float> *outGlyphMaxXs, float *outPixelWidth ) const
+size_t AttrStringIter::shape( const ShapingOptions &shapingOptions, vector<uint32_t> *outGlyphIndices, vector<uint32_t> *outClusters, vector<vec2> *outGlyphPositions, vector<float> *outGlyphXAdvances, vector<float> *outGlyphMaxXs, float *outPixelWidth ) const
 {
 	const Font *font = getFont();
 	if( font ) {
 		font->lock();
-		size_t len = mFont->shapeString( shapingOptions, &mAttrStr->mString[mStrStartOffset], mStrEndOffset - mStrStartOffset, getTracking(), outGlyphIndices, outClusters, outGlyphPositions, outGlyphAdvances, outGlyphMaxXs, outPixelWidth );
+		size_t len = mFont->shapeString( shapingOptions, &mAttrStr->mString[mStrStartOffset], mStrEndOffset - mStrStartOffset, getTracking(), outGlyphIndices, outClusters, outGlyphPositions, outGlyphXAdvances, outGlyphMaxXs, outPixelWidth );
 		font->unlock();
 		return len;
 	}

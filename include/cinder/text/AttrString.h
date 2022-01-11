@@ -237,7 +237,7 @@ class CI_API AttrStringIter {
 	ShapingOptions			getShapingOptions( const ShapingOptions &defaultOptions );
 
 	//! Appends to vectors. Returns number of glyphs added
-	size_t					shape( const ShapingOptions &options, std::vector<uint32_t> *outGlyphIndices, std::vector<uint32_t> *outClusters, std::vector<float> *outGlyphPositions, std::vector<float> *outGlyphAdvances, std::vector<float> *outGlyphMaxXs, float *outPixelWidth ) const;
+	size_t					shape( const ShapingOptions &options, std::vector<uint32_t> *outGlyphIndices, std::vector<uint32_t> *outClusters, std::vector<vec2> *outGlyphPositions, std::vector<float> *outGlyphXAdvances, std::vector<float> *outGlyphMaxXs, float *outPixelWidth ) const;
 //  	bool			getRunTrackingIsConstant() const { return mRunTrackingIsConstant; }
 //  	void			getRunTrackingValue() const { return mRunTrackingValue; }
   	
