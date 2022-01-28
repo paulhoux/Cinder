@@ -272,6 +272,18 @@ class CI_API Frame : public Typesetter {
 	friend class FrameConstructorTypesetProcessor;
 };
 
+class CI_API TextOnPath : public Typesetter {
+  public:
+	TextOnPath() : mDirty( false ) {}
+	TextOnPath( const AttrString &attrString, const Path2d &path, const TypesetOptions &options = TypesetOptions() );
+
+	bool					mDirty;
+	GlyphLayout				mGlyphLayout;
+	AttrString				mAttrString;
+	Path2d					mPath;
+	TypesetOptions			mTypesetOptions;
+};
+
 CI_API std::ostream& operator<<( std::ostream& os, const Run& r );
 CI_API std::ostream& operator<<( std::ostream& os, const Line& l );
 CI_API std::ostream& operator<<( std::ostream& os, const GlyphLayout& f );

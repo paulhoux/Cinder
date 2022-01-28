@@ -201,7 +201,7 @@ void TextTestApp::renderTexture( int width, int height )
 	auto str = text::AttrString() << text::ShapingOptions().ignoreMissingGlyphs() << mFontSmall << u8"Missing ignored: {\u65E5}" << text::ShapingOptions().ignoreMissingGlyphs( false ) << mFontLarge << u8"Missing: {\u65E5}"; // 日本語
 #elif 0 // missing font
 	auto str = text::AttrString() << text::font( "Not here", 36 ) << "Hello Kind" << mFontSmall << "World";
-#elif 1 // ligatures
+#elif 0 // ligatures
 	auto str = text::AttrString() << text::font( { {"Calibri", 36}, {"Times New Roman", 36} } ) << "Office furniture " << text::font( "Calibri Bold", 36 ) << "finally offered";
 #elif 0 // dynamic ligatures
 	auto str = text::AttrString() << text::font( { {"Calibri", 36}, {"Lucida Grande", 36} } ) << text::ShapingOptions().ligatures( true ) << "+Ligatures: Office furniture " << "finally offered " << "\n";
@@ -347,8 +347,10 @@ void TextTestApp::updateAnimatedTest()
 	if( mDrawLines ) {
 		for( auto& line : layout.getLines() ) {
 			for( auto &run : line.getRuns() ) {
-				for( size_t g = 0; g < run.getNumGlyphs(); ++g )
-					ip::fill( &mSurface, Color8u( 200, 64, 0 ), Area( run.getGlyphBounds( g ) + run.getDrawOffset() + line.getDrawOffset() ) );
+				for( size_t g = 0; g < run.getNumGlyphs(); ++g ) {
+					Rectf r = run.getGlyphBounds( g ) + run.getDrawOffset() + line.getDrawOffset();
+					ip::fill( &mSurface, Color8u( 200, 64, 0 ), Area( r.getX1(), r.getY1(), r.getX2() + 0.5f, r.getY2() + 0.5f ) );
+				}
 			}
 		}
 	}

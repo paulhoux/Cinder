@@ -314,7 +314,7 @@ struct SpanData {
 };
 
 // draws runs and advances baseline accordingly. If \a firstLine then we only increase baseline by ascender
-void processLine( const AttrString &attrString, const std::vector<uint32_t> &clusters, const vector<pair<vector<RunData>::iterator,SpanData>> &spans, std::vector<uint32_t> glyphIndices, std::vector<vec2> glyphPositions,
+void processLine( const AttrString &attrString, const std::vector<uint32_t> &clusters, const vector<pair<vector<RunData>::iterator,SpanData>> &spans, const std::vector<uint32_t> &glyphIndices, const std::vector<float> &glyphXAdvances, std::vector<vec2> *glyphPositions,
 						bool *firstLine, Alignment justification, int maxWidth, float *baseline, TypesetProcessor &fn, const TypesetOptions &options )
 {
 	if( spans.empty() )
@@ -347,12 +347,16 @@ void processLine( const AttrString &attrString, const std::vector<uint32_t> &clu
 
 	fn.addLine( justification, vec2( justificationOffset, *baseline ), maxAscent, maxDescent, maxLineGap, measuredLineWidth );
 	for( auto &span : spans ) {
+		double penX = 0;
 		if( span.first->len && span.second.glyphLen ) {
-			std::vector<uint32_t> localClusters; // localized to the string of the Run, rather than the master AttrString
+			std::vector<uint32_t> localClusters; // relativize clusters to the Run, rather than the master AttrString
 			localClusters.reserve( span.second.glyphLen );
-			for( size_t g = 0; g < span.second.glyphLen; g++ )
+			for( size_t g = 0; g < span.second.glyphLen; g++ ) {
 				localClusters.push_back( (uint32_t)(clusters[span.second.glyphStart + g] - span.second.chStart) );
-			fn.addRun( span.first->font, &(attrString.getStringUtf32().c_str()[span.second.chStart]), span.second.chLen, localClusters, span.first->color, span.second.glyphLen, &glyphIndices[span.second.glyphStart], &glyphPositions[span.second.glyphStart], span.second.drawOffset, span.second.measuredWidth );
+				(*glyphPositions)[span.second.glyphStart + g].x = (float)penX; // relativize x-values for position to the Run, but keep y values
+				penX += glyphXAdvances[span.second.glyphStart + g];
+			}
+			fn.addRun( span.first->font, &(attrString.getStringUtf32().c_str()[span.second.chStart]), span.second.chLen, localClusters, span.first->color, span.second.glyphLen, &glyphIndices[span.second.glyphStart], &(*glyphPositions)[span.second.glyphStart], span.second.drawOffset, span.second.measuredWidth );
 		}
 	}
 	fn.finishLine();
@@ -383,8 +387,8 @@ Channel8u renderString( const AttrString &attrString )
 void typeset( const AttrString &attrString, int32_t width, int32_t height, TypesetProcessor &processor, const TypesetOptions &options )
 {
 	std::vector<uint32_t> glyphIndices, clusters;
-	std::vector<float> glyphMaxXs, glyphAdvances;
-	std::vector<vec2> glyphPositions;
+	std::vector<float> glyphMaxXs, glyphXAdvances;
+	std::vector<vec2> glyphPositions; // we pass to processLine() to retrieve the y values, but we ovewrite the x-values based on x-advances
 
 	if( width == 0 || height == 0 )
 		return;
@@ -402,7 +406,7 @@ void typeset( const AttrString &attrString, int32_t width, int32_t height, Types
 	vector<RunData> runData;
 	size_t glyphStart = 0;
 	do {
-		size_t glyphLen = runIt.shape( runIt.getShapingOptions( options.getDefaultShapingOptions() ), &glyphIndices, &clusters, &glyphPositions, &glyphAdvances, &glyphMaxXs, nullptr );
+		size_t glyphLen = runIt.shape( runIt.getShapingOptions( options.getDefaultShapingOptions() ), &glyphIndices, &clusters, &glyphPositions, &glyphXAdvances, &glyphMaxXs, nullptr );
 		runData.push_back( RunData{ runIt.getFont(), runIt.getAlignment( options.getDefaultAlignment() ), runIt.getLeading(), runIt.getColor( ColorAf::white() ), glyphStart, glyphLen, runIt.getStartCh() } );
 		for( size_t g = glyphStart; g < clusters.size(); ++g )
 			clusters[g] += (uint32_t)runIt.getStartCh();
@@ -417,12 +421,12 @@ void typeset( const AttrString &attrString, int32_t width, int32_t height, Types
 	bool firstLine = true;
 	while( lineEndGlyph < glyphIndices.size() && curRunDataIt != runData.end() ) {
 		// calculate last glyph that will fit on the line (or hits a hard break). Does not account for implicit paragraph breaks due to alignment changes
-		double lineWidthPx = glyphAdvances[lineStartGlyph];
+		double lineWidthPx = glyphXAdvances[lineStartGlyph];
 		bool hitHardBreak = lineEndGlyph + 1 == glyphIndices.size() ? true : mustBreak( breaks.data(), clusters[lineEndGlyph + 1] );
 		while( lineEndGlyph + 1 < glyphIndices.size() && lineWidthPx + glyphMaxXs[lineEndGlyph + 1] < width 
 				/*&& lineWidthPx + glyphAdvances[lineEndGlyph + 1] < width*/ && ! hitHardBreak ) {
 			++lineEndGlyph;
-			lineWidthPx += glyphAdvances[lineEndGlyph];
+			lineWidthPx += glyphXAdvances[lineEndGlyph];
 			if( lineEndGlyph + 1 < glyphIndices.size() && mustBreak( breaks.data(), clusters[lineEndGlyph + 1] ) )
 				hitHardBreak = true;
 		}
@@ -444,10 +448,10 @@ void typeset( const AttrString &attrString, int32_t width, int32_t height, Types
 			uint32_t clusterEnd = clusters[end]; // inclusive range
 			float spanWidthPx = 0;
 			for( size_t g = start; g < end; ++g )
-				spanWidthPx += glyphAdvances[g];
+				spanWidthPx += glyphXAdvances[g];
 			spanWidthPx += glyphMaxXs[end];
 			linebreakedSpans.emplace_back( curRunDataIt, SpanData{ start, end - start + 1, clusterStart, clusterEnd - clusterStart + 1, (float)lineWidthPx, spanWidthPx } );
-			lineWidthPx += spanWidthPx + glyphAdvances[end] - glyphMaxXs[end];
+			lineWidthPx += spanWidthPx + glyphXAdvances[end] - glyphMaxXs[end];
 			if( end == curRunDataIt->start + curRunDataIt->len - 1 ) { // finished this run
 				++curRunDataIt;
 				if( curRunDataIt != runData.end() && curRunDataIt->alignment != curAlignment ) { // alignment change implies new paragraph
@@ -462,7 +466,7 @@ void typeset( const AttrString &attrString, int32_t width, int32_t height, Types
 
 		// process the spans
 		if( ! linebreakedSpans.empty() )
-			processLine( attrString, clusters, linebreakedSpans, glyphIndices, glyphPositions, &firstLine, curAlignment, width, &baseline, processor, options );
+			processLine( attrString, clusters, linebreakedSpans, glyphIndices, glyphXAdvances, &glyphPositions, &firstLine, curAlignment, width, &baseline, processor, options );
 		if( hitHardBreak && ! alignmentChange )
 			++lineEndGlyph;
 		++lineEndGlyph;
@@ -472,7 +476,7 @@ void typeset( const AttrString &attrString, int32_t width, int32_t height, Types
 
 		// process any trailing hard breaks
 		while( lineEndGlyph < glyphIndices.size() && curRunDataIt != runData.end() && mustBreak( breaks.data(), clusters[lineEndGlyph] ) ) {
-			processLine( attrString, clusters, { { curRunDataIt, SpanData{ lineEndGlyph, 0, 0, 0 } } }, glyphIndices, glyphPositions, &firstLine, curAlignment, width, &baseline, processor, options );
+			processLine( attrString, clusters, { { curRunDataIt, SpanData{ lineEndGlyph, 0, 0, 0 } } }, glyphIndices, glyphXAdvances, &glyphPositions, &firstLine, curAlignment, width, &baseline, processor, options );
 			++lineEndGlyph;
 			if( lineEndGlyph == curRunDataIt->start + curRunDataIt->len ) { // if we hit the end of the run, advance to the next
 				++curRunDataIt;
@@ -636,6 +640,50 @@ const GlyphLayout& Frame::getGlyphLayout() const
 StaticGlyphLayout Frame::getStaticGlyphLayout() const
 {
 	return StaticGlyphLayout();
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// TextOnPath
+class RenderStringOnPathNvpProcessor : public text::TypesetProcessor {
+public:
+	RenderStringOnPathNvpProcessor( const ci::Path2d &path, double initialMargin ) : mPath( path ), mPathCalcCache( path ), mCurrentDistance( initialMargin ) {
+	}
+
+	void	addLine( text::Alignment /*justification*/, float baseline, float ascender, float descender, float lineGap, float measuredWidth ) override {
+		mCurrentBaseline = baseline;
+	}
+
+	void	addRun( const text::Font *font, size_t chStart, size_t chLen, const ColorAf &color, size_t len, const uint32_t glyphIndices[], const float glyphAdvances[], float penX, float measuredWidth )
+	{
+		if( mCurrentDistance > mPathCalcCache.getLength() )
+			return;
+
+		size_t glyphIdx = 0;
+		std::vector<vec2> positions( len );
+		std::vector<vec2> normals( len );
+		do {
+			float positionTime = mPathCalcCache.calcTimeForDistance( (float)mCurrentDistance, false );
+			positions[glyphIdx] = vec2( 0, 0 ) + mPath.getPosition( positionTime );
+			float tangentTime = mPathCalcCache.calcTimeForDistance( (float)mCurrentDistance + font->getGlyphMetrics( glyphIndices[glyphIdx] ).width / 2.0f, false );
+			vec2 tangent = glm::normalize( mPath.getTangent( tangentTime ) );
+			normals[glyphIdx] = vec2( -tangent.y, tangent.x );
+			mCurrentDistance += glyphAdvances[glyphIdx];
+			++glyphIdx;
+		} while( mCurrentDistance < mPathCalcCache.getLength() && glyphIdx < len );
+
+		drawRun( font, glyphIdx, color, glyphIndices, positions.data(), normals.data() );
+	}
+
+	cinder::Path2d				mPath;
+	cinder::Path2dCalcCache		mPathCalcCache;
+	float			mCurrentBaseline = 0;
+	double			mCurrentDistance;
+};
+
+TextOnPath::TextOnPath( const AttrString &attrString, const Path2d &path, const TypesetOptions &options )
+	: mAttrString( attrString ), mPath( path ), mTypesetOptions( options )
+{
+	
 }
 
 void render( const GlyphLayout &glyphLayout, Surface8u *surface, const vec2 &offset, bool precise )
