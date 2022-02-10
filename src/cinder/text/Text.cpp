@@ -639,17 +639,22 @@ const GlyphLayout& Frame::getGlyphLayout() const
 
 StaticGlyphLayout Frame::getStaticGlyphLayout() const
 {
-	return StaticGlyphLayout();
+	std::vector<Run> runs;
+	for( auto &line : mGlyphLayout.getLines() )
+		for( auto &run : line.getRuns() )
+			runs.push_back( run );
+
+	return StaticGlyphLayout( runs );
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // TextOnPath
-class RenderStringOnPathNvpProcessor : public text::TypesetProcessor {
+/*class RenderStringOnPathNvpProcessor : public text::TypesetProcessor {
 public:
 	RenderStringOnPathNvpProcessor( const ci::Path2d &path, double initialMargin ) : mPath( path ), mPathCalcCache( path ), mCurrentDistance( initialMargin ) {
 	}
 
-	void	addLine( text::Alignment /*justification*/, float baseline, float ascender, float descender, float lineGap, float measuredWidth ) override {
+	void	addLine( text::Alignment justification, float baseline, float ascender, float descender, float lineGap, float measuredWidth ) override {
 		mCurrentBaseline = baseline;
 	}
 
@@ -678,7 +683,7 @@ public:
 	cinder::Path2dCalcCache		mPathCalcCache;
 	float			mCurrentBaseline = 0;
 	double			mCurrentDistance;
-};
+};*/
 
 TextOnPath::TextOnPath( const AttrString &attrString, const Path2d &path, const TypesetOptions &options )
 	: mAttrString( attrString ), mPath( path ), mTypesetOptions( options )

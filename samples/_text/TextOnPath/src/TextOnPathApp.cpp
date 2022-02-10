@@ -145,13 +145,13 @@ void TextOnPathApp::updateText()
 		return;
 
 	text::AttrString str{ "Hello World" };
-	auto textOnPath = text::TextOnPath( str, mPath, text::TypesetOptions().ignoreLineMetrics( false ).defaultAlignment( text::Alignment::LEFT ).defaultShapingOptions( text::ShapingOptions().ignoreMissingGlyphs(true) ) );
+//	auto textOnPath = text::TextOnPath( str, mPath, text::TypesetOptions().ignoreLineMetrics( false ).defaultAlignment( text::Alignment::LEFT ).defaultShapingOptions( text::ShapingOptions().ignoreMissingGlyphs(true) ) );
 
 	Surface8u surface = Surface8u( getWindowWidth(), getWindowHeight(), true );
 	surface.setPremultiplied( true );
 	ip::fill( &surface, ColorA8u( 0, 0, 0, 0 ) );
 
-	text::render( textOnPath, &surface );
+//	text::render( textOnPath, &surface );
 
 	mTex = gl::Texture::create( surface );
 }
