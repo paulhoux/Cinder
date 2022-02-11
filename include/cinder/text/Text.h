@@ -99,6 +99,7 @@ class CI_API Run {
 	const uint32_t*					getGlyphIndices() const { return mGlyphIndices.data(); }
 	const vec2*						getGlyphPositions() const { return mGlyphPositions.data(); }
 	const Font*						getFont() const { return mFont; }
+	float							getDescender() const { return -mFont->getDescender(); }
 	//! Line-relative
 	cinder::vec2					getDrawOffset() const { return mDrawOffset; }
 	ColorAf							getColor() const { return mColor; }
@@ -205,6 +206,8 @@ class CI_API StaticGlyphLayout {
   public:
 	StaticGlyphLayout( const std::vector<Run> &runs ) : mRuns( runs ) {}
 	const std::vector<Run>&		getRuns() const { return mRuns; }
+
+	vec2					calcSize() const;
 
   private:
 	std::vector<Run>		mRuns;
