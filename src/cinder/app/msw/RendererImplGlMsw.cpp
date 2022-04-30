@@ -222,13 +222,16 @@ bool testPixelFormat( HDC dc, int colorSamples, int depthDepth, int msaaSamples,
 	iAttributes.push_back( WGL_RED_BITS_ARB ); iAttributes.push_back( colorSamples );
 	iAttributes.push_back( WGL_GREEN_BITS_ARB ); iAttributes.push_back( colorSamples );
 	iAttributes.push_back( WGL_BLUE_BITS_ARB ); iAttributes.push_back( colorSamples );
-	if( colorSamples == 8 ) {
+	if( colorSamples == 8 || colorSamples == 16 ) {
 		iAttributes.push_back( WGL_ALPHA_BITS_ARB ); iAttributes.push_back( colorSamples );
 	}
 	iAttributes.push_back( WGL_DEPTH_BITS_ARB ); iAttributes.push_back( depthDepth );
 	iAttributes.push_back( WGL_STENCIL_BITS_ARB ); iAttributes.push_back( stencilDepth );
 	iAttributes.push_back( WGL_DOUBLE_BUFFER_ARB ); iAttributes.push_back( GL_TRUE );
 	iAttributes.push_back( WGL_SAMPLES_ARB ); iAttributes.push_back( msaaSamples );
+	if( colorSamples == 16 ) {
+		iAttributes.push_back( WGL_PIXEL_TYPE_ARB ); iAttributes.push_back( WGL_TYPE_RGBA_FLOAT_ARB );
+	}
 	iAttributes.push_back( 0 ); iAttributes.push_back( 0 );
 
 	UINT numFormats;
@@ -243,6 +246,7 @@ bool setPixelFormat( HDC dc, const RendererGl::Options &options )
 {
 	int format;
 	for( int colorDepth = options.getColorChannelDepth(); colorDepth >= 8; colorDepth -= 2 ) {
+		if( colorDepth > 16 || colorDepth == 14 || colorDepth == 12 ) continue;
 		for( int depthDepth = options.getDepthBufferDepth(); depthDepth >= 16; depthDepth -= 8 ) {
 			for( int stencilDepth = options.getStencil() ? 8 : 0; stencilDepth >= 0; stencilDepth -= 8 ) {
 				for( int msaaSamples = options.getMsaa(); msaaSamples >= 0; msaaSamples >>= 1 ) {

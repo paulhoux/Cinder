@@ -150,9 +150,9 @@ class CI_API RendererGl : public Renderer {
 		//! Enables or disables a stencil buffer. Default is \c false
 		void		setStencil( bool createStencil = true ) { mStencil = createStencil; }
 
-		//! Sets the number of bits per color channel. Default is \c 8 but can be \c 10 on professional GPUs (Quadro/FireGL)
+		//! Sets the number of bits per color channel. Default is \c 8 but can be \c 10 on professional GPUs (Quadro/FireGL). If set to 16 bits, a floating point back buffer will be created on supported systems.
 		Options&	colorChannelDepth( int colorBitsPerChannel ) { mColorBpc = colorBitsPerChannel; return *this; }
-		//! Returns the number of bits per color channel. Default is \c 8 but can be \c 10 on professional GPUs (Quadro/FireGL)
+		//! Returns the number of bits per color channel. Default is \c 8 but can be \c 10 on professional GPUs (Quadro/FireGL). If set to 16 bits, a floating point back buffer will be created on supported systems.
 		int			getColorChannelDepth() const { return mColorBpc; }
 
 	  protected:
