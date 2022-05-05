@@ -88,6 +88,13 @@ namespace cinder {
 
 class CI_API DisplayMsw : public Display {
   public:
+	//! Returns whether the Display supports HDR (High Dynamic Range).
+	bool			supportsHdr() const override;
+	//! Returns whether HDR (High Dynamic Range) mode for this Display is enabled.
+	bool			isHdrEnabled() const override;
+	//! Enables or disables HDR (High Dynamic Range) mode for this Display, if supported. Returns whether successful.
+	bool			enableHdr( bool enable = true ) const override;
+
 	std::string		getName() const override;
 
   protected:

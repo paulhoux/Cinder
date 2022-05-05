@@ -39,8 +39,8 @@ typedef std::shared_ptr<class Display> 	DisplayRef;
 
 class CI_API Display {
   public:
-	Display() : mArea( Area::zero() ), mBitsPerPixel( 0 ), mContentScale( 1.0f ), mName( "" ), mNameDirty ( true ) {}
-	virtual ~Display() {}
+	Display() : mArea( Area::zero() ), mBitsPerPixel( 0 ), mContentScale( 1.0f ), mName( "" ), mNameDirty ( true ), mSupportsHdr( false ), mSupportsHdrDirty( true ), mWasHdrEnabled{ false } {}
+	virtual ~Display() = default;
 
 	//! Returns the width of the screen measured in points
 	int				getWidth() const { return mArea.getWidth(); }
@@ -63,6 +63,15 @@ class CI_API Display {
 
 	//! Returns whether the Display's coordinates contain \a pt.
 	bool	contains( const ivec2 &pt ) const { return mArea.contains( pt ); }
+
+	//! Returns whether the Display supports HDR (High Dynamic Range).
+	virtual bool			supportsHdr() const { return mSupportsHdr; }
+	//! Returns whether HDR (High Dynamic Range) mode for this Display was enabled on startup.
+	virtual bool			wasHdrEnabled() const { return mWasHdrEnabled; }
+	//! Returns whether HDR (High Dynamic Range) mode for this Display is enabled.
+	virtual bool			isHdrEnabled() const { return false; }
+	//! Enables or disables HDR (High Dynamic Range) mode for this Display, if supported. Returns whether successful.
+	virtual bool			enableHdr( bool enable = true ) const { return false; }
 
 	//! Returns the display's name or an empty string if unavailable.
 	virtual std::string		getName() const { return mName; }
@@ -87,6 +96,9 @@ class CI_API Display {
 	float				mContentScale;
 	mutable std::string	mName;
 	mutable bool		mNameDirty;
+	mutable bool		mSupportsHdr;
+	mutable bool		mSupportsHdrDirty;
+	mutable bool		mWasHdrEnabled;
 };
 
 } // namespace cinder

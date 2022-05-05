@@ -317,14 +317,44 @@ DisplayRef app::PlatformMsw::findDisplayFromHmonitor( HMONITOR hMonitor )
 }
 
 namespace {
+	
+DISPLAYCONFIG_PATH_INFO getDisplayPathInfo( HMONITOR hMonitor )
+{
+	MONITORINFOEX mix = {};
+	mix.cbSize = sizeof( MONITORINFOEX );
+	::GetMonitorInfo( hMonitor, &mix );
+
+	UINT32 requiredPaths;
+	UINT32 requiredModes;
+	::GetDisplayConfigBufferSizes( QDC_ONLY_ACTIVE_PATHS, &requiredPaths, &requiredModes );
+	std::vector<DISPLAYCONFIG_PATH_INFO> paths( requiredPaths );
+	std::vector<DISPLAYCONFIG_MODE_INFO> modes( requiredModes );
+	::QueryDisplayConfig( QDC_ONLY_ACTIVE_PATHS, &requiredPaths, paths.data(), &requiredModes, modes.data(), nullptr );
+
+	for( auto &p : paths ) {
+		DISPLAYCONFIG_SOURCE_DEVICE_NAME sourceName;
+		sourceName.header.type = DISPLAYCONFIG_DEVICE_INFO_GET_SOURCE_NAME;
+		sourceName.header.size = sizeof( sourceName );
+		sourceName.header.adapterId = p.sourceInfo.adapterId;
+		sourceName.header.id = p.sourceInfo.id;
+		DisplayConfigGetDeviceInfo( &sourceName.header );
+		if( wcscmp( mix.szDevice, sourceName.viewGdiDeviceName ) == 0 )
+			return p;
+	}
+
+	// Throw?
+	return {};
+}
+
 int getMonitorBitsPerPixel( HMONITOR hMonitor )
 {
 	int result = 0;
-	MONITORINFOEX mix;
-	memset( &mix, 0, sizeof( MONITORINFOEX ) );
+
+	MONITORINFOEX mix = {};
 	mix.cbSize = sizeof( MONITORINFOEX );
-	::GetMonitorInfo(hMonitor, &mix);
-	HDC hMonitorDC = ::CreateDC( TEXT("DISPLAY"), mix.szDevice, NULL, NULL );
+	::GetMonitorInfo( hMonitor, &mix );
+
+	HDC hMonitorDC = ::CreateDC( TEXT( "DISPLAY" ), mix.szDevice, NULL, NULL );
 	if( hMonitorDC ) {
 		result = ::GetDeviceCaps( hMonitorDC, BITSPIXEL );
 		::DeleteDC( hMonitorDC );
@@ -332,17 +362,89 @@ int getMonitorBitsPerPixel( HMONITOR hMonitor )
 
 	return result;
 }
+
 std::string getMonitorName( HMONITOR hMonitor )
 {
-	MONITORINFOEX mix;
-	memset( &mix, 0, sizeof( MONITORINFOEX ) );
+	DISPLAYCONFIG_PATH_INFO info = getDisplayPathInfo( hMonitor );
+
+	DISPLAYCONFIG_TARGET_DEVICE_NAME name = {};
+	name.header.type = DISPLAYCONFIG_DEVICE_INFO_GET_TARGET_NAME;
+	name.header.size = sizeof( name );
+	name.header.adapterId = info.sourceInfo.adapterId;
+	name.header.id = info.targetInfo.id;
+	if( ERROR_SUCCESS == DisplayConfigGetDeviceInfo( &name.header ) && wcslen( name.monitorFriendlyDeviceName ) > 0 )
+		return msw::toUtf8String( std::wstring( name.monitorFriendlyDeviceName ) );
+
+	MONITORINFOEX mix = {};
 	mix.cbSize = sizeof( MONITORINFOEX );
 	::GetMonitorInfo( hMonitor, &mix );
-	DISPLAY_DEVICEW dispDev;
+
+	DISPLAY_DEVICEW dispDev = {};
 	dispDev.cb = sizeof( DISPLAY_DEVICEW );
-	::EnumDisplayDevicesW( mix.szDevice, 0, &dispDev, 0);
-	return msw::toUtf8String( std::wstring(  dispDev.DeviceString ) );}
+	::EnumDisplayDevicesW( mix.szDevice, 0, &dispDev, 0 );
+	return msw::toUtf8String( std::wstring( dispDev.DeviceString ) );
+}
+
+bool getHdrStatus( HMONITOR hMonitor )
+{
+	DISPLAYCONFIG_PATH_INFO info = getDisplayPathInfo( hMonitor );
+
+	DISPLAYCONFIG_GET_ADVANCED_COLOR_INFO getColorInfo = {};
+	getColorInfo.header.type = DISPLAYCONFIG_DEVICE_INFO_GET_ADVANCED_COLOR_INFO;
+	getColorInfo.header.size = sizeof( getColorInfo );
+	getColorInfo.header.adapterId = info.sourceInfo.adapterId;
+	getColorInfo.header.id = info.targetInfo.id;
+
+	if( ERROR_SUCCESS == DisplayConfigGetDeviceInfo( &getColorInfo.header ) )
+		return getColorInfo.advancedColorEnabled;
+
+	return false;
+}
+
 } // anonymous namespace
+
+bool DisplayMsw::supportsHdr() const
+{
+	if( mSupportsHdrDirty ) {
+		DISPLAYCONFIG_PATH_INFO info = getDisplayPathInfo( mMonitor );
+
+		DISPLAYCONFIG_GET_ADVANCED_COLOR_INFO getColorInfo = {};
+		getColorInfo.header.type = DISPLAYCONFIG_DEVICE_INFO_GET_ADVANCED_COLOR_INFO;
+		getColorInfo.header.size = sizeof( getColorInfo );
+		getColorInfo.header.adapterId = info.sourceInfo.adapterId;
+		getColorInfo.header.id = info.targetInfo.id;
+
+		if( ERROR_SUCCESS == DisplayConfigGetDeviceInfo( &getColorInfo.header ) )
+			mSupportsHdr = getColorInfo.advancedColorSupported;
+
+		mSupportsHdrDirty = false;
+	}
+	return mSupportsHdr;
+}
+
+bool DisplayMsw::isHdrEnabled() const
+{
+	return getHdrStatus( mMonitor );
+}
+
+bool DisplayMsw::enableHdr( bool enable ) const
+{
+	if( supportsHdr() ) {
+		DISPLAYCONFIG_PATH_INFO info = getDisplayPathInfo( mMonitor );
+
+		DISPLAYCONFIG_SET_ADVANCED_COLOR_STATE setColorState = {};
+		setColorState.header.type = DISPLAYCONFIG_DEVICE_INFO_SET_ADVANCED_COLOR_STATE;
+		setColorState.header.size = sizeof( setColorState );
+		setColorState.header.adapterId = info.sourceInfo.adapterId;
+		setColorState.header.id = info.targetInfo.id;
+		setColorState.enableAdvancedColor = enable;
+
+		if( ERROR_SUCCESS == DisplayConfigSetDeviceInfo( &setColorState.header ) )
+			return true;
+	}
+
+	return false;
+}
 
 std::string DisplayMsw::getName() const
 {
