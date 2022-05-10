@@ -1,0 +1,8 @@
+HDR cube map image courtesy of:
+
+Author: Blochi
+http://www.hdrlabs.com/sibl/archive.html
+
+Converted using:
+https://matheowis.github.io/HDRI-to-CubeMap/
+

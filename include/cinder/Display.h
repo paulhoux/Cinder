@@ -39,7 +39,7 @@ typedef std::shared_ptr<class Display> 	DisplayRef;
 
 class CI_API Display {
   public:
-	Display() : mArea( Area::zero() ), mBitsPerPixel( 0 ), mContentScale( 1.0f ), mName( "" ), mNameDirty ( true ), mSupportsHdr( false ), mSupportsHdrDirty( true ), mWasHdrEnabled{ false } {}
+	Display() : mArea( Area::zero() ), mBitsPerPixel( 0 ), mContentScale( 1.0f ), mName( "" ), mNameDirty ( true ) {}
 	virtual ~Display() = default;
 
 	//! Returns the width of the screen measured in points
@@ -65,13 +65,17 @@ class CI_API Display {
 	bool	contains( const ivec2 &pt ) const { return mArea.contains( pt ); }
 
 	//! Returns whether the Display supports HDR (High Dynamic Range).
-	virtual bool			supportsHdr() const { return mSupportsHdr; }
-	//! Returns whether HDR (High Dynamic Range) mode for this Display was enabled on startup.
-	virtual bool			wasHdrEnabled() const { return mWasHdrEnabled; }
+	virtual bool supportsHdr() const { return false; }
 	//! Returns whether HDR (High Dynamic Range) mode for this Display is enabled.
-	virtual bool			isHdrEnabled() const { return false; }
+	virtual bool isHdrEnabled() const { return false; }
 	//! Enables or disables HDR (High Dynamic Range) mode for this Display, if supported. Returns whether successful.
-	virtual bool			enableHdr( bool enable = true ) const { return false; }
+	virtual bool enableHdr( bool enable = true ) { return false; }
+	//! Returns the SDR white level in nits. To properly render SDR content on an HDR display, use:
+	//! \code{.cpp}
+	//! outputColor.rgb = inputColor.rgb * ( getSdrWhiteLevel() / 80 )
+	//! \endcode
+	//! InputColor's components should be in [0...1] range.
+	virtual float getSdrWhiteLevel() const { return 80; }
 
 	//! Returns the display's name or an empty string if unavailable.
 	virtual std::string		getName() const { return mName; }
@@ -96,9 +100,6 @@ class CI_API Display {
 	float				mContentScale;
 	mutable std::string	mName;
 	mutable bool		mNameDirty;
-	mutable bool		mSupportsHdr;
-	mutable bool		mSupportsHdrDirty;
-	mutable bool		mWasHdrEnabled;
 };
 
 } // namespace cinder

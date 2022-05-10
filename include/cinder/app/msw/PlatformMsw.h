@@ -34,6 +34,8 @@ class CI_API PlatformMsw : public Platform {
 	PlatformMsw();
 	static PlatformMsw*		get() { return reinterpret_cast<PlatformMsw*>( Platform::get() ); }
 
+	void cleanupLaunch() override;
+
 	DataSourceRef	loadResource( const fs::path &resourcePath, int mswID, const std::string &mswType ) override;
 
 	fs::path getResourceDirectory() const override									{ return fs::path(); }
@@ -89,19 +91,25 @@ namespace cinder {
 class CI_API DisplayMsw : public Display {
   public:
 	//! Returns whether the Display supports HDR (High Dynamic Range).
-	bool			supportsHdr() const override;
+	bool supportsHdr() const override;
 	//! Returns whether HDR (High Dynamic Range) mode for this Display is enabled.
-	bool			isHdrEnabled() const override;
+	bool isHdrEnabled() const override;
 	//! Enables or disables HDR (High Dynamic Range) mode for this Display, if supported. Returns whether successful.
-	bool			enableHdr( bool enable = true ) const override;
+	bool enableHdr( bool enable = true ) override;
+	//! Returns the SDR white level in nits. To properly render SDR content on an HDR display, use:
+	//! \code{.cpp}
+	//! outputColor.rgb = inputColor.rgb * ( getSdrWhiteLevel() / 80 )
+	//! \endcode
+	//! InputColor's components should be in [0...1] range.
+	float getSdrWhiteLevel() const override;
 
-	std::string		getName() const override;
+	std::string getName() const override;
 
   protected:
 	static BOOL CALLBACK enumMonitorProc( HMONITOR hMonitor, HDC hdc, LPRECT rect, LPARAM lParam );
 
-	HMONITOR			mMonitor;
-	bool				mVisitedFlag;
+	HMONITOR mMonitor;
+	bool     mVisitedFlag;
 
 	friend app::PlatformMsw;
 };

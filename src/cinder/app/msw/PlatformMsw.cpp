@@ -61,6 +61,15 @@ PlatformMsw::PlatformMsw()
 	ImageTargetFileStbImage::registerSelf();
 }
 
+void PlatformMsw::cleanupLaunch()
+{
+	// Explicitly call Display destructor on exit.
+	if( mDisplaysInitialized ) {
+		mDisplaysInitialized = false;
+		mDisplays.clear();
+	}
+}
+
 DataSourceRef PlatformMsw::loadResource( const fs::path &resourcePath, int mswID, const std::string &mswType )
 {
 	HRSRC resInfoHandle;
@@ -317,7 +326,24 @@ DisplayRef app::PlatformMsw::findDisplayFromHmonitor( HMONITOR hMonitor )
 }
 
 namespace {
-	
+
+int getMonitorBitsPerPixel( HMONITOR hMonitor )
+{
+	int result = 0;
+
+	MONITORINFOEX mix = {};
+	mix.cbSize = sizeof( MONITORINFOEX );
+	::GetMonitorInfo( hMonitor, &mix );
+
+	HDC hMonitorDC = ::CreateDC( TEXT( "DISPLAY" ), mix.szDevice, NULL, NULL );
+	if( hMonitorDC ) {
+		result = ::GetDeviceCaps( hMonitorDC, BITSPIXEL );
+		::DeleteDC( hMonitorDC );
+	}
+
+	return result;
+}
+
 DISPLAYCONFIG_PATH_INFO getDisplayPathInfo( HMONITOR hMonitor )
 {
 	MONITORINFOEX mix = {};
@@ -342,25 +368,7 @@ DISPLAYCONFIG_PATH_INFO getDisplayPathInfo( HMONITOR hMonitor )
 			return p;
 	}
 
-	// Throw?
 	return {};
-}
-
-int getMonitorBitsPerPixel( HMONITOR hMonitor )
-{
-	int result = 0;
-
-	MONITORINFOEX mix = {};
-	mix.cbSize = sizeof( MONITORINFOEX );
-	::GetMonitorInfo( hMonitor, &mix );
-
-	HDC hMonitorDC = ::CreateDC( TEXT( "DISPLAY" ), mix.szDevice, NULL, NULL );
-	if( hMonitorDC ) {
-		result = ::GetDeviceCaps( hMonitorDC, BITSPIXEL );
-		::DeleteDC( hMonitorDC );
-	}
-
-	return result;
 }
 
 std::string getMonitorName( HMONITOR hMonitor )
@@ -385,9 +393,27 @@ std::string getMonitorName( HMONITOR hMonitor )
 	return msw::toUtf8String( std::wstring( dispDev.DeviceString ) );
 }
 
-bool getHdrStatus( HMONITOR hMonitor )
+} // anonymous namespace
+
+bool DisplayMsw::supportsHdr() const
 {
-	DISPLAYCONFIG_PATH_INFO info = getDisplayPathInfo( hMonitor );
+	DISPLAYCONFIG_PATH_INFO info = getDisplayPathInfo( mMonitor );
+
+	DISPLAYCONFIG_GET_ADVANCED_COLOR_INFO getColorInfo = {};
+	getColorInfo.header.type = DISPLAYCONFIG_DEVICE_INFO_GET_ADVANCED_COLOR_INFO;
+	getColorInfo.header.size = sizeof( getColorInfo );
+	getColorInfo.header.adapterId = info.sourceInfo.adapterId;
+	getColorInfo.header.id = info.targetInfo.id;
+
+	if( ERROR_SUCCESS == DisplayConfigGetDeviceInfo( &getColorInfo.header ) )
+		return getColorInfo.advancedColorSupported && !getColorInfo.advancedColorForceDisabled;
+
+	return false;
+}
+
+bool DisplayMsw::isHdrEnabled() const
+{
+	DISPLAYCONFIG_PATH_INFO info = getDisplayPathInfo( mMonitor );
 
 	DISPLAYCONFIG_GET_ADVANCED_COLOR_INFO getColorInfo = {};
 	getColorInfo.header.type = DISPLAYCONFIG_DEVICE_INFO_GET_ADVANCED_COLOR_INFO;
@@ -401,49 +427,37 @@ bool getHdrStatus( HMONITOR hMonitor )
 	return false;
 }
 
-} // anonymous namespace
-
-bool DisplayMsw::supportsHdr() const
+bool DisplayMsw::enableHdr( bool enable )
 {
-	if( mSupportsHdrDirty ) {
-		DISPLAYCONFIG_PATH_INFO info = getDisplayPathInfo( mMonitor );
+	DISPLAYCONFIG_PATH_INFO info = getDisplayPathInfo( mMonitor );
 
-		DISPLAYCONFIG_GET_ADVANCED_COLOR_INFO getColorInfo = {};
-		getColorInfo.header.type = DISPLAYCONFIG_DEVICE_INFO_GET_ADVANCED_COLOR_INFO;
-		getColorInfo.header.size = sizeof( getColorInfo );
-		getColorInfo.header.adapterId = info.sourceInfo.adapterId;
-		getColorInfo.header.id = info.targetInfo.id;
+	DISPLAYCONFIG_SET_ADVANCED_COLOR_STATE setColorState = {};
+	setColorState.header.type = DISPLAYCONFIG_DEVICE_INFO_SET_ADVANCED_COLOR_STATE;
+	setColorState.header.size = sizeof( setColorState );
+	setColorState.header.adapterId = info.sourceInfo.adapterId;
+	setColorState.header.id = info.targetInfo.id;
+	setColorState.enableAdvancedColor = enable;
 
-		if( ERROR_SUCCESS == DisplayConfigGetDeviceInfo( &getColorInfo.header ) )
-			mSupportsHdr = getColorInfo.advancedColorSupported;
-
-		mSupportsHdrDirty = false;
-	}
-	return mSupportsHdr;
-}
-
-bool DisplayMsw::isHdrEnabled() const
-{
-	return getHdrStatus( mMonitor );
-}
-
-bool DisplayMsw::enableHdr( bool enable ) const
-{
-	if( supportsHdr() ) {
-		DISPLAYCONFIG_PATH_INFO info = getDisplayPathInfo( mMonitor );
-
-		DISPLAYCONFIG_SET_ADVANCED_COLOR_STATE setColorState = {};
-		setColorState.header.type = DISPLAYCONFIG_DEVICE_INFO_SET_ADVANCED_COLOR_STATE;
-		setColorState.header.size = sizeof( setColorState );
-		setColorState.header.adapterId = info.sourceInfo.adapterId;
-		setColorState.header.id = info.targetInfo.id;
-		setColorState.enableAdvancedColor = enable;
-
-		if( ERROR_SUCCESS == DisplayConfigSetDeviceInfo( &setColorState.header ) )
-			return true;
-	}
+	if( ERROR_SUCCESS == DisplayConfigSetDeviceInfo( &setColorState.header ) )
+		return true;
 
 	return false;
+}
+
+float DisplayMsw::getSdrWhiteLevel() const
+{
+	DISPLAYCONFIG_PATH_INFO info = getDisplayPathInfo( mMonitor );
+
+	DISPLAYCONFIG_SDR_WHITE_LEVEL sdrWhiteLevel = {};
+	sdrWhiteLevel.header.type = DISPLAYCONFIG_DEVICE_INFO_GET_SDR_WHITE_LEVEL;
+	sdrWhiteLevel.header.size = sizeof( sdrWhiteLevel );
+	sdrWhiteLevel.header.adapterId = info.sourceInfo.adapterId;
+	sdrWhiteLevel.header.id = info.targetInfo.id;
+
+	if( ERROR_SUCCESS == DisplayConfigGetDeviceInfo( &sdrWhiteLevel.header ) )
+		return float( sdrWhiteLevel.SDRWhiteLevel * 80 ) / 1000.0f;
+
+	return 80;
 }
 
 std::string DisplayMsw::getName() const
@@ -457,20 +471,20 @@ std::string DisplayMsw::getName() const
 
 BOOL CALLBACK DisplayMsw::enumMonitorProc( HMONITOR hMonitor, HDC /*hdc*/, LPRECT rect, LPARAM lParam )
 {
-	vector<DisplayRef> *displaysVector = reinterpret_cast<vector<DisplayRef>*>( lParam );
-	
+	vector<DisplayRef> *displaysVector = reinterpret_cast<vector<DisplayRef> *>( lParam );
+
 	DisplayMsw *newDisplay = new DisplayMsw();
 	newDisplay->mArea = Area( rect->left, rect->top, rect->right, rect->bottom );
 	newDisplay->mMonitor = hMonitor;
 	newDisplay->mBitsPerPixel = getMonitorBitsPerPixel( hMonitor );
-	
+
 	newDisplay->mContentScale = 1.0f; // default value
 	// dynamic function resoluion for ::GetDpiForMonitor()
 	if( sShcoreDll != (HMODULE)INVALID_HANDLE_VALUE ) {
-		if( ! sGetDpiForMonitorFnPtr )
-			sGetDpiForMonitorFnPtr = (GetDpiForMonitorFn)::GetProcAddress( sShcoreDll, "GetDpiForMonitor" );
+		if( !sGetDpiForMonitorFnPtr )
+			sGetDpiForMonitorFnPtr = ( GetDpiForMonitorFn )::GetProcAddress( sShcoreDll, "GetDpiForMonitor" );
 		if( sGetDpiForMonitorFnPtr ) {
-			UINT x, y;
+			UINT    x, y;
 			HRESULT hr = sGetDpiForMonitorFnPtr( hMonitor, (DWORD)0 /*MDT_Effective_DPI*/, &x, &y );
 			if( SUCCEEDED( hr ) )
 				newDisplay->mContentScale = x / 96.0f;
