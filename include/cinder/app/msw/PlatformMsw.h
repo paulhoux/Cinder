@@ -85,6 +85,14 @@ class CI_API ResourceLoadExcMsw : public ResourceLoadExc {
 } } // namespace cinder::app
 
 namespace cinder {
+	
+class CI_API AdapterMsw : public Adapter {
+public:
+    explicit AdapterMsw( const DXGI_ADAPTER_DESC &desc );
+
+protected:
+    friend app::PlatformMsw;
+};
 
 class CI_API DisplayMsw : public Display {
   public:

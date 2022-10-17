@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2015, The Cinder Project, All rights reserved.
+ Copyright (c) 2022, The Cinder Project, All rights reserved.
 
  This code is intended for use with the Cinder C++ library: http://libcinder.org
 
@@ -7,9 +7,9 @@
  the following conditions are met:
 
     * Redistributions of source code must retain the above copyright notice, this list of conditions and
-	the following disclaimer.
+    the following disclaimer.
     * Redistributions in binary form must reproduce the above copyright notice, this list of conditions and
-	the following disclaimer in the documentation and/or other materials provided with the distribution.
+    the following disclaimer in the documentation and/or other materials provided with the distribution.
 
  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED
  WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
@@ -25,45 +25,38 @@
 
 #include "cinder/Cinder.h"
 
-//! Forward declarations to minimize dependence on <Windows.h>
+#include <string>
 
-struct HDC__;
-typedef HDC__ *HDC;
-struct HWND__;
-typedef HWND__ *HWND;
-struct HMONITOR__;
-typedef HMONITOR__ *HMONITOR;
-typedef int BOOL;
-#define CALLBACK __stdcall
-typedef struct tagRECT *LPRECT;
-struct HINSTANCE__;
-typedef HINSTANCE__ *HINSTANCE;
+namespace cinder {
 
-#if defined(_WIN64)
-    typedef __int64 INT_PTR, *PINT_PTR;
-    typedef unsigned __int64 UINT_PTR, *PUINT_PTR;
+typedef std::shared_ptr<class Adapter> AdapterRef;
 
-    typedef __int64 LONG_PTR, *PLONG_PTR;
-    typedef unsigned __int64 ULONG_PTR, *PULONG_PTR;
+class CI_API Adapter {
+  public:
+    Adapter()
+        : mDeviceId( 0 )
+        , mVendorId( 0 )
+        , mName( "" )
+        , mNameDirty( true )
+    {
+    }
+    virtual ~Adapter() {}
 
-    #define __int3264   __int64
+    //! Returns the adapter's name or an empty string if unavailable.
+    virtual std::string getName() const { return mName; }
+    //! Returns the adapter's device id used by the operating system.
+    unsigned int getDeviceId() const { return mDeviceId; }
+    //! Returns the adapter's vendor id used by the operating system.
+    unsigned int getVendorId() const { return mVendorId; }
 
-#else
-    typedef _W64 int INT_PTR, *PINT_PTR;
-    typedef _W64 unsigned int UINT_PTR, *PUINT_PTR;
+    bool operator==( const Adapter &other ) const { return mDeviceId == other.mDeviceId && mVendorId == other.mVendorId; }
+    bool operator!=( const Adapter &other ) const { return !( *this == other ); }
 
-    typedef _W64 long LONG_PTR, *PLONG_PTR;
-    typedef _W64 unsigned long ULONG_PTR, *PULONG_PTR;
+  protected:
+    unsigned int        mDeviceId;
+    unsigned int        mVendorId;
+    mutable std::string mName;
+    mutable bool        mNameDirty;
+};
 
-    #define __int3264   __int32
-
-#endif
-
-typedef LONG_PTR LPARAM;
-typedef char CHAR;
-typedef _Null_terminated_ CHAR *NPSTR, *LPSTR, *PSTR;
-
-struct HFONT__;
-typedef HFONT__ *HFONT;
-
-struct DXGI_ADAPTER_DESC;
+} // namespace cinder

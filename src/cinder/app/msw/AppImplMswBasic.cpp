@@ -151,12 +151,15 @@ void AppImplMswBasic::sleep( double seconds )
 	}
 }
 
-RendererRef AppImplMswBasic::findSharedRenderer( const RendererRef &searchRenderer )
+RendererRef AppImplMswBasic::findSharedRenderer( const RendererRef &searchRenderer, const DisplayRef &searchDisplay )
 {
 	if( ! searchRenderer )
 		return RendererRef();
 
 	for( const auto &win : mWindows ) {
+        if( searchDisplay && ! searchDisplay->onSameAdapter( win->getDisplay() ) )
+            continue;
+
 		RendererRef renderer = win->getRenderer();
 		if( renderer && ( typeid(*renderer) == typeid(*searchRenderer) ) )
 			return renderer;
@@ -170,7 +173,7 @@ WindowRef AppImplMswBasic::createWindow( Window::Format format )
 	if( ! format.getRenderer() )
 		format.setRenderer( mApp->getDefaultRenderer()->clone() );
 
-	mWindows.push_back( new WindowImplMswBasic( format, findSharedRenderer( format.getRenderer() ), this ) );
+	mWindows.push_back( new WindowImplMswBasic( format, nullptr /*findSharedRenderer( format.getRenderer(), format.getDisplay() )*/, this ) );
 
 	// emit initial resize if we have fired setup
 	if( mSetupHasBeenCalled )

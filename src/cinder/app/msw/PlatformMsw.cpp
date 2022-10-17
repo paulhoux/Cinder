@@ -35,6 +35,7 @@
 #include "cinder/ImageSourceFileStbImage.h"
 #include "cinder/ImageTargetFileStbImage.h"
 
+#include <dxgi.h>
 #include <windows.h>
 #include <Shlwapi.h>
 #include <shlobj.h>
@@ -317,6 +318,52 @@ DisplayRef app::PlatformMsw::findDisplayFromHmonitor( HMONITOR hMonitor )
 }
 
 namespace {
+bool findAdapterFromHmonitor( HMONITOR hMonitor, DXGI_ADAPTER_DESC &desc )
+{
+    bool found = false;
+
+    IDXGIFactory *pdxFactory;
+    HRESULT       hr = ::CreateDXGIFactory( IID_PPV_ARGS( &pdxFactory ) );
+    if( SUCCEEDED( hr ) ) {
+        int nAdapter = 0;
+        while( !found ) {
+            IDXGIAdapter *pdxAdapter;
+            hr = pdxFactory->EnumAdapters( nAdapter, &pdxAdapter );
+            if( FAILED( hr ) )
+                break;
+
+            DXGI_ADAPTER_DESC dxAdapterDesc;
+            hr = pdxAdapter->GetDesc( &dxAdapterDesc );
+            if( SUCCEEDED( hr ) ) {
+                int nOutput = 0;
+                while( !found ) {
+                    IDXGIOutput *pdxOutput;
+                    if( FAILED( pdxAdapter->EnumOutputs( nOutput, &pdxOutput ) ) )
+                        break;
+
+                    DXGI_OUTPUT_DESC dxOutputDesc;
+                    hr = pdxOutput->GetDesc( &dxOutputDesc );
+                    MONITORINFO mi = { sizeof( mi ) };
+                    ::GetMonitorInfo( dxOutputDesc.Monitor, &mi );
+
+                    if( dxOutputDesc.Monitor == hMonitor ) {
+                        desc = dxAdapterDesc;
+                        found = true;
+                    }
+
+                    pdxOutput->Release();
+                    ++nOutput;
+                }
+            }
+            pdxAdapter->Release();
+            ++nAdapter;
+        }
+        pdxFactory->Release();
+    }
+
+    return found;
+}
+
 int getMonitorBitsPerPixel( HMONITOR hMonitor )
 {
 	int result = 0;
@@ -344,6 +391,14 @@ std::string getMonitorName( HMONITOR hMonitor )
 	return msw::toUtf8String( std::wstring(  dispDev.DeviceString ) );}
 } // anonymous namespace
 
+AdapterMsw::AdapterMsw( const DXGI_ADAPTER_DESC &desc )
+{
+    mDeviceId = desc.DeviceId;
+    mVendorId = desc.VendorId;
+    mName = toUtf8( reinterpret_cast<const char16_t *>( desc.Description ), 256 );
+    mNameDirty = false;
+}
+
 std::string DisplayMsw::getName() const
 {
 	if( mNameDirty ) {
@@ -361,7 +416,12 @@ BOOL CALLBACK DisplayMsw::enumMonitorProc( HMONITOR hMonitor, HDC /*hdc*/, LPREC
 	newDisplay->mArea = Area( rect->left, rect->top, rect->right, rect->bottom );
 	newDisplay->mMonitor = hMonitor;
 	newDisplay->mBitsPerPixel = getMonitorBitsPerPixel( hMonitor );
-	
+
+	DXGI_ADAPTER_DESC desc;
+	if( findAdapterFromHmonitor( hMonitor, desc ) ) {
+        newDisplay->mAdapter = AdapterRef( new AdapterMsw( desc ) );
+	}
+
 	newDisplay->mContentScale = 1.0f; // default value
 	// dynamic function resoluion for ::GetDpiForMonitor()
 	if( sShcoreDll != (HMODULE)INVALID_HANDLE_VALUE ) {

@@ -61,7 +61,7 @@ class AppImplMswBasic : public AppImplMsw {
 	void		sleep( double seconds );
 
 	WindowRef		createWindow( Window::Format format );
-	RendererRef		findSharedRenderer( const RendererRef &searchRenderer );
+    RendererRef     findSharedRenderer( const RendererRef &searchRenderer, const DisplayRef &searchDisplay );
 	void			closeWindow( class WindowImplMsw *windowImpl ) override;
 	void			setForegroundWindow( WindowRef window ) override;
 	

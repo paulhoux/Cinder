@@ -23,6 +23,7 @@
 #pragma once
 
 #include "cinder/Cinder.h"
+#include "cinder/Adapter.h"
 #include "cinder/Area.h"
 #include "cinder/Signals.h"
 
@@ -41,6 +42,18 @@ class CI_API Display {
   public:
 	Display() : mArea( Area::zero() ), mBitsPerPixel( 0 ), mContentScale( 1.0f ), mName( "" ), mNameDirty ( true ) {}
 	virtual ~Display() {}
+
+	//! Returns the adapter to which this display is connected.
+    virtual AdapterRef	getAdapter() const { return mAdapter; }
+	//! Returns whether the displays are connected to the same adapter.
+	bool                onSameAdapter( const DisplayRef &other ) const
+	{
+        if( mAdapter == other->mAdapter )
+            return true;
+        if( mAdapter && other->mAdapter )
+            return *mAdapter == *(other->mAdapter);
+        return false;
+	}
 
 	//! Returns the width of the screen measured in points
 	int				getWidth() const { return mArea.getWidth(); }
@@ -87,6 +100,7 @@ class CI_API Display {
 	float				mContentScale;
 	mutable std::string	mName;
 	mutable bool		mNameDirty;
+    AdapterRef          mAdapter;
 };
 
 } // namespace cinder
