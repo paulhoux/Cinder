@@ -20,12 +20,12 @@ endif()
 
 list( APPEND SRC_SET_APP_MSW
 	# TODO: should these two files be added to "cinder\\app" group?
-	${CINDER_SRC_DIR}/cinder/app/AppScreenSaver.cpp
+	#${CINDER_SRC_DIR}/cinder/app/AppScreenSaver.cpp
 	#${CINDER_SRC_DIR}/cinder/app/RendererDx.cpp
 
 	${CINDER_SRC_DIR}/cinder/app/msw/AppImplMsw.cpp
 	${CINDER_SRC_DIR}/cinder/app/msw/AppImplMswBasic.cpp
-	${CINDER_SRC_DIR}/cinder/app/msw/AppImplMswScreenSaver.cpp
+	#${CINDER_SRC_DIR}/cinder/app/msw/AppImplMswScreenSaver.cpp
 	${CINDER_SRC_DIR}/cinder/app/msw/AppMsw.cpp
 	${CINDER_SRC_DIR}/cinder/app/msw/PlatformMsw.cpp
 	${CINDER_SRC_DIR}/cinder/app/msw/RendererImpl2dGdi.cpp
