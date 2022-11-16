@@ -12,6 +12,7 @@ ci_log_v( "CMAKE_ARCHIVE_OUTPUT_DIRECTORY: ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}" )
 add_library(
 	cinder
     ${CINDER_SRC_FILES}
+    ${CINDER_INC_FILES}
 )
 
 target_include_directories( cinder BEFORE INTERFACE ${CINDER_INCLUDE_USER_INTERFACE} )
