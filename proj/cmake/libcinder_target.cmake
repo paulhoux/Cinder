@@ -11,13 +11,20 @@ ci_log_v( "CMAKE_ARCHIVE_OUTPUT_DIRECTORY: ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}" )
 # See https://cmake.org/cmake/help/v3.0/command/add_library.html for more info.
 add_library(
 	cinder
-    ${CINDER_SRC_FILES}
     ${CINDER_INC_FILES}
+    ${CINDER_SRC_FILES}
 )
 
-target_include_directories( cinder BEFORE INTERFACE ${CINDER_INCLUDE_USER_INTERFACE} )
-target_include_directories( cinder SYSTEM BEFORE INTERFACE ${CINDER_INCLUDE_SYSTEM_INTERFACE} )
+# Tell Cinder to export functions when building as a shared library.
+if( BUILD_SHARED_LIBS )
+add_definitions( -DCINDER_SHARED_BUILD )
+endif()
 
+# Public headers should be used using relative paths.
+target_include_directories( cinder BEFORE INTERFACE $<BUILD_INTERFACE:${CINDER_INCLUDE_USER_INTERFACE}> $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}> )
+target_include_directories( cinder SYSTEM BEFORE INTERFACE  $<BUILD_INTERFACE:${CINDER_INCLUDE_SYSTEM_INTERFACE}> $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}> )
+
+# Private headers can be used using absolute paths.
 target_include_directories( cinder BEFORE PRIVATE ${CINDER_INCLUDE_USER_PRIVATE} )
 target_include_directories( cinder SYSTEM BEFORE PRIVATE ${CINDER_INCLUDE_SYSTEM_PRIVATE} )
 
