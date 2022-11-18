@@ -55,9 +55,9 @@ endif()
 
 if( CINDER_FREETYPE_USE_SYSTEM )
 	#	TODO: finish this, not sure what to do about library linking
-	#	find_package( Freetype2 REQUIRED )
-	#	list( APPEND CINDER_INCLUDE_SYSTEM_PRIVATE  ${FREETYPE2_INCLUDE_DIRS} )
-	#	list( APPEND CINDER_LIBS_DEPENDS 	${FREETYPE2_LIBRARIES} )
+	find_package( freetype REQUIRED )
+	list( APPEND CINDER_INCLUDE_SYSTEM_PRIVATE  ${FREETYPE_INCLUDE_DIRS} )
+	list( APPEND CINDER_LIBS_DEPENDS 	${FREETYPE_LIBRARIES} )
 else()
 	# use freetype copy that ships with cinder
 	ci_log_v( "using freetype copy that ships with cinder" )
