@@ -186,6 +186,27 @@ void AttrString::append( const char32_t *utf32Str )
 	extendCurrentLimits();
 }
 
+void AttrString::clear()
+{
+	mFonts.clear();
+	mColorAs.clear();
+	mTrackings.clear();
+	mAlignments.clear();
+	mLeadings.clear();
+	mColors.clear();
+	mShapingOptions.clear();
+	mRunBreaks.clear();
+
+	mCurrentFontActive = false;
+	mCurrentTrackingActive = false;
+	mCurrentAlignmentActive = false;
+	mCurrentLeadingActive = false;
+	mCurrentColorActive = false;
+	mCurrentShapingOptionsActive = false;
+
+	mString.clear();
+}
+
 void AttrString::extendCurrentLimits()
 {
 	if( mCurrentFontActive )

@@ -183,6 +183,7 @@ class CI_API AttrString
 
 	size_t	size() const { return mString.size(); }
 	bool	empty() const { return mString.empty(); }
+	void	clear();
 
 	AttrStringIter		iterate( const Font *defaultFont ) const;
 
