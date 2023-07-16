@@ -26,6 +26,7 @@ set( SOURCES
 	${UNIT_DIR}/src/audio/FftUnit.cpp
 	${UNIT_DIR}/src/audio/RingBufferUnit.cpp
 	${UNIT_DIR}/src/signals/SignalsTest.cpp
+	${UNIT_DIR}/src/TextTest.cpp
 )
 
 ci_make_app(

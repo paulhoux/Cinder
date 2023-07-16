@@ -525,6 +525,7 @@ xcopy /y "..\..\..\lib\msw\x86\d3dcompiler_46.dll" "$(OutDir)"</Command>
     <ClCompile Include="..\src\signals\SignalsTest.cpp" />
     <ClCompile Include="..\src\SystemTest.cpp" />
     <ClCompile Include="..\src\TestMain.cpp" />
+    <ClCompile Include="..\src\TextTest.cpp" />
     <ClCompile Include="..\src\UnicodeTest.cpp" />
     <ClCompile Include="..\src\PolyLineTest.cpp" />
     <ClCompile Include="..\src\Path2dTest.cpp" />
