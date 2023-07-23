@@ -367,7 +367,7 @@ void TextTestApp::loadFonts( text::Face *face )
 {
 	mFace = face;
 
-	mFontSmall = text::loadFont( mFace, 44 );
+	mFontSmall = text::loadFont( mFace, 12 );
 	mFontMedium = text::loadFont( mFace, 77 );
 	mFontLarge = text::loadFont( mFace, 99 );
 

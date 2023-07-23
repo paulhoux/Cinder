@@ -38,5 +38,6 @@ CI_API inline void blend( Surface32f *background, const Surface32f &foreground )
 CI_API void blend( Channel8u *background, const Channel8u &foreground, const Area &srcArea, const ivec2 &dstRelativeOffset = ivec2() );
 //! blends (unpremultiplied) \a unpremultColor multiplied by \a foregroundAlpha over \a background, copying from \a srcArea to \a srcArea offset by \a dstRelativeOffset
 CI_API void blendColor( Surface8u *background, const ColorAf &unpremultColor, const Channel8u &foregroundAlpha, Area srcArea, const ivec2 &dstRelativeOffset = ivec2() );
+CI_API void blendColorSrgb( Surface8u *background, const ColorAf &unpremultColor, const Channel8u &foregroundAlpha, Area srcArea, const ivec2 &dstRelativeOffset = ivec2() );
 
 } } // namespace cinder::ip

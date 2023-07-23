@@ -103,9 +103,9 @@ class CI_API Font {
 									std::vector<float> *outMaxXs = nullptr, float *outPixelWidth = nullptr ) const;
 //	void 			shapeString( const char32_t *utf32String, size_t length, float tracking, uint32_t *outGlyphIndices, float *outGlyphPositions = nullptr, float *outGlyphAdvances = nullptr, float *outPixelWidth = nullptr ) const;
 	void			drawGlyphs( size_t len, const uint32_t glyphIndices[], const vec2 glyphPositions[], float penX, float baseline, Channel8u &channel ) const;
-	void			drawGlyphs( const ColorAf &color, size_t len, const uint32_t glyphIndices[], const vec2 glyphPositions[], float penX, float baseline, Surface8u &surface ) const;
+	void			drawGlyphs( const ColorAf &color, size_t len, const uint32_t glyphIndices[], const vec2 glyphPositions[], float penX, float baseline, Surface8u &surface, bool srgb = false ) const;
 	//! thread-safe but not thread-efficient
-	void			drawGlyphsPrecise( const ColorAf &color, size_t len, const uint32_t glyphIndices[], const vec2 glyphPositions[], float penX, float baseline, Surface8u &surface ) const;
+	void			drawGlyphsPrecise( const ColorAf &color, size_t len, const uint32_t glyphIndices[], const vec2 glyphPositions[], float penX, float baseline, Surface8u &surface, bool srgb = false ) const;
 
 	virtual GlyphMetrics	getGlyphMetrics( uint32_t glyphIndex ) const { return mGlyphMetrics[glyphIndex]; }
 	virtual float			getGlyphMaxX( uint32_t glyphIndex ) const { return mGlyphMetrics[glyphIndex].horizontalBearingX + mGlyphMetrics[glyphIndex].width; }

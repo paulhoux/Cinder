@@ -442,14 +442,17 @@ void Font::drawGlyphs( size_t len, const uint32_t glyphIndices[], const vec2 gly
 	}
 }
 
-void Font::drawGlyphs( const ColorAf &color, size_t len, const uint32_t glyphIndices[], const vec2 glyphPositions[], float penX, float baseline, Surface8u &surface ) const
+void Font::drawGlyphs( const ColorAf &color, size_t len, const uint32_t glyphIndices[], const vec2 glyphPositions[], float penX, float baseline, Surface8u &surface, bool srgb ) const
 {
 	for( size_t i = 0; i < len; ++i ) {
 		try {
 			int32_t offsetLeft, offsetTop;
 			if( ! getFace()->hasColor() ) {
 				Channel8u glyph = getGlyphBitmap( glyphIndices[i], &offsetLeft, &offsetTop );
-				ip::blendColor( &surface, color, glyph, glyph.getBounds(), ivec2( (int32_t)(penX + glyphPositions[i].x + 0.5f), (int32_t)(baseline + glyphPositions[i].y - offsetTop + 0.5f) ) - ivec2( -offsetLeft, 0 ) );
+				if( srgb )
+					ip::blendColorSrgb( &surface, color, glyph, glyph.getBounds(), ivec2( (int32_t)(penX + glyphPositions[i].x + 0.5f), (int32_t)(baseline + glyphPositions[i].y - offsetTop + 0.5f) ) - ivec2( -offsetLeft, 0 ) );					
+				else
+					ip::blendColor( &surface, color, glyph, glyph.getBounds(), ivec2( (int32_t)(penX + glyphPositions[i].x + 0.5f), (int32_t)(baseline + glyphPositions[i].y - offsetTop + 0.5f) ) - ivec2( -offsetLeft, 0 ) );
 			}
 			else {
 				float scale;
@@ -463,7 +466,7 @@ void Font::drawGlyphs( const ColorAf &color, size_t len, const uint32_t glyphInd
 	}
 }
 
-void Font::drawGlyphsPrecise( const ColorAf &color, size_t len, const uint32_t glyphIndices[], const vec2 glyphPositions[], float penX, float baseline, Surface8u &surface ) const
+void Font::drawGlyphsPrecise( const ColorAf &color, size_t len, const uint32_t glyphIndices[], const vec2 glyphPositions[], float penX, float baseline, Surface8u &surface, bool srgb ) const
 {
 	mFace->lock();
 	lock();
@@ -481,7 +484,10 @@ void Font::drawGlyphsPrecise( const ColorAf &color, size_t len, const uint32_t g
 			throw text::FreeTypeExc( err );
 
 		auto channel = wrapBitmap( mFace->getFtFace()->glyph->bitmap );
-		ip::blendColor( &surface, color, channel, channel.getBounds(), ivec2( (int32_t)intPenX, (int32_t)intBaseline - mFace->getFtFace()->glyph->bitmap_top ) - ivec2( -mFace->getFtFace()->glyph->bitmap_left, 0 ) );
+		if( srgb )
+			ip::blendColorSrgb( &surface, color, channel, channel.getBounds(), ivec2( (int32_t)intPenX, (int32_t)intBaseline - mFace->getFtFace()->glyph->bitmap_top ) - ivec2( -mFace->getFtFace()->glyph->bitmap_left, 0 ) );
+		else
+			ip::blendColor( &surface, color, channel, channel.getBounds(), ivec2( (int32_t)intPenX, (int32_t)intBaseline - mFace->getFtFace()->glyph->bitmap_top ) - ivec2( -mFace->getFtFace()->glyph->bitmap_left, 0 ) );
 	}
 	FT_Set_Transform( mFace->getFtFace(), nullptr, nullptr ); // reset transform
 	unlock();

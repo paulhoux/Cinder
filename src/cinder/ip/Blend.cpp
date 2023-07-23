@@ -313,4 +313,77 @@ void blendColor( Surface8u *background, const ColorAf &unpremultColor, const Cha
 	}
 }
 
+float srgb_to_linear_float(uint8_t srgb)
+{
+	if (srgb <= 10)
+		return ((float)srgb) / 255.0f / 12.92f;
+	else
+		return (float)powf((((float)srgb) / 255.0f + 0.055f) / 1.055f, 2.4f);
+}
+
+uint8_t linear_float_to_srgb( float linear )
+{
+	if (linear <= 0.0031308f)
+		return (uint8_t)(linear * 12.92f * 255);
+	else
+		// The + 0.00001f is so that numbers just under a whole number round up.
+		return (uint8_t)((1.055f * pow(linear + 0.00001f, 0.41666666666f) - 0.055f) * 255);
+}
+
+void blendColorSrgb( Surface8u *background, const ColorAf &unpremultColor, const Channel8u &foreground, Area unclippedSrcArea, const ivec2 &dstRelativeOffset )
+{
+	const ptrdiff_t srcRowBytes = foreground.getRowBytes();
+	const uint8_t srcInc = foreground.getIncrement();
+	const ptrdiff_t dstRowBytes = background->getRowBytes();
+	const uint8_t dR = background->getRedOffset();
+	const uint8_t dG = background->getGreenOffset();
+	const uint8_t dB = background->getBlueOffset();
+	const uint8_t dA = background->hasAlpha() ? (background->getChannelOrder().getAlphaOffset()) : 0;
+	const uint8_t dstInc = background->getPixelInc();
+
+	pair<Area,ivec2> srcDst = clippedSrcDst( foreground.getBounds(), unclippedSrcArea, background->getBounds(), unclippedSrcArea.getUL() + dstRelativeOffset );
+	if( srcDst.first.getWidth() == 0 || srcDst.first.getHeight() == 0 )
+		return;
+	Area srcArea = srcDst.first;
+	ivec2 absOffset = srcDst.second;
+
+	for( int32_t y = 0; y < srcArea.getHeight(); ++y ) {
+		const uint8_t *src = reinterpret_cast<const uint8_t*>( reinterpret_cast<const uint8_t*>( foreground.getData() + srcArea.x1 * srcInc ) + ( srcArea.y1 + y ) * srcRowBytes );
+		uint8_t *dst = reinterpret_cast<uint8_t*>( reinterpret_cast<uint8_t*>( background->getData() + absOffset.x * dstInc ) + ( y + absOffset.y ) * dstRowBytes );
+		for( int32_t x = 0; x < srcArea.getWidth(); ++x ) {
+			if( *src ) {
+				uint8_t srcA = static_cast<uint8_t>( unpremultColor.a * *src );
+				uint8_t srcR = static_cast<uint8_t>( unpremultColor.r * srcA );
+				uint8_t srcG = static_cast<uint8_t>( unpremultColor.g * srcA );
+				uint8_t srcB = static_cast<uint8_t>( unpremultColor.b * srcA );
+				if( background->hasAlpha() ) {
+					dst[dA] = 255 - (255 - srcA) * (255 - dst[dA]) / 255;
+				}
+				if( ! background->hasAlpha() ) { // none * premult -> none
+					dst[dR] = (255 - srcA) * dst[dR] / 255 + srcR;
+					dst[dG] = (255 - srcA) * dst[dG] / 255 + srcG;
+					dst[dB] = (255 - srcA) * dst[dB] / 255 + srcB;
+				}
+				else if( ! background->isPremultiplied() ) { // unpremult * premult -> unpremult
+					if( dst[dA] ) {
+						dst[dR] = ( (255 - srcA) * dst[dA] * dst[dR] / 255 + (255 - dst[dA]) * srcR + dst[dA] * srcR ) / dst[dA];
+						dst[dG] = ( (255 - srcA) * dst[dA] * dst[dG] / 255 + (255 - dst[dA]) * srcG + dst[dA] * srcG ) / dst[dA];
+						dst[dB] = ( (255 - srcA) * dst[dA] * dst[dB] / 255 + (255 - dst[dA]) * srcB + dst[dA] * srcB ) / dst[dA];
+					}
+				}
+				else { // premult * premult -> premult
+					dst[dR] = linear_float_to_srgb((255 - srcA) / 255.0f * srgb_to_linear_float( dst[dR] ) + srcR / 255.0f);
+					dst[dG] = linear_float_to_srgb((255 - srcA) / 255.0f * srgb_to_linear_float( dst[dG] ) + srcG / 255.0f);
+					dst[dB] = linear_float_to_srgb((255 - srcA) / 255.0f * srgb_to_linear_float( dst[dB] ) + srcB / 255.0f);
+					/*dst[dR] = ( (255 - srcA) * dst[dR] + (255 - dst[dA]) * srcR + dst[dA] * srcR ) / 255;
+					dst[dG] = ( (255 - srcA) * dst[dG] + (255 - dst[dA]) * srcG + dst[dA] * srcG ) / 255;
+					dst[dB] = ( (255 - srcA) * dst[dB] + (255 - dst[dA]) * srcB + dst[dA] * srcB ) / 255;*/
+				}
+			}
+			src += srcInc;
+			dst += dstInc;
+		}
+	}
+}
+
 } } // namespace cinder::ip
