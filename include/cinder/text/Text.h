@@ -201,22 +201,16 @@ struct CI_API TypesetOptions {
 	const Font*		mDefaultFont; // = loadFont( systemDefaultFace(), 12 );
 };
 
-// Flattened to remove all but essential rendering information - runs of Font* / glyph index / color information
-class CI_API FlatGlyphLayout {
-  public:
-	FlatGlyphLayout( const std::vector<Run> &runs ) : mRuns( runs ) {}
-	const std::vector<Run>&		getRuns() const { return mRuns; }
-
-	vec2					calcSize() const;
-
-  private:
-	std::vector<Run>		mRuns;
-};
-
 class CI_API Typesetter {
-public:
+  public:
+	struct Iterator {
+		size_t	refcon0, refcon1; // opaque storage for an Iterator to store state
+	};
+
 	virtual ~Typesetter() {}
-	virtual FlatGlyphLayout	getFlatGlyphLayout() const = 0;
+	virtual Iterator	getIterator() const = 0;
+	virtual bool		nextRun( Iterator &iter, const Run** run, vec2 *lineDrawOffset ) const = 0;
+	virtual vec2		calcSize() const = 0;
 };
 
 //! 
@@ -240,7 +234,9 @@ class CI_API GlyphLayout : public Typesetter {
 	void						breakGlyphsIntoRuns() { for( auto &line : mLines ) line.breakGlyphsIntoRuns(); }
 
 
-	FlatGlyphLayout			getFlatGlyphLayout() const override;
+	Iterator		getIterator() const override { return Iterator{ 0, 0 }; }
+	bool			nextRun( Iterator &iter, const Run** run, vec2 *lineDrawOffset ) const override;
+	vec2			calcSize() const override;
 
   protected:
 	float					mMeasuredWidth = -1, mMeasuredHeight = -1;
@@ -263,13 +259,17 @@ class CI_API Frame : public Typesetter {
 	TypesetOptions		getTypesetOptions() const { return mTypesetOptions; }
 
 	const GlyphLayout&		getGlyphLayout() const;
-	FlatGlyphLayout		getFlatGlyphLayout() const override;
 
 	//! Returns number of times a word was forced to break because it was too long for the line width
 	uint32_t				getNumForcedWordBreaks() const;
 
+	Iterator		getIterator() const override { updateGlyphLayout(); return mGlyphLayout.getIterator(); }
+	bool			nextRun( Iterator &iter, const Run** run, vec2 *lineDrawOffset ) const override { return mGlyphLayout.nextRun( iter, run, lineDrawOffset ); }
+	vec2			calcSize() const override { return mGlyphLayout.calcSize(); }
+
   private:
-	void					updateGlyphLayout();
+	void					updateGlyphLayout() const;
+	void					updateGlyphLayoutImpl();
 
 	bool					mDirty;
 	GlyphLayout				mGlyphLayout;
@@ -313,16 +313,11 @@ CI_API Font*				font( const std::vector<std::pair<std::string,float>> &fonts );
 
 CI_API void measureString( const AttrString& attrString, float *resultWidth, float *resultHeight = nullptr, float *resultBaseline = nullptr );
 
-CI_API void				render( const FlatGlyphLayout &glyphLayout, Surface8u *surface, const vec2 &offset = vec2(0), bool precise = false, bool srgb = false );
-CI_API inline void		render( const Typesetter &typesetter, Surface8u *surface, const vec2 &offset = vec2(0), bool precise = false, bool srgb = false ) { render( typesetter.getFlatGlyphLayout(), surface, offset, precise, srgb ); }
+CI_API void		render( const Typesetter &typesetter, Surface8u *surface, const vec2 &offset = vec2(0), bool precise = false, bool srgb = true );
+CI_API void		render( const Typesetter &typesetter, Channel8u *channel, const vec2 &offset = vec2(0), bool precise = false, bool srgb = true );
 //! Creates a premultiplied Surface8u
-CI_API Surface8u		renderSurface( const FlatGlyphLayout &glyphLayout, const vec2 &offset = vec2(0), const ColorA8u &bgColor = ColorA8u(0, 0, 0, 0), bool precise = false );
-//! Creates a premultiplied Surface8u
-CI_API inline Surface8u	renderSurface( const Typesetter &typesetter, const vec2 &offset = vec2(0), const ColorA8u &bgColor = ColorA8u(0, 0, 0, 0), bool precise = false ) { return renderSurface( typesetter.getFlatGlyphLayout(), offset, bgColor, precise ); }
-CI_API void				render( const FlatGlyphLayout &glyphLayout, Channel8u *channel, const vec2 &offset = vec2(0) );
-CI_API inline void		render( const Typesetter &typesetter, Channel8u *channel, const vec2 &offset = vec2(0) ) { render( typesetter.getFlatGlyphLayout(), channel, offset ); }
-CI_API Channel8u		renderChannel( const FlatGlyphLayout &glyphLayout, const vec2 &offset = vec2(0) );
-CI_API inline Channel8u	renderChannel( const Typesetter &typesetter, const vec2 &offset = vec2(0) ) { return renderChannel( typesetter.getFlatGlyphLayout(), offset ); }
+CI_API Surface8u	renderSurface( const Typesetter &typesetter, const vec2 &offset = vec2(0), const ColorA8u &bgColor = ColorA8u(0, 0, 0, 0), bool precise = false, bool srgb = true );
+CI_API Channel8u	renderChannel( const Typesetter &typesetter, const vec2 &offset = vec2(0), bool precise = false, bool srgb = true );
 
 /*CI_API Channel8u	renderString( const Font *font, const char *utf8String, float tracking = 0 );
 CI_API Channel8u	renderString( const AttrString &attrString ); // renders on one line

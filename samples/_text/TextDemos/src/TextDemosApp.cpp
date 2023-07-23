@@ -66,11 +66,14 @@ class PrecisionRenderingDemo : public Demo {
 			strPrecise << fonts.back() << "Waltz, bad nymph, for quick jigs vex! 0123456789\n";
 		}
 
+Channel8u temp( surface->getWidth(), surface->getHeight() );
+ip::fill( &temp, (uint8_t)0 );
 		auto frame = text::Frame( str, text::Frame::GROW, surface->getHeight(), text::TypesetOptions().ignoreLineMetrics( false ).defaultShapingOptions( text::ShapingOptions().ignoreMissingGlyphs(true) ) );
 		auto frameLayout = frame.getGlyphLayout();
-		text::render( frame, surface, vec2{0}, false );
+		text::render( frame, &temp, vec2{0}, false );
 		auto framePrecise = text::Frame( str, text::Frame::GROW, surface->getHeight(), text::TypesetOptions().ignoreLineMetrics( false ).defaultShapingOptions( text::ShapingOptions().ignoreMissingGlyphs(true) ) );
-		text::render( framePrecise, surface, vec2{ frameLayout.getMeasuredWidth() + 30, 0 }, true );
+		text::render( framePrecise, &temp, vec2{ frameLayout.getMeasuredWidth() + 30, 0 }, true );
+*surface = Surface( temp );
 	}
 };
 

@@ -494,6 +494,31 @@ void Font::drawGlyphsPrecise( const ColorAf &color, size_t len, const uint32_t g
 	mFace->unlock();
 }
 
+void Font::drawGlyphsPrecise( size_t len, const uint32_t glyphIndices[], const vec2 glyphPositions[], float penX, float baseline, Channel8u &channel, bool srgb ) const
+{
+	mFace->lock();
+	lock();
+	FT_Activate_Size( mFtSize );
+	for( size_t i = 0; i < len; ++i ) {
+		float intPenX;
+		float fracX = modff( penX + glyphPositions[i].x, &intPenX );
+		float intBaseline;
+		float fracY = modff( baseline + glyphPositions[i].y, &intBaseline );
+		FT_Vector offset = { (int)(fracX * 64), (int)(-fracY * 64) };
+		FT_Set_Transform( mFace->getFtFace(), nullptr, &offset );
+		if( FT_Error err = FT_Load_Glyph( mFace->getFtFace(), glyphIndices[i], FT_LOAD_DEFAULT ) )
+			throw text::FreeTypeExc( err );
+		if( FT_Error err = FT_Render_Glyph( mFace->getFtFace()->glyph, FT_RENDER_MODE_NORMAL ) )
+			throw text::FreeTypeExc( err );
+
+		auto glyphChannel = wrapBitmap( mFace->getFtFace()->glyph->bitmap );
+		ip::blend( &channel, glyphChannel, glyphChannel.getBounds(), ivec2( (int32_t)intPenX, (int32_t)intBaseline - mFace->getFtFace()->glyph->bitmap_top ) - ivec2( -mFace->getFtFace()->glyph->bitmap_left, 0 ) );
+	}
+	FT_Set_Transform( mFace->getFtFace(), nullptr, nullptr ); // reset transform
+	unlock();
+	mFace->unlock();
+}
+
 void Font::setRendererData( uint16_t rendererId, Font::Data *data ) const
 {
 	for( auto &r : mRendererData )
