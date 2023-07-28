@@ -115,7 +115,20 @@ struct CI_API ShapingOptions {
 
 enum class Alignment { LEFT, CENTER, RIGHT, DEFAULT };
 
-struct CI_API RunBreak {};
+struct CI_API RunBreak {
+};
+
+struct CI_API Spacer {
+	Spacer() {}
+	Spacer( ci::vec2 size, size_t data = 0 ) : mSize( size ), mData( data ) {}
+
+	ci::vec2	getSize() const { return mSize; }
+	float		getWidth() const { return mSize.x; }
+	size_t		getData() const { return mData; }
+
+	ci::vec2	mSize;
+	size_t		mData;
+};
 
 class AttrStringIter;
 
@@ -159,7 +172,8 @@ class CI_API AttrString
 	AttrString& operator<<( const Color8u &color );
 	AttrString& operator<<( const ColorAf &color );
 	AttrString& operator<<( const Colorf &color );
-	AttrString& operator<<( RunBreak /*runBreak*/ );
+	AttrString& operator<<( RunBreak runBreak );
+	AttrString& operator<<( const Spacer &spacer );
 	AttrString& operator<<( ShapingOptions shapingOptions );
 //	AttrString& operator<<( const std::pair<const char*,float> &font );
 
@@ -177,7 +191,8 @@ class CI_API AttrString
 	void	append( const std::string &utf8Str );
 	void	append( const char *utf8Str );
 	void	append( const char32_t *utf32Str );
-	void	appendRunBreak();
+	void	appendRunBreak( RunBreak runBreak );
+	void	append( const Spacer& spacer );
 	void	append( const ShapingOptions &shapingOptions );
 //	void	append( const ColorA8u &color );
 
@@ -207,7 +222,18 @@ class CI_API AttrString
 	IntervalMap<ColorAf>			mColors;
 	IntervalMap<ShapingOptions>		mShapingOptions;
 
-	std::vector<size_t>				mRunBreaks; // sorted vector of string offsets 
+	//! Encodes either a RunBreak of a Spacer
+	struct RunBreakInfo {
+		RunBreakInfo() : mIsSpacer( false ) {}
+		RunBreakInfo( const Spacer &spacer ) : mIsSpacer( true ), mSpacer( spacer ) {}
+
+		bool		isSpacer() const { return mIsSpacer; }
+		Spacer		getSpacer() const { return mSpacer; }
+
+		bool		mIsSpacer;
+		Spacer		mSpacer;
+	};
+	std::vector<std::pair<size_t, RunBreakInfo>>	mRunBreaks; // sorted vector of string offsets
 	
 	bool			mCurrentFontActive = false;
 	bool			mCurrentTrackingActive = false;
@@ -225,6 +251,8 @@ class CI_API AttrStringIter {
   public:
 	bool	nextRun();
 	
+	bool					isSpacer() const { return mIsSpacer; }
+	Spacer					getSpacer() const { return mCurrentSpacer; }
 	size_t					getStartCh() const { return mStrStartOffset; }
 	size_t					getLengthCh() const { return mStrEndOffset - mStrStartOffset; }
 	const char32_t*			getStrPtr() const { return &mAttrStr->mString[mStrStartOffset]; }
@@ -284,7 +312,9 @@ class CI_API AttrStringIter {
 	ShapingOptions								mShapingOptions;
 	bool										mShapingOptionsDone = false;
 
-	std::vector<size_t>::const_iterator			mRunBreaksIter;	
+	std::vector<std::pair<size_t, AttrString::RunBreakInfo>>::const_iterator	mRunBreaksIter;
+	bool																		mIsSpacer = false;
+	Spacer																		mCurrentSpacer;
 };
 
 std::ostream& operator<<( std::ostream& os, const AttrString& dt );

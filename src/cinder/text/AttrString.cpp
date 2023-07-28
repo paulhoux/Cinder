@@ -29,6 +29,8 @@
 #include "cinder/Log.h"
 #include "cinder/Utilities.h"
 
+#include <utility>
+
 using namespace std;
 
 namespace {
@@ -138,9 +140,15 @@ AttrString& AttrString::operator<<( const Colorf &color )
 	return *this;
 }
 
-AttrString& AttrString::operator<<( RunBreak /*runBreak*/ )
+AttrString& AttrString::operator<<( RunBreak runBreak )
 {
-	appendRunBreak();
+	appendRunBreak( runBreak );
+	return *this;
+}
+
+AttrString& AttrString::operator<<( const Spacer &spacer )
+{
+	append( spacer );
 	return *this;
 }
 
@@ -150,11 +158,14 @@ AttrString& AttrString::operator<<( ShapingOptions shapingOptions )
 	return *this;
 }
 
-void AttrString::appendRunBreak()
+void AttrString::appendRunBreak( RunBreak runBreak )
 {
-	auto lowerIt = std::lower_bound( mRunBreaks.begin(), mRunBreaks.end(), mString.size() );
-	if( lowerIt == mRunBreaks.end() || *lowerIt != mString.length() )
-		mRunBreaks.insert( std::upper_bound( mRunBreaks.begin(), mRunBreaks.end(), mString.length() ), mString.length() );
+	mRunBreaks.push_back( make_pair( (size_t)mString.length(), RunBreakInfo() ) );
+}
+
+void AttrString::append( const Spacer& spacer )
+{
+	mRunBreaks.push_back( make_pair( (size_t)mString.length(), RunBreakInfo( spacer ) ) );
 }
 
 /*AttrString& AttrString::operator<<( const std::pair<const char*,float> &font )
@@ -345,7 +356,7 @@ std::string AttrString::debugString()
 //
 
 AttrStringIter::AttrStringIter( const AttrString *attrStr, const Font *defaultFont )
-	: mAttrStr( attrStr ), mStrStartOffset( 0 ), mStrLength( attrStr->size() ), mDefaultFont( defaultFont )
+	: mAttrStr( attrStr ), mStrStartOffset( 0 ), mStrEndOffset( 0 ), mStrLength( attrStr->size() ), mDefaultFont( defaultFont )
 {
 }
 
@@ -390,6 +401,13 @@ size_t AttrStringIter::firstRunAttr( const IntervalMap<T> &attrMap, T *attrValue
 
 void AttrStringIter::firstRun()
 {
+	// special case of RunBreak exactly at the start which is a spacer
+	if( ! mAttrStr->mRunBreaks.empty() && mAttrStr->mRunBreaks.begin()->first == 0 && mAttrStr->mRunBreaks.begin()->second.isSpacer() ) {
+		mRunBreaksIter = mAttrStr->mRunBreaks.begin();
+		mIsSpacer = true;
+		mCurrentSpacer = mAttrStr->mRunBreaks.begin()->second.getSpacer();
+		return;
+	}
 	mStrEndOffset = mStrLength;
 
 	mStrEndOffset = std::min( firstRunAttr<const Font*>( mAttrStr->mFonts, &mFont, nullptr, &mFontsDone, &mFontIter ), mStrEndOffset );
@@ -403,8 +421,11 @@ void AttrStringIter::firstRun()
 		mFont = mDefaultFont;
 
 	mRunBreaksIter = mAttrStr->mRunBreaks.begin();
-	if( mRunBreaksIter != mAttrStr->mRunBreaks.end() && *mRunBreaksIter <= mStrEndOffset )
-		mStrEndOffset = *mRunBreaksIter++;
+	if( mRunBreaksIter != mAttrStr->mRunBreaks.end() && mRunBreaksIter->first <= mStrEndOffset ) {
+		mStrEndOffset = mRunBreaksIter->first;
+		if( ! mRunBreaksIter->second.isSpacer() ) // if this is not a spacer, just move on
+			++mRunBreaksIter;
+	}
 }
 
 template<typename T>
@@ -441,8 +462,17 @@ void AttrStringIter::advanceAttr( const IntervalMap<T> &attrMap, T *attrValue, c
 // move all iterators forward so that their starts >= mStrStartOffset
 void AttrStringIter::advance()
 {
+	// if we broke on a Spacer, we need to process that as Run unto itself
+	if( mRunBreaksIter != mAttrStr->mRunBreaks.end() && mStrEndOffset == mRunBreaksIter->first ) {
+		mIsSpacer = true;
+		mCurrentSpacer = mRunBreaksIter->second.getSpacer();
+		++mRunBreaksIter;
+		return;
+	}
+
 	size_t newStrEnd = mStrLength;
 	mStrStartOffset = mStrEndOffset;
+	mIsSpacer = false;
 
 	advanceAttr<const Font*>( mAttrStr->mFonts, &mFont, nullptr, &mFontsDone, &mFontIter, &newStrEnd );
 	advanceAttr<Tracking>( mAttrStr->mTrackings, &mTracking, Tracking(), &mTrackingsDone, &mTrackingIter, &newStrEnd );
@@ -454,8 +484,11 @@ void AttrStringIter::advance()
 	if( ! mFont )
 		mFont = mDefaultFont;
 
-	if( mRunBreaksIter != mAttrStr->mRunBreaks.end() && newStrEnd >= *mRunBreaksIter )
-		newStrEnd = *mRunBreaksIter++;
+	if( mRunBreaksIter != mAttrStr->mRunBreaks.end() && newStrEnd >= mRunBreaksIter->first ) {
+		newStrEnd = mRunBreaksIter->first;
+		if( ! mRunBreaksIter->second.isSpacer() ) // if this is not a spacer, just move on
+			++mRunBreaksIter;
+	}
 	
 	mStrEndOffset = newStrEnd;
 }

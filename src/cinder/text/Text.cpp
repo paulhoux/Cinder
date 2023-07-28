@@ -304,6 +304,8 @@ struct RunData {
 	ColorAf color;
 	size_t start, len;
 	size_t startCh;
+	bool isSpacer = false;
+	Spacer spacer;
 };
 
 struct SpanData {
@@ -320,6 +322,7 @@ void processLine( const AttrString &attrString, const std::vector<uint32_t> &clu
 	if( spans.empty() )
 		return;
 
+	// measure line height metrics
 	float maxAscent = 0, maxLineHeight = 0, maxDescent = 0, maxLineGap = 0;
 	for( auto &span : spans ) {
 		maxAscent = std::max( maxAscent, span.first->font->getAscender() );
@@ -378,6 +381,8 @@ Channel8u renderString( const AttrString &attrString )
 	auto runIt = attrString.iterate( TypesetOptions().getDefaultFont() );
 	float penX = 0, runWidth;
 	while( runIt.nextRun() ) {
+		if( runIt.isSpacer() )
+			continue;
 		runIt.shape( runIt.getShapingOptions( ShapingOptions() ), &glyphIndices, nullptr, &glyphPositions, nullptr, nullptr, &runWidth );
 		runIt.getFont()->drawGlyphs( runIt.getLengthCh(), glyphIndices.data(), glyphPositions.data(), penX, baseline, result ); 
 	}
@@ -396,21 +401,31 @@ void typeset( const AttrString &attrString, int32_t width, int32_t height, Types
 	if( width < 0 )
 		width = std::numeric_limits<int32_t>::max();
 
-	auto runIt = attrString.iterate( options.getDefaultFont() );
+	AttrStringIter runIt = attrString.iterate( options.getDefaultFont() );
 	if( ! runIt.nextRun() ) // empty string
 		return;
 	
 	std::vector<char> breaks( attrString.size() );
 	setLineBreaksUtf32( attrString.getStringUtf32().data(), attrString.size(), breaks.data() );
 
+	// construct 'RunData' vector by extracting runs from the AttrString
 	vector<RunData> runData;
 	size_t glyphStart = 0;
 	do {
-		size_t glyphLen = runIt.shape( runIt.getShapingOptions( options.getDefaultShapingOptions() ), &glyphIndices, &clusters, &glyphPositions, &glyphXAdvances, &glyphMaxXs, nullptr );
-		runData.push_back( RunData{ runIt.getFont(), runIt.getAlignment( options.getDefaultAlignment() ), runIt.getLeading(), runIt.getColor( ColorAf::white() ), glyphStart, glyphLen, runIt.getStartCh() } );
-		for( size_t g = glyphStart; g < clusters.size(); ++g )
-			clusters[g] += (uint32_t)runIt.getStartCh();
-		glyphStart += glyphLen;
+		if( runIt.isSpacer() ) {
+			RunData runData{};
+			runData.isSpacer = true;
+			runData.alignment = options.getDefaultAlignment();
+			runData.spacer = runIt.getSpacer();
+			runData.push_back( runData );
+		}
+		else {
+			size_t glyphLen = runIt.shape( runIt.getShapingOptions( options.getDefaultShapingOptions() ), &glyphIndices, &clusters, &glyphPositions, &glyphXAdvances, &glyphMaxXs, nullptr );
+			runData.push_back( RunData{ runIt.getFont(), runIt.getAlignment( options.getDefaultAlignment() ), runIt.getLeading(), runIt.getColor( ColorAf::white() ), glyphStart, glyphLen, runIt.getStartCh() } );
+			for( size_t g = glyphStart; g < clusters.size(); ++g )
+				clusters[g] += (uint32_t)runIt.getStartCh();
+			glyphStart += glyphLen;
+		}
 	} while( runIt.nextRun() );
 
 	vector<pair<vector<RunData>::iterator,SpanData>> linebreakedSpans;
@@ -421,21 +436,26 @@ void typeset( const AttrString &attrString, int32_t width, int32_t height, Types
 	bool firstLine = true;
 	while( lineEndGlyph < glyphIndices.size() && curRunDataIt != runData.end() ) {
 		// calculate last glyph that will fit on the line (or hits a hard break). Does not account for implicit paragraph breaks due to alignment changes
-		double lineWidthPx = glyphXAdvances[lineStartGlyph];
-		bool hitHardBreak = lineEndGlyph + 1 == glyphIndices.size() ? true : mustBreak( breaks.data(), clusters[lineEndGlyph + 1] );
-		while( lineEndGlyph + 1 < glyphIndices.size() && lineWidthPx + glyphMaxXs[lineEndGlyph + 1] < width 
-				/*&& lineWidthPx + glyphAdvances[lineEndGlyph + 1] < width*/ && ! hitHardBreak ) {
-			++lineEndGlyph;
-			lineWidthPx += glyphXAdvances[lineEndGlyph];
-			if( lineEndGlyph + 1 < glyphIndices.size() && mustBreak( breaks.data(), clusters[lineEndGlyph + 1] ) )
-				hitHardBreak = true;
-		}
-		if( ! hitHardBreak ) { // no hard break means we ran over the end of the line; backtrack to see if we can find a place we can break
-			if( ! findCanBreak( breaks.data(), clusters.data(), lineStartGlyph, &lineEndGlyph ) )
-				processor.incrementNumForcedWordBreaks(); // failed to backtrack to a suitable break - note it for external fitting algorithms; this bookkeeping is not used here though
+		double lineWidthPx;
+		if( curRunDataIt->isSpacer )
+			lineWidthPx = curRunDataIt->spacer.getWidth();
+		else {
+			lineWidthPx = glyphXAdvances[lineStartGlyph];
+			bool hitHardBreak = lineEndGlyph + 1 == glyphIndices.size() ? true : mustBreak( breaks.data(), clusters[lineEndGlyph + 1] );
+			while( lineEndGlyph + 1 < glyphIndices.size() && lineWidthPx + glyphMaxXs[lineEndGlyph + 1] < width 
+					/*&& lineWidthPx + glyphAdvances[lineEndGlyph + 1] < width*/ && ! hitHardBreak ) {
+				++lineEndGlyph;
+				lineWidthPx += glyphXAdvances[lineEndGlyph];
+				if( lineEndGlyph + 1 < glyphIndices.size() && mustBreak( breaks.data(), clusters[lineEndGlyph + 1] ) )
+					hitHardBreak = true;
+			}
+			if( ! hitHardBreak ) { // no hard break means we ran over the end of the line; backtrack to see if we can find a place we can break
+				if( ! findCanBreak( breaks.data(), clusters.data(), lineStartGlyph, &lineEndGlyph ) )
+					processor.incrementNumForcedWordBreaks(); // failed to backtrack to a suitable break - note it for external fitting algorithms; this bookkeeping is not used here though
+			}
 		}
 		
-		// gather the spans (either the first or last may be a partial Run)
+		// gather the spans for this line (the first or last may be a partial Runs)
 		size_t curGlyph = lineStartGlyph;
 		vector<pair<vector<RunData>::iterator,SpanData>> linebreakedSpans;
 		lineWidthPx = 0;
@@ -604,7 +624,6 @@ bool GlyphLayout::nextRun( Iterator &iter, const Run** run, vec2 *lineDrawOffset
 	if( iter.refcon0 >= mLines.size() )
 		return false;
 
-	iter.refcon1++;
 	while( iter.refcon1 >= mLines[iter.refcon0].getNumRuns() ) {
 		iter.refcon0++;
 		iter.refcon1 = 0;
@@ -614,6 +633,7 @@ bool GlyphLayout::nextRun( Iterator &iter, const Run** run, vec2 *lineDrawOffset
 
 	*run = &mLines[iter.refcon0].getRuns()[iter.refcon1];
 	*lineDrawOffset = mLines[iter.refcon0].getDrawOffset();
+	iter.refcon1++;
 	return true;
 }
 

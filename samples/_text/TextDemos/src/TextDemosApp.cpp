@@ -66,14 +66,11 @@ class PrecisionRenderingDemo : public Demo {
 			strPrecise << fonts.back() << "Waltz, bad nymph, for quick jigs vex! 0123456789\n";
 		}
 
-Channel8u temp( surface->getWidth(), surface->getHeight() );
-ip::fill( &temp, (uint8_t)0 );
 		auto frame = text::Frame( str, text::Frame::GROW, surface->getHeight(), text::TypesetOptions().ignoreLineMetrics( false ).defaultShapingOptions( text::ShapingOptions().ignoreMissingGlyphs(true) ) );
 		auto frameLayout = frame.getGlyphLayout();
-		text::render( frame, &temp, vec2{0}, false );
+		text::render( frame, surface, vec2{0}, false );
 		auto framePrecise = text::Frame( str, text::Frame::GROW, surface->getHeight(), text::TypesetOptions().ignoreLineMetrics( false ).defaultShapingOptions( text::ShapingOptions().ignoreMissingGlyphs(true) ) );
-		text::render( framePrecise, &temp, vec2{ frameLayout.getMeasuredWidth() + 30, 0 }, true );
-*surface = Surface( temp );
+		text::render( framePrecise, surface, vec2{ frameLayout.getMeasuredWidth() + 30, 0 }, true );
 	}
 };
 
@@ -97,6 +94,17 @@ class SrgbRenderingDemo : public Demo {
 	}
 };
 
+class SpacersDemo : public Demo {
+	void render( Surface8u *surface ) override {
+		ip::fill( surface, ColorA8u( 32, 32, 32, 255 ) );
+		text::AttrString str;
+		str << text::loadFont( gFace, 30.0f ) << Color8u( 255, 0, 255 ) << "A spacer:" << Color8u( 255, 255, 0 ) << text::Spacer( {22, 0} ) << "done";
+		auto frame = text::Frame( str, text::Frame::GROW, surface->getHeight(), text::TypesetOptions().ignoreLineMetrics( false ).defaultShapingOptions( text::ShapingOptions().ignoreMissingGlyphs(true) ) );
+		auto frameLayout = frame.getGlyphLayout();
+		text::render( frameLayout, surface, vec2{10}, true, true );
+	}
+};
+
 void TextDemosApp::setup()
 {
 	//loadGlobalFonts( text::systemDefaultFace() );
@@ -105,8 +113,9 @@ void TextDemosApp::setup()
 	mDemos.emplace_back( new BasicRenderingDemo() );
 	mDemos.emplace_back( new PrecisionRenderingDemo() );
 	mDemos.emplace_back( new SrgbRenderingDemo() );
+	mDemos.emplace_back( new SpacersDemo() );
 
-	mCurrentDemoIdx = mDemos.size() - 2;
+	mCurrentDemoIdx = mDemos.size() - 1;
 }
 
 void drawFrameLines( const text::GlyphLayout &layout, Surface8u *surface )
@@ -115,9 +124,9 @@ void drawFrameLines( const text::GlyphLayout &layout, Surface8u *surface )
 
 	for( auto &line : layout.getLines() ) {
 		if( drawLineMetrics ) {
-			ip::fill( surface, Color8u( 255, 255, 0 ), Area( 0, line.getDrawOffset().y - line.getAscender(), surface->getWidth(), line.getDrawOffset().y - line.getAscender() + 1 ) );
-			ip::fill( surface, Color8u( 0, 0, 255 ), Area( 0, line.getDrawOffset().y + line.getDescender(), surface->getWidth(), line.getDrawOffset().y + line.getDescender() + 1 ) );
-			ip::fill( surface, Color8u( 0, 255, 0 ), Area( 0, line.getDrawOffset().y, surface->getWidth(), line.getDrawOffset().y + 1 ) );
+			ip::fill( surface, Color8u( 255, 255, 0 ), Area( 0, (int32_t)(line.getDrawOffset().y - line.getAscender()), (int32_t)(surface->getWidth()), (int32_t)(line.getDrawOffset().y - line.getAscender() + 1) ) );
+			ip::fill( surface, Color8u( 0, 0, 255 ), Area( 0, (int32_t)(line.getDrawOffset().y + line.getDescender()), (int32_t)(surface->getWidth()), (int32_t)(line.getDrawOffset().y + line.getDescender() + 1) ) );
+			ip::fill( surface, Color8u( 0, 255, 0 ), Area( 0, (int32_t)(line.getDrawOffset().y), surface->getWidth(), (int32_t)(line.getDrawOffset().y + 1) ) );
 		}
 
 		for( auto &run : line.getRuns() ) {
