@@ -96,17 +96,22 @@ class SrgbRenderingDemo : public Demo {
 
 class SpacersDemo : public Demo {
 	void render( Surface8u *surface ) override {
+		ip::fill( surface, ColorA8u( 32, 32, 32, 255 ) );
+		
 		// create placeholder image
 		Surface8u placeholderImage( 200, 300, false );
 		ip::fill( &placeholderImage, ColorA8u( 255, 128, 64, 255 ) );
-		ip::fill( surface, ColorA8u( 32, 32, 32, 255 ) );
+
 		text::AttrString str;
-//		str << text::loadFont( gFace, 30.0f ) << Color8u( 255, 0, 255 ) << "A placeholder:" << Color8u( 255, 255, 0 ) << text::Spacer( {22, 0} ) << "done";
-		str << text::loadFont( gFace, 100.0f ) << Color8u( 255, 0, 255 ) << "A placeholder:" << text::Placeholder( {placeholderImage.getWidth(), placeholderImage.getHeight()}, "hello" ) << " done";
-		//str << text::loadFont( gFace, 160.0f ) << Color8u( 255, 0, 255 ) << "One two three four five";
+		//str << text::loadFont( gFace, 100.0f ) << Color8u( 255, 0, 255 ) << "A placeholder:" << text::Placeholder( {placeholderImage.getWidth(), placeholderImage.getHeight()}, " " ) << " done";
+		str << text::loadFont( gFace, 100.0f ) << Color8u( 255, 0, 255 ) << "A placeholder" << text::Placeholder( {placeholderImage.getWidth(), placeholderImage.getHeight()}, " " );
+		
 		auto frame = text::Frame( str, surface->getWidth(), surface->getHeight(), text::TypesetOptions().ignoreLineMetrics( false ).defaultShapingOptions( text::ShapingOptions().ignoreMissingGlyphs(true) ) );
-		auto frameLayout = frame.getGlyphLayout();
-		text::render( frameLayout, surface, vec2{0}, true, true );
+		text::GlyphLayout layout = frame.getGlyphLayout();
+		text::render( layout, surface, vec2{0}, true, true );
+		// query the GlyphLayout 
+		text::PlaceholderInfo placeholder = layout.getPlaceholders()[0];
+		surface->copyFrom( placeholderImage, placeholderImage.getBounds(), ivec2( placeholder.getBounds().getUpperLeft() ) );
 	}
 };
 

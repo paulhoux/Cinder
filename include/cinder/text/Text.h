@@ -82,16 +82,33 @@ class CI_API Manager {
 	Face*								mSystemDefaultFace = nullptr;
 };
 
+
+//! Records info about Placeholder after it has been typeset
+struct PlaceholderInfo {
+	Rectf		getBounds() const { return mBounds; }
+	size_t		getData() const { return mData; }
+
+	Rectf		mBounds;
+	size_t		mData;
+};
+
 class CI_API Run {
   public:
-	Run( size_t len, const Font* font, const char32_t *utf32Text, size_t textLength, const std::vector<uint32_t> &clusters, const ColorAf &color, const uint32_t *glyphIndices, const vec2 *glyphPositions, float drawOffsetX, float measuredWidth )
+	Run( size_t len, const Font* font, const char32_t *utf32Text, size_t textLength, const std::vector<uint32_t> &clusters, const ColorAf &color, const uint32_t *glyphIndices, const vec2 *glyphPositions, float drawOffsetX, float measuredWidth, PlaceholderInfo *placeholderInfo )
 		: mFont( font ), mColor( color ), mText( utf32Text, textLength ), mClusters( clusters ),
 			mGlyphIndices( glyphIndices, glyphIndices + len ), mGlyphPositions( glyphPositions, glyphPositions + len ), mDrawOffset( drawOffsetX, 0 ), mMeasuredWidth( measuredWidth )
-	{}
+	{
+		if( placeholderInfo ) {
+			mIsPlaceholder = true;
+			mPlaceholderInfo = *placeholderInfo;
+		}
+		else
+			mIsPlaceholder = false;
+	}
 	//! Single-glyph Run
 	Run( const Font* font, const char32_t *utf32Text, size_t textLength, const std::vector<uint32_t> &clusters, const ColorAf &color, uint32_t glyph, const vec2 &glyphPosition, float drawOffsetX, float measuredWidth )
 		: mFont( font ), mColor( color ), mText( utf32Text, textLength ), mClusters( clusters ),
-		mGlyphIndices( &glyph, &glyph + 1 ), mGlyphPositions( { glyphPosition } ), mDrawOffset( drawOffsetX, 0 ), mMeasuredWidth( measuredWidth )
+		mGlyphIndices( &glyph, &glyph + 1 ), mGlyphPositions( { glyphPosition } ), mDrawOffset( drawOffsetX, 0 ), mMeasuredWidth( measuredWidth ), mIsPlaceholder( false )
 	{}
 
 	//! Length in glyphs
@@ -106,6 +123,10 @@ class CI_API Run {
 	void							setColor( const ColorAf &color ) { mColor = color; }
 	void							setOpacity( const float opacity ) { mColor.a = opacity; }
 	float							getMeasuredWidth() const { return mMeasuredWidth; }
+
+	bool							isPlaceholder() const { return mIsPlaceholder; }
+	const PlaceholderInfo&			getPlaceholderInfo() const { return mPlaceholderInfo; }
+	PlaceholderInfo&				getPlaceholderInfo() { return mPlaceholderInfo; }
 
 	//! Returns Run-relative glyph bounds for glyph index \a g. Must be in the range [0, getNumGlyphs())
 	Rectf							getGlyphBounds( size_t g ) const;
@@ -127,6 +148,8 @@ class CI_API Run {
 	cinder::vec2			mDrawOffset;
 	float					mMeasuredWidth;
 	ColorAf					mColor; // alpha < 0 -> default color
+	bool					mIsPlaceholder;
+	PlaceholderInfo			mPlaceholderInfo;
 
 	friend class FrameConstructorTypesetProcessor;
 };
@@ -238,9 +261,13 @@ class CI_API GlyphLayout : public Typesetter {
 	bool			nextRun( Iterator &iter, const Run** run, vec2 *lineDrawOffset ) const override;
 	vec2			calcSize() const override;
 
+	const std::vector<PlaceholderInfo>&		getPlaceholders() const { return mPlaceholders; }
+	std::vector<PlaceholderInfo>&			getPlaceholders() { return mPlaceholders; }
+
   protected:
-	float					mMeasuredWidth = -1, mMeasuredHeight = -1;
-	std::vector<Line>       mLines;
+	float							mMeasuredWidth = -1, mMeasuredHeight = -1;
+	std::vector<Line>				mLines;
+	std::vector<PlaceholderInfo>	mPlaceholders;
 };
 
 
@@ -340,7 +367,7 @@ class CI_API TypesetProcessor {
 	virtual ~TypesetProcessor() {}
 
 	virtual void	addLine( Alignment justification, vec2 drawOffset, float ascender, float descender, float lineGap, float measuredWidth ) {}
-	virtual void	addRun( const Font *font, const char32_t *utf32Str, size_t chLen, const std::vector<uint32_t> &clusters, const ColorAf &color, size_t len, const uint32_t glyphIndices[], const vec2 glyphPositions[], float penX, float measuredWidth ) {}
+	virtual void	addRun( const Font *font, const char32_t *utf32Str, size_t chLen, const std::vector<uint32_t> &clusters, const ColorAf &color, size_t len, const uint32_t glyphIndices[], const vec2 glyphPositions[], float penX, float measuredWidth, struct PlaceholderInfo *info ) {}
 	virtual void	finishLine() {}
 	virtual void	finish() {}
 

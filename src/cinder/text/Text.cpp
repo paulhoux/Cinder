@@ -364,7 +364,16 @@ void processLine( const AttrString &attrString, const std::vector<uint32_t> &clu
 				(*glyphPositions)[span.second.glyphStart + g].x = (float)penX; // relativize x-values for position to the Run, but keep y values
 				penX += glyphXAdvances[span.second.glyphStart + g];
 			}
-			fn.addRun( span.first->font, &(attrString.getStringUtf32().c_str()[span.second.chStart]), span.second.chLen, localClusters, span.first->color, span.second.glyphLen, &glyphIndices[span.second.glyphStart], &(*glyphPositions)[span.second.glyphStart], span.second.drawOffset, span.second.measuredWidth );
+			if( span.first->isPlaceholder ) {
+				PlaceholderInfo placeholderInfo;
+				placeholderInfo.mData = span.first->placeholder.getData();
+				float width = span.second.measuredWidth;
+				float placeholderX = (*glyphPositions)[span.second.glyphStart].x;
+				placeholderInfo.mBounds = Rectf( placeholderX, -span.first->placeholder.getHeight(), placeholderX + span.second.measuredWidth, 0 ) + vec2( span.second.drawOffset, *baseline );
+				fn.addRun( span.first->font, &(attrString.getStringUtf32().c_str()[span.second.chStart]), span.second.chLen, localClusters, span.first->color, span.second.glyphLen, &glyphIndices[span.second.glyphStart], &(*glyphPositions)[span.second.glyphStart], span.second.drawOffset, span.second.measuredWidth, &placeholderInfo );
+			}
+			else
+				fn.addRun( span.first->font, &(attrString.getStringUtf32().c_str()[span.second.chStart]), span.second.chLen, localClusters, span.first->color, span.second.glyphLen, &glyphIndices[span.second.glyphStart], &(*glyphPositions)[span.second.glyphStart], span.second.drawOffset, span.second.measuredWidth, nullptr );
 		}
 	}
 	fn.finishLine();
@@ -503,7 +512,7 @@ void typeset( const AttrString &attrString, int32_t width, int32_t height, Types
 
 		// skip any trailing whitespace
 		if( ! alignmentChange ) {
-			if( lineEndGlyph < glyphIndices.size() )
+			if( lineEndGlyph < glyphIndices.size() && ! curRunDataIt->isPlaceholder )
 				findNonWhitespace( attrString.getStringUtf32().c_str(), clusters.data(), attrString.getStringUtf32().size(), &lineEndGlyph );
 			// we may have terminated/skipped multiple runs due to whitespace skipping - get 'curRunData' in line with whatever glyph we're on
 			while( curRunDataIt != runData.end() && lineEndGlyph >= curRunDataIt->start + curRunDataIt->len ) {
@@ -642,8 +651,13 @@ class GlyphLayoutConstructorTypesetProcessor : public TypesetProcessor {
 	void	addLine( Alignment justification, vec2 drawOffset, float ascender, float descender, float lineGap, float measuredWidth ) override {
 		mGlyphLayout->getLines().push_back( Line( justification, drawOffset, ascender, descender, lineGap, measuredWidth ) );
 	}
-	void	addRun( const Font *font, const char32_t *utf32Str, size_t chLen, const std::vector<uint32_t> &clusters, const ColorAf &color, size_t len, const uint32_t glyphIndices[], const vec2 glyphPositions[], float penX, float measuredWidth ) override {
-		mGlyphLayout->getLines().back().getRuns().push_back( Run( len, font, utf32Str, chLen, clusters, color, glyphIndices, glyphPositions, penX, measuredWidth ) );
+	void	addRun( const Font *font, const char32_t *utf32Str, size_t chLen, const std::vector<uint32_t> &clusters, const ColorAf &color, size_t len, const uint32_t glyphIndices[], const vec2 glyphPositions[], float penX, float measuredWidth, PlaceholderInfo *placeholderInfo ) override {
+		if( placeholderInfo ) {
+			mGlyphLayout->getPlaceholders().push_back( *placeholderInfo );
+			mGlyphLayout->getLines().back().getRuns().push_back( Run( len, font, utf32Str, chLen, clusters, color, glyphIndices, glyphPositions, penX, measuredWidth, placeholderInfo ) );
+		}
+		else
+			mGlyphLayout->getLines().back().getRuns().push_back( Run( len, font, utf32Str, chLen, clusters, color, glyphIndices, glyphPositions, penX, measuredWidth, nullptr ) );
 	}
 	void	finish() override {
 		mGlyphLayout->measure();
@@ -737,6 +751,8 @@ void render( const Typesetter &typesetter, Surface8u *surface, const vec2 &offse
 	const Run* runPtr;
 	vec2 lineDrawOffset;
 	while( typesetter.nextRun( iter, &runPtr, &lineDrawOffset ) ) {
+		if( runPtr->isPlaceholder() )
+			continue;
 		vec2 drawOffset = lineDrawOffset + runPtr->getDrawOffset();
 		if( precise )
 			runPtr->getFont()->drawGlyphsPrecise( runPtr->getColor(), runPtr->getNumGlyphs(), runPtr->getGlyphIndices(), runPtr->getGlyphPositions(), offset.x + drawOffset.x, offset.y + drawOffset.y, *surface, srgb );
@@ -758,6 +774,8 @@ Surface8u renderSurface( const Typesetter &typesetter, const vec2 &offset, const
 	const Run* runPtr;
 	vec2 lineDrawOffset;
 	while( typesetter.nextRun( iter, &runPtr, &lineDrawOffset ) ) {
+		if( runPtr->isPlaceholder() )
+			continue;
 		vec2 drawOffset = lineDrawOffset + runPtr->getDrawOffset();
 		if( precise )
 			runPtr->getFont()->drawGlyphsPrecise( runPtr->getColor(), runPtr->getNumGlyphs(), runPtr->getGlyphIndices(), runPtr->getGlyphPositions(), offset.x + drawOffset.x, offset.y + drawOffset.y, result, srgb );
@@ -774,6 +792,8 @@ void render( const Typesetter &typesetter, Channel8u *channel, const vec2 &offse
 	const Run* runPtr;
 	vec2 lineDrawOffset;
 	while( typesetter.nextRun( iter, &runPtr, &lineDrawOffset ) ) {
+		if( runPtr->isPlaceholder() )
+			continue;
 		vec2 drawOffset = lineDrawOffset + runPtr->getDrawOffset();
 		if( precise )
 			runPtr->getFont()->drawGlyphsPrecise( runPtr->getNumGlyphs(), runPtr->getGlyphIndices(), runPtr->getGlyphPositions(), offset.x + drawOffset.x, offset.y + drawOffset.y, *channel );
@@ -794,6 +814,8 @@ Channel8u renderChannel( const Typesetter &typesetter, const vec2 &offset, bool 
 	const Run* runPtr;
 	vec2 lineDrawOffset;
 	while( typesetter.nextRun( iter, &runPtr, &lineDrawOffset ) ) {
+		if( runPtr->isPlaceholder() )
+			continue;
 		vec2 drawOffset = lineDrawOffset + runPtr->getDrawOffset();
 		if( precise )
 			runPtr->getFont()->drawGlyphsPrecise( runPtr->getNumGlyphs(), runPtr->getGlyphIndices(), runPtr->getGlyphPositions(), offset.x + drawOffset.x, offset.y + drawOffset.y, result, srgb );
