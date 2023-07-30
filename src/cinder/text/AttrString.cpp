@@ -55,6 +55,22 @@ bool ShapingOptions::isDefault() const
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Placeholder
+Placeholder::Placeholder()
+	: mSize{ 0 }, mData{ 0 }, mEquivalentStr{ toUtf32( " " ) }
+{}
+
+Placeholder::Placeholder( ci::vec2 size, const std::string& equivalentUtf8, size_t data )
+	: mSize( size ), mData( data ), mEquivalentStr( toUtf32( equivalentUtf8 ) )
+{
+}
+
+void Placeholder::setEquivalentString( const std::string& equivalentUtf8 )
+{
+	mEquivalentStr = toUtf32( equivalentUtf8 );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // AttrString
 AttrString::AttrString() {
 }
@@ -146,9 +162,9 @@ AttrString& AttrString::operator<<( RunBreak runBreak )
 	return *this;
 }
 
-AttrString& AttrString::operator<<( const Spacer &spacer )
+AttrString& AttrString::operator<<( const Placeholder &placeholder )
 {
-	append( spacer );
+	append( placeholder );
 	return *this;
 }
 
@@ -163,9 +179,10 @@ void AttrString::appendRunBreak( RunBreak runBreak )
 	mRunBreaks.push_back( make_pair( (size_t)mString.length(), RunBreakInfo() ) );
 }
 
-void AttrString::append( const Spacer& spacer )
+void AttrString::append( const Placeholder& placeholder )
 {
-	mRunBreaks.push_back( make_pair( (size_t)mString.length(), RunBreakInfo( spacer ) ) );
+	mRunBreaks.push_back( make_pair( (size_t)mString.length(), RunBreakInfo( placeholder ) ) );
+	mString.append( placeholder.getEquivalentStringU32() );
 }
 
 /*AttrString& AttrString::operator<<( const std::pair<const char*,float> &font )
@@ -401,11 +418,13 @@ size_t AttrStringIter::firstRunAttr( const IntervalMap<T> &attrMap, T *attrValue
 
 void AttrStringIter::firstRun()
 {
-	// special case of RunBreak exactly at the start which is a spacer
-	if( ! mAttrStr->mRunBreaks.empty() && mAttrStr->mRunBreaks.begin()->first == 0 && mAttrStr->mRunBreaks.begin()->second.isSpacer() ) {
+	// special case of RunBreak exactly at the start which is a Placeholder
+	if( ! mAttrStr->mRunBreaks.empty() && mAttrStr->mRunBreaks.begin()->first == 0 && mAttrStr->mRunBreaks.begin()->second.isPlaceholder() ) {
 		mRunBreaksIter = mAttrStr->mRunBreaks.begin();
-		mIsSpacer = true;
-		mCurrentSpacer = mAttrStr->mRunBreaks.begin()->second.getSpacer();
+		mIsPlaceholder = true;
+		mCurrentPlaceholder = mAttrStr->mRunBreaks.begin()->second.getPlaceholder();
+		mStrEndOffset = mStrStartOffset + mRunBreaksIter->second.getPlaceholder().getEquivalentStringU32().size();
+		++mRunBreaksIter;
 		return;
 	}
 	mStrEndOffset = mStrLength;
@@ -423,7 +442,7 @@ void AttrStringIter::firstRun()
 	mRunBreaksIter = mAttrStr->mRunBreaks.begin();
 	if( mRunBreaksIter != mAttrStr->mRunBreaks.end() && mRunBreaksIter->first <= mStrEndOffset ) {
 		mStrEndOffset = mRunBreaksIter->first;
-		if( ! mRunBreaksIter->second.isSpacer() ) // if this is not a spacer, just move on
+		if( ! mRunBreaksIter->second.isPlaceholder() ) // if this is not a Placeholder, just move on
 			++mRunBreaksIter;
 	}
 }
@@ -462,17 +481,19 @@ void AttrStringIter::advanceAttr( const IntervalMap<T> &attrMap, T *attrValue, c
 // move all iterators forward so that their starts >= mStrStartOffset
 void AttrStringIter::advance()
 {
-	// if we broke on a Spacer, we need to process that as Run unto itself
+	size_t newStrEnd = mStrLength;
+	mStrStartOffset = mStrEndOffset;
+
+	// if we broke on a Placeholder, we need to process that as Run unto itself
 	if( mRunBreaksIter != mAttrStr->mRunBreaks.end() && mStrEndOffset == mRunBreaksIter->first ) {
-		mIsSpacer = true;
-		mCurrentSpacer = mRunBreaksIter->second.getSpacer();
+		mIsPlaceholder = true;
+		mCurrentPlaceholder = mRunBreaksIter->second.getPlaceholder();
+		mStrEndOffset = mStrStartOffset + mRunBreaksIter->second.getPlaceholder().getEquivalentStringU32().size();
 		++mRunBreaksIter;
 		return;
 	}
 
-	size_t newStrEnd = mStrLength;
-	mStrStartOffset = mStrEndOffset;
-	mIsSpacer = false;
+	mIsPlaceholder = false;
 
 	advanceAttr<const Font*>( mAttrStr->mFonts, &mFont, nullptr, &mFontsDone, &mFontIter, &newStrEnd );
 	advanceAttr<Tracking>( mAttrStr->mTrackings, &mTracking, Tracking(), &mTrackingsDone, &mTrackingIter, &newStrEnd );
@@ -486,7 +507,7 @@ void AttrStringIter::advance()
 
 	if( mRunBreaksIter != mAttrStr->mRunBreaks.end() && newStrEnd >= mRunBreaksIter->first ) {
 		newStrEnd = mRunBreaksIter->first;
-		if( ! mRunBreaksIter->second.isSpacer() ) // if this is not a spacer, just move on
+		if( ! mRunBreaksIter->second.isPlaceholder() ) // if this is not a Placeholder, just move on
 			++mRunBreaksIter;
 	}
 	
@@ -514,7 +535,25 @@ size_t AttrStringIter::shape( const ShapingOptions &shapingOptions, vector<uint3
 	const Font *font = getFont();
 	if( font ) {
 		font->lock();
-		size_t len = mFont->shapeString( shapingOptions, &mAttrStr->mString[mStrStartOffset], mStrEndOffset - mStrStartOffset, getTracking(), outGlyphIndices, outClusters, outGlyphPositions, outGlyphXAdvances, outGlyphMaxXs, outPixelWidth );
+		size_t len;
+		if( isPlaceholder() ) { // if this is a placeholder, manipulate the out* vectors so that the last glyph represents the width of the spacer (and the preceding, if they exist, are zero width)
+			len = mFont->shapeString( shapingOptions, &mAttrStr->mString[mStrStartOffset], mStrEndOffset - mStrStartOffset, getTracking(), outGlyphIndices, outClusters, outGlyphPositions, outGlyphXAdvances, outGlyphMaxXs, outPixelWidth );
+			if( outGlyphPositions )
+				for( size_t i = mStrStartOffset; i < mStrEndOffset; ++i )
+					(*outGlyphPositions)[i] = mCurrentPlaceholder.getSize();
+			if( outGlyphXAdvances ) {
+				for( size_t i = mStrStartOffset; i < mStrEndOffset - 1; ++i )
+					(*outGlyphXAdvances)[i] = 0;
+				(*outGlyphXAdvances)[mStrEndOffset - 1] = mCurrentPlaceholder.getWidth();
+			}
+			if( outGlyphMaxXs ) {
+				for( size_t i = mStrStartOffset; i < mStrEndOffset - 1; ++i )
+					(*outGlyphMaxXs)[i] = 0;
+				(*outGlyphMaxXs)[mStrEndOffset - 1] = mCurrentPlaceholder.getWidth();
+			}
+		}
+		else
+			len = mFont->shapeString( shapingOptions, &mAttrStr->mString[mStrStartOffset], mStrEndOffset - mStrStartOffset, getTracking(), outGlyphIndices, outClusters, outGlyphPositions, outGlyphXAdvances, outGlyphMaxXs, outPixelWidth );
 		font->unlock();
 		return len;
 	}
