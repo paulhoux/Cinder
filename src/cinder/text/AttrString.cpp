@@ -60,7 +60,7 @@ Placeholder::Placeholder()
 	: mSize{ 0 }, mData{ 0 }, mEquivalentStr{ toUtf32( " " ) }
 {}
 
-Placeholder::Placeholder( ci::vec2 size, const std::string& equivalentUtf8, size_t data )
+Placeholder::Placeholder( ci::vec2 size, const std::string& equivalentUtf8, void* data )
 	: mSize( size ), mData( data ), mEquivalentStr( toUtf32( equivalentUtf8 ) )
 {
 }
@@ -537,19 +537,22 @@ size_t AttrStringIter::shape( const ShapingOptions &shapingOptions, vector<uint3
 		font->lock();
 		size_t len;
 		if( isPlaceholder() ) { // if this is a placeholder, manipulate the out* vectors so that the last glyph represents the width of the spacer (and the preceding, if they exist, are zero width)
+			size_t startGlyphIdx = outClusters->size();
 			len = mFont->shapeString( shapingOptions, &mAttrStr->mString[mStrStartOffset], mStrEndOffset - mStrStartOffset, getTracking(), outGlyphIndices, outClusters, outGlyphPositions, outGlyphXAdvances, outGlyphMaxXs, outPixelWidth );
-			if( outGlyphPositions )
-				for( size_t i = mStrStartOffset; i < mStrEndOffset; ++i )
-					(*outGlyphPositions)[i] = mCurrentPlaceholder.getSize();
-			if( outGlyphXAdvances ) {
-				for( size_t i = mStrStartOffset; i < mStrEndOffset - 1; ++i )
-					(*outGlyphXAdvances)[i] = 0;
-				(*outGlyphXAdvances)[mStrEndOffset - 1] = mCurrentPlaceholder.getWidth();
-			}
-			if( outGlyphMaxXs ) {
-				for( size_t i = mStrStartOffset; i < mStrEndOffset - 1; ++i )
-					(*outGlyphMaxXs)[i] = 0;
-				(*outGlyphMaxXs)[mStrEndOffset - 1] = mCurrentPlaceholder.getWidth();
+			if( len ) {
+				if( outGlyphPositions )
+					for( size_t i = startGlyphIdx; i < outGlyphPositions->size(); ++i )
+						(*outGlyphPositions)[i] = mCurrentPlaceholder.getSize();
+				if( outGlyphXAdvances ) {
+					for( size_t i = startGlyphIdx; i < outGlyphXAdvances->size() - 1; ++i )
+						(*outGlyphXAdvances)[i] = 0;
+					(*outGlyphXAdvances).back() = mCurrentPlaceholder.getWidth();
+				}
+				if( outGlyphMaxXs ) {
+					for( size_t i = startGlyphIdx; i < outGlyphMaxXs->size() - 1; ++i )
+						(*outGlyphMaxXs)[i] = 0;
+					(*outGlyphMaxXs).back() = mCurrentPlaceholder.getWidth();
+				}
 			}
 		}
 		else

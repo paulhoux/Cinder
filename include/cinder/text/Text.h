@@ -86,10 +86,10 @@ class CI_API Manager {
 //! Records info about Placeholder after it has been typeset
 struct PlaceholderInfo {
 	Rectf		getBounds() const { return mBounds; }
-	size_t		getData() const { return mData; }
+	void*		getData() const { return mData; }
 
 	Rectf		mBounds;
-	size_t		mData;
+	void*		mData;
 };
 
 class CI_API Run {

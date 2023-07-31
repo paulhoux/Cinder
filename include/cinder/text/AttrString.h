@@ -120,17 +120,18 @@ struct CI_API RunBreak {
 
 struct CI_API Placeholder {
 	Placeholder();
-	Placeholder( ci::vec2 size, const std::string& equivalentUtf8 = " ", size_t data = 0 );
+	Placeholder( ci::vec2 size, const std::string& equivalentUtf8 = " ", void *data = nullptr );
 
 	ci::vec2				getSize() const { return mSize; }
 	float					getWidth() const { return mSize.x; }
 	float					getHeight() const { return mSize.y; }
-	size_t					getData() const { return mData; }
+	void*					getData() const { return mData; }
+	void					setData( void *data ) { mData = data; }
 	const std::u32string&	getEquivalentStringU32() const { return mEquivalentStr; }
 	void					setEquivalentString( const std::string& equivalentUtf8 );
 
 	ci::vec2		mSize;
-	size_t			mData;
+	void*			mData;
 	std::u32string	mEquivalentStr;
 };
 
