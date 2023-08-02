@@ -418,15 +418,7 @@ size_t AttrStringIter::firstRunAttr( const IntervalMap<T> &attrMap, T *attrValue
 
 void AttrStringIter::firstRun()
 {
-	// special case of RunBreak exactly at the start which is a Placeholder
-	if( ! mAttrStr->mRunBreaks.empty() && mAttrStr->mRunBreaks.begin()->first == 0 && mAttrStr->mRunBreaks.begin()->second.isPlaceholder() ) {
-		mRunBreaksIter = mAttrStr->mRunBreaks.begin();
-		mIsPlaceholder = true;
-		mCurrentPlaceholder = mAttrStr->mRunBreaks.begin()->second.getPlaceholder();
-		mStrEndOffset = mStrStartOffset + mRunBreaksIter->second.getPlaceholder().getEquivalentStringU32().size();
-		++mRunBreaksIter;
-		return;
-	}
+	mIsPlaceholder = false;
 	mStrEndOffset = mStrLength;
 
 	mStrEndOffset = std::min( firstRunAttr<const Font*>( mAttrStr->mFonts, &mFont, nullptr, &mFontsDone, &mFontIter ), mStrEndOffset );
@@ -440,10 +432,18 @@ void AttrStringIter::firstRun()
 		mFont = mDefaultFont;
 
 	mRunBreaksIter = mAttrStr->mRunBreaks.begin();
-	if( mRunBreaksIter != mAttrStr->mRunBreaks.end() && mRunBreaksIter->first <= mStrEndOffset ) {
-		mStrEndOffset = mRunBreaksIter->first;
-		if( ! mRunBreaksIter->second.isPlaceholder() ) // if this is not a Placeholder, just move on
-			++mRunBreaksIter;
+	if( mRunBreaksIter != mAttrStr->mRunBreaks.end() ) {
+		if( mAttrStr->mRunBreaks.begin()->first == 0 && mAttrStr->mRunBreaks.begin()->second.isPlaceholder() ) { // special case of RunBreak exactly at the start which is a Placeholder
+			mIsPlaceholder = true;
+			mCurrentPlaceholder = mAttrStr->mRunBreaks.begin()->second.getPlaceholder();
+			mStrEndOffset = mStrStartOffset + mRunBreaksIter->second.getPlaceholder().getEquivalentStringU32().size();
+			++mRunBreaksIter;			
+		}
+		else if( mRunBreaksIter->first <= mStrEndOffset ) {
+			mStrEndOffset = mRunBreaksIter->first;
+			if( ! mRunBreaksIter->second.isPlaceholder() ) // if this is not a Placeholder, just move on
+				++mRunBreaksIter;
+		}
 	}
 }
 
