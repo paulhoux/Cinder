@@ -38,6 +38,28 @@ bool verifyAlignmentRuns( const text::AttrString &as, const vector<pair<text::Al
 	return runCount == expectedRuns.size();
 }
 
+//! receives a vector of Placeholders widths. A negative width is a non-Placeholder length of runs of characters; eg "ABC" is -3
+bool verifyPlaceholderRuns( const text::AttrString &as, const vector<int32_t> &expectedRuns )
+{
+	text::AttrStringIter iter = as.iterate( text::loadFont( text::systemDefaultFace(), 12 ) );
+	size_t runCount = 0;
+	while( iter.nextRun() ) {
+		if( runCount >= expectedRuns.size() )
+			return false;
+		if( expectedRuns[runCount] > 0 ) { // is a placeholder
+			if( ! iter.isPlaceholder() || fabs( expectedRuns[runCount] - iter.getPlaceholder().getWidth() ) > 0.001f )
+				return false;
+		}
+		else {
+			if( iter.isPlaceholder() || iter.getLengthCh() != -expectedRuns[runCount] )
+				return false;
+		}
+		runCount++;
+	}
+
+	return runCount == expectedRuns.size();
+}
+
 TEST_CASE("Text")
 {
 	SECTION("AttrString")
@@ -83,5 +105,21 @@ TEST_CASE("Text")
 		// trailing RunBreak should not result in an additional Run
 		as4 << text::RunBreak();
 		CHECK( countRuns( as4 ) == 2 );
+
+		// check Placeholders
+		text::AttrString as5; // leading placeholder
+		as5 << text::Placeholder{ {111, 222}, "!" } << "ABC";
+		CHECK( verifyPlaceholderRuns( as5, { 111, -3 } ) );
+		text::AttrString as6; // two consecutive leading placeholders
+		as6 << text::Placeholder{ {111, 0}, "!" } << text::Placeholder{ {222, 0}, "!" } << "ABC";
+		CHECK( verifyPlaceholderRuns( as6, { 111, 222, -3 } ) ); 
+		text::AttrString as7; // midway placeholder
+		as7 << "AB" << text::Placeholder{ {111, 0}, "!" } << "ABC";
+		CHECK( verifyPlaceholderRuns( as7, { -2, 111, -3 } ) ); 
+	}
+
+	SECTION("Placeholders")
+	{
+		
 	}
 }
