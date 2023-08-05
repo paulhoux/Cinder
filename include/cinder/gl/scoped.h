@@ -360,6 +360,25 @@ struct CI_API ScopedFrontFace : private Noncopyable {
 	Context		*mCtx;
 };
 
+//!
+class ScopedColorMask {
+  public:
+	ScopedColorMask( GLboolean red, GLboolean green, GLboolean blue, GLboolean alpha )
+	{
+		glGetBooleanv( GL_COLOR_WRITEMASK, mMask );
+		glColorMask( red, green, blue, alpha );
+	}
+	~ScopedColorMask() { glColorMask( mMask[0], mMask[1], mMask[2], mMask[3] ); }
+
+	ScopedColorMask( const ScopedColorMask & ) = delete;
+	ScopedColorMask( ScopedColorMask && ) = delete;
+	ScopedColorMask &operator=( const ScopedColorMask & ) = delete;
+	ScopedColorMask &operator=( ScopedColorMask && ) = delete;
+
+  private:
+	GLboolean mMask[4] = { GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE };
+};
+
 #if defined( CINDER_GL_HAS_KHR_DEBUG )
 
 //! Scopes debug group message
