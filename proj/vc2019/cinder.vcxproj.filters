@@ -247,6 +247,12 @@
     <Filter Include="Header Files\gl\nv">
       <UniqueIdentifier>{7ff32b0d-8190-49b2-ab18-187db6196a2b}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Header Files\nvp">
+      <UniqueIdentifier>{f4ff511d-0b7e-45a8-b413-26f4f7cb17d0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\nvp">
+      <UniqueIdentifier>{2a9d1cc3-09b1-44b9-91ce-9cb1bf9e2303}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Header Files\text">
       <UniqueIdentifier>{2ceb0fbc-c2b6-43a5-95fc-361c54669268}</UniqueIdentifier>
     </Filter>
@@ -1019,6 +1025,27 @@
     </ClCompile>
     <ClCompile Include="..\..\src\cinder\MediaTime.cpp">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\cinder\nvp\Canvas.cpp">
+      <Filter>Source Files\nvp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\cinder\nvp\Path.cpp">
+      <Filter>Source Files\nvp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\cinder\nvp\Primitives.cpp">
+      <Filter>Source Files\nvp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\cinder\nvp\Core.cpp">
+      <Filter>Source Files\nvp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\cinder\nvp\Gradient.cpp">
+      <Filter>Source Files\nvp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\cinder\nvp\Transform.cpp">
+      <Filter>Source Files\nvp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\cinder\nvp\Values.cpp">
+      <Filter>Source Files\nvp</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\cinder\text\Face.cpp">
       <Filter>Source Files\text</Filter>
@@ -2308,6 +2335,39 @@
     </ClInclude>
     <ClInclude Include="..\..\include\cinder\MediaTime.h">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\cinder\nvp\Canvas.h">
+      <Filter>Header Files\nvp</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\cinder\nvp\CanvasUi.h">
+      <Filter>Header Files\nvp</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\cinder\nvp\Path.h">
+      <Filter>Header Files\nvp</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\cinder\nvp\Primitives.h">
+      <Filter>Header Files\nvp</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\cinder\nvp\Core.h">
+      <Filter>Header Files\nvp</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\cinder\nvp\Cache.h">
+      <Filter>Header Files\nvp</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\cinder\nvp\Gradient.h">
+      <Filter>Header Files\nvp</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\cinder\nvp\Transform.h">
+      <Filter>Header Files\nvp</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\cinder\nvp\Attribute.h">
+      <Filter>Header Files\nvp</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\cinder\nvp\Values.h">
+      <Filter>Header Files\nvp</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\cinder\nvp\Algorithm.h">
+      <Filter>Header Files\nvp</Filter>
     </ClInclude>
     <ClInclude Include="..\..\include\cinder\text\AttrString.h">
       <Filter>Header Files\text</Filter>
