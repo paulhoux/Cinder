@@ -69,6 +69,26 @@ Path::Path( const Shape2d &shape )
 	gl::pathCommandsNV( mPathId, static_cast<GLsizei>( commands.size() ), commands.data(), static_cast<GLsizei>( coords.size() * 2 /* each vec2 contains 2 floats */ ), GL_FLOAT, coords.data() );
 }
 
+Path::Path( const PolyLine2 &polyLine )
+{
+	const auto &points = polyLine.getPoints();
+
+	std::vector<GLubyte> commands;
+
+	const auto numCommands = points.size() + size_t( polyLine.isClosed() );
+	commands.reserve( numCommands );
+	commands.push_back( GL_MOVE_TO_NV );
+
+	for( size_t i = 0; i < numCommands; ++i )
+		commands.push_back( GL_LINE_TO_NV );
+
+	if( polyLine.isClosed() )
+		commands.push_back( GL_CLOSE_PATH_NV );
+
+	mPathId = gl::genPathsNV( 1 );
+	gl::pathCommandsNV( mPathId, static_cast<GLsizei>( numCommands ), commands.data(), static_cast<GLsizei>( points.size() * 2 /* each vec2 contains 2 floats */ ), GL_FLOAT, points.data() );
+}
+
 float Path::getLength() const
 {
 	float length{ 0 };
@@ -284,33 +304,52 @@ void Path::fill( const gl::TextureRef &texture, const vec2 &upperLeftTexCoord, c
 	gl::stencilThenCoverFillPathNV( mPathId, GL_COUNT_UP_NV, 0xFF, GL_BOUNDING_BOX_NV );
 }
 
-void Path::fillLinear( const Gradients &gradients, const std::string &id, const vec2 &start, const vec2 &end, float opacity )
+void Path::fill( const Gradients &gradients, const std::string &id, float opacity )
 {
-	const auto &gradient = std::dynamic_pointer_cast<const LinearGradient>( gradients.at( id ) );
-	if( !gradient )
-		return; // Gradient is not linear or does not even exist.
-
-	// Use the correct gradient spread.
-	const auto texture = gradients.getTexture();
-	texture->setWrapS( GLenum( gradient->getSpread() ) );
-
-	// Bind gradient texture.
-	gl::ScopedTextureBind scpTex( texture, 0 );
-
 	gl::ScopedState scpStencil( GL_STENCIL_TEST, GL_TRUE );
 	gl::stencilFunc( GL_NOTEQUAL, 0, 0xFF );
 	gl::stencilOp( GL_KEEP, GL_KEEP, GL_ZERO );
 
-	ScopedShader scpShader( Shader::Type::LINEAR_GRADIENT );
+	// Bind gradient texture.
+	const auto &          texture = gradients.getTexture();
+	gl::ScopedTextureBind scpTex( texture, 0 );
 
-	scpShader.uniform( "index", gradients.index( id ) ); //
-	scpShader.uniform( "gradTab", 0 );
-	scpShader.uniform( "gradStart", start );
-	scpShader.uniform( "gradEnd", end );
-	scpShader.uniform( "opacity", opacity );
+	if( auto linear = std::dynamic_pointer_cast<const LinearGradient>( gradients.at( id ) ); linear ) {
+		// Use the correct gradient spread.
+		texture->setWrapS( GLenum( linear->getSpread() ) );
 
-	gl::matrixLoadfEXT( GL_MODELVIEW, value_ptr( gl::getModelView() ) );
-	gl::stencilThenCoverFillPathNV( mPathId, GL_COUNT_UP_NV, 0xFF, GL_BOUNDING_BOX_NV );
+		// Setup shader.
+		ScopedShader scpShader( Shader::Type::LINEAR_GRADIENT );
+		scpShader.setCoords( GLenum( linear->getUnits() ), mat3{ linear->getTransform() } );
+		scpShader.uniform( "index", gradients.index( id ) );                        //
+		scpShader.uniform( "gradTab", 0 );                                          //
+		scpShader.uniform( "gradStart", vec2{ linear->getX1(), linear->getY1() } ); // TODO: percentages.
+		scpShader.uniform( "gradEnd", vec2{ linear->getX2(), linear->getY2() } );   // TODO: percentages.
+		scpShader.uniform( "opacity", opacity );
+
+		// Render.
+		gl::matrixLoadfEXT( GL_MODELVIEW, value_ptr( gl::getModelView() ) );
+		gl::stencilThenCoverFillPathNV( mPathId, GL_COUNT_UP_NV, 0xFF, GL_BOUNDING_BOX_NV );
+	}
+	else if( auto radial = std::dynamic_pointer_cast<const RadialGradient>( gradients.at( id ) ); radial ) {
+		// Use the correct gradient spread.
+		texture->setWrapS( GLenum( radial->getSpread() ) );
+
+		// Setup shader.
+		ScopedShader scpShader( Shader::Type::RADIAL_GRADIENT );
+		scpShader.setCoords( GLenum( radial->getUnits() ), mat3{ radial->getTransform() } );
+		scpShader.uniform( "index", gradients.index( id ) );                                                                //
+		scpShader.uniform( "gradTab", 0 );                                                                                  //
+		scpShader.uniform( "focalToCenter", vec2{ radial->getCx() - radial->getFx(), radial->getCy() - radial->getFy() } ); // TODO: percentages.
+		scpShader.uniform( "centerRadius", radial->getR() );                                                                //
+		scpShader.uniform( "focalRadius", radial->getFr() );                                                                //
+		scpShader.uniform( "translationPoint", vec2{ radial->getFx(), radial->getFy() } );                                  // TODO: percentages.
+		scpShader.uniform( "opacity", opacity );
+
+		// Render.
+		gl::matrixLoadfEXT( GL_MODELVIEW, value_ptr( gl::getModelView() ) );
+		gl::stencilThenCoverFillPathNV( mPathId, GL_COUNT_UP_NV, 0xFF, GL_BOUNDING_BOX_NV );
+	}
 }
 
 void Path::fillInstanced( const std::vector<GLuint> &paths, const std::vector<glm::mat3x2> &transforms, const ColorA &color )
