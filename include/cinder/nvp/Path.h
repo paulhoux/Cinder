@@ -14,6 +14,7 @@ POSSIBILITY OF SUCH DAMAGE.
 
 #pragma once
 
+#include "cinder/PolyLine.h"
 #include "cinder/gl/Texture.h"
 #include "cinder/gl/wrapper.h"
 #include "cinder/nvp/Core.h"
@@ -66,6 +67,8 @@ class Path {
 	explicit Path( const Path2d &path );
 	//! Construct a path from a Shape2d. Note the correct winding order: holes should be defined in clockwise order.
 	explicit Path( const Shape2d &shape );
+	//! Construct a path from a PolyLine2. Note the correct winding order: points should be defined in counter clockwise order.
+	explicit Path( const PolyLine2 &polyLine );
 
 	// ReSharper disable once CppHiddenFunction
 	//! Creates a shallow clone of this path. Use with care.
@@ -139,8 +142,8 @@ class Path {
 	virtual void fill( const gl::TextureRef &texture, const Rectf &bounds );
 	//! Fills the path with a \a texture.
 	virtual void fill( const gl::TextureRef &texture, const vec2 &upperLeftTexCoord, const vec2 &lowerRightTexCoord );
-	//! Fills the path with a linear gradient. Coordinates \a start and \a end are in normalized coordinate space.
-	virtual void fillLinear( const Gradients &gradients, const std::string &id, const vec2 &start, const vec2 &end, float opacity = 1 );
+	//! Fills the path with a gradient.
+	virtual void fill( const Gradients &gradients, const std::string &id, float opacity = 1 );
 
 	//! Fills the path instances with a solid \a color.
 	virtual void fillInstanced( const std::vector<GLuint> &paths, const std::vector<glm::mat3x2> &transforms, const ColorA &color );
