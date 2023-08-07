@@ -94,10 +94,13 @@ struct PlaceholderInfo {
 
 class CI_API Run {
   public:
-	Run( size_t len, const Font* font, const char32_t *utf32Text, size_t textLength, const std::vector<uint32_t> &clusters, const ColorAf &color, const uint32_t *glyphIndices, const vec2 *glyphPositions, float drawOffsetX, float measuredWidth, PlaceholderInfo *placeholderInfo )
+	Run( size_t len, const Font* font, const char32_t *utf32Text, size_t textLength, const std::vector<uint32_t> &clusters, const ColorAf &color, const uint32_t *glyphIndices,
+			const vec2* glyphPositions, const vec2* glyphOrientations, float drawOffsetX, float measuredWidth, PlaceholderInfo *placeholderInfo )
 		: mFont( font ), mColor( color ), mText( utf32Text, textLength ), mClusters( clusters ),
 			mGlyphIndices( glyphIndices, glyphIndices + len ), mGlyphPositions( glyphPositions, glyphPositions + len ), mDrawOffset( drawOffsetX, 0 ), mMeasuredWidth( measuredWidth )
 	{
+		if( glyphOrientations )
+			mGlyphOrientations = std::vector<vec2>( glyphOrientations, glyphOrientations + len );
 		if( placeholderInfo ) {
 			mIsPlaceholder = true;
 			mPlaceholderInfo = *placeholderInfo;
@@ -106,15 +109,21 @@ class CI_API Run {
 			mIsPlaceholder = false;
 	}
 	//! Single-glyph Run
-	Run( const Font* font, const char32_t *utf32Text, size_t textLength, const std::vector<uint32_t> &clusters, const ColorAf &color, uint32_t glyph, const vec2 &glyphPosition, float drawOffsetX, float measuredWidth )
+	Run( const Font* font, const char32_t *utf32Text, size_t textLength, const std::vector<uint32_t> &clusters, const ColorAf &color, uint32_t glyph, const vec2 &glyphPosition,
+			const vec2 *glyphOrientation, float drawOffsetX, float measuredWidth )
 		: mFont( font ), mColor( color ), mText( utf32Text, textLength ), mClusters( clusters ),
 		mGlyphIndices( &glyph, &glyph + 1 ), mGlyphPositions( { glyphPosition } ), mDrawOffset( drawOffsetX, 0 ), mMeasuredWidth( measuredWidth ), mIsPlaceholder( false )
-	{}
+	{
+		if( glyphOrientation )
+			mGlyphOrientations.push_back( *glyphOrientation );
+	}
 
 	//! Length in glyphs
 	size_t							getNumGlyphs() const { return mGlyphIndices.size(); }
 	const uint32_t*					getGlyphIndices() const { return mGlyphIndices.data(); }
 	const vec2*						getGlyphPositions() const { return mGlyphPositions.data(); }
+	//! Will return \c nullptr if the Run has no glyph orientations
+	const vec2*						getGlyphOrientations() const { return mGlyphOrientations.empty() ? nullptr : mGlyphOrientations.data(); }
 	const Font*						getFont() const { return mFont; }
 	float							getDescender() const { return -mFont->getDescender(); }
 	//! Line-relative
@@ -127,6 +136,9 @@ class CI_API Run {
 	bool							isPlaceholder() const { return mIsPlaceholder; }
 	const PlaceholderInfo&			getPlaceholderInfo() const { return mPlaceholderInfo; }
 	PlaceholderInfo&				getPlaceholderInfo() { return mPlaceholderInfo; }
+
+	//! Returns whether this run encodes an orientation per-glyph, which will be a 2D vector it's meant to be aligned to. By default, implicitly this vec2( 0, 1 );
+	bool							hasOrientations() const { return ! mGlyphOrientations.empty(); }
 
 	//! Returns Run-relative glyph bounds for glyph index \a g. Must be in the range [0, getNumGlyphs())
 	Rectf							getGlyphBounds( size_t g ) const;
@@ -145,6 +157,7 @@ class CI_API Run {
 	std::vector<uint32_t>	mClusters;
 	std::vector<uint32_t>	mGlyphIndices;
 	std::vector<vec2>		mGlyphPositions;
+	std::vector<vec2>		mGlyphOrientations;
 	cinder::vec2			mDrawOffset;
 	float					mMeasuredWidth;
 	ColorAf					mColor; // alpha < 0 -> default color
@@ -294,7 +307,7 @@ class CI_API Frame : public Typesetter {
 	bool			nextRun( Iterator &iter, const Run** run, vec2 *lineDrawOffset ) const override { return mGlyphLayout.nextRun( iter, run, lineDrawOffset ); }
 	vec2			calcSize() const override { return mGlyphLayout.calcSize(); }
 
-  private:
+  protected:
 	void					updateGlyphLayout() const;
 	void					updateGlyphLayoutImpl();
 
@@ -313,11 +326,23 @@ class CI_API TextOnPath : public Typesetter {
 	TextOnPath() : mDirty( false ) {}
 	TextOnPath( const AttrString &attrString, const Path2d &path, const TypesetOptions &options = TypesetOptions() );
 
+	TypesetOptions		getTypesetOptions() const { return mTypesetOptions; }
+
+	const GlyphLayout&		getGlyphLayout() const;
+
+	Iterator		getIterator() const override { updateGlyphLayout(); return mGlyphLayout.getIterator(); }
+	bool			nextRun( Iterator &iter, const Run** run, vec2 *lineDrawOffset ) const override { return mGlyphLayout.nextRun( iter, run, lineDrawOffset ); }
+	vec2			calcSize() const override { return mGlyphLayout.calcSize(); }
+
+  protected:
+	void					updateGlyphLayout() const;
+	void					updateGlyphLayoutImpl();
+
 	bool					mDirty;
 	GlyphLayout				mGlyphLayout;
 	AttrString				mAttrString;
-	Path2d					mPath;
 	TypesetOptions			mTypesetOptions;
+	Path2d					mPath;
 };
 
 CI_API std::ostream& operator<<( std::ostream& os, const Run& r );
@@ -366,8 +391,8 @@ class CI_API TypesetProcessor {
   public:
 	virtual ~TypesetProcessor() {}
 
-	virtual void	addLine( Alignment justification, vec2 drawOffset, float ascender, float descender, float lineGap, float measuredWidth ) {}
-	virtual void	addRun( const Font *font, const char32_t *utf32Str, size_t chLen, const std::vector<uint32_t> &clusters, const ColorAf &color, size_t len, const uint32_t glyphIndices[], const vec2 glyphPositions[], float penX, float measuredWidth, struct PlaceholderInfo *info ) {}
+	virtual bool	addLine( Alignment justification, vec2 drawOffset, float ascender, float descender, float lineGap, float measuredWidth ) { return true; }
+	virtual bool	addRun( const Font *font, const char32_t *utf32Str, size_t chLen, const std::vector<uint32_t> &clusters, const ColorAf &color, size_t len, const uint32_t glyphIndices[], const vec2 glyphPositions[], float penX, float measuredWidth, struct PlaceholderInfo *info ) { return true; }
 	virtual void	finishLine() {}
 	virtual void	finish() {}
 

@@ -117,9 +117,4 @@ TEST_CASE("Text")
 		as7 << "AB" << text::Placeholder{ {111, 0}, "!" } << "ABC";
 		CHECK( verifyPlaceholderRuns( as7, { -2, 111, -3 } ) ); 
 	}
-
-	SECTION("Placeholders")
-	{
-		
-	}
 }

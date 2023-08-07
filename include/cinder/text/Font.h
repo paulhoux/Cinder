@@ -105,8 +105,8 @@ class CI_API Font {
 	void			drawGlyphs( size_t len, const uint32_t glyphIndices[], const vec2 glyphPositions[], float penX, float baseline, Channel8u &channel ) const;
 	void			drawGlyphs( const ColorAf &color, size_t len, const uint32_t glyphIndices[], const vec2 glyphPositions[], float penX, float baseline, Surface8u &surface, bool srgb = false ) const;
 	//! thread-safe but not thread-efficient
-	void			drawGlyphsPrecise( const ColorAf &color, size_t len, const uint32_t glyphIndices[], const vec2 glyphPositions[], float penX, float baseline, Surface8u &surface, bool srgb = false ) const;
-	void			drawGlyphsPrecise( size_t len, const uint32_t glyphIndices[], const vec2 glyphPositions[], float penX, float baseline, Channel8u &channel, bool srgb = false ) const;
+	void			drawGlyphsPrecise( const ColorAf &color, size_t len, const uint32_t glyphIndices[], const vec2 glyphPositions[], const vec2 glyphOrientations[], float penX, float baseline, Surface8u &surface, bool srgb = false ) const;
+	void			drawGlyphsPrecise( size_t len, const uint32_t glyphIndices[], const vec2 glyphPositions[], const vec2 glyphOrientations[], float penX, float baseline, Channel8u &channel, bool srgb = false ) const;
 
 	virtual GlyphMetrics	getGlyphMetrics( uint32_t glyphIndex ) const { return mGlyphMetrics[glyphIndex]; }
 	virtual float			getGlyphMaxX( uint32_t glyphIndex ) const { return mGlyphMetrics[glyphIndex].horizontalBearingX + mGlyphMetrics[glyphIndex].width; }

@@ -8,6 +8,7 @@
 #include "cinder/GeomIo.h"
 #include "cinder/Log.h"
 #include "cinder/ip/Fill.h"
+#include "cinder/ip/Blend.h"
 #include "cinder/Rand.h"
 #include "cinder/text/SystemFonts.h"
 #include "cinder/Easing.h"
@@ -20,17 +21,19 @@ using namespace std;
 text::Face	*gFace;
 const text::Font	*gFontSmall, *gFontMedium, *gFontLarge;
 
-class Demo {
+struct Demo {
   public:
 	virtual ~Demo() {}
 	virtual void update() {}
 	virtual void render( Surface8u *surface ) { }
 	virtual void resize( ivec2 size ) {}
+	virtual bool animated() const { return false; }
 };
 
 class TextDemosApp : public App {
  public:
 	void setup() override;
+	void update() override;
 	void draw() override;
 	void loadGlobalFonts( text::Face *face );
 	void fileDrop( FileDropEvent event ) override;
@@ -48,7 +51,7 @@ class TextDemosApp : public App {
 };
 
 /// Basic Rendering Demo
-class BasicRenderingDemo : public Demo {
+struct BasicRenderingDemo : public Demo {
 	void render( Surface8u *surface ) override {
 		auto str = text::AttrString() << gFontLarge << "Hello World";
 		auto frame = text::Frame( str, surface->getWidth(), surface->getHeight(), text::TypesetOptions().ignoreLineMetrics( false ).defaultAlignment( text::Alignment::LEFT ).defaultShapingOptions( text::ShapingOptions().ignoreMissingGlyphs(true) ) );
@@ -56,7 +59,7 @@ class BasicRenderingDemo : public Demo {
 	}
 };
 
-class PrecisionRenderingDemo : public Demo {
+struct PrecisionRenderingDemo : public Demo {
 	void render( Surface8u *surface ) override {
 		vector<const text::Font*> fonts;
 		text::AttrString str, strPrecise;
@@ -74,7 +77,7 @@ class PrecisionRenderingDemo : public Demo {
 	}
 };
 
-class SrgbRenderingDemo : public Demo {
+struct SrgbRenderingDemo : public Demo {
 	void render( Surface8u *surface ) override {
 		ip::fill( surface, ColorA8u( 255, 0, 0, 255 ) );
 		vector<const text::Font*> fonts;
@@ -94,36 +97,105 @@ class SrgbRenderingDemo : public Demo {
 	}
 };
 
-class SpacersDemo : public Demo {
+struct PlaceholdersDemo : public Demo {
+	Surface8u				mHeadshot;
+	std::vector<Surface8u>	mFireFrames;
+	std::vector<Surface8u>	mLightbulbFrames;
+	std::vector<Surface8u>	mHeartFrames;
+
+	PlaceholdersDemo::PlaceholdersDemo()
+	{
+		mHeadshot = loadImage( loadAsset( "paulhoux.png" ) );
+		for( size_t i = 1; i <= 8; ++i )
+			mFireFrames.push_back( loadImage( loadAsset( fs::path("fire") / ("frame." + to_string(i) + ".png") ) ) );
+		for( size_t i = 1; i <= 40; ++i )
+			mHeartFrames.push_back( loadImage( loadAsset( fs::path("heart") / ("frame." + to_string(i) + ".png") ) ) );
+		for( size_t i = 1; i <= 16; ++i )
+			mLightbulbFrames.push_back( loadImage( loadAsset( fs::path("lightbulb") / ("frame." + to_string(i) + ".png") ) ) );
+	}
+
 	void render( Surface8u *surface ) override {
 		ip::fill( surface, ColorA8u( 32, 32, 32, 255 ) );
-		
-		// create placeholder image
-		Surface8u placeholderImage( 200, 300, false );
-		ip::fill( &placeholderImage, ColorA8u( 255, 128, 64, 255 ) );
+		const Surface8u* lightbulbFrame = &mLightbulbFrames[getElapsedFrames() / 3 % mLightbulbFrames.size()];
+		const Surface8u* fireFrame = &mFireFrames[getElapsedFrames() / 3 % mFireFrames.size()];
+		const Surface8u* heartFrame = &mHeartFrames[getElapsedFrames() / 3 % mHeartFrames.size()];
 
 		text::AttrString str;
-		//str << text::loadFont( gFace, 100.0f ) << Color8u( 255, 0, 255 ) << "A placeholder:" << text::Placeholder( {placeholderImage.getWidth(), placeholderImage.getHeight()}, " " ) << " done";
-		str << text::loadFont( gFace, 100.0f ) << Color8u( 255, 0, 255 ) << "A placeholder" << text::Placeholder( {placeholderImage.getWidth(), placeholderImage.getHeight()}, " " );
-		
+		str << text::loadFont( gFace, 32.0f )
+			<<	"In a realm where pixels dance and graphics soar,\n"
+				"Paul Houx " << text::Placeholder( mHeadshot.getSize(), "!", &mHeadshot ) << "stands tall, with tales of lore.\n"
+				"Eye-popping designs, jaw-dropping feats,\n"
+				"His craft leaves onlookers glued to their seats.\n"
+				"\n"
+				"From games to displays, his creations unfold,\n"
+				"With narratives bright, and stories untold.\n"
+				"An artisan of code, C++ his quill,\n"
+				"Transforming abstracts with unmatched skill.\n"
+				"\n"
+				"Complex ideas take life, stories ignite,\n"
+				"With intuitive elegance, he brings them to light" << text::Placeholder( lightbulbFrame->getSize(), "!", (void*)lightbulbFrame ) << ".\n"
+				"Visuals of data, or simulations that play,\n"
+				"He captures the heart " <<  text::Placeholder( heartFrame->getSize(), " ", (void*)heartFrame ) << " in a striking display.\n"
+				"\n"
+				"Beyond just the visuals, a deeper connection,\n"
+				"His works spark curiosity, a closer inspection.\n"
+				"For with every project, a tale he does weave,\n"
+				"Of dreams, of visions, that one must believe.\n"
+				"\n"
+				"Boundless in creativity, with horizons so wide,\n"
+				"Paul seeks new challenges, with passion and pride.\n"
+				"As you venture through his gallery, each frame,\n"
+				"You'll sense the heartbeat, the soul, and the flame " << text::Placeholder( fireFrame->getSize(), "!", (void*)fireFrame ) << ".\n";
+
 		auto frame = text::Frame( str, surface->getWidth(), surface->getHeight(), text::TypesetOptions().ignoreLineMetrics( false ).defaultShapingOptions( text::ShapingOptions().ignoreMissingGlyphs(true) ) );
 		text::GlyphLayout layout = frame.getGlyphLayout();
 		text::render( layout, surface, vec2{0}, true, true );
-		// query the GlyphLayout 
-		text::PlaceholderInfo placeholder = layout.getPlaceholders()[0];
-		surface->copyFrom( placeholderImage, placeholderImage.getBounds(), ivec2( placeholder.getBounds().getUpperLeft() ) );
+		// query the GlyphLayout for placeholders and render them
+		for( text::PlaceholderInfo& placeholder : layout.getPlaceholders() ) {
+			Surface8u *placeholderSurface = (Surface8u*)placeholder.getData();
+			ip::blend( surface, *placeholderSurface, placeholderSurface->getBounds(), ivec2( placeholder.getBounds().getUpperLeft() ) );
+		}
+	}
+
+	bool animated() const override { return true; }
+};
+
+struct TextOnPathDemo : public Demo {
+	void render( Surface8u *surface ) override {
+		ip::fill( surface, ColorA8u( 32, 32, 32, 255 ) );
+
+		Path2d path;
+		vec2 center = vec2( surface->getSize() ) / 2.0f; 
+		path.moveTo( vec2( 20, center.y ) );
+		path.curveTo( vec2( 200, center.y - 200 ), vec2( 300, center.y + 200 ), vec2( surface->getWidth(), center.y + 20 ) );
+		path.curveTo( vec2( 200, center.y - 200 ), vec2( 300, center.y + 200 ), vec2( surface->getHeight() - 20, center.y + 120 ) );
+		text::AttrString str;
+		str << text::loadFont( gFace, 32.0f )
+			<<	"In a realm where pixels dance and graphics soar, "
+				"Paul Houx stands tall, with tales of lore. ";
+		str << text::loadFont( gFace, 24.0f ) <<
+				"Eye-popping designs, jaw-dropping feats, "
+				"His craft leaves onlookers glued to their seats."
+				"From games to displays, his creations unfold, "
+				"With narratives bright, and stories untold.";
+		str << text::loadFont( gFace, 18.0f ) <<
+				"An artisan of code, C++ his quill,"
+				"Transforming abstracts with unmatched skill.";
+		text::TextOnPath typesetting( str, path );
+		text::render( typesetting, surface, vec2{0}, true, true );
 	}
 };
 
 void TextDemosApp::setup()
 {
-	loadGlobalFonts( text::systemDefaultFace() );
-	//loadGlobalFonts( text::loadFace( "C:\\Windows\\Fonts\\Candarali.ttf" ) );
+	//loadGlobalFonts( text::systemDefaultFace() );
+	loadGlobalFonts( text::loadFace( "C:\\Windows\\Fonts\\Candarali.ttf" ) );
 
 	mDemos.emplace_back( new BasicRenderingDemo() );
 	mDemos.emplace_back( new PrecisionRenderingDemo() );
 	mDemos.emplace_back( new SrgbRenderingDemo() );
-	mDemos.emplace_back( new SpacersDemo() );
+	mDemos.emplace_back( new PlaceholdersDemo() );
+	mDemos.emplace_back( new TextOnPathDemo() );
 
 	mCurrentDemoIdx = mDemos.size() - 1;
 }
@@ -155,9 +227,8 @@ void TextDemosApp::resize()
 	mDemos[mCurrentDemoIdx]->resize( getWindowSize() );
 	mSurface = Surface8u( getWindowWidth(), getWindowHeight(), true );
 	mSurface.setPremultiplied( true );
-	ip::fill( &mSurface, ColorA8u( 0, 0, 0, 0 ) );
-	mDemos[mCurrentDemoIdx]->render( &mSurface );
-	
+
+	mDemos[mCurrentDemoIdx]->render( &mSurface );	
 	mTex = gl::Texture::create( mSurface, gl::Texture::Format().magFilter( GL_NEAREST ) );
 }
 
@@ -194,10 +265,18 @@ void TextDemosApp::keyDown( KeyEvent event )
 	}
 }
 
+void TextDemosApp::update()
+{
+	if( mDemos[mCurrentDemoIdx]->animated() ) {
+		mDemos[mCurrentDemoIdx]->render( &mSurface );
+		mTex->update( mSurface );
+	}
+}
+
 void TextDemosApp::draw()
 {
 	gl::setMatricesWindow( getWindowSize() );
-	gl::clear( Color( 0.5f, 0.5f, 0.5f ) );
+	gl::clear( Color( 0.25f, 0.5f, 0.5f ) );
 	//gl::enableAlphaBlending();
 	gl::enableAlphaBlendingPremult();
 	
