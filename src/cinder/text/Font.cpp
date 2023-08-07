@@ -466,7 +466,7 @@ void Font::drawGlyphs( const ColorAf &color, size_t len, const uint32_t glyphInd
 	}
 }
 
-void Font::drawGlyphsPrecise( const ColorAf &color, size_t len, const uint32_t glyphIndices[], const vec2 glyphPositions[], float penX, float baseline, Surface8u &surface, bool srgb ) const
+void Font::drawGlyphsPrecise( const ColorAf &color, size_t len, const uint32_t glyphIndices[], const vec2 glyphPositions[], const vec2 glyphOrientations[], float penX, float baseline, Surface8u &surface, bool srgb ) const
 {
 	mFace->lock();
 	lock();
@@ -477,7 +477,16 @@ void Font::drawGlyphsPrecise( const ColorAf &color, size_t len, const uint32_t g
 		float intBaseline;
 		float fracY = modff( baseline + glyphPositions[i].y, &intBaseline );
 		FT_Vector offset = { (int)(fracX * 64), (int)(-fracY * 64) };
-		FT_Set_Transform( mFace->getFtFace(), nullptr, &offset );
+		if( glyphOrientations ) {
+			FT_Matrix matrix;
+			matrix.xx = (FT_Fixed)(glyphOrientations[i].y * 65536.0f);
+			matrix.xy = (FT_Fixed)(-glyphOrientations[i].x * 65536.0f);
+			matrix.yx = (FT_Fixed)(glyphOrientations[i].x * 65536.0f);
+			matrix.yy = (FT_Fixed)(glyphOrientations[i].y * 65536.0f);
+			FT_Set_Transform( mFace->getFtFace(), &matrix, &offset );
+		}
+		else
+			FT_Set_Transform( mFace->getFtFace(), nullptr, &offset );
 		if( FT_Error err = FT_Load_Glyph( mFace->getFtFace(), glyphIndices[i], FT_LOAD_DEFAULT ) )
 			throw text::FreeTypeExc( err );
 		if( FT_Error err = FT_Render_Glyph( mFace->getFtFace()->glyph, FT_RENDER_MODE_NORMAL ) )
@@ -494,7 +503,7 @@ void Font::drawGlyphsPrecise( const ColorAf &color, size_t len, const uint32_t g
 	mFace->unlock();
 }
 
-void Font::drawGlyphsPrecise( size_t len, const uint32_t glyphIndices[], const vec2 glyphPositions[], float penX, float baseline, Channel8u &channel, bool srgb ) const
+void Font::drawGlyphsPrecise( size_t len, const uint32_t glyphIndices[], const vec2 glyphPositions[], const vec2 glyphOrientations[], float penX, float baseline, Channel8u &channel, bool srgb ) const
 {
 	mFace->lock();
 	lock();
@@ -505,7 +514,15 @@ void Font::drawGlyphsPrecise( size_t len, const uint32_t glyphIndices[], const v
 		float intBaseline;
 		float fracY = modff( baseline + glyphPositions[i].y, &intBaseline );
 		FT_Vector offset = { (int)(fracX * 64), (int)(-fracY * 64) };
-		FT_Set_Transform( mFace->getFtFace(), nullptr, &offset );
+		if( glyphOrientations ) {
+			FT_Matrix matrix;
+			matrix.xx = (FT_Fixed)(glyphOrientations[i].y * 65536.0f);
+			matrix.xy = (FT_Fixed)(-glyphOrientations[i].x * 65536.0f);
+			matrix.yx = (FT_Fixed)(glyphOrientations[i].x * 65536.0f);
+			matrix.yy = (FT_Fixed)(glyphOrientations[i].y * 65536.0f);
+			FT_Set_Transform( mFace->getFtFace(), &matrix, &offset );
+		}
+			FT_Set_Transform( mFace->getFtFace(), nullptr, &offset );
 		if( FT_Error err = FT_Load_Glyph( mFace->getFtFace(), glyphIndices[i], FT_LOAD_DEFAULT ) )
 			throw text::FreeTypeExc( err );
 		if( FT_Error err = FT_Render_Glyph( mFace->getFtFace()->glyph, FT_RENDER_MODE_NORMAL ) )

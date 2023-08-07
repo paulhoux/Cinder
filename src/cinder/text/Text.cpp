@@ -316,11 +316,11 @@ struct SpanData {
 };
 
 // draws runs and advances baseline accordingly. If \a firstLine then we only increase baseline by ascender
-void processLine( const AttrString &attrString, const std::vector<uint32_t> &clusters, const vector<pair<vector<RunData>::iterator,SpanData>> &spans, const std::vector<uint32_t> &glyphIndices, const std::vector<float> &glyphXAdvances, std::vector<vec2> *glyphPositions,
+bool processLine( const AttrString &attrString, const std::vector<uint32_t> &clusters, const vector<pair<vector<RunData>::iterator,SpanData>> &spans, const std::vector<uint32_t> &glyphIndices, const std::vector<float> &glyphXAdvances, std::vector<vec2> *glyphPositions,
 						bool *firstLine, Alignment justification, int maxWidth, float *baseline, TypesetProcessor &fn, const TypesetOptions &options )
 {
 	if( spans.empty() )
-		return;
+		return true;
 
 	// measure line height metrics
 	float maxAscent = 0, maxLineHeight = 0, maxDescent = 0, maxLineGap = 0;
@@ -353,30 +353,42 @@ void processLine( const AttrString &attrString, const std::vector<uint32_t> &clu
 		else if( justification == Alignment::CENTER ) justificationOffset = ( maxWidth - measuredLineWidth ) / 2.0f;
 	}
 
-	fn.addLine( justification, vec2( justificationOffset, *baseline ), maxAscent, maxDescent, maxLineGap, measuredLineWidth );
-	for( auto &span : spans ) {
-		double penX = 0;
-		if( span.first->len && span.second.glyphLen ) {
-			std::vector<uint32_t> localClusters; // relativize clusters to the Run, rather than the master AttrString
-			localClusters.reserve( span.second.glyphLen );
-			for( size_t g = 0; g < span.second.glyphLen; g++ ) {
-				localClusters.push_back( (uint32_t)(clusters[span.second.glyphStart + g] - span.second.chStart) );
-				(*glyphPositions)[span.second.glyphStart + g].x = (float)penX; // relativize x-values for position to the Run, but keep y values
-				penX += glyphXAdvances[span.second.glyphStart + g];
+	bool exited = false;
+	if( ! fn.addLine( justification, vec2( justificationOffset, *baseline ), maxAscent, maxDescent, maxLineGap, measuredLineWidth ) )
+		exited = true;
+	if( ! exited ) {
+		for( auto &span : spans ) {
+			double penX = 0;
+			if( span.first->len && span.second.glyphLen ) {
+				std::vector<uint32_t> localClusters; // relativize clusters to the Run, rather than the master AttrString
+				localClusters.reserve( span.second.glyphLen );
+				for( size_t g = 0; g < span.second.glyphLen; g++ ) {
+					localClusters.push_back( (uint32_t)(clusters[span.second.glyphStart + g] - span.second.chStart) );
+					(*glyphPositions)[span.second.glyphStart + g].x = (float)penX; // relativize x-values for position to the Run, but keep y values
+					penX += glyphXAdvances[span.second.glyphStart + g];
+				}
+				if( span.first->isPlaceholder ) {
+					PlaceholderInfo placeholderInfo;
+					placeholderInfo.mData = span.first->placeholder.getData();
+					float width = span.second.measuredWidth;
+					float placeholderX = (*glyphPositions)[span.second.glyphStart].x;
+					placeholderInfo.mBounds = Rectf( placeholderX, -span.first->placeholder.getHeight(), placeholderX + span.second.measuredWidth, 0 ) + vec2( span.second.drawOffset, *baseline );
+					if( ! fn.addRun( span.first->font, &(attrString.getStringUtf32().c_str()[span.second.chStart]), span.second.chLen, localClusters, span.first->color, span.second.glyphLen, &glyphIndices[span.second.glyphStart], &(*glyphPositions)[span.second.glyphStart], span.second.drawOffset, span.second.measuredWidth, &placeholderInfo ) ) {
+						exited = true;
+						break;
+					}
+				}
+				else {
+					if( ! fn.addRun( span.first->font, &(attrString.getStringUtf32().c_str()[span.second.chStart]), span.second.chLen, localClusters, span.first->color, span.second.glyphLen, &glyphIndices[span.second.glyphStart], &(*glyphPositions)[span.second.glyphStart], span.second.drawOffset, span.second.measuredWidth, nullptr ) ) {
+						exited = true;
+						break;
+					}
+				}
 			}
-			if( span.first->isPlaceholder ) {
-				PlaceholderInfo placeholderInfo;
-				placeholderInfo.mData = span.first->placeholder.getData();
-				float width = span.second.measuredWidth;
-				float placeholderX = (*glyphPositions)[span.second.glyphStart].x;
-				placeholderInfo.mBounds = Rectf( placeholderX, -span.first->placeholder.getHeight(), placeholderX + span.second.measuredWidth, 0 ) + vec2( span.second.drawOffset, *baseline );
-				fn.addRun( span.first->font, &(attrString.getStringUtf32().c_str()[span.second.chStart]), span.second.chLen, localClusters, span.first->color, span.second.glyphLen, &glyphIndices[span.second.glyphStart], &(*glyphPositions)[span.second.glyphStart], span.second.drawOffset, span.second.measuredWidth, &placeholderInfo );
-			}
-			else
-				fn.addRun( span.first->font, &(attrString.getStringUtf32().c_str()[span.second.chStart]), span.second.chLen, localClusters, span.first->color, span.second.glyphLen, &glyphIndices[span.second.glyphStart], &(*glyphPositions)[span.second.glyphStart], span.second.drawOffset, span.second.measuredWidth, nullptr );
 		}
 	}
 	fn.finishLine();
+	return exited;
 }
 
 Channel8u renderString( const AttrString &attrString )
@@ -491,7 +503,8 @@ void typeset( const AttrString &attrString, int32_t width, int32_t height, Types
 
 		// process the spans
 		if( ! linebreakedSpans.empty() )
-			processLine( attrString, clusters, linebreakedSpans, glyphIndices, glyphXAdvances, &glyphPositions, &firstLine, curAlignment, width, &baseline, processor, options );
+			if( ! processLine( attrString, clusters, linebreakedSpans, glyphIndices, glyphXAdvances, &glyphPositions, &firstLine, curAlignment, width, &baseline, processor, options ) )
+				goto exit;
 		if( hitHardBreak && ! alignmentChange )
 			++lineEndGlyph;
 		++lineEndGlyph;
@@ -501,7 +514,8 @@ void typeset( const AttrString &attrString, int32_t width, int32_t height, Types
 
 		// process any trailing hard breaks
 		while( lineEndGlyph < glyphIndices.size() && curRunDataIt != runData.end() && mustBreak( breaks.data(), clusters[lineEndGlyph] ) ) {
-			processLine( attrString, clusters, { { curRunDataIt, SpanData{ lineEndGlyph, 0, 0, 0 } } }, glyphIndices, glyphXAdvances, &glyphPositions, &firstLine, curAlignment, width, &baseline, processor, options );
+			if( ! processLine( attrString, clusters, { { curRunDataIt, SpanData{ lineEndGlyph, 0, 0, 0 } } }, glyphIndices, glyphXAdvances, &glyphPositions, &firstLine, curAlignment, width, &baseline, processor, options ) )
+				goto exit;
 			++lineEndGlyph;
 			if( lineEndGlyph == curRunDataIt->start + curRunDataIt->len ) { // if we hit the end of the run, advance to the next
 				++curRunDataIt;
@@ -525,7 +539,8 @@ void typeset( const AttrString &attrString, int32_t width, int32_t height, Types
 		lineStartGlyph = lineEndGlyph;
 	}
 
-	processor.finish();
+	exit:
+		processor.finish();
 }
 
 namespace {
@@ -577,7 +592,9 @@ void Line::breakGlyphsIntoRuns()
 		std::vector<uint32_t> localClusters{ 0 };
 		for( size_t glyphIdx = 0; glyphIdx < run.getNumGlyphs(); ++glyphIdx ) {
 			//Run( const Font* font, const char32_t *utf32Text, size_t textLength, const ColorAf &color, uint32_t glyph, float drawOffsetX, float measuredWidth )
-			runs.emplace_back( run.getFont(), &run.getTextUtf32()[clusters[glyphIdx]], 1, localClusters, run.getColor(), run.getGlyphIndices()[glyphIdx], run.getGlyphPositions()[glyphIdx], (float)penX, 0.0f );
+			const vec2 *orientation = run.getGlyphOrientations() ? &run.getGlyphOrientations()[glyphIdx] : nullptr;
+			runs.emplace_back( run.getFont(), &run.getTextUtf32()[clusters[glyphIdx]], 1, localClusters, run.getColor(), run.getGlyphIndices()[glyphIdx],
+								run.getGlyphPositions()[glyphIdx], orientation, (float)penX, 0.0f );
 		}
 	}
 
@@ -595,7 +612,7 @@ Rectf Run::getGlyphBounds( size_t g ) const
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////
-// FlatGlyphLayout
+// GlyphLayout
 vec2 GlyphLayout::calcSize() const
 {
 	float width = 0, height = 0;
@@ -609,8 +626,6 @@ vec2 GlyphLayout::calcSize() const
 	return { width, height };
 }
 
-////////////////////////////////////////////////////////////////////////////////////////////////
-// GlyphLayout
 void GlyphLayout::measure()
 {
 	mMeasuredWidth = 0;
@@ -648,17 +663,21 @@ class GlyphLayoutConstructorTypesetProcessor : public TypesetProcessor {
   public:
 	  GlyphLayoutConstructorTypesetProcessor( GlyphLayout *glyphLayout ) : mGlyphLayout{ glyphLayout } {}
 
-	void	addLine( Alignment justification, vec2 drawOffset, float ascender, float descender, float lineGap, float measuredWidth ) override {
+	bool	addLine( Alignment justification, vec2 drawOffset, float ascender, float descender, float lineGap, float measuredWidth ) override {
 		mGlyphLayout->getLines().push_back( Line( justification, drawOffset, ascender, descender, lineGap, measuredWidth ) );
+		return true;
 	}
-	void	addRun( const Font *font, const char32_t *utf32Str, size_t chLen, const std::vector<uint32_t> &clusters, const ColorAf &color, size_t len, const uint32_t glyphIndices[], const vec2 glyphPositions[], float penX, float measuredWidth, PlaceholderInfo *placeholderInfo ) override {
+
+	bool	addRun( const Font *font, const char32_t *utf32Str, size_t chLen, const std::vector<uint32_t> &clusters, const ColorAf &color, size_t len, const uint32_t glyphIndices[], const vec2 glyphPositions[], float penX, float measuredWidth, PlaceholderInfo *placeholderInfo ) override {
 		if( placeholderInfo ) {
 			mGlyphLayout->getPlaceholders().push_back( *placeholderInfo );
-			mGlyphLayout->getLines().back().getRuns().push_back( Run( len, font, utf32Str, chLen, clusters, color, glyphIndices, glyphPositions, penX, measuredWidth, placeholderInfo ) );
+			mGlyphLayout->getLines().back().getRuns().push_back( Run( len, font, utf32Str, chLen, clusters, color, glyphIndices, glyphPositions, nullptr, penX, measuredWidth, placeholderInfo ) );
 		}
 		else
-			mGlyphLayout->getLines().back().getRuns().push_back( Run( len, font, utf32Str, chLen, clusters, color, glyphIndices, glyphPositions, penX, measuredWidth, nullptr ) );
+			mGlyphLayout->getLines().back().getRuns().push_back( Run( len, font, utf32Str, chLen, clusters, color, glyphIndices, glyphPositions, nullptr, penX, measuredWidth, nullptr ) );
+		return true;
 	}
+	
 	void	finish() override {
 		mGlyphLayout->measure();
 	}
@@ -704,47 +723,91 @@ const GlyphLayout& Frame::getGlyphLayout() const
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // TextOnPath
-/*class RenderStringOnPathNvpProcessor : public text::TypesetProcessor {
+class TextOnPathTypesetProcessor : public text::TypesetProcessor {
 public:
-	RenderStringOnPathNvpProcessor( const ci::Path2d &path, double initialMargin ) : mPath( path ), mPathCalcCache( path ), mCurrentDistance( initialMargin ) {
+	TextOnPathTypesetProcessor( const ci::Path2d &path, double initialMargin, GlyphLayout *glyphLayout )
+		: mPath( path ), mPathCalcCache( path ), mInitialMargin( initialMargin ), mGlyphLayout( glyphLayout ), mDone( false )
+	{}
+
+	bool	addLine( Alignment justification, vec2 drawOffset, float ascender, float descender, float lineGap, float measuredWidth ) {
+		if( mDone )
+			return false;
+
+		mGlyphLayout->getLines().push_back( Line( justification, drawOffset, ascender, descender, lineGap, measuredWidth ) );
+		return true;
 	}
 
-	void	addLine( text::Alignment justification, float baseline, float ascender, float descender, float lineGap, float measuredWidth ) override {
-		mCurrentBaseline = baseline;
-	}
-
-	void	addRun( const text::Font *font, size_t chStart, size_t chLen, const ColorAf &color, size_t len, const uint32_t glyphIndices[], const float glyphAdvances[], float penX, float measuredWidth )
+	bool	addRun( const Font *font, const char32_t *utf32Str, size_t chLen, const std::vector<uint32_t> &clusters, const ColorAf &color, size_t len, const uint32_t glyphIndices[], const vec2 glyphPositions[], float penX, float measuredWidth, PlaceholderInfo *placeholderInfo ) override
 	{
-		if( mCurrentDistance > mPathCalcCache.getLength() )
-			return;
+		if( mDone )
+			return false;
 
-		size_t glyphIdx = 0;
-		std::vector<vec2> positions( len );
-		std::vector<vec2> normals( len );
-		do {
-			float positionTime = mPathCalcCache.calcTimeForDistance( (float)mCurrentDistance, false );
-			positions[glyphIdx] = vec2( 0, 0 ) + mPath.getPosition( positionTime );
-			float tangentTime = mPathCalcCache.calcTimeForDistance( (float)mCurrentDistance + font->getGlyphMetrics( glyphIndices[glyphIdx] ).width / 2.0f, false );
-			vec2 tangent = glm::normalize( mPath.getTangent( tangentTime ) );
-			normals[glyphIdx] = vec2( -tangent.y, tangent.x );
-			mCurrentDistance += glyphAdvances[glyphIdx];
-			++glyphIdx;
-		} while( mCurrentDistance < mPathCalcCache.getLength() && glyphIdx < len );
+		if( placeholderInfo ) {
+			mGlyphLayout->getPlaceholders().push_back( *placeholderInfo );
+			mGlyphLayout->getLines().back().getRuns().push_back( Run( len, font, utf32Str, chLen, clusters, color, glyphIndices, glyphPositions, nullptr, penX, measuredWidth, placeholderInfo ) );
+		}
+		else {
+			size_t glyphIdx = 0;
+			std::vector<vec2> positions( len );
+			std::vector<vec2> orientations( len );
+			do {
+				float positionTime = mPathCalcCache.calcTimeForDistance( penX + mInitialMargin + glyphPositions[glyphIdx].x, false );
+				positions[glyphIdx] = vec2( 0, 0 ) + mPath.getPosition( positionTime );
+				float tangentTime = mPathCalcCache.calcTimeForDistance( penX + mInitialMargin + glyphPositions[glyphIdx].x + font->getGlyphMetrics( glyphIndices[glyphIdx] ).width / 2.0f, false );
+				vec2 tangent = glm::normalize( mPath.getTangent( tangentTime ) );
+				orientations[glyphIdx] = vec2( -tangent.y, tangent.x );
+				++glyphIdx;
+			} while( penX + mInitialMargin + glyphPositions[glyphIdx].x < mPathCalcCache.getLength() && glyphIdx < len );
+			
+			if( glyphIdx < len ) // if we terminated because we ran out of path instead of glyphs, we're done
+				mDone = true;
+			mGlyphLayout->getLines().back().getRuns().push_back( Run( glyphIdx, font, utf32Str, chLen, clusters, color, glyphIndices, positions.data(), orientations.data(), 0, measuredWidth, nullptr ) );
+		}
 
-		drawRun( font, glyphIdx, color, glyphIndices, positions.data(), normals.data() );
+		return ! mDone;
+	}
+
+	void	finish() override {
+		mGlyphLayout->measure();
 	}
 
 	cinder::Path2d				mPath;
 	cinder::Path2dCalcCache		mPathCalcCache;
-	float			mCurrentBaseline = 0;
-	double			mCurrentDistance;
-};*/
+	GlyphLayout*				mGlyphLayout;
+	float						mInitialMargin;
+	bool						mDone;
+};
 
 TextOnPath::TextOnPath( const AttrString &attrString, const Path2d &path, const TypesetOptions &options )
 	: mAttrString( attrString ), mPath( path ), mTypesetOptions( options )
 {
 }
 
+void TextOnPath::updateGlyphLayout() const
+{
+	if( mDirty )
+		const_cast<TextOnPath*>( this )->updateGlyphLayoutImpl();
+}
+
+void TextOnPath::updateGlyphLayoutImpl()
+{
+	mGlyphLayout.clear();
+	TextOnPathTypesetProcessor processor{ mPath, 0, &mGlyphLayout };
+
+	// We don't need to limit width or height
+	typeset( mAttrString, -1, -1, processor, mTypesetOptions );
+
+	mDirty = false;
+}
+
+const GlyphLayout& TextOnPath::getGlyphLayout() const
+{
+	updateGlyphLayout();
+	return mGlyphLayout;
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// render implementation
 void render( const Typesetter &typesetter, Surface8u *surface, const vec2 &offset, bool precise, bool srgb )
 {
 	Typesetter::Iterator iter = typesetter.getIterator();
@@ -754,8 +817,8 @@ void render( const Typesetter &typesetter, Surface8u *surface, const vec2 &offse
 		if( runPtr->isPlaceholder() )
 			continue;
 		vec2 drawOffset = lineDrawOffset + runPtr->getDrawOffset();
-		if( precise )
-			runPtr->getFont()->drawGlyphsPrecise( runPtr->getColor(), runPtr->getNumGlyphs(), runPtr->getGlyphIndices(), runPtr->getGlyphPositions(), offset.x + drawOffset.x, offset.y + drawOffset.y, *surface, srgb );
+		if( precise || runPtr->getGlyphOrientations() )
+			runPtr->getFont()->drawGlyphsPrecise( runPtr->getColor(), runPtr->getNumGlyphs(), runPtr->getGlyphIndices(), runPtr->getGlyphPositions(), runPtr->getGlyphOrientations(), offset.x + drawOffset.x, offset.y + drawOffset.y, *surface, srgb );
 		else
 			runPtr->getFont()->drawGlyphs( runPtr->getColor(), runPtr->getNumGlyphs(), runPtr->getGlyphIndices(), runPtr->getGlyphPositions(), offset.x + drawOffset.x, offset.y + drawOffset.y, *surface, srgb );		
 	}
@@ -777,8 +840,8 @@ Surface8u renderSurface( const Typesetter &typesetter, const vec2 &offset, const
 		if( runPtr->isPlaceholder() )
 			continue;
 		vec2 drawOffset = lineDrawOffset + runPtr->getDrawOffset();
-		if( precise )
-			runPtr->getFont()->drawGlyphsPrecise( runPtr->getColor(), runPtr->getNumGlyphs(), runPtr->getGlyphIndices(), runPtr->getGlyphPositions(), offset.x + drawOffset.x, offset.y + drawOffset.y, result, srgb );
+		if( precise || runPtr->getGlyphOrientations() )
+			runPtr->getFont()->drawGlyphsPrecise( runPtr->getColor(), runPtr->getNumGlyphs(), runPtr->getGlyphIndices(), runPtr->getGlyphPositions(), runPtr->getGlyphOrientations(), offset.x + drawOffset.x, offset.y + drawOffset.y, result, srgb );
 		else
 			runPtr->getFont()->drawGlyphs( runPtr->getColor(), runPtr->getNumGlyphs(), runPtr->getGlyphIndices(), runPtr->getGlyphPositions(), offset.x + drawOffset.x, offset.y + drawOffset.y, result, srgb );
 	}
@@ -795,8 +858,8 @@ void render( const Typesetter &typesetter, Channel8u *channel, const vec2 &offse
 		if( runPtr->isPlaceholder() )
 			continue;
 		vec2 drawOffset = lineDrawOffset + runPtr->getDrawOffset();
-		if( precise )
-			runPtr->getFont()->drawGlyphsPrecise( runPtr->getNumGlyphs(), runPtr->getGlyphIndices(), runPtr->getGlyphPositions(), offset.x + drawOffset.x, offset.y + drawOffset.y, *channel );
+		if( precise || runPtr->getGlyphOrientations() )
+			runPtr->getFont()->drawGlyphsPrecise( runPtr->getNumGlyphs(), runPtr->getGlyphIndices(), runPtr->getGlyphPositions(), runPtr->getGlyphOrientations(), offset.x + drawOffset.x, offset.y + drawOffset.y, *channel );
 		else
 			runPtr->getFont()->drawGlyphs( runPtr->getNumGlyphs(), runPtr->getGlyphIndices(), runPtr->getGlyphPositions(), offset.x + drawOffset.x, offset.y + drawOffset.y, *channel );
 	}
@@ -817,8 +880,8 @@ Channel8u renderChannel( const Typesetter &typesetter, const vec2 &offset, bool 
 		if( runPtr->isPlaceholder() )
 			continue;
 		vec2 drawOffset = lineDrawOffset + runPtr->getDrawOffset();
-		if( precise )
-			runPtr->getFont()->drawGlyphsPrecise( runPtr->getNumGlyphs(), runPtr->getGlyphIndices(), runPtr->getGlyphPositions(), offset.x + drawOffset.x, offset.y + drawOffset.y, result, srgb );
+		if( precise || runPtr->getGlyphOrientations() )
+			runPtr->getFont()->drawGlyphsPrecise( runPtr->getNumGlyphs(), runPtr->getGlyphIndices(), runPtr->getGlyphPositions(), runPtr->getGlyphOrientations(), offset.x + drawOffset.x, offset.y + drawOffset.y, result, srgb );
 		else
 			runPtr->getFont()->drawGlyphs( runPtr->getNumGlyphs(), runPtr->getGlyphIndices(), runPtr->getGlyphPositions(), offset.x + drawOffset.x, offset.y + drawOffset.y, result );
 	}
