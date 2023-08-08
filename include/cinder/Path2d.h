@@ -45,16 +45,51 @@ class CI_API Path2d {
 	void	lineTo( float x, float y ) { lineTo( vec2( x, y ) ); }
 	void	quadTo( const vec2 &p1, const vec2 &p2 );
 	void	quadTo( float x1, float y1, float x2, float y2 ) { quadTo( vec2( x1, y1 ), vec2( x2, y2 ) ); }
+	void	smoothQuadTo( const vec2 &p2 );
+	void	smoothQuadTo( float x2, float y2 ) { smoothQuadTo( vec2( x2, y2 ) ); }
 	void	curveTo( const vec2 &p1, const vec2 &p2, const vec2 &p3 );
 	void	curveTo( float x1, float y1, float x2, float y2, float x3, float y3 ) { curveTo( vec2( x1, y1 ), vec2( x2, y2 ), vec2( x3, y3 ) ); }
+	void	smoothCurveTo( const vec2 &p2, const vec2 &p3 );
+	void	smoothCurveTo( float x2, float y2, float x3, float y3 ) { smoothCurveTo( vec2( x2, y2 ), vec2( x3, y3 ) ); }
 	void	arc( const vec2 &center, float radius, float startRadians, float endRadians, bool forward = true );
 	void	arc( float centerX, float centerY, float radius, float startRadians, float endRadians, bool forward = true ) { arc( vec2( centerX, centerY ), radius, startRadians, endRadians, forward ); }
 	void	arcTo( const vec2 &p, const vec2 &t, float radius );
 	void	arcTo( float x, float y, float tanX, float tanY, float radius) { arcTo( vec2( x, y ), vec2( tanX, tanY ), radius ); }
+	void	arcTo( float rx, float ry, float phi, bool largeArcFlag, bool sweepFlag, const vec2 &p2 );
+	void	relativeArcTo( float rx, float ry, float phi, bool largeArcFlag, bool sweepFlag, const vec2 &p2 );
 	
 	//! Closes the path, by drawing a straight line from the first to the last point. This is only legal as the last command.
 	void	close() { mSegments.push_back( CLOSE ); }
 	bool	isClosed() const { return ( mSegments.size() > 1 ) && mSegments.back() == CLOSE; }
+
+	//!
+	static Path2d circle( const vec2 &center, float radius );
+	//!
+	static Path2d ellipse( const vec2 &center, float radiusX, float radiusY );
+	//!
+	static Path2d line( const vec2 &p0, const vec2 &p1 );
+	//!
+	static Path2d polygon( const std::vector<vec2> &points, bool closed = true );
+	//!
+	static Path2d rectangle( const Rectf &bounds ) { return rectangle( bounds.x1, bounds.y1, bounds.getWidth(), bounds.getHeight() ); }
+	//!
+	static Path2d rectangle( float x, float y, float width, float height );
+	//!
+	static Path2d roundedRectangle( const Rectf &bounds, float r ) { return roundedRectangle( bounds, r, r ); }
+	//!
+	static Path2d roundedRectangle( const Rectf &bounds, float rx, float ry ) { return roundedRectangle( bounds.x1, bounds.y1, bounds.getWidth(), bounds.getHeight(), rx, ry ); }
+	//!
+	static Path2d roundedRectangle( float x, float y, float width, float height, float r ) { return roundedRectangle( x, y, width, height, r, r ); }
+	//!
+	static Path2d roundedRectangle( float x, float y, float width, float height, float rx, float ry );
+	//!
+	static Path2d star( const vec2 &center, int points, float largeRadius, float smallRadius, float rotation = 0 );
+	//!
+	static Path2d arrow( const vec2 &p0, const vec2 &p1, float thickness, float width = 4, float length = 4, float concavity = 0 );
+	//!
+	static Path2d arrow( float x0, float y0, float x1, float y1, float thickness, float width = 4, float length = 4, float concavity = 0 ) { return arrow( vec2( x0, y0 ), vec2( x1, y1 ), thickness, width, length, concavity ); }
+	//!
+	static Path2d spiral( const vec2 &center, float innerRadius, float outerRadius, float spacing );
     
 	//! Reverses the order of the path's points, inverting its winding order
     void	reverse();
@@ -94,8 +129,12 @@ class CI_API Path2d {
 
 	const std::vector<vec2>&	getPoints() const { return mPoints; }
 	std::vector<vec2>&			getPoints() { return mPoints; }
-	const vec2&				getPoint( size_t point ) const { return mPoints[point]; }
-	vec2&						getPoint( size_t point ) { return mPoints[point]; }
+	const vec2&				getPoint( size_t point ) const { return mPoints[ point % mPoints.size() ]; }
+	vec2&						getPoint( size_t point ) { return mPoints[ point % mPoints.size() ]; }
+	const vec2&				getPointBefore( size_t point ) const { return getPoint( point + mPoints.size() - 1 ); }
+	vec2&						getPointBefore( size_t point ) { return getPoint( point + mPoints.size() - 1 ); }
+	const vec2&				getPointAfter( size_t point ) const { return getPoint( point + 1 ); }
+	vec2&						getPointAfter( size_t point ) { return getPoint( point + 1 ); }
 	const vec2&				getCurrentPoint() const { return mPoints.back(); }
 	void						setPoint( size_t index, const vec2 &p ) { mPoints[index] = p; }
 
@@ -158,7 +197,9 @@ class CI_API Path2d {
   private:
 	void	arcHelper( const vec2 &center, float radius, float startRadians, float endRadians, bool forward );
 	void	arcSegmentAsCubicBezier( const vec2 &center, float radius, float startRadians, float endRadians );
-	
+
+	float	angleHelper( const vec2 &u, const vec2 &v ) const;
+
 	//! Returns the minimum distance from point \a pt to segment \a segment. The \a firstPoint parameter can be used as an optimization if known, otherwise pass 0.
 	float	calcDistance( const vec2 &pt, size_t segment, size_t firstPoint ) const;
 

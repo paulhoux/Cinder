@@ -138,7 +138,7 @@ struct CI_API ScopedMarker : private Noncopyable {
 	~ScopedMarker() { Marker::pop(); }
 };
 
-using ShaderRef = std::shared_ptr<class Shader>;
+using ShaderRef = std::shared_ptr<struct Shader>;
 
 struct CI_API Shader {
 	enum class Type { SOLID_COLOR, LINEAR_GRADIENT, RADIAL_GRADIENT, CONICAL_GRADIENT, IMAGE, UNDEFINED };

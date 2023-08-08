@@ -22,21 +22,109 @@ POSSIBILITY OF SUCH DAMAGE.
 namespace cinder {
 namespace nvp {
 
-using ArcRef = std::shared_ptr<class Arc>;
+using ShapeRef = std::shared_ptr<class Shape>;
 
-class Arc final : public Path {
-	glm::vec2 mCenter{ 0 };             //
-	float     mRadius{ 100 };           //
-	float     mStart{ 0 };              // In radians.
-	float     mEnd{ glm::pi<float>() }; // In radians.
-	float     mOffset{ 0 };             // In radians.
+CI_API class Shape final : public Path {
+	std::vector<GLubyte> mCommands;
+	std::vector<GLfloat> mCoords;
 
   public:
-	static ArcRef create( const glm::vec2 &center, float radius, float start = 0, float end = 180, float offset = 0 ) { return std::make_shared<Arc>( center, radius, start, end, offset ); }
+	static ShapeRef create() { return std::make_shared<Shape>(); }
+
+	Shape() { mPathId = gl::genPathsNV( 1 ); }
+	~Shape() override = default;
+	Shape( const Shape &other ) = default;
+	Shape( Shape &&other ) noexcept = default;
+	Shape &operator=( const Shape &other ) = default;
+	Shape &operator=( Shape &&other ) noexcept = default;
+
+	//! Should be called prior to rendering the path. This will submit all commands and coords to the GPU.
+	void compile() const;
+	//!
+	void clear();
+	//!
+	void moveTo( float x, float y );
+	//!
+	void moveTo( const vec2 &v ) { moveTo( v.x, v.y ); }
+	//
+	void relativeMoveTo( float x, float y );
+	//
+	void relativeMoveTo( const vec2 &v ) { relativeMoveTo( v.x, v.y ); }
+	//!
+	void lineTo( float x, float y );
+	//!
+	void lineTo( const vec2 &v ) { lineTo( v.x, v.y ); }
+	//!
+	void relativeLineTo( float x, float y );
+	//!
+	void relativeLineTo( const vec2 &v ) { relativeLineTo( v.x, v.y ); }
+	//!
+	void horizontalLineTo( float x );
+	//!
+	void relativeHorizontalLineTo( float x );
+	//!
+	void verticalLineTo( float y );
+	//!
+	void relativeVerticalLineTo( float y );
+	//!
+	void quadTo( float x1, float y1, float x2, float y2 );
+	//!
+	void quadTo( const vec2 &p1, const vec2 &p2 ) { quadTo( p1.x, p1.y, p2.x, p2.y ); }
+	//!
+	void relativeQuadTo( float x1, float y1, float x2, float y2 );
+	//!
+	void relativeQuadTo( const vec2 &p1, const vec2 &p2 ) { relativeQuadTo( p1.x, p1.y, p2.x, p2.y ); }
+	//!
+	void smoothQuadTo( float x2, float y2 );
+	//!
+	void smoothQuadTo( const vec2 &p2 ) { smoothQuadTo( p2.x, p2.y ); }
+	//!
+	void relativeSmoothQuadTo( float x2, float y2 );
+	//!
+	void relativeSmoothQuadTo( const vec2 &p2 ) { relativeSmoothQuadTo( p2.x, p2.y ); }
+	//!
+	void cubicTo( float x1, float y1, float x2, float y2, float x3, float y3 );
+	//!
+	void cubicTo( const vec2 &p1, const vec2 &p2, const vec2 &p3 ) { cubicTo( p1.x, p1.y, p2.x, p2.y, p3.x, p3.y ); }
+	//!
+	void relativeCubicTo( float x1, float y1, float x2, float y2, float x3, float y3 );
+	//!
+	void relativeCubicTo( const vec2 &p1, const vec2 &p2, const vec2 &p3 ) { relativeCubicTo( p1.x, p1.y, p2.x, p2.y, p3.x, p3.y ); }
+	//!
+	void smoothCubicTo( float x2, float y2, float x3, float y3 );
+	//!
+	void smoothCubicTo( const vec2 &p2, const vec2 &p3 ) { smoothCubicTo( p2.x, p2.y, p3.x, p3.y ); }
+	//!
+	void relativeSmoothCubicTo( float x2, float y2, float x3, float y3 );
+	//!
+	void relativeSmoothCubicTo( const vec2 &p2, const vec2 &p3 ) { relativeSmoothCubicTo( p2.x, p2.y, p3.x, p3.y ); }
+	//!
+	void arcTo( float rx, float ry, float phi, bool largeArcFlag, bool sweepFlag, float px, float py );
+	//!
+	void arcTo( float rx, float ry, float phi, bool largeArcFlag, bool sweepFlag, const vec2 &p2 ) { arcTo( rx, ry, phi, largeArcFlag, sweepFlag, p2.x, p2.y ); }
+	//!
+	void relativeArcTo( float rx, float ry, float phi, bool largeArcFlag, bool sweepFlag, float px, float py );
+	//!
+	void relativeArcTo( float rx, float ry, float phi, bool largeArcFlag, bool sweepFlag, const vec2 &p2 ) { relativeArcTo( rx, ry, phi, largeArcFlag, sweepFlag, p2.x, p2.y ); }
+	//!
+	void close();
+};
+
+using ArcRef = std::shared_ptr<class Arc>;
+
+CI_API class Arc final : public Path {
+	vec2  mCenter{ 0 };             //
+	float mRadius{ 100 };           //
+	float mStart{ 0 };              // In radians.
+	float mEnd{ glm::pi<float>() }; // In radians.
+	float mOffset{ 0 };             // In radians.
+
+  public:
+	static ArcRef create( const vec2 &center, float radius, float start = 0, float end = 180, float offset = 0 ) { return std::make_shared<Arc>( center, radius, start, end, offset ); }
 
 	//! Creates an arc with the specified \a center and \a radius, running clockwise from \a start (in degrees) at to \a end (in degrees).
 	//! The result can then optionally be rotated clockwise by specifying an \a offset in degrees.
-	Arc( const glm::vec2 &center, float radius, float start = 0, float end = 180, float offset = 0 )
+	Arc( const vec2 &center, float radius, float start = 0, float end = 180, float offset = 0 )
 		: mCenter{ center }
 		, mRadius{ radius }
 		, mStart{ glm::radians( start ) }
@@ -52,9 +140,9 @@ class Arc final : public Path {
 	Arc &operator=( const Arc &other ) = default;
 	Arc &operator=( Arc &&other ) noexcept = default;
 
-	[[nodiscard]] ci::Rectf getBounds() const override { return { mCenter.x - mRadius, mCenter.y - mRadius, mCenter.x + mRadius, mCenter.y + mRadius }; }
+	[[nodiscard]] Rectf getBounds() const override { return { mCenter.x - mRadius, mCenter.y - mRadius, mCenter.x + mRadius, mCenter.y + mRadius }; }
 
-	Arc transformed( const glm::mat3x2 &transform ) const
+	[[nodiscard]] Arc transformed( const glm::mat3x2 &transform ) const
 	{
 		Arc arc( *this );
 		arc.transform( transform );
@@ -67,15 +155,15 @@ class Arc final : public Path {
 
 using CircleRef = std::shared_ptr<class Circle>;
 
-class Circle final : public Path {
-	glm::vec2 mCenter{ 0 };   //
-	float     mRadius{ 100 }; //
+CI_API class Circle final : public Path {
+	vec2  mCenter{ 0 };   //
+	float mRadius{ 100 }; //
 
   public:
-	static CircleRef create( const glm::vec2 &center, float radius ) { return std::make_shared<Circle>( center, radius ); }
+	static CircleRef create( const vec2 &center, float radius ) { return std::make_shared<Circle>( center, radius ); }
 
 	//! Creates a full circle with the specified \a center and \a radius.
-	Circle( const glm::vec2 &center, float radius )
+	Circle( const vec2 &center, float radius )
 		: mCenter{ center }
 		, mRadius{ radius }
 	{
@@ -88,9 +176,9 @@ class Circle final : public Path {
 	Circle &operator=( const Circle &other ) = default;
 	Circle &operator=( Circle &&other ) noexcept = default;
 
-	[[nodiscard]] ci::Rectf getBounds() const override { return { mCenter.x - mRadius, mCenter.y - mRadius, mCenter.x + mRadius, mCenter.y + mRadius }; }
+	[[nodiscard]] Rectf getBounds() const override { return { mCenter.x - mRadius, mCenter.y - mRadius, mCenter.x + mRadius, mCenter.y + mRadius }; }
 
-	Circle transformed( const glm::mat3x2 &transform ) const
+	[[nodiscard]] Circle transformed( const glm::mat3x2 &transform ) const
 	{
 		Circle circle( *this );
 		circle.transform( transform );
@@ -103,16 +191,16 @@ class Circle final : public Path {
 
 using EllipseRef = std::shared_ptr<class Ellipse>;
 
-class Ellipse final : public Path {
-	glm::vec2 mCenter{ 0 };    //
-	float     mRadiusX{ 100 }; //
-	float     mRadiusY{ 100 }; //
+CI_API class Ellipse final : public Path {
+	vec2  mCenter{ 0 };    //
+	float mRadiusX{ 100 }; //
+	float mRadiusY{ 100 }; //
 
   public:
-	static EllipseRef create( const glm::vec2 &center, float radiusA, float radiusB ) { return std::make_shared<Ellipse>( center, radiusA, radiusB ); }
+	static EllipseRef create( const vec2 &center, float radiusA, float radiusB ) { return std::make_shared<Ellipse>( center, radiusA, radiusB ); }
 
 	//! Creates a full ellipse with the specified \a center and \a radiusA and \a radiusB.
-	Ellipse( const glm::vec2 &center, float radiusA, float radiusB )
+	Ellipse( const vec2 &center, float radiusA, float radiusB )
 		: mCenter{ center }
 		, mRadiusX{ radiusA }
 		, mRadiusY{ radiusB }
@@ -121,7 +209,7 @@ class Ellipse final : public Path {
 		create();
 	}
 	//!
-	explicit Ellipse( const ci::Rectf &bounds )
+	explicit Ellipse( const Rectf &bounds )
 		: Ellipse{ bounds.getCenter(), 0.5f * bounds.getWidth(), 0.5f * bounds.getHeight() }
 	{
 	}
@@ -131,9 +219,9 @@ class Ellipse final : public Path {
 	Ellipse &operator=( const Ellipse &other ) = default;
 	Ellipse &operator=( Ellipse &&other ) noexcept = default;
 
-	[[nodiscard]] ci::Rectf getBounds() const override { return { mCenter.x - mRadiusX, mCenter.y - mRadiusY, mCenter.x + mRadiusX, mCenter.y + mRadiusY }; }
+	[[nodiscard]] Rectf getBounds() const override { return { mCenter.x - mRadiusX, mCenter.y - mRadiusY, mCenter.x + mRadiusX, mCenter.y + mRadiusY }; }
 
-	Ellipse transformed( const glm::mat3x2 &transform ) const
+	[[nodiscard]] Ellipse transformed( const glm::mat3x2 &transform ) const
 	{
 		Ellipse ellipse( *this );
 		ellipse.transform( transform );
@@ -146,14 +234,14 @@ class Ellipse final : public Path {
 
 // using LineRef = std::shared_ptr<class Line>; // TODO: conflict with Text and Svg classes!
 
-class Line final : public Path {
-	glm::vec2 mP0{ 0 }; //
-	glm::vec2 mP1{ 0 }; //
+CI_API class Line final : public Path {
+	vec2 mP0{ 0 }; //
+	vec2 mP1{ 0 }; //
 
   public:
-	static std::shared_ptr<Line> create( const glm::vec2 &p0, const glm::vec2 &p1 ) { return std::make_shared<Line>( p0, p1 ); }
+	static std::shared_ptr<Line> create( const vec2 &p0, const vec2 &p1 ) { return std::make_shared<Line>( p0, p1 ); }
 
-	Line( const glm::vec2 &p0, const glm::vec2 &p1 )
+	Line( const vec2 &p0, const vec2 &p1 )
 		: mP0{ p0 }
 		, mP1{ p1 }
 	{
@@ -166,9 +254,9 @@ class Line final : public Path {
 	Line &operator=( const Line &other ) = default;
 	Line &operator=( Line &&other ) noexcept = default;
 
-	[[nodiscard]] ci::Rectf getBounds() const override { return { mP0, mP1 }; }
+	[[nodiscard]] Rectf getBounds() const override { return { mP0, mP1 }; }
 
-	Line transformed( const glm::mat3x2 &transform ) const
+	[[nodiscard]] Line transformed( const glm::mat3x2 &transform ) const
 	{
 		Line line( *this );
 		line.transform( transform );
@@ -181,20 +269,20 @@ class Line final : public Path {
 
 using PolygonRef = std::shared_ptr<class Polygon>;
 
-class Polygon final : public Path {
-	std::vector<glm::vec2> mPoints;
+CI_API class Polygon final : public Path {
+	std::vector<vec2> mPoints;
 
   public:
-	static PolygonRef create( const std::vector<glm::vec2> &points, bool closed = true ) { return std::make_shared<Polygon>( points, closed ); }
-	static PolygonRef create( const std::initializer_list<glm::vec2> &points, bool closed = true ) { return std::make_shared<Polygon>( points, closed ); }
+	static PolygonRef create( const std::vector<vec2> &points, bool closed = true ) { return std::make_shared<Polygon>( points, closed ); }
+	static PolygonRef create( const std::initializer_list<vec2> &points, bool closed = true ) { return std::make_shared<Polygon>( points, closed ); }
 
-	explicit Polygon( std::vector<glm::vec2> points, bool closed = true )
+	explicit Polygon( std::vector<vec2> points, bool closed = true )
 		: mPoints( std::move( points ) )
 	{
 		mPathId = gl::genPathsNV( 1 );
 		create( closed );
 	}
-	explicit Polygon( const std::initializer_list<glm::vec2> &points, bool closed = true )
+	explicit Polygon( const std::initializer_list<vec2> &points, bool closed = true )
 		: mPoints( points )
 	{
 		mPathId = gl::genPathsNV( 1 );
@@ -206,7 +294,7 @@ class Polygon final : public Path {
 	Polygon &operator=( const Polygon &other ) = default;
 	Polygon &operator=( Polygon &&other ) noexcept = default;
 
-	Polygon transformed( const glm::mat3x2 &transform ) const
+	[[nodiscard]] Polygon transformed( const glm::mat3x2 &transform ) const
 	{
 		Polygon polygon( *this );
 		polygon.transform( transform );
@@ -219,14 +307,14 @@ class Polygon final : public Path {
 
 using RectangleRef = std::shared_ptr<class Rectangle>;
 
-class Rectangle final : public Path {
-	ci::Rectf mBounds; //
+CI_API class Rectangle final : public Path {
+	Rectf mBounds; //
 
   public:
-	static RectangleRef create( const ci::Rectf &bounds ) { return std::make_shared<Rectangle>( bounds ); }
+	static RectangleRef create( const Rectf &bounds ) { return std::make_shared<Rectangle>( bounds ); }
 	static RectangleRef create( float x, float y, float width, float height ) { return std::make_shared<Rectangle>( x, y, width, height ); }
 
-	explicit Rectangle( const ci::Rectf &bounds )
+	explicit Rectangle( const Rectf &bounds )
 		: mBounds{ bounds }
 	{
 		mPathId = gl::genPathsNV( 1 );
@@ -242,9 +330,9 @@ class Rectangle final : public Path {
 	Rectangle &operator=( const Rectangle &other ) = default;
 	Rectangle &operator=( Rectangle &&other ) noexcept = default;
 
-	[[nodiscard]] ci::Rectf getBounds() const override { return mBounds; }
+	[[nodiscard]] Rectf getBounds() const override { return mBounds; }
 
-	Rectangle transformed( const glm::mat3x2 &transform ) const
+	[[nodiscard]] Rectangle transformed( const glm::mat3x2 &transform ) const
 	{
 		Rectangle rectangle( *this );
 		rectangle.transform( transform );
@@ -257,10 +345,10 @@ class Rectangle final : public Path {
 
 using RoundedRectangleRef = std::shared_ptr<class RoundedRectangle>;
 
-class RoundedRectangle final : public Path {
-	ci::Rectf mBounds;             //
-	float     mCornerRadiusX{ 0 }; //
-	float     mCornerRadiusY{ 0 }; //
+CI_API class RoundedRectangle final : public Path {
+	Rectf mBounds;             //
+	float mCornerRadiusX{ 0 }; //
+	float mCornerRadiusY{ 0 }; //
 
   public:
 	static RoundedRectangleRef create( float x, float y, float width, float height, float r ) { return std::make_shared<RoundedRectangle>( x, y, width, height, r ); }
@@ -288,9 +376,9 @@ class RoundedRectangle final : public Path {
 	RoundedRectangle &operator=( const RoundedRectangle &other ) = default;
 	RoundedRectangle &operator=( RoundedRectangle &&other ) noexcept = default;
 
-	[[nodiscard]] ci::Rectf getBounds() const override { return mBounds; }
+	[[nodiscard]] Rectf getBounds() const override { return mBounds; }
 
-	RoundedRectangle transformed( const glm::mat3x2 &transform ) const
+	[[nodiscard]] RoundedRectangle transformed( const glm::mat3x2 &transform ) const
 	{
 		RoundedRectangle rectangle( *this );
 		rectangle.transform( transform );
@@ -303,18 +391,18 @@ class RoundedRectangle final : public Path {
 
 using StarRef = std::shared_ptr<class Star>;
 
-class Star final : public Path {
-	glm::vec2 mCenter;           //
-	float     mRadiusLarge{ 0 }; //
-	float     mRadiusSmall{ 0 }; //
-	float     mRotation{ 0 };    //
-	int       mPoints{ 5 };      //
+CI_API class Star final : public Path {
+	vec2  mCenter;           //
+	float mRadiusLarge{ 0 }; //
+	float mRadiusSmall{ 0 }; //
+	float mRotation{ 0 };    //
+	int   mPoints{ 5 };      //
 
   public:
-	static StarRef create( const glm::vec2 &center, int points, float largeRadius, float smallRadius, float rotation = 0 ) { return std::make_shared<Star>( center, points, largeRadius, smallRadius, rotation ); }
+	static StarRef create( const vec2 &center, int points, float largeRadius, float smallRadius, float rotation = 0 ) { return std::make_shared<Star>( center, points, largeRadius, smallRadius, rotation ); }
 	static StarRef create( float x, float y, int points, float largeRadius, float smallRadius, float rotation = 0 ) { return std::make_shared<Star>( x, y, points, largeRadius, smallRadius, rotation ); }
 
-	Star( const glm::vec2 &center, int points, float largeRadius, float smallRadius, float rotation = 0 )
+	Star( const vec2 &center, int points, float largeRadius, float smallRadius, float rotation = 0 )
 		: Star( center.x, center.y, points, largeRadius, smallRadius, rotation )
 	{
 	}
@@ -334,9 +422,9 @@ class Star final : public Path {
 	Star &operator=( const Star &other ) = default;
 	Star &operator=( Star &&other ) noexcept = default;
 
-	[[nodiscard]] ci::Rectf getBounds() const override { return { mCenter.x - mRadiusLarge, mCenter.y - mRadiusLarge, mCenter.x + mRadiusLarge, mCenter.y + mRadiusLarge }; }
+	[[nodiscard]] Rectf getBounds() const override { return { mCenter.x - mRadiusLarge, mCenter.y - mRadiusLarge, mCenter.x + mRadiusLarge, mCenter.y + mRadiusLarge }; }
 
-	Star transformed( const glm::mat3x2 &transform ) const
+	[[nodiscard]] Star transformed( const glm::mat3x2 &transform ) const
 	{
 		Star star( *this );
 		star.transform( transform );
@@ -349,13 +437,13 @@ class Star final : public Path {
 
 using ArrowRef = std::shared_ptr<class Arrow>;
 
-class Arrow final : public Path {
-	glm::vec2 mP0;
-	glm::vec2 mP1;
-	float     mThickness{ 1 };
-	float     mWidth{ 4 };     // As a percentage of thickness.
-	float     mLength{ 4 };    // As a percentage of thickness.
-	float     mConcavity{ 0 }; //
+CI_API class Arrow final : public Path {
+	vec2  mP0;
+	vec2  mP1;
+	float mThickness{ 1 };
+	float mWidth{ 4 };     // As a percentage of thickness.
+	float mLength{ 4 };    // As a percentage of thickness.
+	float mConcavity{ 0 }; //
   public:
 	static ArrowRef create( float x0, float y0, float x1, float y1, float thickness, float width = 4, float length = 4, float concavity = 0 ) { return std::make_shared<Arrow>( x0, y0, x1, y1, thickness, width, length, concavity ); }
 
@@ -376,19 +464,19 @@ class Arrow final : public Path {
 	Arrow &operator=( const Arrow &other ) = default;
 	Arrow &operator=( Arrow &&other ) noexcept = default;
 
-	[[nodiscard]] ci::Rectf getBounds() const override { return { /* TODO */ }; }
+	[[nodiscard]] Rectf getBounds() const override { return { /* TODO */ }; }
 
-	Arrow transformed( const glm::mat3x2 &transform ) const
+	[[nodiscard]] Arrow transformed( const glm::mat3x2 &transform ) const
 	{
 		Arrow arrow( *this );
 		arrow.transform( transform );
 		return arrow;
 	}
 
-	void stroke( const ci::ColorA &color, float strokeWidth ) override { stroke( color, CapsStyle::DEFAULT, JoinStyle::MITER_REVERT, strokeWidth ); }
-	void stroke( const ci::ColorA &color, CapsStyle caps, float strokeWidth ) override { stroke( color, caps, JoinStyle::MITER_REVERT, strokeWidth ); }
-	void stroke( const ci::ColorA &color, JoinStyle join, float strokeWidth ) override { stroke( color, CapsStyle::DEFAULT, join, strokeWidth ); }
-	void stroke( const ci::ColorA &color, CapsStyle caps, JoinStyle join, float strokeWidth ) override { Path::stroke( color, caps, join, strokeWidth ); }
+	void stroke( const ColorA &color, float strokeWidth ) override { stroke( color, CapsStyle::DEFAULT, JoinStyle::MITER_REVERT, strokeWidth ); }
+	void stroke( const ColorA &color, CapsStyle caps, float strokeWidth ) override { stroke( color, caps, JoinStyle::MITER_REVERT, strokeWidth ); }
+	void stroke( const ColorA &color, JoinStyle join, float strokeWidth ) override { stroke( color, CapsStyle::DEFAULT, join, strokeWidth ); }
+	void stroke( const ColorA &color, CapsStyle caps, JoinStyle join, float strokeWidth ) override { Path::stroke( color, caps, join, strokeWidth ); }
 
   private:
 	void create() const;
@@ -397,17 +485,17 @@ class Arrow final : public Path {
 using SpiralRef = std::shared_ptr<class Spiral>;
 
 //! Creates an Archimedean spiral.
-class Spiral final : public Path {
-	glm::vec2 mCenter;      //
-	float     mInnerRadius; //
-	float     mOuterRadius; //
-	float     mSpacing;     // Distance between each winding.
+CI_API class Spiral final : public Path {
+	vec2  mCenter;      //
+	float mInnerRadius; //
+	float mOuterRadius; //
+	float mSpacing;     // Distance between each winding.
 
   public:
-	static SpiralRef create( const glm::vec2 &center, float innerRadius, float outerRadius, float spacing ) { return std::make_shared<Spiral>( center, innerRadius, outerRadius, spacing ); }
+	static SpiralRef create( const vec2 &center, float innerRadius, float outerRadius, float spacing ) { return std::make_shared<Spiral>( center, innerRadius, outerRadius, spacing ); }
 
 	//! Creates an Archimedean spiral at \a center, with the specified \a innerRadius, \a outerRadius and \a spacing between each winding.
-	Spiral( const glm::vec2 &center, float innerRadius, float outerRadius, float spacing )
+	Spiral( const vec2 &center, float innerRadius, float outerRadius, float spacing )
 		: mCenter{ center }
 		, mInnerRadius{ innerRadius }
 		, mOuterRadius{ outerRadius }
@@ -422,22 +510,22 @@ class Spiral final : public Path {
 	Spiral &operator=( const Spiral &other ) = default;
 	Spiral &operator=( Spiral &&other ) noexcept = default;
 
-	[[nodiscard]] ci::Rectf getBounds() const override { return { /* TODO */ }; }
+	[[nodiscard]] Rectf getBounds() const override { return { /* TODO */ }; }
 
-	Spiral transformed( const glm::mat3x2 &transform ) const
+	[[nodiscard]] Spiral transformed( const glm::mat3x2 &transform ) const
 	{
 		Spiral spiral( *this );
 		spiral.transform( transform );
 		return spiral;
 	}
 
-	void stroke( const ci::ColorA &color, float strokeWidth ) override { stroke( color, CapsStyle::DEFAULT, JoinStyle::MITER_REVERT, strokeWidth ); }
-	void stroke( const ci::ColorA &color, CapsStyle caps, float strokeWidth ) override { stroke( color, caps, JoinStyle::MITER_REVERT, strokeWidth ); }
-	void stroke( const ci::ColorA &color, JoinStyle join, float strokeWidth ) override { stroke( color, CapsStyle::DEFAULT, join, strokeWidth ); }
-	void stroke( const ci::ColorA &color, CapsStyle caps, JoinStyle join, float strokeWidth ) override { Path::stroke( color, caps, join, strokeWidth ); }
+	void stroke( const ColorA &color, float strokeWidth ) override { stroke( color, CapsStyle::DEFAULT, JoinStyle::MITER_REVERT, strokeWidth ); }
+	void stroke( const ColorA &color, CapsStyle caps, float strokeWidth ) override { stroke( color, caps, JoinStyle::MITER_REVERT, strokeWidth ); }
+	void stroke( const ColorA &color, JoinStyle join, float strokeWidth ) override { stroke( color, CapsStyle::DEFAULT, join, strokeWidth ); }
+	void stroke( const ColorA &color, CapsStyle caps, JoinStyle join, float strokeWidth ) override { Path::stroke( color, caps, join, strokeWidth ); }
 
 	//! Returns the coordinates of the center of the spiral.
-	const glm::vec2 &getCenter() const { return mCenter; }
+	const vec2 &getCenter() const { return mCenter; }
 	//! Returns the inner radius of the spiral.
 	float getInnerRadius() const { return mInnerRadius; }
 	//! Returns the outer radius of the spiral.
@@ -462,7 +550,7 @@ class Spiral final : public Path {
 
 		explicit Point( float theta );
 
-		std::pair<glm::vec2, glm::vec2> generate( const Point &previous ) const;
+		std::pair<vec2, vec2> generate( const Point &previous ) const;
 	};
 };
 
