@@ -17,6 +17,176 @@ POSSIBILITY OF SUCH DAMAGE.
 namespace cinder {
 namespace nvp {
 
+void Shape::compile() const
+{
+	GLsizei numCommands;
+	gl::getPathParameterivNV( mPathId, GL_PATH_COMMAND_COUNT_NV, &numCommands );
+	GLsizei numCoords;
+	gl::getPathParameterivNV( mPathId, GL_PATH_COORD_COUNT_NV, &numCoords );
+
+	if( numCommands != static_cast<GLsizei>( mCommands.size() ) || numCoords != static_cast<GLsizei>( mCoords.size() ) )
+		gl::pathCommandsNV( mPathId, static_cast<GLsizei>( mCommands.size() ), mCommands.data(), static_cast<GLsizei>( mCoords.size() ), GL_FLOAT, mCoords.data() );
+}
+
+void Shape::clear()
+{
+	mCommands.clear();
+	mCoords.clear();
+}
+
+void Shape::moveTo( float x, float y )
+{
+	mCommands.emplace_back( GL_MOVE_TO_NV );
+	mCoords.emplace_back( x );
+	mCoords.emplace_back( y );
+}
+
+void Shape::relativeMoveTo( float x, float y )
+{
+	mCommands.emplace_back( GL_RELATIVE_MOVE_TO_NV );
+	mCoords.emplace_back( x );
+	mCoords.emplace_back( y );
+}
+
+void Shape::lineTo( float x, float y )
+{
+	mCommands.emplace_back( GL_LINE_TO_NV );
+	mCoords.emplace_back( x );
+	mCoords.emplace_back( y );
+}
+
+void Shape::relativeLineTo( float x, float y )
+{
+	mCommands.emplace_back( GL_RELATIVE_LINE_TO_NV );
+	mCoords.emplace_back( x );
+	mCoords.emplace_back( y );
+}
+
+void Shape::horizontalLineTo( float x )
+{
+	mCommands.emplace_back( GL_HORIZONTAL_LINE_TO_NV );
+	mCoords.emplace_back( x );
+}
+
+void Shape::relativeHorizontalLineTo( float x )
+{
+	mCommands.emplace_back( GL_RELATIVE_HORIZONTAL_LINE_TO_NV );
+	mCoords.emplace_back( x );
+}
+
+void Shape::verticalLineTo( float y )
+{
+	mCommands.emplace_back( GL_VERTICAL_LINE_TO_NV );
+	mCoords.emplace_back( y );
+}
+
+void Shape::relativeVerticalLineTo( float y )
+{
+	mCommands.emplace_back( GL_RELATIVE_VERTICAL_LINE_TO_NV );
+	mCoords.emplace_back( y );
+}
+
+void Shape::quadTo( float x1, float y1, float x2, float y2 )
+{
+	mCommands.emplace_back( GL_QUADRATIC_CURVE_TO_NV );
+	mCoords.emplace_back( x1 );
+	mCoords.emplace_back( y1 );
+	mCoords.emplace_back( x2 );
+	mCoords.emplace_back( y2 );
+}
+
+void Shape::relativeQuadTo( float x1, float y1, float x2, float y2 )
+{
+	mCommands.emplace_back( GL_RELATIVE_QUADRATIC_CURVE_TO_NV );
+	mCoords.emplace_back( x1 );
+	mCoords.emplace_back( y1 );
+	mCoords.emplace_back( x2 );
+	mCoords.emplace_back( y2 );
+}
+
+void Shape::smoothQuadTo( float x2, float y2 )
+{
+	mCommands.emplace_back( GL_SMOOTH_QUADRATIC_CURVE_TO_NV );
+	mCoords.emplace_back( x2 );
+	mCoords.emplace_back( y2 );
+}
+
+void Shape::relativeSmoothQuadTo( float x2, float y2 )
+{
+	mCommands.emplace_back( GL_RELATIVE_SMOOTH_QUADRATIC_CURVE_TO_NV );
+	mCoords.emplace_back( x2 );
+	mCoords.emplace_back( y2 );
+}
+
+void Shape::cubicTo( float x1, float y1, float x2, float y2, float x3, float y3 )
+{
+	mCommands.emplace_back( GL_CUBIC_CURVE_TO_NV );
+	mCoords.emplace_back( x1 );
+	mCoords.emplace_back( y1 );
+	mCoords.emplace_back( x2 );
+	mCoords.emplace_back( y2 );
+	mCoords.emplace_back( x3 );
+	mCoords.emplace_back( y3 );
+}
+
+void Shape::relativeCubicTo( float x1, float y1, float x2, float y2, float x3, float y3 )
+{
+	mCommands.emplace_back( GL_RELATIVE_CUBIC_CURVE_TO_NV );
+	mCoords.emplace_back( x1 );
+	mCoords.emplace_back( y1 );
+	mCoords.emplace_back( x2 );
+	mCoords.emplace_back( y2 );
+	mCoords.emplace_back( x3 );
+	mCoords.emplace_back( y3 );
+}
+
+void Shape::smoothCubicTo( float x2, float y2, float x3, float y3 )
+{
+	mCommands.emplace_back( GL_SMOOTH_CUBIC_CURVE_TO_NV );
+	mCoords.emplace_back( x2 );
+	mCoords.emplace_back( y2 );
+	mCoords.emplace_back( x3 );
+	mCoords.emplace_back( y3 );
+}
+
+void Shape::relativeSmoothCubicTo( float x2, float y2, float x3, float y3 )
+{
+	mCommands.emplace_back( GL_RELATIVE_SMOOTH_CUBIC_CURVE_TO_NV );
+	mCoords.emplace_back( x2 );
+	mCoords.emplace_back( y2 );
+	mCoords.emplace_back( x3 );
+	mCoords.emplace_back( y3 );
+}
+
+void Shape::arcTo( float rx, float ry, float phi, bool largeArcFlag, bool sweepFlag, float px, float py )
+{
+	mCommands.emplace_back( GL_ARC_TO_NV );
+	mCoords.emplace_back( rx );
+	mCoords.emplace_back( ry );
+	mCoords.emplace_back( phi );
+	mCoords.emplace_back( largeArcFlag );
+	mCoords.emplace_back( sweepFlag );
+	mCoords.emplace_back( px );
+	mCoords.emplace_back( py );
+}
+
+void Shape::relativeArcTo( float rx, float ry, float phi, bool largeArcFlag, bool sweepFlag, float px, float py )
+{
+	mCommands.emplace_back( GL_RELATIVE_ARC_TO_NV );
+	mCoords.emplace_back( rx );
+	mCoords.emplace_back( ry );
+	mCoords.emplace_back( phi );
+	mCoords.emplace_back( largeArcFlag );
+	mCoords.emplace_back( sweepFlag );
+	mCoords.emplace_back( px );
+	mCoords.emplace_back( py );
+}
+
+void Shape::close()
+{
+	mCommands.emplace_back( GL_CLOSE_PATH_NV );
+}
+
 void Arc::create() const
 {
 	bool isSweep = mEnd > mStart;
@@ -150,13 +320,13 @@ void RoundedRectangle::create() const
 	std::vector<GLubyte> commands;
 	std::vector<GLfloat> coords;
 
-	commands.push_back( mCornerRadiusX == mCornerRadiusY ? GL_ROUNDED_RECT_NV : GL_ROUNDED_RECT2_NV );
+	commands.push_back( approxEqual( mCornerRadiusX, mCornerRadiusY ) ? GL_ROUNDED_RECT_NV : GL_ROUNDED_RECT2_NV );
 	coords.push_back( mBounds.x1 );
 	coords.push_back( mBounds.y1 );
 	coords.push_back( mBounds.getWidth() );
 	coords.push_back( mBounds.getHeight() );
 	coords.push_back( mCornerRadiusX );
-	if( mCornerRadiusX != mCornerRadiusY )
+	if( !approxEqual( mCornerRadiusX, mCornerRadiusY ) )
 		coords.push_back( mCornerRadiusY );
 
 	gl::pathCommandsNV( mPathId, GLsizei( commands.size() ), commands.data(), GLsizei( coords.size() ), GL_FLOAT, coords.data() );

@@ -72,15 +72,20 @@ class Path {
 
 	// ReSharper disable once CppHiddenFunction
 	//! Creates a shallow clone of this path. Use with care.
-	PathRef clone() const { return std::make_shared<Path>( *this ); }
+	[[nodiscard]] PathRef clone() const { return std::make_shared<Path>( *this ); }
 
 	//! Returns the path's unique id number.
 	GLuint getId() const { return mPathId; }
 
 	//! Returns the total length of the path.
-	virtual float getLength() const;
+	[[nodiscard]] virtual float getLength() const;
 	//! Returns the path's bounding box, calculated from the actual shape and adjusted for stroke width.
-	virtual Rectf getBounds() const;
+	[[nodiscard]] virtual Rectf getBounds() const;	
+
+	//! Obtains the path's commands and coords.
+	void getPath( std::vector<GLubyte> &commands, std::vector<GLfloat> &coords ) const;
+	//! Set the path's commands and coords. This will overwrite any existing commands and coords.
+	void setPath( const std::vector<GLubyte> &commands, const std::vector<GLfloat> &coords ); /* non-const */
 
 	//! Returns the number of segments defined for this path.
 	int getNumSegments() const;
@@ -151,7 +156,7 @@ class Path {
 	virtual void fillInstanced( const std::vector<GLuint> &paths, const std::vector<glm::mat4x3> &transforms, const ColorA &color );
 
 	//! Creates a new path by adding paths together.
-	Path operator+( const Path &other ) const
+	[[nodiscard]] Path operator+( const Path &other ) const
 	{
 		Path path( *this );
 
@@ -206,7 +211,7 @@ class Path {
 
 	void transform( const glm::mat3x2 &transform ) const { gl::transformPathNV( mPathId, mPathId, GL_AFFINE_2D_NV, reinterpret_cast<const GLfloat *>( &transform ) ); }
 
-	Path transformed( const glm::mat3x2 &transform ) const
+	[[nodiscard]] Path transformed( const glm::mat3x2 &transform ) const
 	{
 		Path path( *this );
 		path.transform( transform );

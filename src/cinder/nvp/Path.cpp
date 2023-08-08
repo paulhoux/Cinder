@@ -565,5 +565,24 @@ std::string Path::toSvgString( GLuint pathId )
 	return svg;
 }
 
+void Path::getPath( std::vector<GLubyte> &commands, std::vector<GLfloat> &coords ) const
+{
+	GLint numCommands;
+	gl::getPathParameterivNV( mPathId, GL_PATH_COMMAND_COUNT_NV, &numCommands );
+	GLint numCoords;
+	gl::getPathParameterivNV( mPathId, GL_PATH_COORD_COUNT_NV, &numCoords );
+
+	commands.resize( numCommands );
+	gl::getPathCommandsNV( mPathId, commands.data() );
+
+	coords.resize( numCoords );
+	gl::getPathCoordsNV( mPathId, coords.data() );
+}
+
+void Path::setPath( const std::vector<GLubyte> &commands, const std::vector<GLfloat> &coords )
+{
+	gl::pathCommandsNV( mPathId, commands.size(), commands.data(), coords.size(), GL_FLOAT, coords.data() );
+}
+
 } // namespace nvp
 } // namespace cinder
