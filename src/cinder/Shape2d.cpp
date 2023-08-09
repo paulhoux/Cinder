@@ -116,7 +116,7 @@ void Shape2d::smoothCurveTo( const vec2 &p2, const vec2 &p3 )
 void Shape2d::relativeSmoothCurveTo( const vec2 &p2, const vec2 &p3 )
 {
 	const auto &pt = getCurrentPoint();
-	relativeSmoothCurveTo( pt + p2, pt + p3 );
+	smoothCurveTo( pt + p2, pt + p3 );
 }
 
 void Shape2d::arc( const vec2 &center, float radius, float startRadians, float endRadians, bool forward )
