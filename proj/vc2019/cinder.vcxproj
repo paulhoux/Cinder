@@ -820,6 +820,8 @@
     <ClCompile Include="..\..\src\cinder\Matrix.cpp" />
     <ClCompile Include="..\..\src\cinder\MediaTime.cpp" />
     <ClCompile Include="..\..\src\cinder\nvp\Canvas.cpp" />
+    <ClCompile Include="..\..\src\cinder\nvp\NvpFace.cpp" />
+    <ClCompile Include="..\..\src\cinder\nvp\NvpFont.cpp" />
     <ClCompile Include="..\..\src\cinder\nvp\Gradient.cpp" />
     <ClCompile Include="..\..\src\cinder\nvp\Path.cpp" />
     <ClCompile Include="..\..\src\cinder\nvp\Primitives.cpp" />
@@ -1090,6 +1092,7 @@
     <ClInclude Include="..\..\include\cinder\Base64.h" />
     <ClInclude Include="..\..\include\cinder\Breakpoint.h" />
     <ClInclude Include="..\..\include\cinder\CameraUi.h" />
+    <ClInclude Include="..\..\include\cinder\CanvasUi.h" />
     <ClInclude Include="..\..\include\cinder\CaptureImplDirectShow.h" />
     <ClInclude Include="..\..\include\cinder\CinderAssert.h" />
     <ClInclude Include="..\..\include\cinder\CinderImGui.h" />
@@ -1159,8 +1162,9 @@
     <ClInclude Include="..\..\include\cinder\nvp\Attribute.h" />
     <ClInclude Include="..\..\include\cinder\nvp\Cache.h" />
     <ClInclude Include="..\..\include\cinder\nvp\Canvas.h" />
-    <ClInclude Include="..\..\include\cinder\nvp\CanvasUi.h" />
     <ClInclude Include="..\..\include\cinder\nvp\Core.h" />
+    <ClInclude Include="..\..\include\cinder\nvp\NvpFace.h" />
+    <ClInclude Include="..\..\include\cinder\nvp\NvpFont.h" />
     <ClInclude Include="..\..\include\cinder\nvp\Gradient.h" />
     <ClInclude Include="..\..\include\cinder\nvp\Path.h" />
     <ClInclude Include="..\..\include\cinder\nvp\Primitives.h" />

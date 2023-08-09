@@ -1,10 +1,14 @@
+#include "cinder/CanvasUi.h"
 #include "cinder/Log.h"
 #include "cinder/app/App.h"
 #include "cinder/app/RendererGl.h"
 #include "cinder/gl/gl.h"
+#include "cinder/ip/Fill.h"
 #include "cinder/nvp/Canvas.h"
-#include "cinder/nvp/CanvasUi.h"
+#include "cinder/nvp/NvpFace.h"
+#include "cinder/nvp/NvpFont.h"
 #include "cinder/nvp/Primitives.h"
+#include "cinder/text/Text.h"
 
 using namespace ci;
 using namespace app;
@@ -23,16 +27,21 @@ class PathRenderingDevApp : public App {
 	void keyDown( KeyEvent event ) override;
 
   private:
+	CanvasUi              mCanvasUi;
 	nvp::Canvas           mCanvas{ 32, 16, false };
-	nvp::CanvasUi         mCanvasUi;
 	nvp::Gradients        mGradients;
 	std::vector<fs::path> mFiles;
 	gl::Texture2dRef      mTexture;
+	text::Face *          mFacePtr{};
+	text::AttrString      mText;
+	vec2                  mTextSize;
+	gl::Texture2dRef      mReference;
 };
 
 void PathRenderingDevApp::prepare( Settings *settings )
 {
 	settings->disableFrameRate();
+	settings->setWindowSize( 1880, 1000 );
 }
 
 void PathRenderingDevApp::setup()
@@ -42,7 +51,7 @@ void PathRenderingDevApp::setup()
 	mCanvasUi.connect( getWindow() );
 
 	// Load texture.
-	mTexture = gl::Texture2d::create( loadImage( getAppPath() / "../../../../data/CinderApp_ios.png" ) );
+	// mTexture = gl::Texture2d::create( loadImage( getAppPath() / "../../../../data/CinderApp_ios.png" ) );
 
 	// Create linear gradient.
 	auto linear = nvp::LinearGradient::create( "my_gradient" );
@@ -57,6 +66,28 @@ void PathRenderingDevApp::setup()
 
 	// Store gradients.
 	mGradients.set( linear );
+
+	// Load font face.
+	auto body = text::loadSystemFace( "Curlz MT" );
+
+	// Create text.
+	mText.clear();
+	mText << text::Alignment::CENTER << text::Leading::mult( 0.8f );
+	mText << text::loadFont( body, 32 ) << Color( 0.8f, 0, 0 );
+	mText << "In a realm where pixels dance and graphics soar,\n"
+			 "Paul Houx stands tall, with tales of lore.\n";
+	mText << text::loadFont( body, 32 ) << Color( 0.5f, 0, 0 );
+	mText << "Eye popping designs, jaw dropping feats,\n"
+			 "His craft leaves onlookers glued to their seats.\n"
+			 "From games to displays, his creations unfold,\n"
+			 "With narratives bright, and stories untold.\n";
+	mText << text::loadFont( body, 32 ) << Color( 0.2f, 0, 0 );
+	mText << "An artisan of code, C++ his quill,\n"
+			 "Transforming abstracts with unmatched skill.";
+
+	text::Frame typesetter( mText, 0.5f * getWindowWidth(), getWindowHeight() );
+	mTextSize.x = typesetter.getGlyphLayout().getMeasuredWidth();
+	mTextSize.y = typesetter.getGlyphLayout().getMeasuredHeight();
 }
 
 void PathRenderingDevApp::update()
@@ -82,156 +113,177 @@ void PathRenderingDevApp::draw()
 
 		gl::ScopedBlendPremult scpBlend; // Important! Use either pre-multiplied alpha or additive blending.
 
-		static const std::vector<std::function<void()>> sDispatch = {
-			//
-			[&]() {
-				// Arc.
-				nvp::ScopedClipRect scpClipRect( 0, 0, 256, 256 );
+		// Render text.
+		nvp::NvpFontProcessor processor;
+		text::typeset( mText, 0.5f * getWindowWidth(), getWindowHeight(), processor, text::TypesetOptions().topLineOffset( ( getWindowHeight() - mTextSize.y ) * 0.5f ) );
 
-				nvp::Arc primitive( { 128, 128 }, 96 );
-				primitive.fill( Color::black() );
-				primitive.stroke( Color( 0.2f, 0.4f, 1.0f ), 5 );
-			},
-			[&]() {
-				// Circle.
-				nvp::ScopedClipRect scpClipRect( 0, 0, 256, 256 );
+		// static const std::vector<std::function<void()>> sDispatch = {
+		//	//
+		//	[&]() {
+		//		// Arc.
+		//		nvp::ScopedClipRect scpClipRect( 0, 0, 256, 256 );
 
-				nvp::Circle primitive( { 128, 128 }, 96 );
-				primitive.fill( Color::black() );
-				primitive.stroke( Color( 0.2f, 0.4f, 1.0f ), 5 );
-			},
-			[&]() {
-				// Ellipse.
-				nvp::ScopedClipRect scpClipRect( 0, 0, 256, 256 );
+		//		nvp::Arc primitive( { 128, 128 }, 96 );
+		//		primitive.fill( Color::black() );
+		//		primitive.stroke( Color( 0.2f, 0.4f, 1.0f ), 5 );
+		//	},
+		//	[&]() {
+		//		// Circle.
+		//		nvp::ScopedClipRect scpClipRect( 0, 0, 256, 256 );
 
-				nvp::Ellipse primitive( { 128, 128 }, 96, 64 );
-				primitive.fill( Color::black() );
-				primitive.stroke( Color( 0.2f, 0.4f, 1.0f ), 5 );
-			},
-			[&]() {
-				// Line.
-				nvp::ScopedClipRect scpClipRect( 0, 0, 256, 256 );
+		//		nvp::Circle primitive( { 128, 128 }, 96 );
+		//		primitive.fill( Color::black() );
+		//		primitive.stroke( Color( 0.2f, 0.4f, 1.0f ), 5 );
+		//	},
+		//	[&]() {
+		//		// Ellipse.
+		//		nvp::ScopedClipRect scpClipRect( 0, 0, 256, 256 );
 
-				nvp::Line primitive( { 64, 64 }, { 192, 192 } );
-				primitive.stroke( Color( 0.2f, 0.4f, 1.0f ), 5 );
-			},
-			[&]() {
-				// Rectangle.
-				nvp::ScopedClipRect scpClipRect( 0, 0, 256, 256 );
+		//		nvp::Ellipse primitive( { 128, 128 }, 96, 64 );
+		//		primitive.fill( Color::black() );
+		//		primitive.stroke( Color( 0.2f, 0.4f, 1.0f ), 5 );
+		//	},
+		//	[&]() {
+		//		// Line.
+		//		nvp::ScopedClipRect scpClipRect( 0, 0, 256, 256 );
 
-				nvp::Rectangle primitive( { 32, 32, 192, 192 } );
-				primitive.fill( Color::black() );
-				primitive.stroke( Color( 0.2f, 0.4f, 1.0f ), 5 );
-			},
-			[&]() {
-				// Rounded rectangle.
-				nvp::ScopedClipRect scpClipRect( 0, 0, 256, 256 );
+		//		nvp::Line primitive( { 64, 64 }, { 192, 192 } );
+		//		primitive.stroke( Color( 0.2f, 0.4f, 1.0f ), 5 );
+		//	},
+		//	[&]() {
+		//		// Rectangle.
+		//		nvp::ScopedClipRect scpClipRect( 0, 0, 256, 256 );
 
-				nvp::RoundedRectangle primitive( 32, 32, 192, 192, 16 );
-				primitive.fill( Color::black() );
-				primitive.stroke( Color( 0.2f, 0.4f, 1.0f ), 5 );
-			},
-			[&]() {
-				// Star.
-				nvp::ScopedClipRect scpClipRect( 0, 0, 256, 256 );
+		//		nvp::Rectangle primitive( { 32, 32, 192, 192 } );
+		//		primitive.fill( Color::black() );
+		//		primitive.stroke( Color( 0.2f, 0.4f, 1.0f ), 5 );
+		//	},
+		//	[&]() {
+		//		// Rounded rectangle.
+		//		nvp::ScopedClipRect scpClipRect( 0, 0, 256, 256 );
 
-				nvp::Star primitive( 128, 128, 5, 96, 40 );
-				primitive.fill( Color::black() );
-				primitive.stroke( Color( 0.2f, 0.4f, 1.0f ), 5 );
-			},
-			[&]() {
-				// Arrow.
-				nvp::ScopedClipRect scpClipRect( 0, 0, 256, 256 );
+		//		nvp::RoundedRectangle primitive( 32, 32, 192, 192, 16 );
+		//		primitive.fill( Color::black() );
+		//		primitive.stroke( Color( 0.2f, 0.4f, 1.0f ), 5 );
+		//	},
+		//	[&]() {
+		//		// Star.
+		//		nvp::ScopedClipRect scpClipRect( 0, 0, 256, 256 );
 
-				nvp::Arrow primitive( 32, 128, 224, 128, 16 );
-				primitive.fill( Color::black() );
-				primitive.stroke( Color( 0.2f, 0.4f, 1.0f ), 5 );
-			},
-			[&]() {
-				// Spiral.
-				nvp::ScopedClipRect scpClipRect( 0, 0, 256, 256 );
+		//		nvp::Star primitive( 128, 128, 5, 96, 40 );
+		//		primitive.fill( Color::black() );
+		//		primitive.stroke( Color( 0.2f, 0.4f, 1.0f ), 5 );
+		//	},
+		//	[&]() {
+		//		// Arrow.
+		//		nvp::ScopedClipRect scpClipRect( 0, 0, 256, 256 );
 
-				nvp::Spiral primitive( { 128, 128 }, 0, 96, 16 );
-				primitive.fill( Color::black() );
-				primitive.stroke( Color( 0.2f, 0.4f, 1.0f ), 5 );
-			},
-			[&]() {
-				// Dash caps.
-				nvp::ScopedClipRect scpClipRect( 0, 0, 256, 256 );
+		//		nvp::Arrow primitive( 32, 128, 224, 128, 16 );
+		//		primitive.fill( Color::black() );
+		//		primitive.stroke( Color( 0.2f, 0.4f, 1.0f ), 5 );
+		//	},
+		//	[&]() {
+		//		// Spiral.
+		//		nvp::ScopedClipRect scpClipRect( 0, 0, 256, 256 );
 
-				nvp::RoundedRectangle primitive( -64, 64, 256, 256, 16 );
-				primitive.setDashPattern( { 30.0f, 15.0f } );
-				primitive.setDashCaps( nvp::CapsStyle::ROUND, nvp::CapsStyle::TRIANGULAR );
-				primitive.stroke( Color( 0.2f, 0.4f, 1.0f ), 10 );
-			},
-			[&]() {
-				// Stencil demo.
-				nvp::ScopedClipRect scpClipRect( 0, 0, 256, 256 );
+		//		nvp::Spiral primitive( { 128, 128 }, 0, 96, 16 );
+		//		primitive.fill( Color::black() );
+		//		primitive.stroke( Color( 0.2f, 0.4f, 1.0f ), 5 );
+		//	},
+		//	[&]() {
+		//		// Dash caps.
+		//		nvp::ScopedClipRect scpClipRect( 0, 0, 256, 256 );
 
-				// Render a circle to the stencil buffer.
-				nvp::Circle primitive( { 128, 128 }, 540.0f / glm::radians( 360.0f ) );
-				primitive.stencilFill();
+		//		nvp::RoundedRectangle primitive( -64, 64, 256, 256, 16 );
+		//		primitive.setDashPattern( { 30.0f, 15.0f } );
+		//		primitive.setDashCaps( nvp::CapsStyle::ROUND, nvp::CapsStyle::TRIANGULAR );
+		//		primitive.stroke( Color( 0.2f, 0.4f, 1.0f ), 10 );
+		//	},
+		//	[&]() {
+		//		// Stencil demo.
+		//		nvp::ScopedClipRect scpClipRect( 0, 0, 256, 256 );
 
-				// Calculate the size and position of the texture from the circle's bounds.
-				auto bounds = primitive.getBounds();
-				auto width = mTexture->getAspectRatio() * bounds.getHeight();
-				bounds.inflate( { width - bounds.getWidth(), 0 } );
+		//		// Render a circle to the stencil buffer.
+		//		nvp::Circle primitive( { 128, 128 }, 540.0f / glm::radians( 360.0f ) );
+		//		primitive.stencilFill();
 
-				// Cover the circle with our texture.
-				primitive.cover( mTexture, bounds );
-			},
-			[&]() {
-				// Shape2d to nvp::Path
-				nvp::ScopedClipRect scpClipRect( 0, 0, 256, 256 );
+		//		// Calculate the size and position of the texture from the circle's bounds.
+		//		auto bounds = primitive.getBounds();
+		//		auto width = mTexture->getAspectRatio() * bounds.getHeight();
+		//		bounds.inflate( { width - bounds.getWidth(), 0 } );
 
-				// Create a Shape2d from a glyph.
-				Font    font( "Arial", 512 );
-				Shape2d glyph = font.getGlyphShape( font.getGlyphChar( u'a' ) );
+		//		// Cover the circle with our texture.
+		//		primitive.cover( mTexture, bounds );
+		//	},
+		//	//[&]() {
+		//	//	// Shape2d to nvp::Path
+		//	//	nvp::ScopedClipRect scpClipRect( 0, 0, 256, 256 );
 
-				// Render the glyph.
-				nvp::Path primitive( glyph );
-				vec2      offset = vec2( 128 ) - primitive.getBounds().getCenter();
+		//	//	// Create a Shape2d from a glyph.
+		//	//	Font    font( "Arial", 512 );
+		//	//	Shape2d glyph = font.getGlyphShape( font.getGlyphChar( u'a' ) );
 
-				gl::ScopedModelMatrix scpModelMatrix;
-				gl::translate( offset );
+		//	//	// Render the glyph.
+		//	//	nvp::Path primitive( glyph );
+		//	//	vec2      offset = vec2( 128 ) - primitive.getBounds().getCenter();
 
-				primitive.fill( mGradients, "my_gradient" );
-				primitive.stroke( Color::black(), 10 );
-			},
-		};
+		//	//	gl::ScopedModelMatrix scpModelMatrix;
+		//	//	gl::translate( offset );
 
-		// Render all scenes in a grid.
-		const auto rows = glm::floor( glm::sqrt( sDispatch.size() ) );
-		const auto cols = glm::ceil( double( sDispatch.size() ) / rows );
-		const auto width = getWindowWidth() / cols;
-		const auto height = getWindowHeight() / rows;
+		//	//	primitive.fill( mGradients, "my_gradient" );
+		//	//	primitive.stroke( Color::black(), 10 );
+		//	//},
+		//};
 
-		int index = 0;
-		for( const auto &func : sDispatch ) {
-			constexpr int size = 256;
-			const auto    scale = glm::min( float( width ) / size, float( height ) / size );
-			const auto    offset = vec2( index % int( cols ) * width, index / int( cols ) * height ) + 0.5f * ( vec2( width, height ) - scale * vec2{ size } ) - scale * vec2{ 0 };
+		//// Render all scenes in a grid.
+		// const auto rows = glm::floor( glm::sqrt( sDispatch.size() ) );
+		// const auto cols = glm::ceil( double( sDispatch.size() ) / rows );
+		// const auto width = getWindowWidth() / cols;
+		// const auto height = getWindowHeight() / rows;
 
-			gl::ScopedModelMatrix m;
-			gl::translate( offset );
-			gl::scale( scale, scale );
+		// int index = 0;
+		// for( const auto &func : sDispatch ) {
+		//	constexpr int size = 256;
+		//	const auto    scale = glm::min( float( width ) / size, float( height ) / size );
+		//	const auto    offset = vec2( index % int( cols ) * width, index / int( cols ) * height ) + 0.5f * ( vec2( width, height ) - scale * vec2{ size } ) - scale * vec2{ 0 };
 
-			func();
+		//	gl::ScopedModelMatrix m;
+		//	gl::translate( offset );
+		//	gl::scale( scale, scale );
 
-			++index;
-		}
+		//	func();
+
+		//	++index;
+		//}
+	}
+	{
+		// Our canvas has gone out of scope, so now we can render it to the main window.
+		gl::ScopedBlendPremult scpBlend;
+
+		mCanvas.draw();
 	}
 
-	// Our canvas has gone out of scope, so now we can render it to the main window.
-	gl::ScopedBlendPremult scpBlend;
+	// To check if NVP renders text correctly, render using the Text classes.
+	gl::ScopedModelMatrix scpModel;
+	// gl::multModelMatrix( mCanvasUi.getModelMatrix() );
+	gl::translate( 0.5f * getWindowWidth(), 0 );
 
-	mCanvas.draw();
+	gl::ScopedColor color( 1, 1, 1 );
+	gl::draw( mReference );
 }
 
 void PathRenderingDevApp::resize()
 {
 	mCanvas.resize( getWindowSize() );
 	mCanvasUi.reset();
+
+	// Render reference texture.
+	Surface surface( 0.5f * getWindowWidth(), getWindowHeight(), true );
+	ip::fill( &surface, ColorA( 0, 0, 0, 0.15f ) );
+	text::Frame typesetting( mText, 0.5f * getWindowWidth(), getWindowHeight(), text::TypesetOptions().topLineOffset( ( getWindowHeight() - mTextSize.y ) * 0.5f ) );
+	text::render( typesetting, &surface );
+
+	mReference = gl::Texture2d::create( surface );
 }
 
 void PathRenderingDevApp::keyDown( KeyEvent event )
@@ -242,6 +294,9 @@ void PathRenderingDevApp::keyDown( KeyEvent event )
 			setFullScreen( false );
 		else
 			quit();
+		break;
+	case KeyEvent::KEY_f:
+		setFullScreen( !isFullScreen() );
 		break;
 	case KeyEvent::KEY_v:
 		gl::enableVerticalSync( !gl::isVerticalSyncEnabled() );

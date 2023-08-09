@@ -1158,6 +1158,12 @@
     <ClCompile Include="..\..\src\libunibreak\emojidef.c">
       <Filter>Source Files\libunibreak</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\cinder\nvp\NvpFont.cpp">
+      <Filter>Source Files\nvp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\cinder\nvp\NvpFace.cpp">
+      <Filter>Source Files\nvp</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\src\cinder\svg\Svg.cpp">
       <Filter>Source Files\svg</Filter>
     </ClCompile>
@@ -2339,9 +2345,6 @@
     <ClInclude Include="..\..\include\cinder\nvp\Canvas.h">
       <Filter>Header Files\nvp</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\include\cinder\nvp\CanvasUi.h">
-      <Filter>Header Files\nvp</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\include\cinder\nvp\Path.h">
       <Filter>Header Files\nvp</Filter>
     </ClInclude>
@@ -2397,6 +2400,15 @@
       <Filter>Header Files\libunibreak</Filter>
     </ClInclude>
     <ClInclude Include="..\..\include\cinder\IntervalMap.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\cinder\nvp\NvpFont.h">
+      <Filter>Header Files\nvp</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\cinder\nvp\NvpFace.h">
+      <Filter>Header Files\nvp</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\cinder\CanvasUi.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

@@ -55,6 +55,8 @@ struct CI_API GlyphMetrics {
 	float	horizontalBearingX;
 	float	horizontalBearingY;
 	float	horizontalAdvance;
+
+	GlyphMetrics operator*( float size ) const { return GlyphMetrics{ width * size, height * size, horizontalBearingX * size, horizontalBearingY * size, horizontalAdvance * size }; }
 };
 
 class CI_API Font {
