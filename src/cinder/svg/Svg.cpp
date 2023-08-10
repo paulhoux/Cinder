@@ -2095,22 +2095,14 @@ void TextSpan::renderSelf( Renderer &renderer ) const
 
 std::vector<std::pair<uint16_t,vec2> > TextSpan::getGlyphMeasures() const
 {
-	if( ! mGlyphMeasures ) {		
-		TextBox tbox = TextBox().font( *getFont() ).text( mString );
-#if defined( CINDER_ANDROID ) || defined( CINDER_LINUX )
-		auto tmpGlyphs = tbox.measureGlyphs();
-		mGlyphMeasures = shared_ptr<std::vector<std::pair<uint16_t,vec2> > >( 
-			new std::vector<std::pair<uint16_t,vec2> >( tmpGlyphs.size() ) );
-		for( size_t i = 0; i < tmpGlyphs.size(); ++i ) {
-			const auto& src = tmpGlyphs[i];
-			auto& dst = (*mGlyphMeasures)[i];
-			dst.first = (uint16_t)src.first;
-			dst.second = src.second;
-		}
-#else	
-		mGlyphMeasures = shared_ptr<std::vector<std::pair<uint16_t,vec2> > >( 
-			new std::vector<std::pair<uint16_t,vec2> >( tbox.measureGlyphs() ) );
-#endif		
+	if( ! mGlyphMeasures ) {
+		std::vector<uint32_t> glyphs;
+		std::vector<vec2> positions;
+
+		mFont->shapeString( text::ShapingOptions(), mString.c_str(), mString.size(), 0, &glyphs, nullptr, &positions, nullptr, nullptr, nullptr );
+		mGlyphMeasures->resize( glyphs.size() );
+		for( size_t g = 0; g < glyphs.size(); ++g )
+			(*mGlyphMeasures)[g] = std::make_pair( (uint16_t)glyphs[g], positions[g] );
 	}
 	
 	return *mGlyphMeasures;
@@ -2162,19 +2154,19 @@ TextSpan::Attributes::Attributes( const XmlTree &xml )
 		mLetterSpacing = readValueList( xml["letter-spacing"], false );
 }
 
-const std::shared_ptr<Font>	TextSpan::getFont() const
+text::Font*	TextSpan::getFont() const
 {
 	if( ! mFont ) {
 		const vector<string> &fontFamilies = getFontFamilies();
 		float fontSize = getFontSize().asUser();		
 		for( vector<string>::const_iterator familyIt = fontFamilies.begin(); familyIt != fontFamilies.end(); ++familyIt ) {
 			try {
-				mFont = shared_ptr<Font>( new Font( *familyIt, fontSize ) );
+				mFont = text::loadFont( text::loadSystemFace( *familyIt ), fontSize );
 				break;
 			}
 			catch( ci::Exception &exc ) {
 				CI_LOG_W( "failed to load font with name: " << *familyIt << ", size: " << fontSize << ". what: " << exc.what() << "\t - loading default font." );
-				mFont = shared_ptr<Font>( new Font( Font::getDefault() ) );
+				mFont = text::loadFont( text::systemDefaultFace(), fontSize );
 			}
 		}
 	}
