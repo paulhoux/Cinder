@@ -90,6 +90,9 @@ class CI_API Platform {
 	//! Sets the path to the associated executable, overriding the default
 	void				setExecutablePath( const fs::path &execPath )	{ mExecutablePath = execPath; }
 
+	//! Finds all folders with the specified \a folderName by walking up the path from the executable until a folder is found. Subclasses can override this method to disable this functionality.
+	virtual std::vector<fs::path>	findFolders( const std::string &folderName );
+
 #if defined( CINDER_UWP )
 	//! Presents the user with an open-file dialog and returns the selected file path. \a callback is called with the file selected asynchronously.
 	//! The dialog optionally begins at the path \a initialPath and can be limited to allow selection of files ending in the extensions enumerated in \a extensions. An empty result implies cancellation.

@@ -94,6 +94,25 @@ fs::path Platform::getExecutablePath() const
 	return mExecutablePath;
 }
 
+std::vector<fs::path> Platform::findFolders( const std::string &folderName )
+{
+	std::vector<fs::path> result;
+
+	// first search the local directory, then its parent, and so on
+	// check at least the app path, even if it has no parent directory
+	auto   execPath = getExecutablePath();
+	size_t parentCt = 0;
+	for( fs::path curPath = execPath; curPath.has_parent_path() || ( curPath == execPath ); curPath = curPath.parent_path(), ++parentCt ) {
+		const fs::path curDir = curPath / fs::path( folderName );
+		if( fs::exists( curDir ) && fs::is_directory( curDir ) )
+			result.push_back( curDir );
+		if( curPath == curPath.root_path() )
+			break;
+	}
+
+	return result;
+}
+
 void Platform::setCommandLineArgs( int argc, char * const argv[] )
 {
 	for( int i = 0; i < argc; ++i )
