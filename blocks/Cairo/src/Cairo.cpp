@@ -25,9 +25,10 @@
 #include "cinder/cairo/Cairo.h"
 #include "cinder/svg/Svg.h"
 #include "cinder/ip/Premultiply.h"
-#include "cinder/Text.h"
+#include "cinder/text/Text.h"
 
 #include <cairo.h>
+#include <cairo-ft.h>
 #include <cairo-svg.h>
 #include <cairo-pdf.h>
 #include <cairo-ps.h>
@@ -41,6 +42,8 @@
 #elif defined( CINDER_MSW )
 	#include "cinder/app/App.h"
 	#include <cairo-win32.h>
+
+uint16_t CAIRO_TEXT_RENDERER_ID = 77;
 
 FILE _iob[] = {*stdin, *stdout, *stderr};
 
@@ -1744,16 +1747,26 @@ void Context::getFontOptions( FontOptions *options )
 	cairo_get_font_options( mCairo, options->getCairoFontOptions() );
 }
 
-void Context::setFont( const cinder::Font &font )
+class FontDataCairo : public cinder::text::Face::Data {
+  public:
+	FontDataCairo( cairo_font_face_t* cairoFace ) : mCairoFace( cairoFace ) {}
+	~FontDataCairo() override { cairo_font_face_destroy( mCairoFace ); }
+
+	cairo_font_face_t* mCairoFace;
+};
+
+void Context::setFont( const text::Font *font )
 {
-#if defined( CINDER_COCOA )
-	cairo_font_face_t *cairoFont = cairo_quartz_font_face_create_for_cgfont( font.getCgFontRef() );
-#elif defined( CINDER_MSW )
-	cairo_font_face_t *cairoFont = cairo_win32_font_face_create_for_logfontw( const_cast<LOGFONTW*>( (const LOGFONTW*)font.getLogfont() ) );
-#endif
+	cairo_font_face_t *cairoFont = nullptr;
+	FontDataCairo* fontData = reinterpret_cast<FontDataCairo*>( font->getFace()->getRendererData( CAIRO_TEXT_RENDERER_ID ) );
+	if( ! fontData ) {
+		cairoFont = cairo_ft_font_face_create_for_ft_face( font->getFace()->getFtFace(), 0 );
+		font->getFace()->setRendererData( CAIRO_TEXT_RENDERER_ID, new FontDataCairo( cairoFont ) );
+	}
+	else
+		cairoFont = fontData->mCairoFace;
 	cairo_set_font_face( mCairo, cairoFont );
-	cairo_set_font_size( mCairo, font.getSize() );
-	cairo_font_face_destroy( cairoFont );
+	cairo_set_font_size( mCairo, font->getSize() );
 }
 
 void Context::setFontFace( const FontFace &font_face )
@@ -1779,6 +1792,28 @@ ScaledFont*	Context::getScaledFont()
 void Context::showText( const std::string &s )
 {
 	cairo_show_text( mCairo, s.c_str() );
+}
+
+void Context::showText( const text::Typesetter &typesetter, const vec2& pos )
+{
+	text::Typesetter::Iterator iter = typesetter.getIterator();
+	const text::Run* runPtr;
+	vec2 lineDrawOffset;
+	while( typesetter.nextRun( iter, &runPtr, &lineDrawOffset ) ) {
+		if( runPtr->isPlaceholder() )
+			continue;
+		vec2 drawOffset = pos + lineDrawOffset + runPtr->getDrawOffset();
+		setSource( runPtr->getColor() );
+		setFont( runPtr->getFont() );
+		std::vector<cairo_glyph_t> glyphs( runPtr->getNumGlyphs() );
+		for( size_t g = 0; g < runPtr->getNumGlyphs(); ++g ) {
+			glyphs[g].index = runPtr->getGlyphIndices()[g];
+			glyphs[g].x = runPtr->getGlyphPositions()[g].x + drawOffset.x;
+			glyphs[g].y = runPtr->getGlyphPositions()[g].y + drawOffset.y;
+		}
+		cairo_show_glyphs( mCairo, glyphs.data(), (int)glyphs.size() );
+		fill();
+	}
 }
 
 void Context::textPath( const std::string &s )
@@ -2043,8 +2078,8 @@ class SvgRendererCairo : public svg::Renderer {
 		}*/
 		mCtx.appendPath( span.getShape() );
 #else		
-		std::shared_ptr<Font> font = span.getFont();
-		mCtx.setFont( *font );
+		text::Font* font = span.getFont();
+		mCtx.setFont( font );
 
 		mCtx.moveTo( mTextPenStack.back() );
 		// we can use a text path when the rotate is empty
@@ -2053,6 +2088,7 @@ class SvgRendererCairo : public svg::Renderer {
 			mTextPenStack.back() = mCtx.getCurrentPoint();
 		}
 		else {
+#if defined NOT_YET
 			mCtx.save();
 			cairo::Matrix fontMatrix, oldFontMatrix, rotationMatrix;
 			mCtx.getFontMatrix( &oldFontMatrix );
@@ -2073,6 +2109,7 @@ class SvgRendererCairo : public svg::Renderer {
 			}
 			mTextPenStack.back() = mCtx.getCurrentPoint();
 			mCtx.restore();
+#endif
 		}
 #endif
 		strokeAndFill( span );

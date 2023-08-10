@@ -28,63 +28,27 @@
 #include "cinder/Rect.h"
 #include "cinder/BSpline.h"
 #include "cinder/Shape2d.h"
-#include "cinder/Font.h"
+#include "cinder/text/Font.h"
 #include "cinder/ImageIo.h"
 #include "cinder/Matrix.h"
 #include "cinder/Function.h"
 #include "cinder/svg/Svg.h"
+#include "cinder/text/Text.h"
 
 #if defined( CINDER_COCOA_TOUCH )
 	#include <CoreGraphics/CoreGraphics.h>
 #elif defined( CINDER_MAC )
 	#include <ApplicationServices/ApplicationServices.h>
+#elif defined( CINDER_MSW )
+	#include "cinder/msw/CinderWindowsFwd.h"
 #endif
 
 #include <string>
 #include <vector>
 #include <iomanip>
 
-// Forward declarations used by our cairo wrappers 
-struct _cairo_surface;
-typedef struct _cairo_surface cairo_surface_t;
-
-struct _cairo;
-typedef struct _cairo cairo_t;
-
-struct cairo_path; 
-typedef struct cairo_path cairo_path_t;
-
-struct _cairo_pattern;
-typedef struct _cairo_pattern cairo_pattern_t;
-
-/*
-struct _cairo_rectangle;
-typedef struct _cairo_rectangle cairo_rectangle_t;
-
-struct _cairo_rectangle_list;
-typedef struct _cairo_rectangle_list cairo_rectangle_list_t;
-*/
-
-struct _cairo_font_options;
-typedef struct _cairo_font_options cairo_font_options_t;
-
-struct _cairo_matrix;
-typedef struct _cairo_matrix cairo_matrix_t;
-
-struct _cairo_font_face;
-typedef struct _cairo_font_face cairo_font_face_t;
-
-struct _cairo_scaled_font;
-typedef struct _cairo_scaled_font cairo_scaled_font_t;
-
-/*struct _cairo_glyph;
-typedef struct _cairo_glyph cairo_glyph_t;*/
-
-struct _cairo_text_extents;
-typedef struct _cairo_text_extents cairo_text_extents_t;
-
-struct _cairo_font_extents;
-typedef struct _cairo_font_extents cairo_font_extents_t;
+#define CAIRO_WIN32_STATIC_BUILD 1
+#include <cairo.h>
 
 namespace cinder { namespace cairo {
 /////////////////////////////////////////////////////////////////////////////
@@ -402,7 +366,7 @@ private:
 
 class FontFace 
 {
-public:
+  public:
 	FontFace() { mCairoFontFace = 0; }
 	FontFace( const std::string &fontName );
 	FontFace( cairo_font_face_t *aCairoFontFace );
@@ -412,7 +376,7 @@ public:
 	
 	int32_t		getType();
 	
-private:
+  private:
 	cairo_font_face_t	*mCairoFontFace;
 };
 
@@ -678,7 +642,7 @@ class Context
 	void        deviceToUserDistance( double *dx, double *dy );
 	
 // Text/font functions
-	void		setFont( const cinder::Font &font );
+	void		setFont( const text::Font* font );
 	void        selectFontFace( const std::string &family, int32_t slant, int32_t weight );
 	void        setFontSize( double size );
 	void        setFontMatrix( const Matrix &matrix );
@@ -690,9 +654,10 @@ class Context
 	void        setScaledFont( const ScaledFont *scaled_font );
 	ScaledFont*	getScaledFont();
 	void        showText( const std::string &s );
+	void		showText( const text::Typesetter &typesetter, const vec2& pos );
 	void		textPath( const std::string &s );
 	//! Renders glyphs as returned by TextBox::measureGlyphs()
-	void		glyphPath( const std::vector<std::pair<uint16_t,vec2> > &glyphs );
+	void		glyphPath( const std::vector<std::pair<uint16_t,vec2>> &glyphs );
 	void		glyphPath( uint16_t index, const vec2 &offset );
 	//void        showGlyphs( const Glyph *glyphs, int num_glyphs );							// glyphs is an array of cairo_glyph_t
 	//void		showGlyphs( const GlyphArray &glyphs );
