@@ -1131,6 +1131,9 @@
     <ClCompile Include="..\..\src\libunibreak\emojidef.c">
       <Filter>Source Files\libunibreak</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\cinder\svg\Svg.cpp">
+      <Filter>Source Files\svg</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\AntTweakBar\AntPerfTimer.h">
