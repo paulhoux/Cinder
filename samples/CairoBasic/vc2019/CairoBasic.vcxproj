@@ -111,8 +111,8 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>..\include;"..\..\..\include";..\..\..\blocks\Cairo\include;..\..\..\blocks\Cairo\include\msw</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;NOMINMAX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>..\include;..\..\..\include;..\..\..\blocks\Cairo\include;..\..\..\blocks\Cairo\include\msw;..\..\..\include\freetype</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>WIN32;CAIRO_WIN32_STATIC_BUILD=1;_DEBUG;_WINDOWS;NOMINMAX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <PrecompiledHeader>
@@ -167,8 +167,8 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
-      <AdditionalIncludeDirectories>..\include;"..\..\..\include";..\..\..\blocks\Cairo\include;..\..\..\blocks\Cairo\include\msw</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;NOMINMAX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>..\include;..\..\..\include;..\..\..\blocks\Cairo\include;..\..\..\blocks\Cairo\include\msw;..\..\..\include\freetype</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>WIN32;CAIRO_WIN32_STATIC_BUILD=1;NDEBUG;_WINDOWS;NOMINMAX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <PrecompiledHeader>
       </PrecompiledHeader>
