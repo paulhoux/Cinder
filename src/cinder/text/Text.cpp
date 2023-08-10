@@ -388,7 +388,7 @@ bool processLine( const AttrString &attrString, const std::vector<uint32_t> &clu
 		}
 	}
 	fn.finishLine();
-	return exited;
+	return ! exited;
 }
 
 Channel8u renderString( const AttrString &attrString )
@@ -725,7 +725,7 @@ const GlyphLayout& Frame::getGlyphLayout() const
 // TextOnPath
 class TextOnPathTypesetProcessor : public text::TypesetProcessor {
 public:
-	TextOnPathTypesetProcessor( const ci::Path2d &path, double initialMargin, GlyphLayout *glyphLayout )
+	TextOnPathTypesetProcessor( const ci::Path2d &path, float initialMargin, GlyphLayout *glyphLayout )
 		: mPath( path ), mPathCalcCache( path ), mInitialMargin( initialMargin ), mGlyphLayout( glyphLayout ), mDone( false )
 	{}
 
