@@ -14,10 +14,10 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\src\PathRenderingApp.cpp">
+    <ClCompile Include="..\src\NvPathBasicApp.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\PathRenderingApp.cpp">
+    <ClCompile Include="..\src\NvPathBasicApp.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClInclude Include="..\include\Resources.h">
