@@ -5,9 +5,9 @@ This code is intended for use with the Cinder C++ library: http://libcinder.org
  Redistribution and use in source and binary forms, with or without modification, are permitted provided that
  the following conditions are met:
 
-    * Redistributions of source code must retain the above copyright notice, this list of conditions and
+	* Redistributions of source code must retain the above copyright notice, this list of conditions and
 	the following disclaimer.
-    * Redistributions in binary form must reproduce the above copyright notice, this list of conditions and
+	* Redistributions in binary form must reproduce the above copyright notice, this list of conditions and
 	the following disclaimer in the documentation and/or other materials provided with the distribution.
 
  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED
@@ -77,7 +77,7 @@ class Path {
 	explicit Path( const Shape2d &shape );
 	//! Construct a path from a PolyLine2. Note the correct winding order: points should be defined in counter clockwise order.
 	explicit Path( const PolyLine2 &polyLine );
-	
+
 	//! Creates a shallow clone of this path. Use with care.
 	[[nodiscard]] PathRef clone() const { return std::make_shared<Path>( *this ); }
 
@@ -87,7 +87,7 @@ class Path {
 	//! Returns the total length of the path.
 	[[nodiscard]] virtual float getLength() const;
 	//! Returns the path's bounding box, calculated from the actual shape and adjusted for stroke width.
-	[[nodiscard]] virtual Rectf getBounds() const;	
+	[[nodiscard]] virtual Rectf getBounds() const;
 
 	//! Obtains the path's commands and coords.
 	void getPath( std::vector<GLubyte> &commands, std::vector<GLfloat> &coords ) const;
@@ -133,13 +133,13 @@ class Path {
 	virtual void cover( const gl::Texture2dRef &texture, const Rectf &bounds, bool clearStencil = true );
 
 	//! Strokes the path with a solid \a color.
-	virtual void stroke( const ColorA &color, float strokeWidth = 1 ) { stroke( color, CapsStyle::DEFAULT, JoinStyle::DEFAULT, strokeWidth ); }
+	virtual void stroke( const ColorA &color, float strokeWidth = 1 ) const { stroke( color, CapsStyle::DEFAULT, JoinStyle::DEFAULT, strokeWidth ); }
 	//! Strokes the path with a solid \a color and the specified \a caps style.
-	virtual void stroke( const ColorA &color, CapsStyle caps, float strokeWidth = 1 ) { stroke( color, caps, JoinStyle::DEFAULT, strokeWidth ); }
+	virtual void stroke( const ColorA &color, CapsStyle caps, float strokeWidth = 1 ) const { stroke( color, caps, JoinStyle::DEFAULT, strokeWidth ); }
 	//! Strokes the path with a solid \a color and the specified \a join style.
-	virtual void stroke( const ColorA &color, JoinStyle join, float strokeWidth = 1 ) { stroke( color, CapsStyle::DEFAULT, join, strokeWidth ); }
+	virtual void stroke( const ColorA &color, JoinStyle join, float strokeWidth = 1 ) const { stroke( color, CapsStyle::DEFAULT, join, strokeWidth ); }
 	//! Strokes the path with a solid \a color and the specified \a caps and \a join styles.
-	virtual void stroke( const ColorA &color, CapsStyle caps, JoinStyle join, float strokeWidth = 1 );
+	virtual void stroke( const ColorA &color, CapsStyle caps, JoinStyle join, float strokeWidth = 1 ) const;
 
 	//! Strokes the path instances with a solid \a color and the specified \a caps and \a join styles.
 	virtual void strokeInstanced( const std::vector<GLuint> &paths, const std::vector<glm::mat3x2> &transforms, const ColorA &color, CapsStyle caps, JoinStyle join, float strokeWidth = 1 );

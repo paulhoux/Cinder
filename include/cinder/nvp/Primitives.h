@@ -5,9 +5,9 @@ This code is intended for use with the Cinder C++ library: http://libcinder.org
  Redistribution and use in source and binary forms, with or without modification, are permitted provided that
  the following conditions are met:
 
-    * Redistributions of source code must retain the above copyright notice, this list of conditions and
+	* Redistributions of source code must retain the above copyright notice, this list of conditions and
 	the following disclaimer.
-    * Redistributions in binary form must reproduce the above copyright notice, this list of conditions and
+	* Redistributions in binary form must reproduce the above copyright notice, this list of conditions and
 	the following disclaimer in the documentation and/or other materials provided with the distribution.
 
  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED
@@ -481,10 +481,10 @@ CI_API class Arrow final : public Path {
 		return arrow;
 	}
 
-	void stroke( const ColorA &color, float strokeWidth ) override { stroke( color, CapsStyle::DEFAULT, JoinStyle::MITER_REVERT, strokeWidth ); }
-	void stroke( const ColorA &color, CapsStyle caps, float strokeWidth ) override { stroke( color, caps, JoinStyle::MITER_REVERT, strokeWidth ); }
-	void stroke( const ColorA &color, JoinStyle join, float strokeWidth ) override { stroke( color, CapsStyle::DEFAULT, join, strokeWidth ); }
-	void stroke( const ColorA &color, CapsStyle caps, JoinStyle join, float strokeWidth ) override { Path::stroke( color, caps, join, strokeWidth ); }
+	void stroke( const ColorA &color, float strokeWidth ) const override { stroke( color, CapsStyle::DEFAULT, JoinStyle::MITER_REVERT, strokeWidth ); }
+	void stroke( const ColorA &color, CapsStyle caps, float strokeWidth ) const override { stroke( color, caps, JoinStyle::MITER_REVERT, strokeWidth ); }
+	void stroke( const ColorA &color, JoinStyle join, float strokeWidth ) const override { stroke( color, CapsStyle::DEFAULT, join, strokeWidth ); }
+	void stroke( const ColorA &color, CapsStyle caps, JoinStyle join, float strokeWidth ) const override { Path::stroke( color, caps, join, strokeWidth ); }
 
   private:
 	void create() const;
@@ -527,10 +527,10 @@ CI_API class Spiral final : public Path {
 		return spiral;
 	}
 
-	void stroke( const ColorA &color, float strokeWidth ) override { stroke( color, CapsStyle::DEFAULT, JoinStyle::MITER_REVERT, strokeWidth ); }
-	void stroke( const ColorA &color, CapsStyle caps, float strokeWidth ) override { stroke( color, caps, JoinStyle::MITER_REVERT, strokeWidth ); }
-	void stroke( const ColorA &color, JoinStyle join, float strokeWidth ) override { stroke( color, CapsStyle::DEFAULT, join, strokeWidth ); }
-	void stroke( const ColorA &color, CapsStyle caps, JoinStyle join, float strokeWidth ) override { Path::stroke( color, caps, join, strokeWidth ); }
+	void stroke( const ColorA &color, float strokeWidth ) const override { stroke( color, CapsStyle::DEFAULT, JoinStyle::MITER_REVERT, strokeWidth ); }
+	void stroke( const ColorA &color, CapsStyle caps, float strokeWidth ) const override { stroke( color, caps, JoinStyle::MITER_REVERT, strokeWidth ); }
+	void stroke( const ColorA &color, JoinStyle join, float strokeWidth ) const override { stroke( color, CapsStyle::DEFAULT, join, strokeWidth ); }
+	void stroke( const ColorA &color, CapsStyle caps, JoinStyle join, float strokeWidth ) const override { Path::stroke( color, caps, join, strokeWidth ); }
 
 	//! Returns the coordinates of the center of the spiral.
 	const vec2 &getCenter() const { return mCenter; }
