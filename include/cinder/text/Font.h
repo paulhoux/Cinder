@@ -96,7 +96,9 @@ class CI_API Font {
 	float 			calcStringWidth( const char *utf8String, float tracking = 0 ) const;
 	
 	////! Returns string width in pixels
-	//void 			shapeString( const ShapingOptions &options, const char *utf8String, float tracking, std::vector<uint32_t> *outGlyphIndices, std::vector<uint32_t> *outClusters, std::vector<float> *outGlyphPositions, std::vector<float> *outGlyphAdvances = nullptr, std::vector<float> *outMaxXs = nullptr, float *outPixelWidth = nullptr ) const;
+	size_t 			shapeString( const ShapingOptions &options, const char *utf8String, size_t length, float tracking,
+									std::vector<uint32_t> *outGlyphIndices, std::vector<uint32_t> *outClusters = nullptr, std::vector<vec2> *outGlyphPositions = nullptr, std::vector<float> *outGlyphXAdvances = nullptr,
+									std::vector<float> *outMaxXs = nullptr, float *outPixelWidth = nullptr ) const;
 	//! Appends to out* vectors. Returns number of glyphs appended
 	size_t 			shapeString( const ShapingOptions &options, const char32_t *utf32String, size_t length, float tracking,
 									std::vector<uint32_t> *outGlyphIndices, std::vector<uint32_t> *outClusters = nullptr, std::vector<vec2> *outGlyphPositions = nullptr, std::vector<float> *outGlyphXAdvances = nullptr,

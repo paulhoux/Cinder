@@ -352,6 +352,14 @@ std::vector<size_t> findHardBreaks( const char32_t *utf32String, size_t length )
 	shapeBuffer( buf.get(), features, options.getIgnoreMissingGlyphs(), tracking, outGlyphIndices, outClusters, outGlyphPositions, outGlyphAdvances, outMaxXs, outPixelWidth );
 }*/
 
+size_t Font::shapeString( const ShapingOptions &options, const char *utf8String, size_t length, float tracking, std::vector<uint32_t> *outGlyphIndices, std::vector<uint32_t> *outClusters, std::vector<vec2> *outGlyphPositions, std::vector<float> *outGlyphXAdvances,
+								std::vector<float> *outMaxXs, float *outPixelWidth ) const
+{
+	u32string u32 = toUtf32( utf8String, length );
+	return shapeString( options, u32.data(), u32.length(), tracking, outGlyphIndices, outClusters, outGlyphPositions, outGlyphXAdvances, outMaxXs, outPixelWidth );
+}
+
+
 size_t Font::shapeString( const ShapingOptions &options, const char32_t *utf32String, size_t length, float tracking, vector<uint32_t> *outGlyphIndices, std::vector<uint32_t> *outClusters, vector<vec2> *outGlyphPositions, vector<float> *outGlyphXAdvances, vector<float> *outMaxXs, float *outPixelWidth ) const
 {
 	auto buf = createBuffer( options );
