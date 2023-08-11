@@ -535,11 +535,11 @@ std::string Path::toSvgString( GLuint pathId )
 					w = glm::max( 0.0f, w - r - r );
 					h = glm::max( 0.0f, h - r - r );
 					PATH( svg,
-						{ "M", x + r, y,                                 //
-							"h", w, "a", r, r, "", 0, 0, 1, "", r, r,    //
-							"v", h, "a", r, r, "", 0, 0, 1, "", -r, r,   //
-							"h", -w, "a", r, r, "", 0, 0, 1, "", -r, -r, //
-							"v", -h, "a", r, r, "", 0, 0, 1, "", r, -r,  //
+						{ "M", x + r, y,                                       //
+							"h", w, "a", r, r, "", 0.f, 0.f, 1.f, "", r, r,    //
+							"v", h, "a", r, r, "", 0.f, 0.f, 1.f, "", -r, r,   //
+							"h", -w, "a", r, r, "", 0.f, 0.f, 1.f, "", -r, -r, //
+							"v", -h, "a", r, r, "", 0.f, 0.f, 1.f, "", r, -r,  //
 							"Z" } );
 
 				} break;
@@ -553,11 +553,11 @@ std::string Path::toSvgString( GLuint pathId )
 					w = glm::max( 0.0f, w - rx - rx );
 					h = glm::max( 0.0f, h - ry - ry );
 					PATH( svg,
-						{ "M", x + rx, y,                                    //
-							"h", w, "a", rx, ry, "", 0, 0, 1, "", rx, ry,    //
-							"v", h, "a", rx, ry, "", 0, 0, 1, "", -rx, ry,   //
-							"h", -w, "a", rx, ry, "", 0, 0, 1, "", -rx, -ry, //
-							"v", -h, "a", rx, ry, "", 0, 0, 1, "", rx, -ry,  //
+						{ "M", x + rx, y,                                          //
+							"h", w, "a", rx, ry, "", 0.f, 0.f, 1.f, "", rx, ry,    //
+							"v", h, "a", rx, ry, "", 0.f, 0.f, 1.f, "", -rx, ry,   //
+							"h", -w, "a", rx, ry, "", 0.f, 0.f, 1.f, "", -rx, -ry, //
+							"v", -h, "a", rx, ry, "", 0.f, 0.f, 1.f, "", rx, -ry,  //
 							"Z" } );
 
 				} break;
@@ -589,7 +589,7 @@ void Path::getPath( std::vector<GLubyte> &commands, std::vector<GLfloat> &coords
 
 void Path::setPath( const std::vector<GLubyte> &commands, const std::vector<GLfloat> &coords )
 {
-	gl::pathCommandsNV( mPathId, commands.size(), commands.data(), coords.size(), GL_FLOAT, coords.data() );
+	gl::pathCommandsNV( mPathId, GLsizei( commands.size() ), commands.data(), GLsizei( coords.size() ), GL_FLOAT, coords.data() );
 }
 
 } // namespace nvp
