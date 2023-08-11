@@ -29,16 +29,21 @@ class NvPathTextApp : public App {
   private:
 	CanvasUi         mCanvasUi;                // Pan & zoom the contents of the window.
 	nvp::Canvas      mCanvas{ 32, 16, false }; // Creates a frame buffer with stencil buffer, required by NVP.
+	text::AttrString mTitleLeft;               //
+	text::AttrString mTitleRight;              //
 	text::AttrString mText;                    // Our sample text.
+	ivec2            mColumnSize;              //
 	vec2             mTextSize;                // The measured size of our text.
 	gl::Texture2dRef mReference;               // Text will be rasterized to this texture.
 	Path2d           mSpiral;                  // A spiral shape.
+	float            mPosition{ 0.5f };        //
+	float            mTarget{ 0.5f };          //
 };
 
 void NvPathTextApp::prepare( Settings *settings )
 {
 	settings->disableFrameRate();
-	settings->setWindowSize( 1880, 1000 );
+	settings->setWindowSize( 1200, 900 );
 }
 
 void NvPathTextApp::setup()
@@ -49,7 +54,19 @@ void NvPathTextApp::setup()
 	mCanvasUi.connect( getWindow() );
 
 	// Load font face.
+	const auto title = text::loadSystemFace( "Georgia Italic" );
 	const auto body = text::loadSystemFace( "Curlz MT" );
+
+	// Create titles.
+	mTitleLeft.clear();
+	mTitleLeft << text::loadFont( title, 14 ) << text::Alignment::CENTER;
+	mTitleLeft << Color( 0, 0, 0 );
+	mTitleLeft << "Software Rasterized using FreeType";
+
+	mTitleRight.clear();
+	mTitleRight << text::loadFont( title, 14 ) << text::Alignment::CENTER;
+	mTitleRight << Color( 0, 0, 0 );
+	mTitleRight << "Real-time rendered using Path Rendering";
 
 	// Create text.
 	mText.clear();
@@ -70,6 +87,11 @@ void NvPathTextApp::setup()
 
 void NvPathTextApp::update()
 {
+	// Update position.
+	mPosition += 0.05f * ( mTarget - mPosition );
+	if( approxEqual( mPosition, mTarget ) )
+		mPosition = mTarget;
+
 	// Show application name and frame rate in the window title bar.
 	std::string name = app::getAppPath().stem().string();
 
@@ -86,42 +108,34 @@ void NvPathTextApp::draw()
 
 	// Render to our canvas in its own scope.
 	{
-		nvp::ScopedCanvas     scpCanvas( mCanvas );
+		nvp::ScopedCanvas scpCanvas( mCanvas );
+
+		// Important! Use either pre-multiplied alpha or additive blending.
+		gl::ScopedBlendPremult scpBlend;
+
 		gl::ScopedModelMatrix scpModel( mCanvasUi.getModelMatrix() );
+		gl::translate( mPosition * getWindowWidth(), 0 );
 
-		gl::ScopedBlendPremult scpBlend; // Important! Use either pre-multiplied alpha or additive blending.
-
-		// Render text.
-		nvp::NvpTextProcessor text;
-		text::typeset( mText, 0.5f * getWindowWidth(), 0.5f * getWindowHeight(), text, text::TypesetOptions().topLineOffset( ( 0.5f * getWindowHeight() - mTextSize.y ) * 0.5f ) );
+		// Render text using path rendering.
+		nvp::NvpTextFrame text;
+		text::typeset( mText, mColumnSize.x, mColumnSize.y * 4 / 10, text, text::TypesetOptions().topLineOffset( ( 0.4f * float( mColumnSize.y ) - mTextSize.y ) * 0.5f ) );
 
 		nvp::NvpTextOnPath textOnPath( mSpiral, 0 );
 		text::typeset( mText, -1, -1, textOnPath, text::TypesetOptions() );
 
-		// Render spiral for reference.
-		auto spiral = nvp::Path( mSpiral );
-		spiral.setDashPattern( { 3, 6 } );
-		spiral.stroke( Color( 0, 0, 0 ), 1 );
+		gl::translate( 0, 35 * ( 0.5f - mPosition ) );
+		text::typeset( mTitleRight, mColumnSize.x, -1, text, text::TypesetOptions().topLineOffset( 10 ) );
 	}
 
-	{
-		// Our canvas has gone out of scope, so now we can render it to the main window.
-		gl::ScopedBlendPremult scpBlend;
+	// Our canvas has gone out of scope, so now we can render it to the main window.
+	gl::ScopedBlendPremult scpBlend;
+	mCanvas.draw();
 
-		mCanvas.draw();
-	}
-
-	// To check if NVP renders text correctly, render to the right half of the window using the default rasterizer.
-	gl::ScopedModelMatrix scpModel;
-	gl::translate( 0.5f * getWindowWidth(), 0 );
-
-	gl::ScopedColor color( 1, 1, 1 );
+	// Render reference text on the left.
+	gl::ScopedModelMatrix scpModel( mCanvasUi.getModelMatrix() );
+	gl::ScopedColor       scpColor( 1, 1, 1 );
+	gl::enableAlphaBlending();
 	gl::draw( mReference );
-
-	// Render spiral for reference.
-	gl::ScopedBlendAlpha scpBlend;
-	gl::color( 0, 0, 0, 0.25f );
-	gl::draw( mSpiral );
 }
 
 void NvPathTextApp::resize()
@@ -129,31 +143,42 @@ void NvPathTextApp::resize()
 	mCanvas.resize( getWindowSize() );
 	mCanvasUi.reset();
 
+	//
+	mColumnSize.x = getWindowWidth() / 2;
+	mColumnSize.y = getWindowHeight();
+
 	// Measure text for later.
-	text::Frame typesetter( mText, 0.5f * getWindowWidth(), 0.5f * getWindowHeight() );
+	text::Frame typesetter( mText, mColumnSize.x, mColumnSize.y );
 	mTextSize.x = typesetter.getGlyphLayout().getMeasuredWidth();
 	mTextSize.y = typesetter.getGlyphLayout().getMeasuredHeight();
 
 	// Update spiral shape.
-	const auto size = glm::min( 0.5f * getWindowWidth(), 0.5f * getWindowHeight() );
-	mSpiral = Path2d::spiral( vec2( 0.25f, 0.75f ) * vec2( getWindowSize() ), 0.10f * size, 0.45f * size, 35 /* line gap */ );
+	constexpr auto leading = 35;
+	const auto     radius = 0.45f * float( glm::min( mColumnSize.x, mColumnSize.y * 6 / 10 - 2 * leading ) );
+	mSpiral = Path2d::spiral( vec2( 0.25f, 0.7f ) * vec2( getWindowSize() ), 0.3f * radius, radius, leading );
 
-	// Render reference texture.
-	Surface surface( 0.5f * getWindowWidth(), getWindowHeight(), true );
-	ip::fill( &surface, ColorA( 0, 0, 0, 0.15f ) );
+	// Render reference texture using FreeType software rasterizer.
+	Surface surface( mColumnSize.x, mColumnSize.y, true );
+	ip::fill( &surface, ColorA( 0, 0, 0, 0.15f ).premultiplied() );
 
-	text::Frame text( mText, 0.5f * getWindowWidth(), 0.5f * getWindowHeight(), text::TypesetOptions().topLineOffset( ( 0.5f * getWindowHeight() - mTextSize.y ) * 0.5f ) );
-	text::render( text, &surface, vec2{}, false, true, true );
+	text::Frame title( mTitleLeft, mColumnSize.x, -1, text::TypesetOptions().topLineOffset( 10 ) );
+	text::render( title, &surface, {}, true, true, true );
+
+	text::Frame text( mText, mColumnSize.x, mColumnSize.y * 4 / 10, text::TypesetOptions().topLineOffset( ( 0.4f * float( mColumnSize.y ) - mTextSize.y ) * 0.5f ) );
+	text::render( text, &surface, vec2{}, true, true, true );
 
 	text::TextOnPath textOnPath( mText, mSpiral );
-	text::render( textOnPath, &surface, vec2{}, false, true, false );
+	text::render( textOnPath, &surface, vec2{}, true, true, false );
 
-	mReference = gl::Texture2d::create( surface );
+	mReference = gl::Texture2d::create( surface, gl::Texture2d::Format().minFilter( GL_LINEAR ).magFilter( GL_NEAREST ) );
 }
 
 void NvPathTextApp::keyDown( KeyEvent event )
 {
 	switch( event.getCode() ) {
+	case KeyEvent::KEY_SPACE:
+		mTarget = mTarget > 0 ? 0 : 0.5f;
+		break;
 	case KeyEvent::KEY_ESCAPE:
 		if( isFullScreen() )
 			setFullScreen( false );
