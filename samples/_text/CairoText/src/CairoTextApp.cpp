@@ -8,6 +8,7 @@ using std::vector;
 #include "cinder/Rand.h"
 #include "cinder/Utilities.h"
 #include "cinder/text/Text.h"
+#include "cinder/Path2d.h"
 
 #include <cairo.h>
 
@@ -49,11 +50,33 @@ class Flower {
 		ctx.moveTo( mLoc );
 		ctx.showText( "12345" );
 
-		text::AttrString str;
+/*		text::AttrString str;
 		str << Color( 1.0f, 0.25f, 1.0f ) << text::loadFont( gFace, 40.0f ) << "Born today in 1908, Mary G. Ross was the first known Native American female engineer, and the first female engineer in the history of Lockheed, remembered for her work on aerospace design and design concepts for interplanetary space travel";
 		ctx.showText( text::Frame( str, 300, 500 ), mLoc );
-		//ctx.stroke();
+		//ctx.stroke();*/
 
+		int32_t canvasWidth = getWindowWidth();
+		int32_t canvasHeight = getWindowHeight();
+
+		ci::Path2d path;
+		vec2 center = vec2( app::getWindowSize() ) / 2.0f; 
+		path.moveTo( vec2( 20, center.y ) );
+		path.curveTo( vec2( 200, center.y - 200 ), vec2( 300, center.y + 200 ), vec2( canvasWidth, center.y + 20 ) );
+		path.curveTo( vec2( 200, center.y - 200 ), vec2( 300, center.y + 200 ), vec2( canvasHeight - 20, center.y + 120 ) );
+		text::AttrString str;
+		str << text::loadFont( gFace, 24.0f ) << Color( 1.0f, 0.25f, 1.0f )
+			<<	"In a realm where pixels dance and graphics soar, "
+				"Paul Houx stands tall, with tales of lore. ";
+		str << text::loadFont( gFace, 16.0f ) <<
+				"Eye-popping designs, jaw-dropping feats, "
+				"His craft leaves onlookers glued to their seats."
+				"From games to displays, his creations unfold, "
+				"With narratives bright, and stories untold.";
+		str << text::loadFont( gFace, 8.0f ) <<
+				"An artisan of code, C++ his quill,"
+				"Transforming abstracts with unmatched skill.";
+		text::TextOnPath textOnPath( str, path );
+		ctx.showText( textOnPath, mLoc );
 	};
 	
   private:

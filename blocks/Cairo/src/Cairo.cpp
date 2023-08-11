@@ -1805,13 +1805,30 @@ void Context::showText( const text::Typesetter &typesetter, const vec2& pos )
 		vec2 drawOffset = pos + lineDrawOffset + runPtr->getDrawOffset();
 		setSource( runPtr->getColor() );
 		setFont( runPtr->getFont() );
-		std::vector<cairo_glyph_t> glyphs( runPtr->getNumGlyphs() );
-		for( size_t g = 0; g < runPtr->getNumGlyphs(); ++g ) {
-			glyphs[g].index = runPtr->getGlyphIndices()[g];
-			glyphs[g].x = runPtr->getGlyphPositions()[g].x + drawOffset.x;
-			glyphs[g].y = runPtr->getGlyphPositions()[g].y + drawOffset.y;
+		if( runPtr->hasOrientations() ) {
+			for( size_t g = 0; g < runPtr->getNumGlyphs(); ++g ) {
+				cairo_glyph_t glyph;
+				glyph.index = runPtr->getGlyphIndices()[g];
+				glyph.x = runPtr->getGlyphPositions()[g].x + drawOffset.x;
+				glyph.y = runPtr->getGlyphPositions()[g].y + drawOffset.y;
+				cairo_matrix_t matrix = { 0 };
+				matrix.xx = runPtr->getGlyphOrientations()[g].y * runPtr->getFont()->getSize();
+				matrix.xy = runPtr->getGlyphOrientations()[g].x * runPtr->getFont()->getSize();
+				matrix.yx = -runPtr->getGlyphOrientations()[g].x * runPtr->getFont()->getSize();
+				matrix.yy = runPtr->getGlyphOrientations()[g].y * runPtr->getFont()->getSize();
+				cairo_set_font_matrix( mCairo, &matrix );
+				cairo_show_glyphs( mCairo, &glyph, 1 );
+			}
 		}
-		cairo_show_glyphs( mCairo, glyphs.data(), (int)glyphs.size() );
+		else {
+			std::vector<cairo_glyph_t> glyphs( runPtr->getNumGlyphs() );
+			for( size_t g = 0; g < runPtr->getNumGlyphs(); ++g ) {
+				glyphs[g].index = runPtr->getGlyphIndices()[g];
+				glyphs[g].x = runPtr->getGlyphPositions()[g].x + drawOffset.x;
+				glyphs[g].y = runPtr->getGlyphPositions()[g].y + drawOffset.y;
+			}
+			cairo_show_glyphs( mCairo, glyphs.data(), (int)glyphs.size() );
+		}
 		fill();
 	}
 }
