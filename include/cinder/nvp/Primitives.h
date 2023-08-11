@@ -498,16 +498,18 @@ CI_API class Spiral final : public Path {
 	float mInnerRadius; //
 	float mOuterRadius; //
 	float mSpacing;     // Distance between each winding.
+	float mOffset;      // Angle offset.
 
   public:
-	static SpiralRef create( const vec2 &center, float innerRadius, float outerRadius, float spacing ) { return std::make_shared<Spiral>( center, innerRadius, outerRadius, spacing ); }
+	static SpiralRef create( const vec2 &center, float innerRadius, float outerRadius, float spacing, float offset = 0 ) { return std::make_shared<Spiral>( center, innerRadius, outerRadius, spacing, offset ); }
 
 	//! Creates an Archimedean spiral at \a center, with the specified \a innerRadius, \a outerRadius and \a spacing between each winding.
-	Spiral( const vec2 &center, float innerRadius, float outerRadius, float spacing )
+	Spiral( const vec2 &center, float innerRadius, float outerRadius, float spacing, float offset = 0 )
 		: mCenter{ center }
 		, mInnerRadius{ innerRadius }
 		, mOuterRadius{ outerRadius }
 		, mSpacing{ spacing }
+		, mOffset{ offset }
 	{
 		mPathId = gl::genPathsNV( 1 );
 		create();
@@ -556,7 +558,7 @@ CI_API class Spiral final : public Path {
 		float theta;
 		float tangent;
 
-		explicit Point( float theta );
+		explicit Point( float theta, float offset = 0 );
 
 		std::pair<vec2, vec2> generate( const Point &previous ) const;
 	};

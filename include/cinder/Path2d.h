@@ -89,7 +89,7 @@ class CI_API Path2d {
 	//!
 	static Path2d arrow( float x0, float y0, float x1, float y1, float thickness, float width = 4, float length = 4, float concavity = 0 ) { return arrow( vec2( x0, y0 ), vec2( x1, y1 ), thickness, width, length, concavity ); }
 	//!
-	static Path2d spiral( const vec2 &center, float innerRadius, float outerRadius, float spacing );
+	static Path2d spiral( const vec2 &center, float innerRadius, float outerRadius, float spacing, float offset = 0 );
     
 	//! Reverses the order of the path's points, inverting its winding order
     void	reverse();

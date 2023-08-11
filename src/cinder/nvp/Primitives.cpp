@@ -5,9 +5,9 @@ This code is intended for use with the Cinder C++ library: http://libcinder.org
  Redistribution and use in source and binary forms, with or without modification, are permitted provided that
  the following conditions are met:
 
-    * Redistributions of source code must retain the above copyright notice, this list of conditions and
+	* Redistributions of source code must retain the above copyright notice, this list of conditions and
 	the following disclaimer.
-    * Redistributions in binary form must reproduce the above copyright notice, this list of conditions and
+	* Redistributions in binary form must reproduce the above copyright notice, this list of conditions and
 	the following disclaimer in the documentation and/or other materials provided with the distribution.
 
  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED
@@ -406,7 +406,7 @@ void Spiral::create() const
 	std::vector<GLubyte> commands;
 	std::vector<GLfloat> coords;
 
-	Point p0( radiansStart );
+	Point p0( radiansStart, mOffset - radiansStart );
 
 	commands.push_back( GL_MOVE_TO_NV );
 	coords.push_back( mCenter.x + p0.x * spacing );
@@ -414,7 +414,7 @@ void Spiral::create() const
 
 	float radians = radiansStart + glm::radians( clamp( radiansStart * spacing, 3.0f, 90.0f ) ); // Adaptive step size.
 	while( radians < radiansEnd ) {
-		const auto p3 = Point( radians );
+		const auto p3 = Point( radians, mOffset - radiansStart );
 		const auto controls = p3.generate( p0 );
 
 		commands.push_back( GL_CUBIC_CURVE_TO_NV );
@@ -430,7 +430,7 @@ void Spiral::create() const
 		radians += glm::radians( clamp( radians * spacing, 3.0f, 90.0f ) ); // Adaptive step size.
 	}
 
-	const auto p3 = Point( radiansEnd );
+	const auto p3 = Point( radiansEnd, mOffset - radiansStart );
 	const auto controls = p3.generate( p0 );
 
 	commands.push_back( GL_CUBIC_CURVE_TO_NV );
@@ -444,12 +444,14 @@ void Spiral::create() const
 	gl::pathCommandsNV( mPathId, GLsizei( commands.size() ), commands.data(), GLsizei( coords.size() ), GL_FLOAT, coords.data() );
 }
 
-Spiral::Point::Point( float theta )
+Spiral::Point::Point( float theta, float offset )
 	: theta( theta )
 {
-	x = theta * glm::cos( theta );
-	y = theta * glm::sin( theta );
-	tangent = glm::atan( glm::sin( theta ) + theta * glm::cos( theta ), glm::cos( theta ) - theta * glm::sin( theta ) );
+	float c = glm::cos( theta + offset );
+	float s = glm::sin( theta + offset );
+	x = theta * c;
+	y = theta * s;
+	tangent = glm::atan( s + x, c - y );
 }
 
 std::pair<vec2, vec2> Spiral::Point::generate( const Point &previous ) const

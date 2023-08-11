@@ -593,7 +593,7 @@ Path2d Path2d::arrow( const vec2 &p0, const vec2 &p1, float thickness, float wid
 	return shape;
 }
 
-Path2d Path2d::spiral( const vec2 &center, float innerRadius, float outerRadius, float spacing )
+Path2d Path2d::spiral( const vec2 &center, float innerRadius, float outerRadius, float spacing, float offset )
 {
 	// Helper struct
 	struct Point {
@@ -602,12 +602,14 @@ Path2d Path2d::spiral( const vec2 &center, float innerRadius, float outerRadius,
 		float theta;
 		float tangent;
 
-		explicit Point( float theta )
+		explicit Point( float theta, float offset = 0 )
 			: theta( theta )
 		{
-			x = theta * glm::cos( theta );
-			y = theta * glm::sin( theta );
-			tangent = glm::atan( glm::sin( theta ) + theta * glm::cos( theta ), glm::cos( theta ) - theta * glm::sin( theta ) );
+			float c = glm::cos( theta + offset );
+			float s = glm::sin( theta + offset );
+			x = theta * c;
+			y = theta * s;
+			tangent = glm::atan( s + x, c - y );
 		}
 
 		std::pair<vec2, vec2> generate( const Point &previous ) const
@@ -623,14 +625,14 @@ Path2d Path2d::spiral( const vec2 &center, float innerRadius, float outerRadius,
 	const auto radiansStart = glm::radians( 360 * innerRadius / spacing );
 	const auto radiansEnd = glm::radians( 360 * outerRadius / spacing );
 
-	Point p0( radiansStart );
+	Point p0( radiansStart, offset - radiansStart );
 
 	Path2d shape;
 	shape.moveTo( center.x + p0.x * step, center.y + p0.y * step );
 
 	float radians = radiansStart + glm::radians( clamp( radiansStart * step, 3.0f, 90.0f ) ); // Adaptive step size.
 	while( radians < radiansEnd ) {
-		const auto p3 = Point( radians );
+		const auto p3 = Point( radians, offset - radiansStart );
 		const auto controls = p3.generate( p0 );
 		shape.curveTo( center.x + controls.first.x * step, center.y + controls.first.y * step, center.x + controls.second.x * step, center.y + controls.second.y * step, center.x + p3.x * step, center.y + p3.y * step );
 
@@ -639,7 +641,7 @@ Path2d Path2d::spiral( const vec2 &center, float innerRadius, float outerRadius,
 		radians += glm::radians( clamp( radians * step, 3.0f, 90.0f ) ); // Adaptive step size.
 	}
 
-	const auto p3 = Point( radiansEnd );
+	const auto p3 = Point( radiansEnd, offset - radiansStart );
 	const auto controls = p3.generate( p0 );
 
 	shape.curveTo( center.x + controls.first.x * step, center.y + controls.first.y * step, center.x + controls.second.x * step, center.y + controls.second.y * step, center.x + p3.x * step, center.y + p3.y * step );
