@@ -126,7 +126,7 @@ class Font {
 	}
 };
 
-class CI_API NvpTextProcessor : public text::TypesetProcessor {
+class CI_API NvpTextFrame : public text::TypesetProcessor {
 	vec2 mCursor;
 
   public:

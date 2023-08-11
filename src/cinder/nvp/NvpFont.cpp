@@ -337,14 +337,14 @@ void Font::calcAdvances( const char32_t *data, size_t size, std::vector<GLfloat>
 	}
 }
 
-bool NvpTextProcessor::addLine( text::Alignment justification, vec2 drawOffset, float ascender, float descender, float lineGap, float measuredWidth )
+bool NvpTextFrame::addLine( text::Alignment justification, vec2 drawOffset, float ascender, float descender, float lineGap, float measuredWidth )
 {
 	mCursor = drawOffset;
 
 	return true;
 }
 
-bool NvpTextProcessor::addRun( const text::Font *font, const char32_t *utf32Str, size_t chLen, const std::vector<uint32_t> &clusters, const ColorAf &color, size_t len, const uint32_t glyphIndices[], const vec2 glyphPositions[], float penX,
+bool NvpTextFrame::addRun( const text::Font *font, const char32_t *utf32Str, size_t chLen, const std::vector<uint32_t> &clusters, const ColorAf &color, size_t len, const uint32_t glyphIndices[], const vec2 glyphPositions[], float penX,
 	float measuredWidth, text::PlaceholderInfo *info )
 {
 	// Cache the font face.
