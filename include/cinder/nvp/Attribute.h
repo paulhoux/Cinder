@@ -261,6 +261,8 @@ bool operator!=( const Attribute<T> &lhs, const Attribute<U> &rhs )
 } // namespace nvp
 } // namespace cinder
 
+#pragma warning( push )
+#pragma warning( disable: 4244 )
 inline void testAttribute()
 {
 	cinder::nvp::Attribute              a( 5 ); // Default to int.
@@ -335,3 +337,4 @@ inline void testAttribute()
 	assert( fraction.value() == 2 && "Should be 10 / 5 = 2" );
 	assert( fraction.default() == 10 && "Should be the default of the first operand (a)" );
 }
+#pragma warning( pop )
