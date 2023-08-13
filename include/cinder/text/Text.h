@@ -146,7 +146,7 @@ class CI_API Run {
 	//! UTF-32 string represented by the Run. Doesn't require conversion
 	std::u32string					getTextUtf32() const { return mText; }
 	//! UTF-8 string represented by the Run. Requires conversion from UTF-32
-	std::string						getTextUtf8() const { ci::toUtf8( mText ); }
+	std::string						getTextUtf8() const { return ci::toUtf8( mText ); }
 	const std::vector<uint32_t>&	getClusters() const { return mClusters; }
 
 	void							setDrawOffset( const cinder::vec2 &drawOffset ) { mDrawOffset = drawOffset; }
@@ -289,7 +289,7 @@ class CI_API Frame : public Typesetter {
 	static constexpr int GROW = -1;
 
 	Frame() : mWidth( 0 ), mHeight( 0 ), mDirty( false ) {}
-	Frame( const AttrString &attrString, int32_t width, int32_t height = GROW, const TypesetOptions &options = TypesetOptions() );
+	Frame( const AttrString &attrString, int32_t width = GROW, int32_t height = GROW, const TypesetOptions &options = TypesetOptions() );
 
 	//! Returns pre-typesetting width. A measured width requires the generation of a GlyphLayout. May return \c -1, meaning \c GROW
 	int32_t				getWidth() const { return mWidth; }
