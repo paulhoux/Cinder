@@ -64,8 +64,8 @@ class Flower {
 		path.curveTo( vec2( 200, center.y - 200 ), vec2( 300, center.y + 200 ), vec2( canvasWidth, center.y + 20 ) );
 		path.curveTo( vec2( 200, center.y - 200 ), vec2( 300, center.y + 200 ), vec2( canvasHeight - 20, center.y + 120 ) );
 		text::AttrString str;
-		str << text::loadFont( gFace, 24.0f ) << Color( 1.0f, 0.25f, 1.0f )
-			<<	"In a realm where pixels dance and graphics soar, "
+		/*str << text::loadFont( gFace, 24.0f ) << Color( 1.0f, 0.25f, 1.0f )
+			<<	"Stuff. In a realm where pixels dance and graphics soar, "
 				"Paul Houx stands tall, with tales of lore. ";
 		str << text::loadFont( gFace, 16.0f ) <<
 				"Eye-popping designs, jaw-dropping feats, "
@@ -74,9 +74,11 @@ class Flower {
 				"With narratives bright, and stories untold.";
 		str << text::loadFont( gFace, 8.0f ) <<
 				"An artisan of code, C++ his quill,"
-				"Transforming abstracts with unmatched skill.";
-		text::TextOnPath textOnPath( str, path );
-		ctx.showText( textOnPath, mLoc );
+				"Transforming abstracts with unmatched skill.";*/
+		str << text::loadFont( gFace, 32.0f ) << Color( 1.0f, 0.25f, 1.0f ) << "Jos\xc3\xa9 and Zo\xc3\xab enjoyed caf\xc3\xa9 cr\xc3\xa8me and" << Color( 0.5f, 0.25f, 1.0f ) << " affogatos in Malm\xc3\xb6.";
+
+		ctx.showText( text::TextOnPath( str, path ), mLoc );
+		//ctx.showText( text::Frame( str ), mLoc );
 	};
 	
   private:
@@ -99,7 +101,8 @@ class CairoTextApp : public App {
 
 void CairoTextApp::setup()
 {
-	gFace = text::loadFace( "C:\\Windows\\Fonts\\Candarali.ttf" );
+	//gFace = text::loadFace( "C:\\Windows\\Fonts\\Candarali.ttf" );
+	gFace = text::loadFace( "C:\\Windows\\Fonts\\Gabriola.ttf" );
 }
 
 void CairoTextApp::mouseDown( MouseEvent event )

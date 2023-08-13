@@ -643,6 +643,7 @@ class Context
 	
 // Text/font functions
 	void		setFont( const text::Font* font );
+	void        setFontFace( const text::Face* face );
 	void        selectFontFace( const std::string &family, int32_t slant, int32_t weight );
 	void        setFontSize( double size );
 	void        setFontMatrix( const Matrix &matrix );
