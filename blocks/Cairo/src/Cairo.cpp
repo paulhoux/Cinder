@@ -1800,77 +1800,79 @@ void Context::showText( const std::string &s )
 	cairo_show_text( mCairo, s.c_str() );
 }
 
+namespace {
+
+void showTextRunHelperWithOrientations( Context* ctx, const text::Run* runPtr, const vec2& drawOffset )
+{
+	std::string utf8 = runPtr->getTextUtf8();
+	size_t utf8LengthBytes = utf8.size();
+	size_t curUtf8Byte = 0; // for iterating UTF-8 string using runPtr->clusters, which are expressed in UTF-32 characters
+	ctx->setFontFace( runPtr->getFont()->getFace() );
+	for( size_t g = 0; g < runPtr->getNumGlyphs(); ++g ) {
+		cairo_glyph_t glyph;
+		glyph.index = runPtr->getGlyphIndices()[g];
+		glyph.x = runPtr->getGlyphPositions()[g].x + drawOffset.x;
+		glyph.y = runPtr->getGlyphPositions()[g].y + drawOffset.y;
+		cairo_matrix_t matrix = { 0 };
+		matrix.xx = runPtr->getGlyphOrientations()[g].y * runPtr->getFont()->getSize();
+		matrix.xy = runPtr->getGlyphOrientations()[g].x * runPtr->getFont()->getSize();
+		matrix.yx = -runPtr->getGlyphOrientations()[g].x * runPtr->getFont()->getSize();
+		matrix.yy = runPtr->getGlyphOrientations()[g].y * runPtr->getFont()->getSize();
+		cairo_set_font_matrix( ctx->getCairo(), &matrix );
+		cairo_text_cluster_t cluster;
+		// calculate the number of characters in the cluster by subtracting the current cluster value from the succeeding cluster (or the length of the string in the end)
+		size_t clusterSizeUtf32 = (g < runPtr->getNumGlyphs() - 1 ) ? (runPtr->getClusters()[g+1] - runPtr->getClusters()[g]) : (runPtr->getTextUtf32().length() - runPtr->getClusters()[g]);
+		// ...and determine how many bytes this represents in UTF-8
+		size_t startUtf8Byte = curUtf8Byte;
+		for( size_t i = 0; i < clusterSizeUtf32; ++i )
+			nextCharUtf8( utf8.c_str(), &curUtf8Byte, utf8LengthBytes );
+		cluster.num_bytes = curUtf8Byte - startUtf8Byte;
+		cluster.num_glyphs = 1;
+		cairo_show_text_glyphs( ctx->getCairo(), &utf8.c_str()[startUtf8Byte], cluster.num_bytes, &glyph, 1, &cluster, 1, (cairo_text_cluster_flags_t)0);
+	}
+}
+
+void showTextRunHelper( Context* ctx, const text::Run* runPtr, const vec2& drawOffset )
+{
+	std::string utf8 = runPtr->getTextUtf8();
+	size_t utf8LengthBytes = utf8.size();
+	ctx->setFont( runPtr->getFont() );
+	std::vector<cairo_glyph_t> glyphs( runPtr->getNumGlyphs() );
+	std::vector<cairo_text_cluster_t> clusters( runPtr->getNumGlyphs() );
+	size_t curUtf8Byte = 0; // for iterating UTF-8 string using runPtr->clusters, which are expressed in UTF-32 characters
+	for( size_t g = 0; g < runPtr->getNumGlyphs(); ++g ) {
+		glyphs[g].index = runPtr->getGlyphIndices()[g];
+		glyphs[g].x = runPtr->getGlyphPositions()[g].x + drawOffset.x;
+		glyphs[g].y = runPtr->getGlyphPositions()[g].y + drawOffset.y;
+		// calculate the number of characters in the cluster by subtracting the current cluster value from the succeeding cluster (or the length of the string in the end)
+		size_t clusterSizeUtf32 = (g < runPtr->getNumGlyphs() - 1 ) ? (runPtr->getClusters()[g+1] - runPtr->getClusters()[g]) : (runPtr->getTextUtf32().length() - runPtr->getClusters()[g]);
+		// ...and determine how many bytes this represents in UTF-8
+		size_t startUtf8Byte = curUtf8Byte;
+		for( size_t i = 0; i < clusterSizeUtf32; ++i )
+			nextCharUtf8( utf8.c_str(), &curUtf8Byte, utf8LengthBytes );
+		clusters[g].num_bytes = curUtf8Byte - startUtf8Byte;
+		clusters[g].num_glyphs = 1;
+	}
+	cairo_show_text_glyphs( ctx->getCairo(), utf8.c_str(), -1, glyphs.data(), (int)glyphs.size(), clusters.data(), clusters.size(), (cairo_text_cluster_flags_t)0);
+}
+
+} // anonymous
+
 void Context::showText( const text::Typesetter &typesetter, const vec2& pos )
 {
-	// determine whether surface actually uses the provided text and cluster data
-	bool supportsTextGlyphs = cairo_surface_has_show_text_glyphs( mCairoSurface );
-
 	text::Typesetter::Iterator iter = typesetter.getIterator();
 	const text::Run* runPtr;
 	vec2 lineDrawOffset;
 	while( typesetter.nextRun( iter, &runPtr, &lineDrawOffset ) ) {
 		if( runPtr->isPlaceholder() )
 			continue;
+
 		vec2 drawOffset = pos + lineDrawOffset + runPtr->getDrawOffset();
 		setSource( runPtr->getColor() );
-		if( runPtr->hasOrientations() ) {
-			std::string utf8 = runPtr->getTextUtf8();
-			size_t utf8LengthBytes = utf8.size();
-			size_t curUtf8Byte = 0; // for iterating UTF-8 string using runPtr->clusters, which are expressed in UTF-32 characters
-			setFontFace( runPtr->getFont()->getFace() );
-			for( size_t g = 0; g < runPtr->getNumGlyphs(); ++g ) {
-				cairo_glyph_t glyph;
-				glyph.index = runPtr->getGlyphIndices()[g];
-				glyph.x = runPtr->getGlyphPositions()[g].x + drawOffset.x;
-				glyph.y = runPtr->getGlyphPositions()[g].y + drawOffset.y;
-				cairo_matrix_t matrix = { 0 };
-				matrix.xx = runPtr->getGlyphOrientations()[g].y * runPtr->getFont()->getSize();
-				matrix.xy = runPtr->getGlyphOrientations()[g].x * runPtr->getFont()->getSize();
-				matrix.yx = -runPtr->getGlyphOrientations()[g].x * runPtr->getFont()->getSize();
-				matrix.yy = runPtr->getGlyphOrientations()[g].y * runPtr->getFont()->getSize();
-				cairo_set_font_matrix( mCairo, &matrix );
-				if( supportsTextGlyphs ) {
-					cairo_text_cluster_t cluster;
-					// calculate the number of characters in the cluster by subtracting the current cluster value from the succeeding cluster (or the length of the string in the end)
-					size_t clusterSizeUtf32 = (g < runPtr->getNumGlyphs() - 1 ) ? (runPtr->getClusters()[g+1] - runPtr->getClusters()[g]) : (runPtr->getTextUtf32().length() - runPtr->getClusters()[g]);
-					// ...and determine how many bytes this represents in UTF-8
-					size_t startUtf8Byte = curUtf8Byte;
-					for( size_t i = 0; i < clusterSizeUtf32; ++i )
-						nextCharUtf8( utf8.c_str(), &curUtf8Byte, utf8LengthBytes );
-					cluster.num_bytes = curUtf8Byte - startUtf8Byte;
-					cluster.num_glyphs = 1;
-					cairo_show_text_glyphs( mCairo, &utf8.c_str()[startUtf8Byte], cluster.num_bytes, &glyph, 1, &cluster, 1, (cairo_text_cluster_flags_t)0);
-				}
-				else
-					cairo_show_glyphs( mCairo, &glyph, 1 );
-			}
-		}
-		else {
-			std::string utf8 = runPtr->getTextUtf8();
-			size_t utf8LengthBytes = utf8.size();
-			setFont( runPtr->getFont() );
-			std::vector<cairo_glyph_t> glyphs( runPtr->getNumGlyphs() );
-			std::vector<cairo_text_cluster_t> clusters( runPtr->getNumGlyphs() );
-			size_t curUtf8Byte = 0; // for iterating UTF-8 string using runPtr->clusters, which are expressed in UTF-32 characters
-			for( size_t g = 0; g < runPtr->getNumGlyphs(); ++g ) {
-				glyphs[g].index = runPtr->getGlyphIndices()[g];
-				glyphs[g].x = runPtr->getGlyphPositions()[g].x + drawOffset.x;
-				glyphs[g].y = runPtr->getGlyphPositions()[g].y + drawOffset.y;
-				// calculate the number of characters in the cluster by subtracting the current cluster value from the succeeding cluster (or the length of the string in the end)
-				size_t clusterSizeUtf32 = (g < runPtr->getNumGlyphs() - 1 ) ? (runPtr->getClusters()[g+1] - runPtr->getClusters()[g]) : (runPtr->getTextUtf32().length() - runPtr->getClusters()[g]);
-				// ...and determine how many bytes this represents in UTF-8
-				size_t startUtf8Byte = curUtf8Byte;
-				for( size_t i = 0; i < clusterSizeUtf32; ++i )
-					nextCharUtf8( utf8.c_str(), &curUtf8Byte, utf8LengthBytes );
-				clusters[g].num_bytes = curUtf8Byte - startUtf8Byte;
-				clusters[g].num_glyphs = 1;
-			}
-			if( supportsTextGlyphs )
-				cairo_show_text_glyphs( mCairo, utf8.c_str(), -1, glyphs.data(), (int)glyphs.size(), clusters.data(), clusters.size(), (cairo_text_cluster_flags_t)0);
-			else
-				cairo_show_glyphs( mCairo, glyphs.data(), (int)glyphs.size() );
-		}
-		//fill();
+		if( runPtr->hasOrientations() )
+			showTextRunHelperWithOrientations( this, runPtr, drawOffset );
+		else
+			showTextRunHelper( this, runPtr, drawOffset );
 	}
 }
 
