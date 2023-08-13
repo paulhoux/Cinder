@@ -17,74 +17,40 @@ using namespace ci::app;
 
 text::Face *gFace;
 
-class Flower {
+class TextFragment {
   public:
-	Flower( vec2 loc, float radius, float petalOutsideRadius, float petalInsideRadius, int numPetals, ColorA color )
-		: mLoc( loc ), mRadius( radius ), mPetalOutsideRadius( petalOutsideRadius ), mPetalInsideRadius( petalInsideRadius ), mNumPetals( numPetals ), mColor( color )
+	TextFragment( vec2 loc, ColorA color )
+		: mLoc( loc ), mColor( color )
 	{}
-
-	void makePath( cairo::Context &ctx ) const
-	{
-		for( int petal = 0; petal < mNumPetals; ++petal ) {
-			ctx.newSubPath();
-			float petalAngle = ( petal / (float)mNumPetals ) * 2 * M_PI;
-			vec2 outsideCircleCenter = mLoc + vec2( 1, 0 ) * (float)cos( petalAngle ) * mRadius + vec2( 0, 1 ) * (float)sin( petalAngle ) * mRadius;
-			vec2 insideCircleCenter = mLoc + vec2( 1, 0 ) * (float)cos( petalAngle ) * mPetalInsideRadius + vec2( 0, 1 ) * (float)sin( petalAngle ) * mPetalInsideRadius;
-			ctx.arc( outsideCircleCenter, mPetalOutsideRadius, petalAngle + M_PI / 2 + M_PI, petalAngle + M_PI / 2 );
-			ctx.arc( insideCircleCenter, mPetalInsideRadius, petalAngle + M_PI / 2, petalAngle + M_PI / 2 + M_PI );
-			ctx.closePath();
-		}		
-	}
 	
 	void draw( cairo::Context &ctx ) const
 	{
-		// draw the solid petals
-		ctx.setSource( mColor );
-//		makePath( ctx );
-//		ctx.fill();
-		
-		// draw the petal outlines
-		ctx.setSource( mColor * 0.8f );
-		//makePath( ctx );
-		ctx.setFont( text::loadFont( gFace, 24 ) );
-		ctx.moveTo( mLoc );
-		ctx.showText( "12345" );
-
-/*		text::AttrString str;
-		str << Color( 1.0f, 0.25f, 1.0f ) << text::loadFont( gFace, 40.0f ) << "Born today in 1908, Mary G. Ross was the first known Native American female engineer, and the first female engineer in the history of Lockheed, remembered for her work on aerospace design and design concepts for interplanetary space travel";
-		ctx.showText( text::Frame( str, 300, 500 ), mLoc );
-		//ctx.stroke();*/
-
 		int32_t canvasWidth = getWindowWidth();
 		int32_t canvasHeight = getWindowHeight();
 
 		ci::Path2d path;
-		vec2 center = vec2( app::getWindowSize() ) / 2.0f; 
-		path.moveTo( vec2( 20, center.y ) );
-		path.curveTo( vec2( 200, center.y - 200 ), vec2( 300, center.y + 200 ), vec2( canvasWidth, center.y + 20 ) );
-		path.curveTo( vec2( 200, center.y - 200 ), vec2( 300, center.y + 200 ), vec2( canvasHeight - 20, center.y + 120 ) );
+		path.moveTo( vec2( 0, 0 ) );
+		path.lineTo( canvasWidth, 0 );
+		//path.curveTo( vec2( 200, -200 ), vec2( 300, 200 ), vec2( canvasWidth, 20 ) );
+		//path.curveTo( vec2( 200, -200 ), vec2( 300, 200 ), vec2( canvasWidth - 20, 120 ) );
 		text::AttrString str;
-		/*str << text::loadFont( gFace, 24.0f ) << Color( 1.0f, 0.25f, 1.0f )
-			<<	"Stuff. In a realm where pixels dance and graphics soar, "
-				"Paul Houx stands tall, with tales of lore. ";
-		str << text::loadFont( gFace, 16.0f ) <<
-				"Eye-popping designs, jaw-dropping feats, "
-				"His craft leaves onlookers glued to their seats."
-				"From games to displays, his creations unfold, "
-				"With narratives bright, and stories untold.";
-		str << text::loadFont( gFace, 8.0f ) <<
-				"An artisan of code, C++ his quill,"
-				"Transforming abstracts with unmatched skill.";*/
-		str << text::loadFont( gFace, 32.0f ) << Color( 1.0f, 0.25f, 1.0f ) << "Jos\xc3\xa9 and Zo\xc3\xab enjoyed caf\xc3\xa9 cr\xc3\xa8me and" << Color( 0.5f, 0.25f, 1.0f ) << " affogatos in Malm\xc3\xb6.";
+		str << text::loadFont( gFace, 32.0f ) << Color( 1.0f, 0.25f, 1.0f ) << "Jos\xc3\xa9 and Zo\xc3\xab enjoyed caf\xc3\xa9 cr\xc3\xa8me and"
+			<< text::loadFont( gFace, 48.0f ) << Color( 0.5f, 0.25f, 1.0f ) << " affogatos in Malm\xc3\xb6.";
 
-		ctx.showText( text::TextOnPath( str, path ), mLoc );
+		//ctx.showText( text::TextOnPath( str, path ), mLoc );
+		ctx.showText( text::Frame( str ), mLoc );
+		
+		ctx.setSource( Color( 0, 0, 1.0f ) );
+		ctx.save();
+		ctx.translate( mLoc );
+		ctx.appendPath( path );
+		ctx.stroke();
+		ctx.restore();
 		//ctx.showText( text::Frame( str ), mLoc );
 	};
 	
   private:
 	vec2		mLoc;
-	float		mRadius, mPetalOutsideRadius, mPetalInsideRadius;
-	int			mNumPetals;
 	ColorA		mColor;
 };
 
@@ -96,7 +62,7 @@ class CairoTextApp : public App {
 	void renderScene( cairo::Context &ctx );
 	void draw() override;
 	
-	vector<Flower>		mFlowers;
+	vector<TextFragment>		mTextFragments;
 };
 
 void CairoTextApp::setup()
@@ -107,12 +73,8 @@ void CairoTextApp::setup()
 
 void CairoTextApp::mouseDown( MouseEvent event )
 {	
-	// create a new flower
-	float radius = randFloat( 60, 90 );
-	int numPetals = randInt( 6, 50 );
-	float outerRadius = ( 2 * M_PI * radius ) / numPetals / 2 * randFloat( 0.9f, 1.0f );
-	float innerRadius = outerRadius * randFloat( 0.2f, 0.4f );
-	mFlowers.push_back( Flower( event.getPos(), radius, outerRadius, innerRadius, numPetals, ColorA( CM_HSV, randFloat(), 1, 1, 0.65f ) ) );
+	// create a new TextFragment
+	mTextFragments.push_back( TextFragment( event.getPos(), ColorA( CM_HSV, randFloat(), 1, 1, 0.65f ) ) );
 }
 
 void CairoTextApp::keyDown( KeyEvent event )
@@ -121,7 +83,7 @@ void CairoTextApp::keyDown( KeyEvent event )
 		setFullScreen( ! isFullScreen() );
 	}
 	else if( event.getChar() == 'x' ) {
-		mFlowers.clear();
+		mTextFragments.clear();
 	}
 	else if( event.getChar() == 's' ) {
 		cairo::Context ctx( cairo::SurfaceSvg( getHomeDirectory() / "CairoBasicShot.svg", getWindowWidth(), getWindowHeight() ) );
@@ -154,7 +116,7 @@ void CairoTextApp::renderScene( cairo::Context &ctx )
 	ctx.setFont( loadFont( gFace, 24 ) );
 	ctx.showText( "12345" );
 
-	for( vector<Flower>::const_iterator flIt = mFlowers.begin(); flIt != mFlowers.end(); ++flIt )
+	for( vector<TextFragment>::const_iterator flIt = mTextFragments.begin(); flIt != mTextFragments.end(); ++flIt )
 		flIt->draw( ctx );
 }
 
