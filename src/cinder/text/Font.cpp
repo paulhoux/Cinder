@@ -487,10 +487,10 @@ void Font::drawGlyphsPrecise( const ColorAf &color, size_t len, const uint32_t g
 		FT_Vector offset = { (int)(fracX * 64), (int)(-fracY * 64) };
 		if( glyphOrientations ) {
 			FT_Matrix matrix;
-			matrix.xx = (FT_Fixed)(glyphOrientations[i].y * 65536.0f);
-			matrix.xy = (FT_Fixed)(-glyphOrientations[i].x * 65536.0f);
-			matrix.yx = (FT_Fixed)(glyphOrientations[i].x * 65536.0f);
-			matrix.yy = (FT_Fixed)(glyphOrientations[i].y * 65536.0f);
+			matrix.xx = -(FT_Fixed)(glyphOrientations[i].y * 65536.0f);
+			matrix.xy = (FT_Fixed)(glyphOrientations[i].x * 65536.0f);
+			matrix.yx = -(FT_Fixed)(glyphOrientations[i].x * 65536.0f);
+			matrix.yy = -(FT_Fixed)(glyphOrientations[i].y * 65536.0f);
 			FT_Set_Transform( mFace->getFtFace(), &matrix, &offset );
 		}
 		else

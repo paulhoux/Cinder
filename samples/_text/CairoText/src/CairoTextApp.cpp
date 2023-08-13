@@ -30,23 +30,22 @@ class TextFragment {
 
 		ci::Path2d path;
 		path.moveTo( vec2( 0, 0 ) );
-		path.lineTo( canvasWidth, 0 );
-		//path.curveTo( vec2( 200, -200 ), vec2( 300, 200 ), vec2( canvasWidth, 20 ) );
-		//path.curveTo( vec2( 200, -200 ), vec2( 300, 200 ), vec2( canvasWidth - 20, 120 ) );
+		//path.lineTo( canvasWidth, canvasHeight );
+		path.curveTo( vec2( 200, -200 ), vec2( canvasWidth / 2, 200 ), vec2( canvasWidth, 20 ) );
+		path.curveTo( vec2( 200, -200 ), vec2( 300, 200 ), vec2( canvasWidth - 20, 120 ) );
 		text::AttrString str;
-		str << text::loadFont( gFace, 32.0f ) << Color( 1.0f, 0.25f, 1.0f ) << "Jos\xc3\xa9 and Zo\xc3\xab enjoyed caf\xc3\xa9 cr\xc3\xa8me and"
-			<< text::loadFont( gFace, 48.0f ) << Color( 0.5f, 0.25f, 1.0f ) << " affogatos in Malm\xc3\xb6.";
+		str << text::loadFont( gFace, 48.0f ) << Color( 1.0f, 0.25f, 1.0f ) << "Jos\xc3\xa9 and Zo\xc3\xab enjoyed caf\xc3\xa9 cr\xc3\xa8me and"
+			<< text::loadFont( gFace, 64.0f ) << Color( 0.5f, 0.25f, 1.0f ) << " affogatos in Malm\xc3\xb6.";
 
-		//ctx.showText( text::TextOnPath( str, path ), mLoc );
-		ctx.showText( text::Frame( str ), mLoc );
-		
 		ctx.setSource( Color( 0, 0, 1.0f ) );
 		ctx.save();
 		ctx.translate( mLoc );
 		ctx.appendPath( path );
 		ctx.stroke();
 		ctx.restore();
-		//ctx.showText( text::Frame( str ), mLoc );
+
+		ctx.showText( text::TextOnPath( str, path, text::TypesetOptions(), getElapsedSeconds() * 0, -getElapsedSeconds() * 2 ), mLoc );
+		//ctx.showText( text::Frame( str ), mLoc );	
 	};
 	
   private:

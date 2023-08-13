@@ -725,8 +725,8 @@ const GlyphLayout& Frame::getGlyphLayout() const
 // TextOnPath
 class TextOnPathTypesetProcessor : public text::TypesetProcessor {
 public:
-	TextOnPathTypesetProcessor( const ci::Path2d &path, float initialMargin, GlyphLayout *glyphLayout )
-		: mPath( path ), mPathCalcCache( path ), mInitialMargin( initialMargin ), mGlyphLayout( glyphLayout ), mDone( false ), mLineVerticalOffset( 0 )
+	TextOnPathTypesetProcessor( const ci::Path2d &path, float initialMargin, float baselineOffset, GlyphLayout *glyphLayout )
+		: mPath( path ), mPathCalcCache( path ), mInitialMargin( initialMargin ), mBaselineOffset( baselineOffset ), mGlyphLayout( glyphLayout ), mDone( false ), mLineVerticalOffset( 0 )
 	{}
 
 	bool	addLine( Alignment justification, vec2 drawOffset, float ascender, float descender, float lineGap, float measuredWidth ) {
@@ -755,10 +755,10 @@ public:
 			std::vector<vec2> orientations( len );
 			do {
 				float positionTime = mPathCalcCache.calcTimeForDistance( penX + glyphPositions[glyphIdx].x, false );
-				positions[glyphIdx] = vec2( 0, mLineVerticalOffset ) + mPath.getPosition( positionTime );
 				float tangentTime = mPathCalcCache.calcTimeForDistance( penX + glyphPositions[glyphIdx].x + font->getGlyphMetrics( glyphIndices[glyphIdx] ).width / 2.0f, false );
 				vec2 tangent = glm::normalize( mPath.getTangent( tangentTime ) );
-				orientations[glyphIdx] = vec2( -tangent.y, tangent.x );
+				orientations[glyphIdx] = vec2( tangent.y, -tangent.x );
+				positions[glyphIdx] = mPath.getPosition( positionTime ) + vec2( 0, mLineVerticalOffset ) + orientations[glyphIdx] * mBaselineOffset;
 				++glyphIdx;
 			} while( penX + glyphPositions[glyphIdx].x < mPathCalcCache.getLength() && glyphIdx < len );
 			
@@ -777,12 +777,12 @@ public:
 	cinder::Path2d				mPath;
 	cinder::Path2dCalcCache		mPathCalcCache;
 	GlyphLayout*				mGlyphLayout;
-	float						mLineVerticalOffset, mInitialMargin;
+	float						mLineVerticalOffset, mInitialMargin, mBaselineOffset;
 	bool						mDone;
 };
 
-TextOnPath::TextOnPath( const AttrString &attrString, const Path2d &path, const TypesetOptions &options, float initialMargin )
-	: mDirty( true ), mAttrString( attrString ), mPath( path ), mTypesetOptions( options ), mInitialMargin( initialMargin )
+TextOnPath::TextOnPath( const AttrString &attrString, const Path2d &path, const TypesetOptions &options, float initialMargin, float baselineOffset )
+	: mDirty( true ), mAttrString( attrString ), mPath( path ), mTypesetOptions( options ), mInitialMargin( initialMargin ), mBaselineOffset( baselineOffset )
 {
 }
 
@@ -795,7 +795,7 @@ void TextOnPath::updateGlyphLayout() const
 void TextOnPath::updateGlyphLayoutImpl()
 {
 	mGlyphLayout.clear();
-	TextOnPathTypesetProcessor processor{ mPath, mInitialMargin, &mGlyphLayout };
+	TextOnPathTypesetProcessor processor{ mPath, mInitialMargin, mBaselineOffset, &mGlyphLayout };
 
 	// We don't need to limit width or height
 	typeset( mAttrString, -1, -1, processor, mTypesetOptions );
