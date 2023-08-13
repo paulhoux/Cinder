@@ -1814,10 +1814,10 @@ void showTextRunHelperWithOrientations( Context* ctx, const text::Run* runPtr, c
 		glyph.x = runPtr->getGlyphPositions()[g].x + drawOffset.x;
 		glyph.y = runPtr->getGlyphPositions()[g].y + drawOffset.y;
 		cairo_matrix_t matrix = { 0 };
-		matrix.xx = runPtr->getGlyphOrientations()[g].y * runPtr->getFont()->getSize();
-		matrix.xy = runPtr->getGlyphOrientations()[g].x * runPtr->getFont()->getSize();
-		matrix.yx = -runPtr->getGlyphOrientations()[g].x * runPtr->getFont()->getSize();
-		matrix.yy = runPtr->getGlyphOrientations()[g].y * runPtr->getFont()->getSize();
+		matrix.xx = -runPtr->getGlyphOrientations()[g].y * runPtr->getFont()->getSize();
+		matrix.xy = -runPtr->getGlyphOrientations()[g].x * runPtr->getFont()->getSize();
+		matrix.yx = runPtr->getGlyphOrientations()[g].x * runPtr->getFont()->getSize();
+		matrix.yy = -runPtr->getGlyphOrientations()[g].y * runPtr->getFont()->getSize();
 		cairo_set_font_matrix( ctx->getCairo(), &matrix );
 		cairo_text_cluster_t cluster;
 		// calculate the number of characters in the cluster by subtracting the current cluster value from the succeeding cluster (or the length of the string in the end)
