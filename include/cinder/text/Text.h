@@ -324,7 +324,7 @@ class CI_API Frame : public Typesetter {
 class CI_API TextOnPath : public Typesetter {
   public:
 	TextOnPath() : mDirty( false ) {}
-	TextOnPath( const AttrString &attrString, const Path2d &path, const TypesetOptions &options = TypesetOptions() );
+	TextOnPath( const AttrString &attrString, const Path2d &path, const TypesetOptions &options = TypesetOptions(), float initialMargin = 0 );
 
 	TypesetOptions		getTypesetOptions() const { return mTypesetOptions; }
 
@@ -342,6 +342,7 @@ class CI_API TextOnPath : public Typesetter {
 	GlyphLayout				mGlyphLayout;
 	AttrString				mAttrString;
 	TypesetOptions			mTypesetOptions;
+	float					mInitialMargin;
 	Path2d					mPath;
 };
 

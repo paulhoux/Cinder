@@ -726,13 +726,14 @@ const GlyphLayout& Frame::getGlyphLayout() const
 class TextOnPathTypesetProcessor : public text::TypesetProcessor {
 public:
 	TextOnPathTypesetProcessor( const ci::Path2d &path, float initialMargin, GlyphLayout *glyphLayout )
-		: mPath( path ), mPathCalcCache( path ), mInitialMargin( initialMargin ), mGlyphLayout( glyphLayout ), mDone( false )
+		: mPath( path ), mPathCalcCache( path ), mInitialMargin( initialMargin ), mGlyphLayout( glyphLayout ), mDone( false ), mLineVerticalOffset( 0 )
 	{}
 
 	bool	addLine( Alignment justification, vec2 drawOffset, float ascender, float descender, float lineGap, float measuredWidth ) {
 		if( mDone )
 			return false;
 
+		mLineVerticalOffset = -ascender;
 		mGlyphLayout->getLines().push_back( Line( justification, drawOffset, ascender, descender, lineGap, measuredWidth ) );
 		return true;
 	}
@@ -741,6 +742,8 @@ public:
 	{
 		if( mDone )
 			return false;
+
+		penX += mInitialMargin;
 
 		if( placeholderInfo ) {
 			mGlyphLayout->getPlaceholders().push_back( *placeholderInfo );
@@ -751,13 +754,13 @@ public:
 			std::vector<vec2> positions( len );
 			std::vector<vec2> orientations( len );
 			do {
-				float positionTime = mPathCalcCache.calcTimeForDistance( penX + mInitialMargin + glyphPositions[glyphIdx].x, false );
-				positions[glyphIdx] = vec2( 0, 0 ) + mPath.getPosition( positionTime );
-				float tangentTime = mPathCalcCache.calcTimeForDistance( penX + mInitialMargin + glyphPositions[glyphIdx].x + font->getGlyphMetrics( glyphIndices[glyphIdx] ).width / 2.0f, false );
+				float positionTime = mPathCalcCache.calcTimeForDistance( penX + glyphPositions[glyphIdx].x, false );
+				positions[glyphIdx] = vec2( 0, mLineVerticalOffset ) + mPath.getPosition( positionTime );
+				float tangentTime = mPathCalcCache.calcTimeForDistance( penX + glyphPositions[glyphIdx].x + font->getGlyphMetrics( glyphIndices[glyphIdx] ).width / 2.0f, false );
 				vec2 tangent = glm::normalize( mPath.getTangent( tangentTime ) );
 				orientations[glyphIdx] = vec2( -tangent.y, tangent.x );
 				++glyphIdx;
-			} while( penX + mInitialMargin + glyphPositions[glyphIdx].x < mPathCalcCache.getLength() && glyphIdx < len );
+			} while( penX + glyphPositions[glyphIdx].x < mPathCalcCache.getLength() && glyphIdx < len );
 			
 			if( glyphIdx < len ) // if we terminated because we ran out of path instead of glyphs, we're done
 				mDone = true;
@@ -774,12 +777,12 @@ public:
 	cinder::Path2d				mPath;
 	cinder::Path2dCalcCache		mPathCalcCache;
 	GlyphLayout*				mGlyphLayout;
-	float						mInitialMargin;
+	float						mLineVerticalOffset, mInitialMargin;
 	bool						mDone;
 };
 
-TextOnPath::TextOnPath( const AttrString &attrString, const Path2d &path, const TypesetOptions &options )
-	: mAttrString( attrString ), mPath( path ), mTypesetOptions( options )
+TextOnPath::TextOnPath( const AttrString &attrString, const Path2d &path, const TypesetOptions &options, float initialMargin )
+	: mDirty( true ), mAttrString( attrString ), mPath( path ), mTypesetOptions( options ), mInitialMargin( initialMargin )
 {
 }
 
@@ -792,7 +795,7 @@ void TextOnPath::updateGlyphLayout() const
 void TextOnPath::updateGlyphLayoutImpl()
 {
 	mGlyphLayout.clear();
-	TextOnPathTypesetProcessor processor{ mPath, 0, &mGlyphLayout };
+	TextOnPathTypesetProcessor processor{ mPath, mInitialMargin, &mGlyphLayout };
 
 	// We don't need to limit width or height
 	typeset( mAttrString, -1, -1, processor, mTypesetOptions );
