@@ -208,9 +208,9 @@ Font* font( const std::string &name, float size )
 	if( ! face )
 		face = loadSystemFace( name );
 	if( face )
-		return loadFont( face, size );
+		return font( face, size );
 	else
-		return loadFont( systemDefaultFace(), size );
+		return font( systemDefaultFace(), size );
 }
 
 Font* font( const std::vector<std::pair<std::string,float>> &fonts )
@@ -220,13 +220,13 @@ Font* font( const std::vector<std::pair<std::string,float>> &fonts )
 		if( ! face )
 			face = loadSystemFace( tryFont.first );
 		if( face )
-			return loadFont( face, tryFont.second );
+			return font( face, tryFont.second );
 	}
 
 	if( fonts.empty() )
-		return loadFont( systemDefaultFace(), 12 );
+		return font( systemDefaultFace(), 12 );
 	else
-		return loadFont( systemDefaultFace(), fonts.front().second );
+		return font( systemDefaultFace(), fonts.front().second );
 }
 
 void measureString( const AttrString& attrString, float *resultWidth, float *resultHeight, float *resultBaseline )
@@ -577,7 +577,7 @@ void setWordBreaksUtf32( const char32_t *str, size_t len, char *outBreaks )
 // TypesetOptions
 TypesetOptions::TypesetOptions()
 {
-	mDefaultFont = loadFont( systemDefaultFace(), 12 );
+	mDefaultFont = font( systemDefaultFace(), 12 );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////

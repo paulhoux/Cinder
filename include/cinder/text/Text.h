@@ -254,6 +254,7 @@ class CI_API GlyphLayout : public Typesetter {
   public:
 	float			getMeasuredWidth() const { return mMeasuredWidth; }
 	float			getMeasuredHeight() const { return mMeasuredHeight; }
+	glm::vec2		getMeasuredSize() const { return { mMeasuredWidth, mMeasuredHeight }; }
 	float			getFirstBaseline() const { return mLines.empty() ? 0 : mLines[0].getDrawOffset().y; }
 
 	//! Modification of Lines requires a call to measure()
@@ -291,10 +292,13 @@ class CI_API Frame : public Typesetter {
 	Frame() : mWidth( 0 ), mHeight( 0 ), mDirty( false ) {}
 	Frame( const AttrString &attrString, int32_t width = GROW, int32_t height = GROW, const TypesetOptions &options = TypesetOptions() );
 
+	float				getMeasuredWidth() const { return getGlyphLayout().getMeasuredWidth(); }
+	float				getMeasuredHeight() const { return getGlyphLayout().getMeasuredHeight(); }
+	vec2				getMeasuredSize() const { return getGlyphLayout().getMeasuredSize(); }
+	//! Returns pre-typesetting width. May return \c -1, meaning \c GROW
+	int32_t				getOriginalWidth() const { return mWidth; }
 	//! Returns pre-typesetting width. A measured width requires the generation of a GlyphLayout. May return \c -1, meaning \c GROW
-	int32_t				getWidth() const { return mWidth; }
-	//! Returns pre-typesetting width. A measured width requires the generation of a GlyphLayout. May return \c -1, meaning \c GROW
-	int32_t				getHeight() const { return mHeight; }
+	int32_t				getOriginalHeight() const { return mHeight; }
 
 	TypesetOptions		getTypesetOptions() const { return mTypesetOptions; }
 
@@ -356,8 +360,8 @@ CI_API inline Face*		systemDefaultFace() { return Manager::get()->systemDefaultF
 CI_API inline Face*		loadFace( const ci::fs::path &path, int faceIndex = 0 ) { return Manager::get()->loadFace( path, faceIndex ); }
 CI_API inline Face*		loadFace( const DataSourceRef &dataSource, int faceIndex = 0 ) { return Manager::get()->loadFace( dataSource, faceIndex ); }
 CI_API inline Face*		loadFace( const void *data, size_t dataSize, int faceIndex = 0 ) { return Manager::get()->loadFace( data, dataSize, faceIndex ); }
-CI_API inline Font*		loadFont( Face *face, float size ) { return Manager::get()->loadFont( face, size ); }
-CI_API inline Font*		loadFont( Face *face, float size, const Face::Variation &variation ) { return Manager::get()->loadFont( face, size, variation ); }
+CI_API inline Font*		font( Face *face, float size ) { return Manager::get()->loadFont( face, size ); }
+CI_API inline Font*		font( Face *face, float size, const Face::Variation &variation ) { return Manager::get()->loadFont( face, size, variation ); }
 //! Load a system font named \a name, of point size \a size
 CI_API Font*				font( const std::string &name, float size );
 //! Load a system font, searching in-order in \a fonts

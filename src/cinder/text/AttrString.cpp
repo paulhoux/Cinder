@@ -108,7 +108,7 @@ AttrString& AttrString::operator<<( const std::pair<std::string,float> &fontName
 {
 	Face *face = text::loadFace( fontNameSize.first );
 	if( face ) {
-		Font *font = text::loadFont( face, fontNameSize.second );
+		Font *font = text::font( face, fontNameSize.second );
 		setCurrentFont( font );
 	}
 	return *this;
