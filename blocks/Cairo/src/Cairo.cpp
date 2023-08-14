@@ -1856,6 +1856,36 @@ void showTextRunHelper( Context* ctx, const text::Run* runPtr, const vec2& drawO
 	cairo_show_text_glyphs( ctx->getCairo(), utf8.c_str(), -1, glyphs.data(), (int)glyphs.size(), clusters.data(), clusters.size(), (cairo_text_cluster_flags_t)0);
 }
 
+void glyphPathRunHelperWithOrientations( Context* ctx, const text::Run* runPtr, const vec2& drawOffset )
+{
+	ctx->setFontFace( runPtr->getFont()->getFace() );
+	for( size_t g = 0; g < runPtr->getNumGlyphs(); ++g ) {
+		cairo_glyph_t glyph;
+		glyph.index = runPtr->getGlyphIndices()[g];
+		glyph.x = runPtr->getGlyphPositions()[g].x + drawOffset.x;
+		glyph.y = runPtr->getGlyphPositions()[g].y + drawOffset.y;
+		cairo_matrix_t matrix = { 0 };
+		matrix.xx = -runPtr->getGlyphOrientations()[g].y * runPtr->getFont()->getSize();
+		matrix.xy = -runPtr->getGlyphOrientations()[g].x * runPtr->getFont()->getSize();
+		matrix.yx = runPtr->getGlyphOrientations()[g].x * runPtr->getFont()->getSize();
+		matrix.yy = -runPtr->getGlyphOrientations()[g].y * runPtr->getFont()->getSize();
+		cairo_set_font_matrix( ctx->getCairo(), &matrix );
+		cairo_glyph_path( ctx->getCairo(), &glyph, 1 );
+	}
+}
+
+void glyphPathRunHelper( Context* ctx, const text::Run* runPtr, const vec2& drawOffset )
+{
+	ctx->setFont( runPtr->getFont() );
+	std::vector<cairo_glyph_t> glyphs( runPtr->getNumGlyphs() );
+	for( size_t g = 0; g < runPtr->getNumGlyphs(); ++g ) {
+		glyphs[g].index = runPtr->getGlyphIndices()[g];
+		glyphs[g].x = runPtr->getGlyphPositions()[g].x + drawOffset.x;
+		glyphs[g].y = runPtr->getGlyphPositions()[g].y + drawOffset.y;
+	}
+	cairo_glyph_path( ctx->getCairo(), glyphs.data(), (int)glyphs.size() );
+}
+
 } // anonymous
 
 void Context::showText( const text::Typesetter &typesetter, const vec2& pos )
@@ -1879,6 +1909,23 @@ void Context::showText( const text::Typesetter &typesetter, const vec2& pos )
 void Context::textPath( const std::string &s )
 {
 	cairo_text_path( mCairo, s.c_str() );
+}
+
+void Context::glyphPath( const text::Typesetter &typesetter, const vec2& pos )
+{
+	text::Typesetter::Iterator iter = typesetter.getIterator();
+	const text::Run* runPtr;
+	vec2 lineDrawOffset;
+	while( typesetter.nextRun( iter, &runPtr, &lineDrawOffset ) ) {
+		if( runPtr->isPlaceholder() )
+			continue;
+
+		vec2 drawOffset = pos + lineDrawOffset + runPtr->getDrawOffset();
+		if( runPtr->hasOrientations() )
+			glyphPathRunHelperWithOrientations( this, runPtr, drawOffset );
+		else
+			glyphPathRunHelper( this, runPtr, drawOffset );
+	}
 }
 
 /*void Context::showGlyphs( const GlyphArray &glyphs )

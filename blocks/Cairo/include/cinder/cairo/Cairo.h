@@ -654,9 +654,10 @@ class Context
 	FontFace*	getFontFace();
 	void        setScaledFont( const ScaledFont *scaled_font );
 	ScaledFont*	getScaledFont();
-	void        showText( const std::string &s );
-	void		showText( const text::Typesetter &typesetter, const vec2& pos );
-	void		textPath( const std::string &s );
+	void        showText( const std::string& s );
+	void		showText( const text::Typesetter& typesetter, const vec2& pos = vec2{0} );
+	void		textPath( const std::string& s );
+	void		glyphPath( const text::Typesetter& typesetter, const vec2& pos = vec2{0} );
 	//! Renders glyphs as returned by TextBox::measureGlyphs()
 	void		glyphPath( const std::vector<std::pair<uint16_t,vec2>> &glyphs );
 	void		glyphPath( uint16_t index, const vec2 &offset );
