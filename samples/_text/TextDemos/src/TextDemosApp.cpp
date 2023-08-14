@@ -64,7 +64,7 @@ struct PrecisionRenderingDemo : public Demo {
 		vector<const text::Font*> fonts;
 		text::AttrString str, strPrecise;
 		for( float size = 7.0f; size < 21.0f; size += 0.5f ) {
-			fonts.push_back( text::loadFont( gFace, size ) );
+			fonts.push_back( text::font( gFace, size ) );
 			str << fonts.back() << "Waltz, bad nymph, for quick jigs vex! 0123456789\n";
 			strPrecise << fonts.back() << "Waltz, bad nymph, for quick jigs vex! 0123456789\n";
 		}
@@ -83,7 +83,7 @@ struct SrgbRenderingDemo : public Demo {
 		vector<const text::Font*> fonts;
 		text::AttrString str, strPrecise;
 		for( float size = 7.0f; size < 21.0f; size += 0.5f ) {
-			fonts.push_back( text::loadFont( gFace, size ) );
+			fonts.push_back( text::font( gFace, size ) );
 			str << Color8u( 0, 255, 0 );
 			str << fonts.back() << "Waltz, bad nymph, for quick jigs vex! 0123456789\n";
 			strPrecise << fonts.back() << "Waltz, bad nymph, for quick jigs vex! 0123456789\n";
@@ -121,7 +121,7 @@ struct PlaceholdersDemo : public Demo {
 		const Surface8u* heartFrame = &mHeartFrames[getElapsedFrames() / 3 % mHeartFrames.size()];
 
 		text::AttrString str;
-		str << text::loadFont( gFace, 32.0f )
+		str << text::font( gFace, 32.0f )
 			<<	"In a realm where pixels dance and graphics soar,\n"
 				"Paul Houx " << text::Placeholder( mHeadshot.getSize(), "!", &mHeadshot ) << "stands tall, with tales of lore.\n"
 				"Eye-popping designs, jaw-dropping feats,\n"
@@ -170,15 +170,15 @@ struct TextOnPathDemo : public Demo {
 		path.curveTo( vec2( 200, center.y - 200 ), vec2( 300, center.y + 200 ), vec2( surface->getWidth(), center.y + 20 ) );
 		path.curveTo( vec2( 200, center.y - 200 ), vec2( 300, center.y + 200 ), vec2( surface->getHeight() - 20, center.y + 120 ) );
 		text::AttrString str;
-		str << text::loadFont( gFace, 32.0f )
+		str << text::font( gFace, 32.0f )
 			<<	"In a realm where pixels dance and graphics soar, "
 				"Paul Houx stands tall, with tales of lore. ";
-		str << text::loadFont( gFace, 24.0f ) <<
+		str << text::font( gFace, 24.0f ) <<
 				"Eye-popping designs, jaw-dropping feats, "
 				"His craft leaves onlookers glued to their seats."
 				"From games to displays, his creations unfold, "
 				"With narratives bright, and stories untold.";
-		str << text::loadFont( gFace, 18.0f ) <<
+		str << text::font( gFace, 18.0f ) <<
 				"An artisan of code, C++ his quill,"
 				"Transforming abstracts with unmatched skill.";
 		text::TextOnPath typesetting( str, path );
@@ -236,9 +236,9 @@ void TextDemosApp::loadGlobalFonts( text::Face *face )
 {
 	gFace = face;
 
-	gFontSmall = text::loadFont( gFace, 12 );
-	gFontMedium = text::loadFont( gFace, 77 );
-	gFontLarge = text::loadFont( gFace, 99 );
+	gFontSmall = text::font( gFace, 12 );
+	gFontMedium = text::font( gFace, 77 );
+	gFontLarge = text::font( gFace, 99 );
 }
 
 void TextDemosApp::fileDrop( FileDropEvent event )
