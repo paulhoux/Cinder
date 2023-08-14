@@ -2161,12 +2161,12 @@ text::Font*	TextSpan::getFont() const
 		float fontSize = getFontSize().asUser();		
 		for( vector<string>::const_iterator familyIt = fontFamilies.begin(); familyIt != fontFamilies.end(); ++familyIt ) {
 			try {
-				mFont = text::loadFont( text::loadSystemFace( *familyIt ), fontSize );
+				mFont = text::font( text::loadSystemFace( *familyIt ), fontSize );
 				break;
 			}
 			catch( ci::Exception &exc ) {
 				CI_LOG_W( "failed to load font with name: " << *familyIt << ", size: " << fontSize << ". what: " << exc.what() << "\t - loading default font." );
-				mFont = text::loadFont( text::systemDefaultFace(), fontSize );
+				mFont = text::font( text::systemDefaultFace(), fontSize );
 			}
 		}
 	}
