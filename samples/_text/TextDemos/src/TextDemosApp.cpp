@@ -209,6 +209,21 @@ struct AlignmentDemo : public Demo {
 	}
 };
 
+struct SuperSubscriptDemo : public Demo {
+	void render( Surface8u *surface ) override {
+		ip::fill( surface, ColorA8u( 32, 32, 32, 255 ) );
+
+		text::ShapingOptions shapeDefault;
+		text::ShapingOptions super = text::ShapingOptions().superscript();
+		text::ShapingOptions sub = text::ShapingOptions().subscript();
+		text::AttrString str;
+		str << text::font( "Cambria", 48.0f ) << "O" << sub << "3\n";
+		str << "a" << super << "2" << shapeDefault << " + b" << super << "2" << shapeDefault << " = c" << super << "2";
+
+		text::render( text::Frame( str ), surface, vec2{0} );
+	}
+};
+
 void TextDemosApp::setup()
 {
 	//loadGlobalFonts( text::systemDefaultFace() );
@@ -220,6 +235,7 @@ void TextDemosApp::setup()
 	mDemos.emplace_back( new PlaceholdersDemo() );
 	mDemos.emplace_back( new TextOnPathDemo() );
 	mDemos.emplace_back( new AlignmentDemo() );
+	mDemos.emplace_back( new SuperSubscriptDemo() );
 
 	mCurrentDemoIdx = mDemos.size() - 1;
 }

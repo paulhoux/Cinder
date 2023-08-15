@@ -49,6 +49,18 @@ ShapingOptions& ShapingOptions::ligatures( bool enabled )
 	return *this;
 }
 
+ShapingOptions& ShapingOptions::subscript( bool enabled )
+{
+	mFeatures[text::feature( "subs" )] = enabled;
+	return *this;
+}
+
+ShapingOptions& ShapingOptions::superscript( bool enabled )
+{
+	mFeatures[text::feature( "sups" )] = enabled;
+	return *this;
+}
+
 bool ShapingOptions::isDefault() const
 {
 	return ! mIgnoreMissingGlyphsNondefault && mFeatures.empty();

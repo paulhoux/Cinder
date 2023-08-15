@@ -105,6 +105,8 @@ struct CI_API ShapingOptions {
 	ShapingOptions&					feature( uint32_t feature, bool enabled ) { mFeatures[feature] = enabled; return *this; }
 	//! Enables/disables 'liga', 'clig', and 'calt' features
 	ShapingOptions&					ligatures( bool enabled = true );
+	ShapingOptions&					superscript( bool enabled = true );
+	ShapingOptions&					subscript( bool enabled = true );
 	void							setFeatureDefault( uint32_t feature ) { mFeatures.erase( feature ); }
 	const std::map<uint32_t,bool>&	getFeatures() const { return mFeatures; }
 
