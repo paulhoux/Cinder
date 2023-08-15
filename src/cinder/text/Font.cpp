@@ -352,24 +352,24 @@ std::vector<size_t> findHardBreaks( const char32_t *utf32String, size_t length )
 	shapeBuffer( buf.get(), features, options.getIgnoreMissingGlyphs(), tracking, outGlyphIndices, outClusters, outGlyphPositions, outGlyphAdvances, outMaxXs, outPixelWidth );
 }*/
 
-size_t Font::shapeString( const ShapingOptions &options, const char *utf8String, size_t length, float tracking, std::vector<uint32_t> *outGlyphIndices, std::vector<uint32_t> *outClusters, std::vector<vec2> *outGlyphPositions, std::vector<float> *outGlyphXAdvances,
+size_t Font::shapeString( const ShapingOptions &options, const char *utf8String, size_t length, float tracking, float baselineOffset, std::vector<uint32_t> *outGlyphIndices, std::vector<uint32_t> *outClusters, std::vector<vec2> *outGlyphPositions, std::vector<float> *outGlyphXAdvances,
 								std::vector<float> *outMaxXs, float *outPixelWidth ) const
 {
 	u32string u32 = toUtf32( utf8String, length );
-	return shapeString( options, u32.data(), u32.length(), tracking, outGlyphIndices, outClusters, outGlyphPositions, outGlyphXAdvances, outMaxXs, outPixelWidth );
+	return shapeString( options, u32.data(), u32.length(), tracking, baselineOffset, outGlyphIndices, outClusters, outGlyphPositions, outGlyphXAdvances, outMaxXs, outPixelWidth );
 }
 
 
-size_t Font::shapeString( const ShapingOptions &options, const char32_t *utf32String, size_t length, float tracking, vector<uint32_t> *outGlyphIndices, std::vector<uint32_t> *outClusters, vector<vec2> *outGlyphPositions, vector<float> *outGlyphXAdvances, vector<float> *outMaxXs, float *outPixelWidth ) const
+size_t Font::shapeString( const ShapingOptions &options, const char32_t *utf32String, size_t length, float tracking, float baselineOffset, vector<uint32_t> *outGlyphIndices, std::vector<uint32_t> *outClusters, vector<vec2> *outGlyphPositions, vector<float> *outGlyphXAdvances, vector<float> *outMaxXs, float *outPixelWidth ) const
 {
 	auto buf = createBuffer( options );
 	auto features = createFeatures( options );
 	vector<size_t> hardBreakIndices = options.getIgnoreMissingGlyphs() ? findHardBreaks( utf32String, length ) : std::vector<size_t>();
 	hb_buffer_add_utf32( buf.get(), (const uint32_t*)utf32String, (int)length, 0, -1 );
-	return shapeBuffer( buf.get(), features, options.getIgnoreMissingGlyphs(), hardBreakIndices, tracking, outGlyphIndices, outClusters, outGlyphPositions, outGlyphXAdvances, outMaxXs, outPixelWidth );
+	return shapeBuffer( buf.get(), features, options.getIgnoreMissingGlyphs(), hardBreakIndices, tracking, baselineOffset, outGlyphIndices, outClusters, outGlyphPositions, outGlyphXAdvances, outMaxXs, outPixelWidth );
 }
 
-size_t Font::shapeBuffer( hb_buffer_t *buf, const vector<hb_feature_t> &features, bool ignoreMissing, const vector<size_t> &hardBreakIndices, float tracking,
+size_t Font::shapeBuffer( hb_buffer_t *buf, const vector<hb_feature_t> &features, bool ignoreMissing, const vector<size_t> &hardBreakIndices, float tracking, float baselineOffset,
 							vector<uint32_t> *outGlyphIndices, vector<uint32_t> *outClusters, vector<vec2> *outGlyphPositions, vector<float> *outGlyphXAdvances, vector<float> *outMaxXs, float *outPixelWidth ) const
 {
 	lock();
@@ -407,7 +407,7 @@ size_t Font::shapeBuffer( hb_buffer_t *buf, const vector<hb_feature_t> &features
 	hardBreakIndicesIdx = 0;
 	if( outGlyphPositions || outGlyphXAdvances || outPixelWidth ) {
 		const hb_glyph_position_t *glyph_positions = hb_buffer_get_glyph_positions( buf, nullptr );
-		double penX = 0, penY = 0;
+		double penX = 0, penY = -(double)baselineOffset;
 		for( unsigned int g = 0; g < glyphCount; ++g ) {
 			bool missing = ignoreMissing && glyph_infos[g].codepoint == missingGlyph;
 			if( missing && hardBreakIndicesIdx < hardBreakIndices.size() && hardBreakIndices[hardBreakIndicesIdx] == glyph_infos[g].cluster ) {

@@ -224,6 +224,20 @@ struct SuperSubscriptDemo : public Demo {
 	}
 };
 
+struct BaselineOffsetDemo : public Demo {
+	void render( Surface8u *surface ) override {
+		ip::fill( surface, ColorA8u( 32, 32, 32, 255 ) );
+
+		text::AttrString str;
+		text::Font* normal = text::font( "Cambria", 48.0f );
+		text::Font* small = text::font( "Cambria", 24.0f );
+		str << normal << "Normal" << small << text::BaselineOffset::pixels( 20 ) << "Super" << text::BaselineOffset() << normal << " Normal" << small << text::BaselineOffset::em( -512 ) << "Sub";
+		str << normal << "\nAnother string beneath these.";
+
+		text::render( text::Frame( str ), surface, vec2{0} );
+	}
+};
+
 void TextDemosApp::setup()
 {
 	//loadGlobalFonts( text::systemDefaultFace() );
@@ -236,7 +250,8 @@ void TextDemosApp::setup()
 	mDemos.emplace_back( new TextOnPathDemo() );
 	mDemos.emplace_back( new AlignmentDemo() );
 	mDemos.emplace_back( new SuperSubscriptDemo() );
-
+	mDemos.emplace_back( new BaselineOffsetDemo() );
+	
 	mCurrentDemoIdx = mDemos.size() - 1;
 }
 

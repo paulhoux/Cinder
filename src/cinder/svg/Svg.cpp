@@ -2099,7 +2099,7 @@ std::vector<std::pair<uint16_t,vec2> > TextSpan::getGlyphMeasures() const
 		std::vector<uint32_t> glyphs;
 		std::vector<vec2> positions;
 
-		mFont->shapeString( text::ShapingOptions(), mString.c_str(), mString.size(), 0, &glyphs, nullptr, &positions, nullptr, nullptr, nullptr );
+		mFont->shapeString( text::ShapingOptions(), mString.c_str(), mString.size(), 0, 0, &glyphs, nullptr, &positions, nullptr, nullptr, nullptr );
 		mGlyphMeasures->resize( glyphs.size() );
 		for( size_t g = 0; g < glyphs.size(); ++g )
 			(*mGlyphMeasures)[g] = std::make_pair( (uint16_t)glyphs[g], positions[g] );

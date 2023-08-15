@@ -132,6 +132,12 @@ AttrString& AttrString::operator<<( Tracking tracking )
 	return *this;
 }
 
+AttrString& AttrString::operator<<( BaselineOffset baselineOffset )
+{
+	setCurrentBaselineOffset( baselineOffset );
+	return *this;
+}
+
 AttrString& AttrString::operator<<( Alignment alignment )
 {
 	setCurrentAlignment( alignment );
@@ -231,6 +237,7 @@ void AttrString::clear()
 	mFonts.clear();
 	mColorAs.clear();
 	mTrackings.clear();
+	mBaselineOffsets.clear();
 	mAlignments.clear();
 	mLeadings.clear();
 	mColors.clear();
@@ -239,6 +246,7 @@ void AttrString::clear()
 
 	mCurrentFontActive = false;
 	mCurrentTrackingActive = false;
+	mCurrentBaselineOffsetActive = false;
 	mCurrentAlignmentActive = false;
 	mCurrentLeadingActive = false;
 	mCurrentColorActive = false;
@@ -253,6 +261,8 @@ void AttrString::extendCurrentLimits()
 		mFonts.setEndLimit( mString.size() );
 	if( mCurrentTrackingActive )
 		mTrackings.setEndLimit( mString.size() );
+	if( mCurrentBaselineOffsetActive )
+		mBaselineOffsets.setEndLimit( mString.size() );
 	if( mCurrentAlignmentActive )
 		mAlignments.setEndLimit( mString.size() );
 	if( mCurrentLeadingActive )
@@ -294,6 +304,11 @@ void AttrString::setCurrentTracking( Tracking tracking )
 	setCurrentAttr( tracking, tracking.isDefault(), &mCurrentTrackingActive, &mTrackings );
 }
 
+void AttrString::setCurrentBaselineOffset( BaselineOffset baselineOffset )
+{
+	setCurrentAttr( baselineOffset, baselineOffset.isDefault(), &mCurrentBaselineOffsetActive, &mBaselineOffsets );
+}
+
 void AttrString::setCurrentAlignment( Alignment alignment )
 {
 	setCurrentAttr( alignment, alignment == Alignment::DEFAULT, &mCurrentAlignmentActive, &mAlignments );
@@ -328,6 +343,14 @@ void AttrString::setTracking( size_t start, size_t end, Tracking tracking )
 		mTrackings.clearInterval( start, end );
 	else
 		mTrackings.set( start, end, tracking ); 
+}
+
+void AttrString::setBaselineOffset( size_t start, size_t end, BaselineOffset baselineOffset )
+{
+	if( baselineOffset.isDefault() )
+		mBaselineOffsets.clearInterval( start, end );
+	else
+		mBaselineOffsets.set( start, end, baselineOffset ); 
 }
 
 void AttrString::setAlignment( size_t start, size_t end, Alignment alignment )
@@ -370,9 +393,10 @@ std::string AttrString::debugString()
 	auto runIt = iterate( nullptr );
 	while( runIt.nextRun() ) {
 		float tracking = runIt.getTracking();
+		float baselineOffset = runIt.getBaselineOffset();
 		bool colorIsDefault = runIt.isColorDefault();
 		ColorAf color = runIt.getColor( ColorAf::white() );
-		os << "> '" << runIt.getStrUtf8() << "' Font:" << *runIt.getFont() << " Tracking: " << tracking
+		os << "> '" << runIt.getStrUtf8() << "' Font:" << *runIt.getFont() << " Tracking: " << tracking << " Baseline Offset: " << baselineOffset
 				<< " Alignment: " << runIt.getAlignment( Alignment::DEFAULT )
 //				<< " Color: " << ( colorIsDefault ? "Default" : toString( runIt.getColor( nullptr ).r ).c_str() )
 				<< " Leading: " << toString( runIt.getLeading() )
@@ -435,6 +459,7 @@ void AttrStringIter::firstRun()
 
 	mStrEndOffset = std::min( firstRunAttr<const Font*>( mAttrStr->mFonts, &mFont, nullptr, &mFontsDone, &mFontIter ), mStrEndOffset );
 	mStrEndOffset = std::min( firstRunAttr<Tracking>( mAttrStr->mTrackings, &mTracking, Tracking(), &mTrackingsDone, &mTrackingIter ), mStrEndOffset );
+	mStrEndOffset = std::min( firstRunAttr<BaselineOffset>( mAttrStr->mBaselineOffsets, &mBaselineOffset, BaselineOffset(), &mBaselineOffsetsDone, &mBaselineOffsetIter ), mStrEndOffset );
 	mStrEndOffset = std::min( firstRunAttr<Alignment>( mAttrStr->mAlignments, &mAlignment, Alignment::DEFAULT, &mAlignmentsDone, &mAlignmentIter ), mStrEndOffset );
 	mStrEndOffset = std::min( firstRunAttr<Leading>( mAttrStr->mLeadings, &mLeading, Leading(), &mLeadingsDone, &mLeadingIter ), mStrEndOffset );
 	mStrEndOffset = std::min( firstRunAttr<ColorAf>( mAttrStr->mColors, &mColor, ColorAf( 0, 0, 0, -1 ), &mColorsDone, &mColorIter ), mStrEndOffset );
@@ -509,6 +534,7 @@ void AttrStringIter::advance()
 
 	advanceAttr<const Font*>( mAttrStr->mFonts, &mFont, nullptr, &mFontsDone, &mFontIter, &newStrEnd );
 	advanceAttr<Tracking>( mAttrStr->mTrackings, &mTracking, Tracking(), &mTrackingsDone, &mTrackingIter, &newStrEnd );
+	advanceAttr<BaselineOffset>( mAttrStr->mBaselineOffsets, &mBaselineOffset, BaselineOffset(), &mBaselineOffsetsDone, &mBaselineOffsetIter, &newStrEnd );
 	advanceAttr<Alignment>( mAttrStr->mAlignments, &mAlignment, Alignment::DEFAULT, &mAlignmentsDone, &mAlignmentIter, &newStrEnd );
 	advanceAttr<Leading>( mAttrStr->mLeadings, &mLeading, Leading(), &mLeadingsDone, &mLeadingIter, &newStrEnd );
 	advanceAttr<ColorAf>( mAttrStr->mColors, &mColor, ColorAf( 0, 0, 0, -1 ), &mColorsDone, &mColorIter, &newStrEnd );
@@ -550,7 +576,7 @@ size_t AttrStringIter::shape( const ShapingOptions &shapingOptions, vector<uint3
 		size_t len;
 		if( isPlaceholder() ) { // if this is a placeholder, manipulate the out* vectors so that the last glyph represents the width of the spacer (and the preceding, if they exist, are zero width)
 			size_t startGlyphIdx = outClusters->size();
-			len = mFont->shapeString( shapingOptions, &mAttrStr->mString[mStrStartOffset], mStrEndOffset - mStrStartOffset, getTracking(), outGlyphIndices, outClusters, outGlyphPositions, outGlyphXAdvances, outGlyphMaxXs, outPixelWidth );
+			len = mFont->shapeString( shapingOptions, &mAttrStr->mString[mStrStartOffset], mStrEndOffset - mStrStartOffset, getTracking(), getBaselineOffset(), outGlyphIndices, outClusters, outGlyphPositions, outGlyphXAdvances, outGlyphMaxXs, outPixelWidth );
 			if( len ) {
 				if( outGlyphPositions )
 					for( size_t i = startGlyphIdx; i < outGlyphPositions->size(); ++i )
@@ -568,7 +594,7 @@ size_t AttrStringIter::shape( const ShapingOptions &shapingOptions, vector<uint3
 			}
 		}
 		else
-			len = mFont->shapeString( shapingOptions, &mAttrStr->mString[mStrStartOffset], mStrEndOffset - mStrStartOffset, getTracking(), outGlyphIndices, outClusters, outGlyphPositions, outGlyphXAdvances, outGlyphMaxXs, outPixelWidth );
+			len = mFont->shapeString( shapingOptions, &mAttrStr->mString[mStrStartOffset], mStrEndOffset - mStrStartOffset, getTracking(), getBaselineOffset(), outGlyphIndices, outClusters, outGlyphPositions, outGlyphXAdvances, outGlyphMaxXs, outPixelWidth );
 		font->unlock();
 		return len;
 	}

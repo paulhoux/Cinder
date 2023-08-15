@@ -59,6 +59,30 @@ struct CI_API Tracking {
 	float		mValue;
 };
 
+struct CI_API BaselineOffset {
+	enum class Type { DEFAULT, PIXELS, EM };
+
+	BaselineOffset() : mType( Type::DEFAULT ), mValue( 0 ) {}
+	//! Thousandths of an em, thus font size-relative
+	static BaselineOffset em( float offset ) { return BaselineOffset( Type::EM, offset ); }
+	//! Pixels
+	static BaselineOffset pixels( float offset ) { return BaselineOffset( Type::PIXELS, offset ); }
+	BaselineOffset( const BaselineOffset &rhs ) = default;
+
+	float		getValuePx( float fontSize ) const {
+		if( mType == Type::DEFAULT ) return 0;
+		else if( mType == Type::PIXELS ) return mValue;
+		else /*( mType == Type::EM )*/ return fontSize * mValue / 1000.0f;
+	}
+	bool		isDefault() const { return mType == Type::DEFAULT; }
+
+  private:
+	BaselineOffset( Type type, float value ) : mType( type ), mValue( value ) {}
+
+	Type		mType;
+	float		mValue;
+};
+
 struct CI_API Leading {
 	enum class Type { DEFAULT, MULT, EXTRA, SIZE };
 
@@ -173,6 +197,7 @@ class CI_API AttrString
 	AttrString& operator<<( const Font *font );
 	AttrString& operator<<( const std::pair<std::string,float> &fontNameSize );
 	AttrString& operator<<( Tracking tracking );
+	AttrString& operator<<( BaselineOffset baselineOffset );
 	AttrString& operator<<( Alignment alignment );
 	AttrString& operator<<( Leading leading );
 	AttrString& operator<<( const ColorA8u &color );
@@ -186,12 +211,14 @@ class CI_API AttrString
 
 	void 	setCurrentFont( const Font *font );
 	void	setCurrentTracking( Tracking tracking );
+	void	setCurrentBaselineOffset( BaselineOffset baselineOffset );
 	void	setCurrentAlignment( Alignment alignment );
 	void	setCurrentLeading( Leading leading );
 	void 	setCurrentColor( const ColorAf &c );
 	void 	setCurrentShapingOptions( const ShapingOptions &options );
 	void 	setFont( size_t start, size_t end, const Font *font );
 	void	setTracking( size_t start, size_t end, Tracking tracking );
+	void	setBaselineOffset( size_t start, size_t end, BaselineOffset baselineOffset );
 	void	setAlignment( size_t start, size_t end, Alignment alignment );
 	void	setShapingOptions( size_t start, size_t end, ShapingOptions options );
 
@@ -224,6 +251,7 @@ class CI_API AttrString
 	IntervalMap<const Font*> 		mFonts;
 	IntervalMap<ColorA> 			mColorAs;
 	IntervalMap<Tracking>			mTrackings;
+	IntervalMap<BaselineOffset>		mBaselineOffsets;
 	IntervalMap<Alignment>			mAlignments;
 	IntervalMap<Leading>			mLeadings;
 	IntervalMap<ColorAf>			mColors;
@@ -244,6 +272,7 @@ class CI_API AttrString
 	
 	bool			mCurrentFontActive = false;
 	bool			mCurrentTrackingActive = false;
+	bool			mCurrentBaselineOffsetActive = false;
 	bool			mCurrentAlignmentActive = false;
 	bool			mCurrentLeadingActive = false;
 	bool			mCurrentColorActive = false;
@@ -266,6 +295,7 @@ class CI_API AttrStringIter {
 	std::string				getStrUtf8() const;
 	const Font*				getFont() const { return mFont; }
 	float					getTracking() const { return mTracking.getValuePx( mFont->getSize() ); }
+	float					getBaselineOffset() const { return mBaselineOffset.getValuePx( mFont->getSize() ); }
 	Alignment				getAlignment( Alignment defaultValue ) const { return mAlignment == Alignment::DEFAULT ? defaultValue : mAlignment; }
 	Leading					getLeading() const { return mLeading; }
 	ColorAf					getColor( ColorAf defaultColor ) const { return mColor.a < 0 ? defaultColor : mColor; }
@@ -302,6 +332,10 @@ class CI_API AttrStringIter {
 	IntervalMap<Tracking>::ConstMapIter	mTrackingIter;
 	Tracking							mTracking;
 	bool								mTrackingsDone = false;
+
+	IntervalMap<BaselineOffset>::ConstMapIter	mBaselineOffsetIter;
+	BaselineOffset								mBaselineOffset;
+	bool										mBaselineOffsetsDone = false;
 
 	IntervalMap<Alignment>::ConstMapIter	mAlignmentIter;
 	Alignment								mAlignment = Alignment::DEFAULT;

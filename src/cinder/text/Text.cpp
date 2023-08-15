@@ -237,9 +237,10 @@ void measureString( const AttrString& attrString, float *resultWidth, float *res
 	while( runIt.nextRun() ) {
 		float glyphsWidth;
 		float tracking = runIt.getTracking();
-		runIt.getFont()->shapeString( runIt.getShapingOptions( defaultShapingOptions ), runIt.getStrPtr(), runIt.getLengthCh(), tracking, nullptr, nullptr, nullptr, nullptr, nullptr, &glyphsWidth );
+		float baselineOffset = runIt.getBaselineOffset();
+		runIt.getFont()->shapeString( runIt.getShapingOptions( defaultShapingOptions ), runIt.getStrPtr(), runIt.getLengthCh(), tracking, baselineOffset, nullptr, nullptr, nullptr, nullptr, nullptr, &glyphsWidth );
 		measuredWidth += glyphsWidth;
-		measuredHeight = std::max<float>( measuredHeight, runIt.getFont()->getHeight() );
+		measuredHeight = std::max<float>( measuredHeight, runIt.getFont()->getHeight() + baselineOffset );
 		measuredBaseline = std::max<float>( measuredBaseline, runIt.getFont()->getAscender() );
 	}
 	
