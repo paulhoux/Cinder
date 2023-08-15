@@ -391,30 +391,6 @@ bool processLine( const AttrString &attrString, const std::vector<uint32_t> &clu
 	return ! exited;
 }
 
-Channel8u renderString( const AttrString &attrString )
-{
-	std::vector<uint32_t> glyphIndices;
-	std::vector<vec2> glyphPositions;
-
-	float resultWidthF, resultHeightF, baseline;
-	measureString( attrString, &resultWidthF, &resultHeightF, &baseline );
-	int resultWidth = (int)ceil( resultWidthF );
-	int resultHeight = (int)ceil( resultHeightF );
-	
-	Channel8u result( resultWidth, resultHeight );
-	ip::fill( &result, (uint8_t)0 );
-	
-	auto runIt = attrString.iterate( TypesetOptions().getDefaultFont() );
-	float penX = 0, runWidth;
-	while( runIt.nextRun() ) {
-		if( runIt.isPlaceholder() )
-			continue;
-		runIt.shape( runIt.getShapingOptions( ShapingOptions() ), &glyphIndices, nullptr, &glyphPositions, nullptr, nullptr, &runWidth );
-		runIt.getFont()->drawGlyphs( runIt.getLengthCh(), glyphIndices.data(), glyphPositions.data(), penX, baseline, result ); 
-	}
-	return result;
-}
-
 void typeset( const AttrString &attrString, int32_t width, int32_t height, TypesetProcessor &processor, const TypesetOptions &options )
 {
 	std::vector<uint32_t> glyphIndices, clusters;
@@ -612,6 +588,35 @@ Rectf Run::getGlyphBounds( size_t g ) const
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////
+// GlyphLayoutConstructorTypesetProcessor
+class GlyphLayoutConstructorTypesetProcessor : public TypesetProcessor {
+  public:
+	  GlyphLayoutConstructorTypesetProcessor( GlyphLayout *glyphLayout ) : mGlyphLayout{ glyphLayout } {}
+
+	bool	addLine( Alignment justification, vec2 drawOffset, float ascender, float descender, float lineGap, float measuredWidth ) override {
+		mGlyphLayout->getLines().push_back( Line( justification, drawOffset, ascender, descender, lineGap, measuredWidth ) );
+		return true;
+	}
+
+	bool	addRun( const Font *font, const char32_t *utf32Str, size_t chLen, const std::vector<uint32_t> &clusters, const ColorAf &color, size_t len, const uint32_t glyphIndices[], const vec2 glyphPositions[], float penX, float measuredWidth, PlaceholderInfo *placeholderInfo ) override {
+		if( placeholderInfo ) {
+			mGlyphLayout->getPlaceholders().push_back( *placeholderInfo );
+			mGlyphLayout->getLines().back().getRuns().push_back( Run( len, font, utf32Str, chLen, clusters, color, glyphIndices, glyphPositions, nullptr, penX, measuredWidth, placeholderInfo ) );
+		}
+		else
+			mGlyphLayout->getLines().back().getRuns().push_back( Run( len, font, utf32Str, chLen, clusters, color, glyphIndices, glyphPositions, nullptr, penX, measuredWidth, nullptr ) );
+		return true;
+	}
+	
+	void	finish() override {
+		mGlyphLayout->measure();
+	}
+
+  private:
+	GlyphLayout	*mGlyphLayout;
+};
+
+////////////////////////////////////////////////////////////////////////////////////////////////
 // GlyphLayout
 vec2 GlyphLayout::calcSize() const
 {
@@ -659,33 +664,6 @@ bool GlyphLayout::nextRun( Iterator &iter, const Run** run, vec2 *lineDrawOffset
 
 ////////////////////////////////////////////////////////////////////////////////////////////////
 // Frame
-class GlyphLayoutConstructorTypesetProcessor : public TypesetProcessor {
-  public:
-	  GlyphLayoutConstructorTypesetProcessor( GlyphLayout *glyphLayout ) : mGlyphLayout{ glyphLayout } {}
-
-	bool	addLine( Alignment justification, vec2 drawOffset, float ascender, float descender, float lineGap, float measuredWidth ) override {
-		mGlyphLayout->getLines().push_back( Line( justification, drawOffset, ascender, descender, lineGap, measuredWidth ) );
-		return true;
-	}
-
-	bool	addRun( const Font *font, const char32_t *utf32Str, size_t chLen, const std::vector<uint32_t> &clusters, const ColorAf &color, size_t len, const uint32_t glyphIndices[], const vec2 glyphPositions[], float penX, float measuredWidth, PlaceholderInfo *placeholderInfo ) override {
-		if( placeholderInfo ) {
-			mGlyphLayout->getPlaceholders().push_back( *placeholderInfo );
-			mGlyphLayout->getLines().back().getRuns().push_back( Run( len, font, utf32Str, chLen, clusters, color, glyphIndices, glyphPositions, nullptr, penX, measuredWidth, placeholderInfo ) );
-		}
-		else
-			mGlyphLayout->getLines().back().getRuns().push_back( Run( len, font, utf32Str, chLen, clusters, color, glyphIndices, glyphPositions, nullptr, penX, measuredWidth, nullptr ) );
-		return true;
-	}
-	
-	void	finish() override {
-		mGlyphLayout->measure();
-	}
-
-  private:
-	GlyphLayout	*mGlyphLayout;
-};
-
 Frame::Frame( const AttrString &attrString, int32_t width, int32_t height, const TypesetOptions &options )
 	: mAttrString( attrString), mWidth( width ), mHeight( height ), mTypesetOptions( options ), mDirty( true )
 {
@@ -811,6 +789,30 @@ const GlyphLayout& TextOnPath::getGlyphLayout() const
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // render implementation
+Channel8u renderString( const AttrString &attrString )
+{
+	std::vector<uint32_t> glyphIndices;
+	std::vector<vec2> glyphPositions;
+
+	float resultWidthF, resultHeightF, baseline;
+	measureString( attrString, &resultWidthF, &resultHeightF, &baseline );
+	int resultWidth = (int)ceil( resultWidthF );
+	int resultHeight = (int)ceil( resultHeightF );
+	
+	Channel8u result( resultWidth, resultHeight );
+	ip::fill( &result, (uint8_t)0 );
+	
+	auto runIt = attrString.iterate( TypesetOptions().getDefaultFont() );
+	float penX = 0, runWidth;
+	while( runIt.nextRun() ) {
+		if( runIt.isPlaceholder() )
+			continue;
+		runIt.shape( runIt.getShapingOptions( ShapingOptions() ), &glyphIndices, nullptr, &glyphPositions, nullptr, nullptr, &runWidth );
+		runIt.getFont()->drawGlyphs( runIt.getLengthCh(), glyphIndices.data(), glyphPositions.data(), penX, baseline, result ); 
+	}
+	return result;
+}
+
 void render( const Typesetter &typesetter, Surface8u *surface, const vec2 &offset, bool precise, bool srgb )
 {
 	Typesetter::Iterator iter = typesetter.getIterator();

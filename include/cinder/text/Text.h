@@ -249,7 +249,6 @@ class CI_API Typesetter {
 	virtual vec2		calcSize() const = 0;
 };
 
-//! 
 class CI_API GlyphLayout : public Typesetter {
   public:
 	float			getMeasuredWidth() const { return mMeasuredWidth; }
