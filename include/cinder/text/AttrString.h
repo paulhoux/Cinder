@@ -113,7 +113,7 @@ struct CI_API ShapingOptions {
 	std::map<uint32_t,bool>		mFeatures;
 };
 
-enum class Alignment { LEFT, CENTER, RIGHT, DEFAULT };
+enum class Alignment { LEFT, CENTER, RIGHT, JUSTIFIED, DEFAULT };
 
 struct CI_API RunBreak {
 };

@@ -315,9 +315,19 @@ struct SpanData {
 	float measuredWidth;
 };
 
+namespace {
+size_t countGlyphs( const vector<pair<vector<RunData>::iterator,SpanData>> &spans )
+{
+	size_t result = 0;
+	for( const auto &span : spans )
+		result += span.second.glyphLen;
+	return result;
+}
+} // anonymous
+
 // draws runs and advances baseline accordingly. If \a firstLine then we only increase baseline by ascender
 bool processLine( const AttrString &attrString, const std::vector<uint32_t> &clusters, const vector<pair<vector<RunData>::iterator,SpanData>> &spans, const std::vector<uint32_t> &glyphIndices, const std::vector<float> &glyphXAdvances, std::vector<vec2> *glyphPositions,
-						bool *firstLine, Alignment justification, int maxWidth, float *baseline, TypesetProcessor &fn, const TypesetOptions &options )
+						bool *firstLine, bool lastLine, Alignment justification, int maxWidth, float *baseline, TypesetProcessor &fn, const TypesetOptions &options )
 {
 	if( spans.empty() )
 		return true;
@@ -346,28 +356,39 @@ bool processLine( const AttrString &attrString, const std::vector<uint32_t> &clu
 		*baseline += maxLineHeight;
 	}
 
+	// local lambda
+
+	// prep offsets based on line alignment
 	float measuredLineWidth = spans.back().second.drawOffset + spans.back().second.measuredWidth;	
 	float justificationOffset = 0;
+	double trackingPerGlyph = 0;
 	if( maxWidth != std::numeric_limits<int32_t>::max() ) {
 		if( justification == Alignment::RIGHT ) justificationOffset = maxWidth - measuredLineWidth;
 		else if( justification == Alignment::CENTER ) justificationOffset = ( maxWidth - measuredLineWidth ) / 2.0f;
+		else if( justification == Alignment::JUSTIFIED && ! lastLine ) {
+			size_t numGlyphs = countGlyphs( spans );
+			if( numGlyphs > 1 )
+				trackingPerGlyph = ( maxWidth - measuredLineWidth ) / (double)(numGlyphs - 1);
+		}
 	}
 
 	bool exited = false;
 	if( ! fn.addLine( justification, vec2( justificationOffset, *baseline ), maxAscent, maxDescent, maxLineGap, measuredLineWidth ) )
 		exited = true;
-	if( ! exited ) {
+	double trackingSum = 0; // for tracking offset for JUSTIFIED across Runs
+	if( ! exited ) { // iterate the Spans
 		for( auto &span : spans ) {
-			double penX = 0;
-			if( span.first->len && span.second.glyphLen ) {
+			double penX = trackingSum;
+			if( span.first->len && span.second.glyphLen ) { // not an empty Span or RunData
 				std::vector<uint32_t> localClusters; // relativize clusters to the Run, rather than the master AttrString
 				localClusters.reserve( span.second.glyphLen );
 				for( size_t g = 0; g < span.second.glyphLen; g++ ) {
 					localClusters.push_back( (uint32_t)(clusters[span.second.glyphStart + g] - span.second.chStart) );
 					(*glyphPositions)[span.second.glyphStart + g].x = (float)penX; // relativize x-values for position to the Run, but keep y values
-					penX += glyphXAdvances[span.second.glyphStart + g];
+					penX += glyphXAdvances[span.second.glyphStart + g] + trackingPerGlyph; // move pen by xAdvance, as well as tracking used for JUSTIFIED alignment
+					trackingSum += trackingPerGlyph;
 				}
-				if( span.first->isPlaceholder ) {
+				if( span.first->isPlaceholder ) { // special handling for a Placeholder
 					PlaceholderInfo placeholderInfo;
 					placeholderInfo.mData = span.first->placeholder.getData();
 					float width = span.second.measuredWidth;
@@ -378,7 +399,7 @@ bool processLine( const AttrString &attrString, const std::vector<uint32_t> &clu
 						break;
 					}
 				}
-				else {
+				else { // normal Run
 					if( ! fn.addRun( span.first->font, &(attrString.getStringUtf32().c_str()[span.second.chStart]), span.second.chLen, localClusters, span.first->color, span.second.glyphLen, &glyphIndices[span.second.glyphStart], &(*glyphPositions)[span.second.glyphStart], span.second.drawOffset, span.second.measuredWidth, nullptr ) ) {
 						exited = true;
 						break;
@@ -479,7 +500,7 @@ void typeset( const AttrString &attrString, int32_t width, int32_t height, Types
 
 		// process the spans
 		if( ! linebreakedSpans.empty() )
-			if( ! processLine( attrString, clusters, linebreakedSpans, glyphIndices, glyphXAdvances, &glyphPositions, &firstLine, curAlignment, width, &baseline, processor, options ) )
+			if( ! processLine( attrString, clusters, linebreakedSpans, glyphIndices, glyphXAdvances, &glyphPositions, &firstLine, lineEndGlyph >= glyphIndices.size() - 1, curAlignment, width, &baseline, processor, options ) )
 				goto exit;
 		if( hitHardBreak && ! alignmentChange )
 			++lineEndGlyph;
@@ -490,7 +511,7 @@ void typeset( const AttrString &attrString, int32_t width, int32_t height, Types
 
 		// process any trailing hard breaks
 		while( lineEndGlyph < glyphIndices.size() && curRunDataIt != runData.end() && mustBreak( breaks.data(), clusters[lineEndGlyph] ) ) {
-			if( ! processLine( attrString, clusters, { { curRunDataIt, SpanData{ lineEndGlyph, 0, 0, 0 } } }, glyphIndices, glyphXAdvances, &glyphPositions, &firstLine, curAlignment, width, &baseline, processor, options ) )
+			if( ! processLine( attrString, clusters, { { curRunDataIt, SpanData{ lineEndGlyph, 0, 0, 0 } } }, glyphIndices, glyphXAdvances, &glyphPositions, &firstLine, false, curAlignment, width, &baseline, processor, options ) )
 				goto exit;
 			++lineEndGlyph;
 			if( lineEndGlyph == curRunDataIt->start + curRunDataIt->len ) { // if we hit the end of the run, advance to the next

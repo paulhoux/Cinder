@@ -186,6 +186,29 @@ struct TextOnPathDemo : public Demo {
 	}
 };
 
+struct AlignmentDemo : public Demo {
+	void render( Surface8u *surface ) override {
+		ip::fill( surface, ColorA8u( 32, 32, 32, 255 ) );
+
+		text::AttrString str;
+		str << text::Alignment::JUSTIFIED;
+		str << text::font( gFace, 32.0f )
+			<<	"In a realm where pixels dance and graphics soar, "
+				"Paul Houx stands tall, with tales of lore. ";
+		str << text::font( gFace, 24.0f ) <<
+				"Eye-popping designs, " << Color( 1.0f, 0.5f, 0.25f ) << "jaw-dropping feats, " << Color( 1.0f, 1.0f, 1.0f ) <<
+				"His craft leaves onlookers glued to their seats."
+				"From games to displays, his creations unfold, "
+				"With narratives bright, and stories untold.";
+		str << text::font( gFace, 18.0f ) <<
+				"An artisan of code, C++ his quill,"
+				"Transforming abstracts with unmatched skill.";
+
+		text::Frame typesetting( str, surface->getWidth(), -1 );
+		text::render( typesetting, surface, vec2{0}, true, true );
+	}
+};
+
 void TextDemosApp::setup()
 {
 	//loadGlobalFonts( text::systemDefaultFace() );
@@ -196,6 +219,7 @@ void TextDemosApp::setup()
 	mDemos.emplace_back( new SrgbRenderingDemo() );
 	mDemos.emplace_back( new PlaceholdersDemo() );
 	mDemos.emplace_back( new TextOnPathDemo() );
+	mDemos.emplace_back( new AlignmentDemo() );
 
 	mCurrentDemoIdx = mDemos.size() - 1;
 }
