@@ -5,9 +5,9 @@ This code is intended for use with the Cinder C++ library: http://libcinder.org
  Redistribution and use in source and binary forms, with or without modification, are permitted provided that
  the following conditions are met:
 
-    * Redistributions of source code must retain the above copyright notice, this list of conditions and
+	* Redistributions of source code must retain the above copyright notice, this list of conditions and
 	the following disclaimer.
-    * Redistributions in binary form must reproduce the above copyright notice, this list of conditions and
+	* Redistributions in binary form must reproduce the above copyright notice, this list of conditions and
 	the following disclaimer in the documentation and/or other materials provided with the distribution.
 
  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED
@@ -25,9 +25,57 @@ This code is intended for use with the Cinder C++ library: http://libcinder.org
 #include "cinder/Log.h"
 #include "cinder/gl/gl.h"
 #include "cinder/nvp/Cache.h"
+#include "cinder/nvp/NvpFont.h"
+#include "cinder/text/Text.h"
 
 namespace cinder {
 namespace nvp {
+
+void renderText( const text::Typesetter &typesetter, const vec2 &offset )
+{
+	gl::ScopedBlendPremult scpBlend;
+	gl::ScopedColor        scpColor;
+	gl::matrixLoadfEXT( GL_MODELVIEW, value_ptr( gl::getModelView() ) );
+
+	std::vector<glm::mat3x2> transforms;
+
+	text::Typesetter::Iterator iter = typesetter.getIterator();
+	const text::Run *          runPtr;
+	vec2                       lineDrawOffset;
+	while( typesetter.nextRun( iter, &runPtr, &lineDrawOffset ) ) {
+		if( runPtr->isPlaceholder() )
+			continue;
+
+		// Cache the font face.
+		auto face = nvp::Cache::loadFace( runPtr->getFont()->getFace() );
+		auto font = nvp::Font( face, runPtr->getFont()->getSize() );
+
+		// Create transforms.
+		transforms.clear();
+		transforms.reserve( runPtr->getNumGlyphs() );
+
+		const auto origin = offset + lineDrawOffset + runPtr->getDrawOffset();
+		const auto scale = runPtr->getFont()->getSize() / Face::BASE_SIZE;
+		const auto positions = runPtr->getGlyphPositions();
+		const auto orientations = runPtr->getGlyphOrientations();
+		const auto indices = runPtr->getGlyphIndices();
+
+		for( size_t i = 0; i < runPtr->getNumGlyphs(); ++i ) {
+			const auto position = origin + positions[i];
+			const auto normal = orientations ? scale * orientations[i] : vec2( 0, -scale );
+			transforms.emplace_back( -normal.y, normal.x, normal.x, normal.y, position.x, position.y );
+		}
+
+		// Draw immediately.
+		gl::ScopedState scpStencil( GL_STENCIL_TEST, GL_TRUE );
+		gl::stencilFunc( GL_NOTEQUAL, 0, 0xFF );
+		gl::stencilOp( GL_KEEP, GL_KEEP, GL_ZERO );
+
+		ScopedShader scpShader( runPtr->getColor().premultiplied() );
+		gl::stencilThenCoverFillPathInstancedNV(
+			static_cast<GLsizei>( transforms.size() ), GL_UNSIGNED_INT, indices, face->getBaseId(), GL_PATH_FILL_MODE_NV, 0xFF, GL_BOUNDING_BOX_OF_BOUNDING_BOXES_NV, GL_AFFINE_2D_NV, reinterpret_cast<const GLfloat *>( transforms.data() ) );
+	}
+}
 
 bool ClipRect::push()
 {

@@ -126,36 +126,5 @@ class Font {
 	}
 };
 
-class CI_API NvpTextFrame : public text::TypesetProcessor {
-	vec2 mCursor;
-
-  public:
-	bool addLine( text::Alignment justification, vec2 drawOffset, float ascender, float descender, float lineGap, float measuredWidth ) override;
-	bool addRun( const text::Font *font, const char32_t *utf32Str, size_t chLen, const std::vector<uint32_t> &clusters, const ColorAf &color, size_t len, const uint32_t glyphIndices[], const vec2 glyphPositions[], float penX,
-		float measuredWidth, text::PlaceholderInfo *info ) override;
-	void finish() override {}
-};
-
-class CI_API NvpTextOnPath : public text::TypesetProcessor {
-	Path2d          mPath;
-	Path2dCalcCache mPathCalcCache;
-	float           mInitialMargin;
-	float           mPenX;
-
-  public:
-	NvpTextOnPath( const ci::Path2d &path, float initialMargin )
-		: mPath( path )
-		, mPathCalcCache( path )
-		, mInitialMargin( initialMargin )
-		, mPenX( initialMargin )
-	{
-	}
-
-	bool addLine( text::Alignment justification, vec2 drawOffset, float ascender, float descender, float lineGap, float measuredWidth ) override;
-	bool addRun( const text::Font *font, const char32_t *utf32Str, size_t chLen, const std::vector<uint32_t> &clusters, const ColorAf &color, size_t len, const uint32_t glyphIndices[], const vec2 glyphPositions[], float penX,
-		float measuredWidth, text::PlaceholderInfo *info ) override;
-	void finish() override;
-};
-
 } // namespace nvp
 } // namespace cinder

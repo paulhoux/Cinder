@@ -32,12 +32,15 @@ class NvPathTextApp : public App {
 	text::AttrString mTitleLeft;               //
 	text::AttrString mTitleRight;              //
 	text::AttrString mText;                    // Our sample text.
+	text::AttrString mTextNoLineBreaks;        // Our sample text without line breaks.
+	text::Frame      mTextFrame;               //
+	text::TextOnPath mTextOnPath;              //
 	ivec2            mColumnSize;              //
 	vec2             mTextSize;                // The measured size of our text.
 	gl::Texture2dRef mReference;               // Text will be rasterized to this texture.
 	Path2d           mSpiral;                  // A spiral shape.
-	float            mPosition{ 0.5f };        //
-	float            mTarget{ 0.5f };          //
+	float            mPosition{ 0.0f };        //
+	float            mTarget{ 0.0f };          //
 };
 
 void NvPathTextApp::prepare( Settings *settings )
@@ -59,18 +62,22 @@ void NvPathTextApp::setup()
 
 	// Create titles.
 	mTitleLeft.clear();
-	mTitleLeft << text::loadFont( title, 14 ) << text::Alignment::CENTER;
+	mTitleLeft << text::font( title, 14 ) << text::Alignment::CENTER;
 	mTitleLeft << Color( 0, 0, 0 );
 	mTitleLeft << "Software Rasterized using FreeType";
 
 	mTitleRight.clear();
-	mTitleRight << text::loadFont( title, 14 ) << text::Alignment::CENTER;
+	mTitleRight << text::font( title, 14 ) << text::Alignment::CENTER;
 	mTitleRight << Color( 0, 0, 0 );
 	mTitleRight << "Real-time rendered using Path Rendering";
 
 	// Create text.
+	text::ShapingOptions sub = text::ShapingOptions().subscript();
+	text::ShapingOptions super = text::ShapingOptions().superscript();
+	text::ShapingOptions standard = text::ShapingOptions();
+
 	mText.clear();
-	mText << text::loadFont( body, 32 ) << text::Alignment::CENTER << text::Leading::mult( 0.8f );
+	mText << text::font( body, 32 ) << text::Alignment::CENTER << text::Leading::mult( 0.8f );
 	mText << Color( 0.8f, 0, 0 );
 	mText << "Upon vectors' wings, text comes alive,\n";
 	mText << "Lines and curves, a dance to strive.\n";
@@ -83,12 +90,27 @@ void NvPathTextApp::setup()
 	mText << Color( 0.2f, 0, 0 );
 	mText << "With precision and art, a visual feat,\n";
 	mText << "Text transformed, in vectors' heartbeat.";
+
+	mTextNoLineBreaks.clear();
+	mTextNoLineBreaks << text::font( body, 32 ) << text::Alignment::CENTER << text::Leading::mult( 0.9f );
+	mTextNoLineBreaks << Color( 0.8f, 0, 0 );
+	mTextNoLineBreaks << "Upon vectors' wings, text comes alive, ";
+	mTextNoLineBreaks << "Lines and curves, a dance to strive. ";
+	mTextNoLineBreaks << Color( 0.6f, 0, 0 );
+	mTextNoLineBreaks << "From abstract forms to words so clear, ";
+	mTextNoLineBreaks << "Rendering tales for all to hear. ";
+	mTextNoLineBreaks << Color( 0.4f, 0, 0 );
+	mTextNoLineBreaks << "Intricate patterns, meticulously designed, ";
+	mTextNoLineBreaks << "Every character, a story confined. ";
+	mTextNoLineBreaks << Color( 0.2f, 0, 0 );
+	mTextNoLineBreaks << "With precision and art, a visual feat, ";
+	mTextNoLineBreaks << "Text transformed, in vectors' heartbeat.";
 }
 
 void NvPathTextApp::update()
 {
 	// Update position.
-	mPosition += 0.05f * ( mTarget - mPosition );
+	mPosition += 0.1f * ( mTarget - mPosition );
 	if( approxEqual( mPosition, mTarget ) )
 		mPosition = mTarget;
 
@@ -114,17 +136,15 @@ void NvPathTextApp::draw()
 		gl::ScopedBlendPremult scpBlend;
 
 		gl::ScopedModelMatrix scpModel( mCanvasUi.getModelMatrix() );
-		gl::translate( mPosition * getWindowWidth(), 0 );
 
 		// Render text using path rendering.
-		nvp::NvpTextFrame text;
-		text::typeset( mText, mColumnSize.x, mColumnSize.y * 4 / 10, text, text::TypesetOptions().topLineOffset( ( 0.4f * float( mColumnSize.y ) - mTextSize.y ) * 0.5f ) );
+		gl::translate( 0.5f * getWindowWidth(), 0 );
+		text::Frame title( mTitleRight, mColumnSize.x, -1, text::TypesetOptions().topLineOffset( 10 ) );
+		nvp::renderText( title );
 
-		nvp::NvpTextOnPath textOnPath( mSpiral, 0 );
-		text::typeset( mText, -1, -1, textOnPath, text::TypesetOptions() );
-
-		gl::translate( 0, 35 * ( 0.5f - mPosition ) );
-		text::typeset( mTitleRight, mColumnSize.x, -1, text, text::TypesetOptions().topLineOffset( 10 ) );
+		gl::translate( mPosition * getWindowWidth(), 0 );
+		nvp::renderText( mTextFrame );
+		nvp::renderText( mTextOnPath );
 	}
 
 	// Our canvas has gone out of scope, so now we can render it to the main window.
@@ -162,13 +182,13 @@ void NvPathTextApp::resize()
 	ip::fill( &surface, ColorA( 0, 0, 0, 0.15f ).premultiplied() );
 
 	text::Frame title( mTitleLeft, mColumnSize.x, -1, text::TypesetOptions().topLineOffset( 10 ) );
-	text::render( title, &surface, {}, true, true, true );
+	text::render( title, &surface, {}, true, true );
 
-	text::Frame text( mText, mColumnSize.x, mColumnSize.y * 4 / 10, text::TypesetOptions().topLineOffset( ( 0.4f * float( mColumnSize.y ) - mTextSize.y ) * 0.5f ) );
-	text::render( text, &surface, vec2{}, true, true, true );
+	mTextFrame = text::Frame( mText, mColumnSize.x, mColumnSize.y * 4 / 10, text::TypesetOptions().topLineOffset( ( 0.4f * float( mColumnSize.y ) - mTextSize.y ) * 0.5f ) );
+	text::render( mTextFrame, &surface, vec2{}, true, true );
 
-	text::TextOnPath textOnPath( mText, mSpiral );
-	text::render( textOnPath, &surface, vec2{}, true, true, false );
+	mTextOnPath = text::TextOnPath( mTextNoLineBreaks, mSpiral );
+	text::render( mTextOnPath, &surface, vec2{}, true, true );
 
 	mReference = gl::Texture2d::create( surface, gl::Texture2d::Format().minFilter( GL_LINEAR ).magFilter( GL_NEAREST ) );
 }
@@ -177,7 +197,7 @@ void NvPathTextApp::keyDown( KeyEvent event )
 {
 	switch( event.getCode() ) {
 	case KeyEvent::KEY_SPACE:
-		mTarget = mTarget > 0 ? 0 : 0.5f;
+		mTarget = mTarget < 0 ? 0 : -0.5f;
 		break;
 	case KeyEvent::KEY_ESCAPE:
 		if( isFullScreen() )

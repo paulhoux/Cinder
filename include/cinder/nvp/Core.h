@@ -5,9 +5,9 @@ This code is intended for use with the Cinder C++ library: http://libcinder.org
  Redistribution and use in source and binary forms, with or without modification, are permitted provided that
  the following conditions are met:
 
-    * Redistributions of source code must retain the above copyright notice, this list of conditions and
+	* Redistributions of source code must retain the above copyright notice, this list of conditions and
 	the following disclaimer.
-    * Redistributions in binary form must reproduce the above copyright notice, this list of conditions and
+	* Redistributions in binary form must reproduce the above copyright notice, this list of conditions and
 	the following disclaimer in the documentation and/or other materials provided with the distribution.
 
  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED
@@ -25,6 +25,12 @@ This code is intended for use with the Cinder C++ library: http://libcinder.org
 #include "cinder/gl/Context.h"
 
 namespace cinder {
+
+// Forward declaration.
+namespace text {
+class Typesetter;
+}
+
 namespace nvp {
 
 CI_API enum class CapsStyle { FLAT = GL_FLAT, SQUARE = GL_SQUARE_NV, ROUND = GL_ROUND_NV, TRIANGULAR = GL_TRIANGULAR_NV, DEFAULT = GL_FLAT };
@@ -66,6 +72,9 @@ CI_API inline float areaOfPolygon( const ci::vec2 *points, size_t count )
 	}
 	return 0.5f * area;
 }
+
+//!
+CI_API void renderText( const text::Typesetter &typesetter, const vec2 &offset = vec2() );
 
 //!
 struct CI_API ClipRect {
