@@ -1026,27 +1026,6 @@
     <ClCompile Include="..\..\src\cinder\MediaTime.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\cinder\nvp\Canvas.cpp">
-      <Filter>Source Files\nvp</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\cinder\nvp\Path.cpp">
-      <Filter>Source Files\nvp</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\cinder\nvp\Primitives.cpp">
-      <Filter>Source Files\nvp</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\cinder\nvp\Core.cpp">
-      <Filter>Source Files\nvp</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\cinder\nvp\Gradient.cpp">
-      <Filter>Source Files\nvp</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\cinder\nvp\Transform.cpp">
-      <Filter>Source Files\nvp</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\cinder\nvp\Values.cpp">
-      <Filter>Source Files\nvp</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\src\cinder\text\Face.cpp">
       <Filter>Source Files\text</Filter>
     </ClCompile>
@@ -1158,14 +1137,11 @@
     <ClCompile Include="..\..\src\libunibreak\emojidef.c">
       <Filter>Source Files\libunibreak</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\cinder\nvp\NvpFont.cpp">
-      <Filter>Source Files\nvp</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\cinder\nvp\NvpFace.cpp">
-      <Filter>Source Files\nvp</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\src\cinder\svg\Svg.cpp">
       <Filter>Source Files\svg</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\cinder\nvp\NvPath.cpp">
+      <Filter>Source Files\nvp</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -2342,33 +2318,6 @@
     <ClInclude Include="..\..\include\cinder\MediaTime.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\include\cinder\nvp\Canvas.h">
-      <Filter>Header Files\nvp</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\include\cinder\nvp\Path.h">
-      <Filter>Header Files\nvp</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\include\cinder\nvp\Primitives.h">
-      <Filter>Header Files\nvp</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\include\cinder\nvp\Core.h">
-      <Filter>Header Files\nvp</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\include\cinder\nvp\Cache.h">
-      <Filter>Header Files\nvp</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\include\cinder\nvp\Gradient.h">
-      <Filter>Header Files\nvp</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\include\cinder\nvp\Transform.h">
-      <Filter>Header Files\nvp</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\include\cinder\nvp\Attribute.h">
-      <Filter>Header Files\nvp</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\include\cinder\nvp\Values.h">
-      <Filter>Header Files\nvp</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\include\cinder\text\AttrString.h">
       <Filter>Header Files\text</Filter>
     </ClInclude>
@@ -2399,14 +2348,11 @@
     <ClInclude Include="..\..\include\cinder\IntervalMap.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\include\cinder\nvp\NvpFont.h">
-      <Filter>Header Files\nvp</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\include\cinder\nvp\NvpFace.h">
-      <Filter>Header Files\nvp</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\include\cinder\CanvasUi.h">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\cinder\nvp\NvPath.h">
+      <Filter>Header Files\nvp</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

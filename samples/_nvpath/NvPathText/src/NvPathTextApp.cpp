@@ -5,9 +5,7 @@
 #include "cinder/app/RendererGl.h"
 #include "cinder/gl/gl.h"
 #include "cinder/ip/Fill.h"
-#include "cinder/nvp/Canvas.h"
-#include "cinder/nvp/NvpFace.h"
-#include "cinder/nvp/NvpFont.h"
+#include "cinder/nvp/NvPath.h"
 #include "cinder/text/Text.h"
 
 using namespace ci;
