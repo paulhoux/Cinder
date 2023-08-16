@@ -2369,9 +2369,6 @@
     <ClInclude Include="..\..\include\cinder\nvp\Values.h">
       <Filter>Header Files\nvp</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\include\cinder\nvp\Algorithm.h">
-      <Filter>Header Files\nvp</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\include\cinder\text\AttrString.h">
       <Filter>Header Files\text</Filter>
     </ClInclude>

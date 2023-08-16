@@ -16,7 +16,7 @@ POSSIBILITY OF SUCH DAMAGE.
 #include "cinder/Cinder.h"
 #include "cinder/Log.h"
 #include "cinder/Unicode.h"
-#include "cinder/nvp/Algorithm.h"
+#include "cinder/Utilities.h"
 #include "cinder/nvp/Primitives.h"
 
 #include <freetype/ftoutln.h>

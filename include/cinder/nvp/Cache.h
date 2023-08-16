@@ -61,39 +61,6 @@ class Cache {
 
 	static FaceRef loadFace( const text::Font *font ) { return loadFace( font->getFace() ); }
 
-	// static FaceRef loadFace( const std::string &name )
-	//{
-	//	Cache &self = get();
-
-	//	if( self.mFonts.count( name ) && static_cast<bool>( self.mFonts.at( name ) ) ) {
-	//		// CI_LOG_V( "Using cached face for " << name << " (" << std::this_thread::get_id() << ")" );
-	//		return self.mFonts.at( name );
-	//	}
-
-	//	CI_LOG_V( "Loading face for " << name << " (" << std::this_thread::get_id() << ")" );
-	//	auto face = Face::create( name );
-	//	self.mFonts.insert_or_assign( name, face );
-
-	//	return face;
-	//}
-
-	// static FaceRef loadFace( const ci::DataSourceRef &src )
-	//{
-	//	Cache &self = get();
-
-	//	const auto file = src->getFilePath().generic_string();
-	//	if( self.mFonts.count( file ) && static_cast<bool>( self.mFonts.at( file ) ) ) {
-	//		// CI_LOG_V( "Using cached face for " << file << " (" << std::this_thread::get_id() << ")" );
-	//		return self.mFonts.at( file );
-	//	}
-
-	//	CI_LOG_V( "Loading face for " << file << " (" << std::this_thread::get_id() << ")" );
-	//	auto face = Face::create( src );
-	//	self.mFonts.insert_or_assign( file, face );
-
-	//	return face;
-	//}
-
 	static ShaderRef loadShader( Shader::Type type )
 	{
 		Cache &self = get();

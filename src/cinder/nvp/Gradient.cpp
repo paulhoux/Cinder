@@ -22,8 +22,8 @@ This code is intended for use with the Cinder C++ library: http://libcinder.org
 
 #include "cinder/nvp/Gradient.h"
 
+#include "cinder/Utilities.h"
 #include "cinder/gl/Context.h"
-#include "cinder/nvp/Algorithm.h"
 
 namespace cinder {
 namespace nvp {
@@ -38,7 +38,7 @@ GradientUnits toGradientUnits( std::string style )
 
 GradientSpreadMethod toSpreadMethod( std::string style )
 {
-	style = trim( to_lower( style ) );
+	style = trim( toLower( style ) );
 	if( style == "reflect" )
 		return GradientSpreadMethod::REFLECT;
 	if( style == "repeat" )

@@ -23,7 +23,6 @@ This code is intended for use with the Cinder C++ library: http://libcinder.org
 #include "cinder/nvp/Values.h"
 
 #include "cinder/Utilities.h"
-#include "cinder/nvp/Algorithm.h"
 
 namespace cinder {
 namespace nvp {
@@ -39,7 +38,7 @@ Number::Number( const std::string &v )
 		return;
 	}
 
-	const auto value = std::stof( filter( v, '%' ) );
+	const auto value = std::stof( filter( v, "%" ) );
 	if( std::isfinite( value ) )
 		mValue = value;
 
@@ -74,9 +73,9 @@ std::vector<Number> Number::split( const std::string &s, const std::string &sepa
 std::string Number::toString() const
 {
 	if( mIsPercentage )
-		return trimNumber( std::to_string( mValue * 100 ) ) + "%";
+		return valueToString( mValue * 100 ) + "%";
 
-	return trimNumber( std::to_string( mValue ) );
+	return valueToString( mValue );
 }
 
 } // namespace nvp

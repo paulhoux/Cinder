@@ -42,36 +42,35 @@ CI_API enum class PathStyle { MOVETO_RESETS = GL_MOVE_TO_RESETS_NV, MOVETO_CONTI
 CI_API inline bool hasNvPathRendering()
 {
 	assert( ci::gl::context() ); // We must have an active OpenGL context first!
-
 	return bool( GLAD_GL_NV_path_rendering );
 }
 
-CI_API inline void color3fv( const ci::Color &color )
-{
-	glColor3fv( &color.r );
-}
-CI_API inline void color4fv( const ci::ColorA &color )
-{
-	glColor4fv( &color.r );
-}
-CI_API inline void color3ubv( const ci::Color8u &color )
-{
-	glColor3ubv( &color.r );
-}
-CI_API inline void color4ubv( const ci::ColorA8u &color )
-{
-	glColor4ubv( &color.r );
-}
+// CI_API inline void color3fv( const ci::Color &color )
+//{
+//	glColor3fv( &color.r );
+//}
+// CI_API inline void color4fv( const ci::ColorA &color )
+//{
+//	glColor4fv( &color.r );
+//}
+// CI_API inline void color3ubv( const ci::Color8u &color )
+//{
+//	glColor3ubv( &color.r );
+//}
+// CI_API inline void color4ubv( const ci::ColorA8u &color )
+//{
+//	glColor4ubv( &color.r );
+//}
 
-//!
-CI_API inline float areaOfPolygon( const ci::vec2 *points, size_t count )
-{
-	float area = 0.0f;
-	for( size_t i = 0, j = count - 1; i < count; ++i, j = i - 1 ) {
-		area += points[j].x * points[i].y - points[i].x * points[j].y;
-	}
-	return 0.5f * area;
-}
+////!
+//CI_API inline float areaOfPolygon( const ci::vec2 *points, size_t count )
+//{
+//	float area = 0.0f;
+//	for( size_t i = 0, j = count - 1; i < count; ++i, j = i - 1 ) {
+//		area += points[j].x * points[i].y - points[i].x * points[j].y;
+//	}
+//	return 0.5f * area;
+//}
 
 //!
 CI_API void renderText( const text::Typesetter &typesetter, const vec2 &offset = vec2() );

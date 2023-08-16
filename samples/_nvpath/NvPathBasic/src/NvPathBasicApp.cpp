@@ -199,7 +199,7 @@ void NvPathBasicApp::draw()
 
 				// Create a Shape2d from a glyph.
 				auto    face = text::loadSystemFace( "Arial" );
-				auto    font = text::loadFont( face, 384 );
+				auto    font = text::font( face, 384 );
 				Shape2d glyph = font->getGlyphShape( font->getCharIndex( u'a' ) );
 
 				// Render the glyph.

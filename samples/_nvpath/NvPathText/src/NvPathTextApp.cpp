@@ -1,5 +1,6 @@
-#include "cinder/CanvasUi.h"
+﻿#include "cinder/CanvasUi.h"
 #include "cinder/Log.h"
+#include "cinder/Utilities.h"
 #include "cinder/app/App.h"
 #include "cinder/app/RendererGl.h"
 #include "cinder/gl/gl.h"
@@ -7,7 +8,6 @@
 #include "cinder/nvp/Canvas.h"
 #include "cinder/nvp/NvpFace.h"
 #include "cinder/nvp/NvpFont.h"
-#include "cinder/nvp/Primitives.h"
 #include "cinder/text/Text.h"
 
 using namespace ci;
@@ -51,6 +51,11 @@ void NvPathTextApp::prepare( Settings *settings )
 
 void NvPathTextApp::setup()
 {
+	if( !nvp::hasNvPathRendering() ) {
+		console() << "This GPU does not support for NV path rendering. Try running this application on systems equipped with an NVIDIA GPU." << std::endl;
+		return quit();
+	}
+
 	gl::enableVerticalSync();
 
 	// Setup canvas Ui.

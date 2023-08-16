@@ -1158,7 +1158,6 @@
     <ClInclude Include="..\..\include\cinder\Matrix33.h" />
     <ClInclude Include="..\..\include\cinder\Matrix44.h" />
     <ClInclude Include="..\..\include\cinder\MediaTime.h" />
-    <ClInclude Include="..\..\include\cinder\nvp\Algorithm.h" />
     <ClInclude Include="..\..\include\cinder\nvp\Attribute.h" />
     <ClInclude Include="..\..\include\cinder\nvp\Cache.h" />
     <ClInclude Include="..\..\include\cinder\nvp\Canvas.h" />

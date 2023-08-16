@@ -23,7 +23,6 @@ This code is intended for use with the Cinder C++ library: http://libcinder.org
 #include "cinder/nvp/Transform.h"
 
 #include "cinder/Utilities.h"
-#include "cinder/nvp/Algorithm.h"
 #include "cinder/nvp/Values.h"
 
 namespace cinder {
@@ -44,7 +43,7 @@ Transform::Transform( const std::string &param )
 			itr = parts.insert( itr, s.back() );
 	}
 	for( auto itr = parts.begin(); itr != parts.end(); ) {
-		const auto command = trim( filter( *itr++, ',' ) );
+		const auto command = trim( filter( *itr++, "," ) );
 		const auto params = trim( *itr++ );
 		const auto numbers = split( params, " ," );
 
@@ -125,17 +124,17 @@ std::string Transform::toString() const
 		return result;
 
 	result += "matrix(";
-	result += trimNumber( std::to_string( mTransform[0][0] ) );
+	result += valueToString( mTransform[0][0] );
 	result += ",";
-	result += trimNumber( std::to_string( mTransform[1][0] ) );
+	result += valueToString( mTransform[1][0] );
 	result += ",";
-	result += trimNumber( std::to_string( mTransform[0][1] ) );
+	result += valueToString( mTransform[0][1] );
 	result += ",";
-	result += trimNumber( std::to_string( mTransform[1][1] ) );
+	result += valueToString( mTransform[1][1] );
 	result += ",";
-	result += trimNumber( std::to_string( mTransform[2][0] ) );
+	result += valueToString( mTransform[2][0] );
 	result += ",";
-	result += trimNumber( std::to_string( mTransform[2][1] ) );
+	result += valueToString( mTransform[2][1] );
 	result += ")";
 
 	return result;

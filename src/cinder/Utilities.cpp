@@ -35,6 +35,7 @@
 #include <fstream>
 #include <cctype>
 #include <algorithm>
+#include <cwctype>
 
 using std::vector;
 using std::string;
