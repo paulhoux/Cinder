@@ -171,11 +171,117 @@ int asciiCaseCmp( const char *a, const char *b )
 	return ((int)std::toupper(*a)) - ((int)std::toupper(*b));
 }
 
-std::string trim( const std::string &str )
+void ltrim( std::string &str )
 {
-	size_t wsFront = str.find_first_not_of( " \f\n\r\t\v" );
-	size_t wsBack = str.find_last_not_of( " \f\n\r\t\v" );
-	return wsBack <= wsFront ? std::string() : str.substr( wsFront, wsBack - wsFront + 1 );
+	str.erase( str.begin(), str.begin() + str.find_first_not_of( " \f\n\r\t\v" ) );
+}
+
+void rtrim( std::string &str )
+{
+	str.erase( str.begin() + str.find_last_not_of( " \f\n\r\t\v" ) + 1, str.end() );
+}
+
+void ltrim( std::string &str, const std::string &characters )
+{
+	str.erase( str.begin(), str.begin() + str.find_first_not_of( characters ) );
+}
+
+void rtrim( std::string &str, const std::string &characters )
+{
+	str.erase( str.begin() + str.find_last_not_of( characters ) + 1, str.end() );
+}
+
+std::string trim( std::string str )
+{
+	ltrim( str );
+	rtrim( str );
+	return str;
+}
+
+std::string toLower( std::string str )
+{
+	static std::locale loc( "" );
+	std::transform( str.begin(), str.end(), str.begin(), []( unsigned char c ) { return std::tolower( c, loc ); } );
+	return str;
+}
+
+std::string toUpper( std::string str )
+{
+	static std::locale loc( "" );
+	std::transform( str.begin(), str.end(), str.begin(), []( unsigned char c ) { return std::toupper( c, loc ); } );
+	return str;
+}
+
+std::u16string toLower( std::u16string str )
+{
+	std::setlocale( LC_ALL, "" );
+	std::transform( str.begin(), str.end(), str.begin(), []( char16_t c ) { return std::towlower( c ); } );
+	return str;
+}
+
+std::u16string toUpper( std::u16string str )
+{
+	std::setlocale( LC_ALL, "" );
+	std::transform( str.begin(), str.end(), str.begin(), []( char16_t c ) { return std::towupper( c ); } );
+	return str;
+}
+
+std::string valueToString( int value )
+{
+	std::setlocale( LC_ALL, "en_US.UTF-8" );
+	return std::to_string( value );
+}
+
+std::string valueToString( unsigned value )
+{
+	std::setlocale( LC_ALL, "en_US.UTF-8" );
+	return std::to_string( value );
+}
+
+std::string valueToString( long value )
+{
+	std::setlocale( LC_ALL, "en_US.UTF-8" );
+	return std::to_string( value );
+}
+
+std::string valueToString( unsigned long value )
+{
+	std::setlocale( LC_ALL, "en_US.UTF-8" );
+	return std::to_string( value );
+}
+
+std::string valueToString( long long value )
+{
+	std::setlocale( LC_ALL, "en_US.UTF-8" );
+	return std::to_string( value );
+}
+
+std::string valueToString( unsigned long long value )
+{
+	std::setlocale( LC_ALL, "en_US.UTF-8" );
+	return std::to_string( value );
+}
+
+std::string valueToString( float value )
+{
+	std::setlocale( LC_ALL, "en_US.UTF-8" );
+	std::string str = std::to_string( value );
+	rtrim( str, "0.," );
+	return str;
+}
+
+std::string valueToString( double value )
+{
+	std::setlocale( LC_ALL, "en_US.UTF-8" );
+	std::string str = std::to_string( value );
+	rtrim( str, "0.," );
+	return str;
+}
+
+std::string filter( std::string str, const std::string &chars )
+{
+	str.erase( std::remove_if( str.begin(), str.end(), [chars]( char c ) { return chars.find( c ) != std::string::npos; } ), str.end() );
+	return str;
 }
 
 void sleep( float milliseconds )

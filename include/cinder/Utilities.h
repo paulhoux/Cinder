@@ -95,8 +95,48 @@ CI_API bool asciiCaseEqual( const char *a, const char *b );
 //! returns equivalent of strcmp() using ASCII case-insensitive comparison
 CI_API int asciiCaseCmp( const char *a, const char *b );
 
+//! removes all whitespace (as defined by std::isspace()) from the beginning of \a str. Unicode aware.
+CI_API void ltrim( std::string &str );
+//! removes all whitespace (as defined by std::isspace()) from the end of \a str. Unicode aware.
+CI_API void rtrim( std::string &str );
+
+//! removes all specified \a characters from the beginning of \a str.
+CI_API void ltrim( std::string &str, const std::string &characters );
+//! removes all specified \a characters from the end of \a str.
+CI_API void rtrim( std::string &str, const std::string &characters );
+
 //! returns a copy of \a str with all whitespace (as defined by std::isspace()) removed from beginning and end. Unicode aware.
-CI_API std::string trim( const std::string &str );
+CI_API std::string trim( std::string str );
+
+//! returns a copy of \a str with all characters converted to lowercase (using std::tolower()). 
+CI_API std::string toLower( std::string str );
+//! returns a copy of \a str with all characters converted to uppercase (using std::toupper()).
+CI_API std::string toUpper( std::string str );
+
+//! returns a copy of \a str with all characters converted to lowercase (using std::towlower()). Unicode aware.
+CI_API std::u16string toLower( std::u16string str );
+//! returns a copy of \a str with all characters converted to uppercase (using std::towupper()). Unicode aware.
+CI_API std::u16string toUpper( std::u16string str );
+
+//! converts the value to a string without leading and trailing zeroes.
+CI_API std::string valueToString( int value );
+//! converts the value to a string without leading and trailing zeroes.
+CI_API std::string valueToString( unsigned value );
+//! converts the value to a string without leading and trailing zeroes.
+CI_API std::string valueToString( long value );
+//! converts the value to a string without leading and trailing zeroes.
+CI_API std::string valueToString( unsigned long value );
+//! converts the value to a string without leading and trailing zeroes.
+CI_API std::string valueToString( long long value );
+//! converts the value to a string without leading and trailing zeroes.
+CI_API std::string valueToString( unsigned long long value );
+//! converts the value to a string without leading and trailing zeroes.
+CI_API std::string valueToString( float value );
+//! converts the value to a string without leading and trailing zeroes.
+CI_API std::string valueToString( double value );
+
+//! returns a copy of \a str with all occurrences of any of \a chars filtered out. 
+CI_API std::string filter( std::string str, const std::string &chars );
 
 //! Returns a stack trace (aka backtrace) where \c stackTrace()[0] == caller, \c stackTrace()[1] == caller's parent, etc
 CI_API std::vector<std::string> stackTrace();
