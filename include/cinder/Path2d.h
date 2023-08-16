@@ -62,33 +62,34 @@ class CI_API Path2d {
 	void	close() { mSegments.push_back( CLOSE ); }
 	bool	isClosed() const { return ( mSegments.size() > 1 ) && mSegments.back() == CLOSE; }
 
-	//!
+	//! Creates a circle with given \a center and \a radius and returns it as a Path2d.
 	static Path2d circle( const vec2 &center, float radius );
-	//!
+	//! Creates an ellipse with given \a center and \a radiusX and \a radiusY and returns it as a Path2d.
 	static Path2d ellipse( const vec2 &center, float radiusX, float radiusY );
-	//!
+	//! Creates a line with given start point \a p0 and end point \a p1 and returns it as a Path2d.
 	static Path2d line( const vec2 &p0, const vec2 &p1 );
-	//!
+	//! Creates a polygon from the given \a points and returns it as a Path2d.
 	static Path2d polygon( const std::vector<vec2> &points, bool closed = true );
-	//!
+	//! Creates a rectangle with given \a bounds and returns it as a Path2d.
 	static Path2d rectangle( const Rectf &bounds ) { return rectangle( bounds.x1, bounds.y1, bounds.getWidth(), bounds.getHeight() ); }
-	//!
+	//! Creates a rectangle with given origin \a x, \a y and size \a width, \a height and returns it as a Path2d.
 	static Path2d rectangle( float x, float y, float width, float height );
-	//!
+	//! Creates a rounded rectangle with given \a bounds and corner radius \a r and returns it as a Path2d.
 	static Path2d roundedRectangle( const Rectf &bounds, float r ) { return roundedRectangle( bounds, r, r ); }
-	//!
+	//! Creates a rounded rectangle with given \a bounds and corner radii \a rx and \a ry and returns it as a Path2d.
 	static Path2d roundedRectangle( const Rectf &bounds, float rx, float ry ) { return roundedRectangle( bounds.x1, bounds.y1, bounds.getWidth(), bounds.getHeight(), rx, ry ); }
-	//!
+	//! Creates a rounded rectangle with given origin \a x, \a y and size \a width, \a height and corner radius \a r returns it as a Path2d.
 	static Path2d roundedRectangle( float x, float y, float width, float height, float r ) { return roundedRectangle( x, y, width, height, r, r ); }
-	//!
+	//! Creates a rounded rectangle with given origin \a x, \a y and size \a width, \a height and corner radii \a rx and \a ry and returns it as a Path2d.
 	static Path2d roundedRectangle( float x, float y, float width, float height, float rx, float ry );
-	//!
+	//! Creates a star with the given \a center and number of \a points and returns it as a Path2d.
 	static Path2d star( const vec2 &center, int points, float largeRadius, float smallRadius, float rotation = 0 );
-	//!
+	//! Creates an arrow from start point \a p0 to end point \a p1 and returns it as a Path2d. The arrow head can be shaped with parameters \a thickness, \a width, \a length and \a concavity.
 	static Path2d arrow( const vec2 &p0, const vec2 &p1, float thickness, float width = 4, float length = 4, float concavity = 0 );
-	//!
+	//! Creates an arrow from start point \a x0, \a y0 to end point \a x1, \a y1 and returns it as a Path2d. The arrow head can be shaped with parameters \a thickness, \a width, \a length and \a concavity.
 	static Path2d arrow( float x0, float y0, float x1, float y1, float thickness, float width = 4, float length = 4, float concavity = 0 ) { return arrow( vec2( x0, y0 ), vec2( x1, y1 ), thickness, width, length, concavity ); }
-	//!
+	//! Creates an Archimedean spiral at \a center and returns it as a Path2d. The spiral runs from \a innerRadius to \a outerRadius and the radius will increase by \a spacing every full revolution.
+	//! You can provide an optional radial \a offset.
 	static Path2d spiral( const vec2 &center, float innerRadius, float outerRadius, float spacing, float offset = 0 );
     
 	//! Reverses the order of the path's points, inverting its winding order
