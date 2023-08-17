@@ -163,45 +163,45 @@ struct FtShape2dData {
 	float				mUnitScale;
 };
 
-static int ftShape2dMoveTo(const FT_Vector *to, void *user)
+int ftShape2dMoveTo( const FT_Vector *to, void *user )
 {
-	Shape2d *shape = &reinterpret_cast<FtShape2dData*>(user)->mShape;
-	float unitScale = reinterpret_cast<FtShape2dData*>(user)->mUnitScale;
-	shape->moveTo((float)to->x / unitScale, (float)to->y / unitScale);
+	Shape2d *shape = &static_cast<FtShape2dData *>( user )->mShape;
+	float    unitScale = static_cast<FtShape2dData *>( user )->mUnitScale;
+	shape->moveTo( float( to->x ) * unitScale, float( to->y ) * unitScale );
 	return 0;
 }
 
-static int ftShape2dLineTo(const FT_Vector *to, void *user)
+int ftShape2dLineTo( const FT_Vector *to, void *user )
 {
-	Shape2d *shape = &reinterpret_cast<FtShape2dData*>(user)->mShape;
-	float unitScale = reinterpret_cast<FtShape2dData*>(user)->mUnitScale;
-	shape->lineTo((float)to->x / unitScale, (float)to->y / unitScale);
+	Shape2d *shape = &static_cast<FtShape2dData *>( user )->mShape;
+	float    unitScale = static_cast<FtShape2dData *>( user )->mUnitScale;
+	shape->lineTo( float( to->x ) * unitScale, float( to->y ) * unitScale );
 	return 0;
 }
 
-static int ftShape2dConicTo(const FT_Vector *control, const FT_Vector *to, void *user)
+int ftShape2dConicTo( const FT_Vector *control, const FT_Vector *to, void *user )
 {
-	Shape2d *shape = &reinterpret_cast<FtShape2dData*>(user)->mShape;
-	float unitScale = reinterpret_cast<FtShape2dData*>(user)->mUnitScale;
-	shape->quadTo((float)control->x / unitScale, (float)control->y / unitScale, (float)to->x / unitScale, (float)to->y / unitScale);
+	Shape2d *shape = &static_cast<FtShape2dData *>( user )->mShape;
+	float    unitScale = static_cast<FtShape2dData *>( user )->mUnitScale;
+	shape->quadTo( float( control->x ) * unitScale, float( control->y ) * unitScale, float( to->x ) * unitScale, float( to->y ) * unitScale );
 	return 0;
 }
 
-static int ftShape2dCubicTo(const FT_Vector *control1, const FT_Vector *control2, const FT_Vector *to, void *user)
+int ftShape2dCubicTo( const FT_Vector *control1, const FT_Vector *control2, const FT_Vector *to, void *user )
 {
-	Shape2d *shape = &reinterpret_cast<FtShape2dData*>(user)->mShape;
-	float unitScale = reinterpret_cast<FtShape2dData*>(user)->mUnitScale;
-	shape->curveTo((float)control1->x / unitScale, (float)control1->y / unitScale, (float)control2->x / unitScale, (float)control2->y / unitScale, (float)to->x / unitScale, (float)to->y / unitScale);
+	Shape2d *shape = &static_cast<FtShape2dData *>( user )->mShape;
+	float    unitScale = static_cast<FtShape2dData *>( user )->mUnitScale;
+	shape->curveTo( float( control1->x ) * unitScale, float( control1->y ) * unitScale, float( control2->x ) * unitScale, float( control2->y ) * unitScale, float( to->x ) * unitScale, float( to->y ) * unitScale );
 	return 0;
 }
-}
+} // namespace
 
-cinder::Shape2d	Face::getGlyphShape( uint32_t glyphIndex ) const
+cinder::Shape2d Face::getGlyphShape( uint32_t glyphIndex ) const
 {
 	lock();
 
 	FT_Load_Glyph( mFtFace, glyphIndex, FT_LOAD_NO_HINTING | FT_LOAD_NO_SCALE | FT_LOAD_NO_BITMAP );
-	FT_Outline outline = mFtFace->glyph->outline;
+	FT_Outline       outline = mFtFace->glyph->outline;
 	FT_Outline_Funcs funcs;
 	funcs.move_to = ftShape2dMoveTo;
 	funcs.line_to = ftShape2dLineTo;
@@ -211,11 +211,11 @@ cinder::Shape2d	Face::getGlyphShape( uint32_t glyphIndex ) const
 	funcs.delta = 0;
 
 	FtShape2dData userData;
-	userData.mUnitScale = (float)mFtFace->units_per_EM;
+	userData.mUnitScale = 1.0f / float( mFtFace->units_per_EM );
 	FT_Outline_Decompose( &outline, &funcs, &userData );
 	if( userData.mShape.getNumContours() )
 		userData.mShape.close();
-	userData.mShape.scale(vec2(1, -1));
+	userData.mShape.scale( vec2( 1, -1 ) );
 
 	unlock();
 
