@@ -28,13 +28,6 @@ This code is intended for use with the Cinder C++ library: http://libcinder.org
 #include "cinder/gl/Context.h"
 #include "cinder/gl/Fbo.h"
 
-// Forward declarations.
-typedef struct hb_blob_t    hb_blob_t;
-typedef struct hb_face_t    hb_face_t;
-typedef struct hb_feature_t hb_feature_t;
-typedef struct hb_font_t    hb_font_t;
-typedef struct FT_Vector_   FT_Vector;
-
 namespace cinder {
 
 // Forward declarations.
@@ -178,18 +171,6 @@ using FaceRef = std::shared_ptr<class Face>;
 
 //! Represents a font face stored efficiently on the GPU as a list of glyph paths.
 CI_API class Face {
-	struct Glyph {
-		float                scale{ 1 };
-		std::vector<GLubyte> commands;
-		std::vector<GLfloat> coords;
-
-		void clear()
-		{
-			commands.clear();
-			coords.clear();
-		}
-	};
-
   public:
 	static FaceRef create( const text::Face *face ) { return std::make_shared<Face>( face ); }
 
@@ -204,78 +185,23 @@ CI_API class Face {
 
 	~Face();
 
-	//!
+	//! Returns the base path id.
 	[[nodiscard]] GLuint getBaseId() const { return mBaseId; }
 	//! Returns the base path id, pointing to the first glyph of the font. Returns zero if no id was assigned.
 	[[nodiscard]] GLuint getId( uint32_t index = 0 ) const { return mBaseId > 0 ? mBaseId + index : 0; }
-	//! TODO
-	[[nodiscard]] float getUnits( float size = 1 ) const { return mUnits * size; }
-	//! Returns the ascender height in pixels.
-	[[nodiscard]] GLfloat getAscender( float size = 1 ) const { return mAscender * size; }
-	//! Returns the descender height in pixels. Note: negative value!
-	[[nodiscard]] GLfloat getDescender( float size = 1 ) const { return mDescender * size; }
-	//! Returns the total height in pixels, which usually is the same as ascender and descender combined.
-	[[nodiscard]] GLfloat getHeight( float size = 1 ) const { return mHeight * size; }
-	//!
-	[[nodiscard]] GLsizei getNumGlyphs() const;
-
-	inline static constexpr float BASE_SIZE = 1000;
+	//! Returns the number of glyphs defined for this face.
+	[[nodiscard]] GLsizei getNumGlyphs() const { return mNumGlyphs; }
 
   private:
 	//! Sets the stroke style for all glyphs.
 	void setStrokeStyle( float width, JoinStyle joinStyle, CapsStyle capsStyle ) const;
+
 	//!
 	void createPaths() const;
 
-	static int moveTo( const FT_Vector *to, void *user );
-	static int lineTo( const FT_Vector *to, void *user );
-	static int quadTo( const FT_Vector *control, const FT_Vector *to, void *user );
-	static int cubicTo( const FT_Vector *control1, const FT_Vector *control2, const FT_Vector *to, void *user );
-
-	const text::Face *mFace = nullptr;  //
-	GLuint            mBaseId{ 0 };     //
-	GLfloat           mUnits{ 1 };      //
-	GLfloat           mAscender{ -1 };  //
-	GLfloat           mDescender{ -1 }; //
-	GLfloat           mHeight{ -1 };    //
-	GLuint            mNumGlyphs{ 0 };  //
-
-	friend class Font;
-};
-
-//! Represents a font face of a specific size. This is a cheap wrapper around the much more expensive Face class.
-class Font {
-  public:
-	Font() = default;
-
-	//!
-	Font( FaceRef face, float size );
-
-	//!
-	explicit operator bool() const { return static_cast<bool>( mFace ); }
-	//!
-	bool operator==( const Font &other ) const { return mFace == other.mFace && approxEqual( mSize, other.mSize ); }
-	//!
-	bool operator!=( const Font &other ) const { return !( *this == other ); }
-
-	//!
-	[[nodiscard]] const FaceRef &getFace() const { return mFace; }
-	//! Returns the base path id, pointing to the first glyph of the font. Returns zero if no id was assigned.
-	[[nodiscard]] GLuint getId( uint32_t index = 0 ) const { return mFace->getId( index ); }
-	//! Returns the size of the font in pixels(?). TODO
-	[[nodiscard]] float getSize() const { return mSize; }
-	//! TODO
-	[[nodiscard]] float getUnits() const { return mFace->getUnits( mSize ); }
-	//! Returns the ascender height in pixels.
-	[[nodiscard]] GLfloat getAscender() const { return mFace->getAscender( mSize ); }
-	//! Returns the descender height in pixels. Note: negative value!
-	[[nodiscard]] GLfloat getDescender() const { return mFace->getDescender( mSize ); }
-	//! Returns the total height in pixels, which usually is the same as ascender and descender combined.
-	[[nodiscard]] GLfloat getHeight() const { return mFace->getHeight( mSize ); }
-
-  private:
-	FaceRef mFace;
-	float   mSize{ 0 };
+	const text::Face *mFace = nullptr; //
+	GLuint            mBaseId{ 0 };    //
+	GLsizei           mNumGlyphs{ 0 }; //
 };
 
 //! Represents a rectangular region in 2D space outside of which no content should be drawn. Transformations are respected.

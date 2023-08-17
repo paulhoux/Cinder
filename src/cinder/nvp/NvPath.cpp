@@ -479,24 +479,10 @@ void Path::setPath( const std::vector<GLubyte> &commands, const std::vector<GLfl
 Face::Face( const text::Face *face )
 	: mFace( face )
 {
-	hb_face_t *facePtr = hb_ft_face_create_referenced( mFace->getFtFace() );
-	hb_font_t *fontPtr = hb_font_create( facePtr );
-
 	mNumGlyphs = mFace->getNumGlyphs();
-	mBaseId = gl::genPathsNV( mFace->getNumGlyphs() );
+	mBaseId = gl::genPathsNV( mNumGlyphs );
 
 	createPaths();
-
-	hb_font_extents_t extents;
-	hb_font_get_h_extents( fontPtr, &extents );
-
-	mUnits = 1.0f / float( hb_face_get_upem( facePtr ) );
-	mAscender = float( extents.ascender ) * mUnits;
-	mDescender = float( extents.descender ) * mUnits;
-	mHeight = float( extents.ascender - extents.descender ) * mUnits;
-
-	hb_font_destroy( fontPtr );
-	hb_face_destroy( facePtr );
 }
 
 Face::~Face()
@@ -505,19 +491,70 @@ Face::~Face()
 		gl::deletePathsNV( mBaseId, GLsizei( mNumGlyphs ) );
 }
 
-GLsizei Face::getNumGlyphs() const
-{
-	return mFace->getNumGlyphs();
-}
-
 void Face::setStrokeStyle( float width, JoinStyle joinStyle, CapsStyle capsStyle ) const
 {
-	for( GLuint i = 0; i < mNumGlyphs; ++i ) {
+	for( GLsizei i = 0; i < mNumGlyphs; ++i ) {
 		gl::pathParameterfNV( mBaseId + i, GL_PATH_STROKE_WIDTH_NV, width );
 		gl::pathParameteriNV( mBaseId + i, GL_PATH_JOIN_STYLE_NV, GLint( joinStyle ) );
 		gl::pathParameteriNV( mBaseId + i, GL_PATH_END_CAPS_NV, GLint( capsStyle ) );
 	}
 }
+
+namespace {
+struct Glyph {
+	float                scale{ 1 };
+	std::vector<GLubyte> commands;
+	std::vector<GLfloat> coords;
+
+	void clear()
+	{
+		commands.clear();
+		coords.clear();
+	}
+};
+
+int moveTo( const FT_Vector *to, void *user )
+{
+	auto &glyph = *static_cast<Glyph *>( user );
+	glyph.commands.push_back( GL_MOVE_TO_NV );
+	glyph.coords.push_back( to->x * glyph.scale );
+	glyph.coords.push_back( to->y * glyph.scale );
+	return 0;
+}
+
+int lineTo( const FT_Vector *to, void *user )
+{
+	auto &glyph = *static_cast<Glyph *>( user );
+	glyph.commands.push_back( GL_LINE_TO_NV );
+	glyph.coords.push_back( to->x * glyph.scale );
+	glyph.coords.push_back( to->y * glyph.scale );
+	return 0;
+}
+
+int quadTo( const FT_Vector *control, const FT_Vector *to, void *user )
+{
+	auto &glyph = *static_cast<Glyph *>( user );
+	glyph.commands.push_back( GL_QUADRATIC_CURVE_TO_NV );
+	glyph.coords.push_back( control->x * glyph.scale );
+	glyph.coords.push_back( control->y * glyph.scale );
+	glyph.coords.push_back( to->x * glyph.scale );
+	glyph.coords.push_back( to->y * glyph.scale );
+	return 0;
+}
+
+int cubicTo( const FT_Vector *control1, const FT_Vector *control2, const FT_Vector *to, void *user )
+{
+	auto &glyph = *static_cast<Glyph *>( user );
+	glyph.commands.push_back( GL_CUBIC_CURVE_TO_NV );
+	glyph.coords.push_back( control1->x * glyph.scale );
+	glyph.coords.push_back( control1->y * glyph.scale );
+	glyph.coords.push_back( control2->x * glyph.scale );
+	glyph.coords.push_back( control2->y * glyph.scale );
+	glyph.coords.push_back( to->x * glyph.scale );
+	glyph.coords.push_back( to->y * glyph.scale );
+	return 0;
+}
+} // namespace
 
 void Face::createPaths() const
 {
@@ -530,64 +567,16 @@ void Face::createPaths() const
 	functions.delta = 0;
 
 	Glyph glyph;
-	glyph.scale = BASE_SIZE / float( mFace->getFtFace()->units_per_EM );
+	glyph.scale = 1.0f / float( mFace->getFtFace()->units_per_EM );
 
-	for( FT_UInt i = 0; i < mNumGlyphs; ++i ) {
-		FT_Load_Glyph( mFace->getFtFace(), i, FT_LOAD_NO_HINTING | FT_LOAD_NO_SCALE | FT_LOAD_NO_BITMAP );
+	for( GLsizei i = 0; i < mNumGlyphs; ++i ) {
+		FT_Load_Glyph( mFace->getFtFace(), FT_UInt( i ), FT_LOAD_NO_HINTING | FT_LOAD_NO_SCALE | FT_LOAD_NO_BITMAP );
 		FT_Outline_Decompose( &mFace->getFtFace()->glyph->outline, &functions, &glyph );
 
 		gl::pathCommandsNV( mBaseId + i, GLsizei( glyph.commands.size() ), glyph.commands.data(), GLsizei( glyph.coords.size() ), GL_FLOAT, glyph.coords.data() );
 
 		glyph.clear();
 	}
-}
-
-int Face::moveTo( const FT_Vector *to, void *user )
-{
-	auto &glyph = *static_cast<Glyph *>( user );
-	glyph.commands.push_back( GL_MOVE_TO_NV );
-	glyph.coords.push_back( to->x * glyph.scale );
-	glyph.coords.push_back( to->y * glyph.scale );
-	return 0;
-}
-
-int Face::lineTo( const FT_Vector *to, void *user )
-{
-	auto &glyph = *static_cast<Glyph *>( user );
-	glyph.commands.push_back( GL_LINE_TO_NV );
-	glyph.coords.push_back( to->x * glyph.scale );
-	glyph.coords.push_back( to->y * glyph.scale );
-	return 0;
-}
-
-int Face::quadTo( const FT_Vector *control, const FT_Vector *to, void *user )
-{
-	auto &glyph = *static_cast<Glyph *>( user );
-	glyph.commands.push_back( GL_QUADRATIC_CURVE_TO_NV );
-	glyph.coords.push_back( control->x * glyph.scale );
-	glyph.coords.push_back( control->y * glyph.scale );
-	glyph.coords.push_back( to->x * glyph.scale );
-	glyph.coords.push_back( to->y * glyph.scale );
-	return 0;
-}
-
-int Face::cubicTo( const FT_Vector *control1, const FT_Vector *control2, const FT_Vector *to, void *user )
-{
-	auto &glyph = *static_cast<Glyph *>( user );
-	glyph.commands.push_back( GL_CUBIC_CURVE_TO_NV );
-	glyph.coords.push_back( control1->x * glyph.scale );
-	glyph.coords.push_back( control1->y * glyph.scale );
-	glyph.coords.push_back( control2->x * glyph.scale );
-	glyph.coords.push_back( control2->y * glyph.scale );
-	glyph.coords.push_back( to->x * glyph.scale );
-	glyph.coords.push_back( to->y * glyph.scale );
-	return 0;
-}
-
-Font::Font( FaceRef face, float size )
-	: mFace( std::move( face ) )
-	, mSize( size )
-{
 }
 
 bool ClipRect::push()
@@ -1098,15 +1087,14 @@ void renderText( const text::Typesetter &typesetter, const vec2 &offset )
 			continue;
 
 		// Cache the font face.
-		auto face = nvp::Cache::loadFace( runPtr->getFont()->getFace() );
-		auto font = nvp::Font( face, runPtr->getFont()->getSize() );
+		auto face = Cache::loadFace( runPtr->getFont()->getFace() );
 
 		// Create transforms.
 		transforms.clear();
 		transforms.reserve( runPtr->getNumGlyphs() );
 
 		const auto origin = offset + lineDrawOffset + runPtr->getDrawOffset();
-		const auto scale = runPtr->getFont()->getSize() / Face::BASE_SIZE;
+		const auto scale = runPtr->getFont()->getSize();
 		const auto positions = runPtr->getGlyphPositions();
 		const auto orientations = runPtr->getGlyphOrientations();
 		const auto indices = runPtr->getGlyphIndices();
