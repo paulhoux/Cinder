@@ -64,6 +64,9 @@ class CI_API Face {
 	//! Returns the available fixed pixel sizes. Only relevant in bitmap fonts.
 	std::vector<int32_t>	getFixedSizes() const;
 
+	//! Returns the unit size of the face. Useful when scaling glyphs.
+	unsigned short getUnitsPerEm() const;
+
 	void			lock() const {}
 	void			unlock() const {}
 	
@@ -126,6 +129,24 @@ class CI_API Face {
 
 	//! Returns a Shape2d containing the outline for glyph \a glyphIndex, in font units. Note that this index is not a Unicode codepoint, and can be obtained with \a getCharIndex().
 	cinder::Shape2d			getGlyphShape( uint32_t glyphIndex ) const;
+	
+	//! Function called by the getGlyphOutline and getGlyphOutlines methods. See nvp::Face::createPaths() for an example of how to use these.
+	using MoveToFn = int ( * )( const ivec2 *, void * );
+	using LineToFn = int ( * )( const ivec2 *, void * );
+	using QuadToFn = int ( * )( const ivec2 *, const ivec2 *, void * );
+	using CubicToFn = int ( * )( const ivec2 *, const ivec2 *, const ivec2 *, void * );
+	using RestartFn = void ( * )( void * );
+	struct OutlineFunctions {
+		MoveToFn  moveTo;
+		LineToFn  lineTo;
+		QuadToFn  quadTo;
+		CubicToFn cubicTo;
+		RestartFn restart;
+	};
+	//! Obtain the outline of the glyph with the specified \a glyphIndex. See nvp::Face::createPaths() for an example of how to use this method.
+	void getGlyphOutline( uint32_t glyphIndex, const OutlineFunctions &functions, void *user ) const;
+	//! Obtain the outline of \a count glyphs, starting at \a startIndex. See nvp::Face::createPaths() for an example of how to use this method.
+	void getGlyphOutlines( uint32_t startIndex, uint32_t count, const OutlineFunctions &functions, void *user ) const;
 
 	struct CI_API Data {
 		virtual ~Data() {}

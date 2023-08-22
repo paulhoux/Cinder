@@ -156,6 +156,14 @@ vector<int32_t> Face::getFixedSizes() const
 	return result;
 }
 
+unsigned short Face::getUnitsPerEm() const
+{
+	if( mFtFace )
+		return mFtFace->units_per_EM;
+
+	return 0;
+}
+
 namespace {
 
 struct FtShape2dData {
@@ -220,6 +228,37 @@ cinder::Shape2d Face::getGlyphShape( uint32_t glyphIndex ) const
 	unlock();
 
 	return userData.mShape;
+}
+
+void Face::getGlyphOutline( uint32_t glyphIndex, const OutlineFunctions &functions, void *user ) const
+{
+	getGlyphOutlines( glyphIndex, 1, functions, user );
+}
+
+void Face::getGlyphOutlines( uint32_t startIndex, uint32_t count, const OutlineFunctions &functions, void *user ) const
+{
+	// Make sure types are convertible. If not, change the vector type of the OutlineFunctions accordingly for this platform.
+	static_assert( sizeof( FT_Vector ) == sizeof( ivec2 ) );
+	static_assert( is_integral<FT_Pos>() == is_integral<glm::i32>() );
+
+	FT_Outline_Funcs funcs;
+	funcs.move_to = reinterpret_cast<int ( * )( const FT_Vector *, void * )>( functions.moveTo );
+	funcs.line_to = reinterpret_cast<int ( * )( const FT_Vector *, void * )>( functions.lineTo );
+	funcs.conic_to = reinterpret_cast<int ( * )( const FT_Vector *, const FT_Vector *, void * )>( functions.quadTo );
+	funcs.cubic_to = reinterpret_cast<int ( * )( const FT_Vector *, const FT_Vector *, const FT_Vector *, void * )>( functions.cubicTo );
+	funcs.shift = 0;
+	funcs.delta = 0;
+
+	lock();
+
+	for( uint32_t i = 0; i < count; ++i ) {
+		FT_Load_Glyph( mFtFace, startIndex + i, FT_LOAD_NO_HINTING | FT_LOAD_NO_SCALE | FT_LOAD_NO_BITMAP );
+		FT_Outline outline = mFtFace->glyph->outline;
+		FT_Outline_Decompose( &outline, &funcs, user );
+		functions.restart( user );
+	}
+
+	unlock();
 }
 
 void Face::setRendererData( uint16_t rendererId, Face::Data *data ) const

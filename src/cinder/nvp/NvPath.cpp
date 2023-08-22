@@ -27,10 +27,6 @@ This code is intended for use with the Cinder C++ library: http://libcinder.org
 #include "cinder/gl/scoped.h"
 #include "cinder/text/Text.h"
 
-#include <freetype/ftoutln.h>
-#include <hb-ft.h>
-#include <hb.h>
-
 namespace cinder {
 namespace nvp {
 
@@ -502,18 +498,13 @@ void Face::setStrokeStyle( float width, JoinStyle joinStyle, CapsStyle capsStyle
 
 namespace {
 struct Glyph {
-	float                scale{ 1 };
+	GLuint               id{ 0 };
+	GLfloat              scale{ 1 };
 	std::vector<GLubyte> commands;
 	std::vector<GLfloat> coords;
-
-	void clear()
-	{
-		commands.clear();
-		coords.clear();
-	}
 };
 
-int moveTo( const FT_Vector *to, void *user )
+int moveTo( const ivec2 *to, void *user )
 {
 	auto &glyph = *static_cast<Glyph *>( user );
 	glyph.commands.push_back( GL_MOVE_TO_NV );
@@ -522,7 +513,7 @@ int moveTo( const FT_Vector *to, void *user )
 	return 0;
 }
 
-int lineTo( const FT_Vector *to, void *user )
+int lineTo( const ivec2 *to, void *user )
 {
 	auto &glyph = *static_cast<Glyph *>( user );
 	glyph.commands.push_back( GL_LINE_TO_NV );
@@ -531,7 +522,7 @@ int lineTo( const FT_Vector *to, void *user )
 	return 0;
 }
 
-int quadTo( const FT_Vector *control, const FT_Vector *to, void *user )
+int quadTo( const ivec2 *control, const ivec2 *to, void *user )
 {
 	auto &glyph = *static_cast<Glyph *>( user );
 	glyph.commands.push_back( GL_QUADRATIC_CURVE_TO_NV );
@@ -542,7 +533,7 @@ int quadTo( const FT_Vector *control, const FT_Vector *to, void *user )
 	return 0;
 }
 
-int cubicTo( const FT_Vector *control1, const FT_Vector *control2, const FT_Vector *to, void *user )
+int cubicTo( const ivec2 *control1, const ivec2 *control2, const ivec2 *to, void *user )
 {
 	auto &glyph = *static_cast<Glyph *>( user );
 	glyph.commands.push_back( GL_CUBIC_CURVE_TO_NV );
@@ -554,29 +545,35 @@ int cubicTo( const FT_Vector *control1, const FT_Vector *control2, const FT_Vect
 	glyph.coords.push_back( to->y * glyph.scale );
 	return 0;
 }
+
+void restart( void *user )
+{
+	auto &glyph = *static_cast<Glyph *>( user );
+
+	if( !( glyph.commands.empty() || glyph.coords.empty() ) )
+		gl::pathCommandsNV( glyph.id, GLsizei( glyph.commands.size() ), glyph.commands.data(), GLsizei( glyph.coords.size() ), GL_FLOAT, glyph.coords.data() );
+
+	glyph.id++;
+	glyph.commands.clear();
+	glyph.coords.clear();
+}
+
 } // namespace
 
 void Face::createPaths() const
 {
-	FT_Outline_Funcs functions;
-	functions.move_to = moveTo;
-	functions.line_to = lineTo;
-	functions.conic_to = quadTo;
-	functions.cubic_to = cubicTo;
-	functions.shift = 0;
-	functions.delta = 0;
+	text::Face::OutlineFunctions functions;
+	functions.moveTo = moveTo;
+	functions.lineTo = lineTo;
+	functions.quadTo = quadTo;
+	functions.cubicTo = cubicTo;
+	functions.restart = restart;
 
 	Glyph glyph;
-	glyph.scale = 1.0f / float( mFace->getFtFace()->units_per_EM );
+	glyph.id = mBaseId;
+	glyph.scale = 1.0f / float( mFace->getUnitsPerEm() );
 
-	for( GLsizei i = 0; i < mNumGlyphs; ++i ) {
-		FT_Load_Glyph( mFace->getFtFace(), FT_UInt( i ), FT_LOAD_NO_HINTING | FT_LOAD_NO_SCALE | FT_LOAD_NO_BITMAP );
-		FT_Outline_Decompose( &mFace->getFtFace()->glyph->outline, &functions, &glyph );
-
-		gl::pathCommandsNV( mBaseId + i, GLsizei( glyph.commands.size() ), glyph.commands.data(), GLsizei( glyph.coords.size() ), GL_FLOAT, glyph.coords.data() );
-
-		glyph.clear();
-	}
+	mFace->getGlyphOutlines( 0, mNumGlyphs, functions, &glyph );
 }
 
 bool ClipRect::push()
