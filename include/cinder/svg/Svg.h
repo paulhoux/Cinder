@@ -101,6 +101,8 @@ class CI_API Renderer {
 	virtual void	popLineCap() {}
 	virtual void	pushLineJoin(LineJoin  /*lineJoin*/ ) {}
 	virtual void	popLineJoin() {}
+	virtual void	pushMiterLimit(float  /*miterLimit*/ ) {}
+	virtual void	popMiterLimit() {}
 	virtual void	pushTextPen(const vec2 &  /*penPos*/ ) {}
 	virtual void	popTextPen() {}
 	virtual void	pushTextRotation( float  /*rotation*/ ) {}
@@ -166,7 +168,9 @@ class CI_API Paint {
 	bool			useObjectBoundingBox() const { return mUseObjectBoundingBox; }
 	bool			specifiesTransform() const { return mSpecifiesTransform; }
 	mat3			getTransform() const { return mTransform; }
-	
+
+	const std::string& getId() const { return mId; }
+
 	uint8_t									mType;
 	std::vector<std::pair<float,ColorA8u> >	mStops;
 	
@@ -175,6 +179,8 @@ class CI_API Paint {
 	bool				mUseObjectBoundingBox;
 	mat3				mTransform;
 	bool				mSpecifiesTransform;
+
+	std::string			mId;
 };
 
 //! SVG Style for a node. Corresponds to SVG Styling: http://www.w3.org/TR/SVG/styling.html
@@ -241,6 +247,12 @@ class CI_API Style {
 	LineJoin		getLineJoin() const { return mLineJoin; }
 	void			setLineJoin( LineJoin lineJoin ) { mSpecifiesLineJoin = true; mLineJoin = lineJoin; }	
 	static LineJoin	getLineJoinDefault() { return svg::LINE_JOIN_MITER; }
+
+	bool			specifiesMiterLimit() const { return mSpecifiesMiterLimit; }
+	void			unspecifyMiterLimit() { mSpecifiesMiterLimit = false; }
+	float			getMiterLimit() const { return mMiterLimit; }
+	void			setMiterLimit( float miterLimit ) { mSpecifiesMiterLimit = true; mMiterLimit = miterLimit; }
+	static float	getMiterLimitDefault() { return 4; }
 	
 	// fonts
 	bool									specifiesFontFamilies() const { return mSpecifiesFontFamilies; }
@@ -286,13 +298,15 @@ class CI_API Style {
 	bool			mSpecifiesFill, mSpecifiesStroke;
 	Paint			mFill, mStroke;
 	bool			mSpecifiesStrokeWidth;
-	float			mStrokeWidth;  	
+	float			mStrokeWidth;
 	bool			mSpecifiesFillRule;
 	FillRule		mFillRule;
 	bool			mSpecifiesLineCap;
 	LineCap			mLineCap;
 	bool			mSpecifiesLineJoin;
 	LineJoin		mLineJoin;
+	bool			mSpecifiesMiterLimit;
+	float			mMiterLimit;
 	
 	// fonts
 	bool			mSpecifiesFontFamilies, mSpecifiesFontSize, mSpecifiesFontWeight;
@@ -377,6 +391,8 @@ class CI_API Node {
 	LineCap			getLineCap() const;
 	//! Returns node's line join, or the first among its ancestors when it has none
 	LineJoin		getLineJoin() const;
+	//! Returns node's miter limit, or the first among its ancestors when it has none
+	float			getMiterLimit() const;
 	//! Returns node's stroke width, or the first among its ancestors when it has none
 	float			getStrokeWidth() const;
 	//! Returns node's font families, or the first among its ancestors when it has none

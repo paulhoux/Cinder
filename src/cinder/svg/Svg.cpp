@@ -306,6 +306,7 @@ Style Style::makeGlobalDefaults()
 	result.setFillRule( getFillRuleDefault() );
 	result.setLineCap( getLineCapDefault() );
 	result.setLineJoin( getLineJoinDefault() );
+	result.setMiterLimit( getMiterLimitDefault() );
 	
 	result.setFontFamilies( getFontFamiliesDefault() );
 	result.setFontSize( getFontSizeDefault() );
@@ -326,6 +327,7 @@ void Style::clear()
 	mSpecifiesFillRule = false;
 	mSpecifiesLineCap = false;
 	mSpecifiesLineJoin = false;
+	mSpecifiesMiterLimit = false;
 	mSpecifiesFontFamilies = mSpecifiesFontSize = mSpecifiesFontWeight = false;
 	mSpecifiesVisible = false;
 	mDisplayNone = false;
@@ -359,6 +361,11 @@ void Style::parseStyleAttribute( const std::string &stylePropertyString, const N
 		vector<string> valuePair = split( *pairIt, ':' );
 		if( valuePair.size() != 2 )
 			continue;
+	    // trim white space: TODO move inside parseProperty itself?
+		ltrim(valuePair[0]);
+		rtrim(valuePair[0]);
+		ltrim(valuePair[1]);
+		rtrim(valuePair[1]);
 		parseProperty( valuePair[0], valuePair[1], parent );
 	}
 }
@@ -433,6 +440,13 @@ bool Style::parseProperty( const std::string &key, const std::string &value, con
 		else if( value == "bevel" ) {
 			mSpecifiesLineJoin = true;
 			mLineJoin = LINE_JOIN_BEVEL;
+		}
+		return true;
+	}
+	else if( key == "stroke-miterlimit" ) {
+        if( value != "inherit" ) {
+			mSpecifiesMiterLimit = true;
+			mMiterLimit = (float)atof( value.c_str() ); // should be >= 1, otherwise error
 		}
 		return true;
 	}
@@ -514,6 +528,8 @@ void Style::startRender( Renderer &renderer, bool isNodeDrawable ) const
 		renderer.pushLineCap( mLineCap );
 	if( mSpecifiesLineJoin )
 		renderer.pushLineJoin( mLineJoin );
+	if( mSpecifiesMiterLimit )
+		renderer.pushMiterLimit( mMiterLimit );
 }
 
 void Style::finishRender( Renderer &renderer, bool isNodeDrawable ) const
@@ -529,11 +545,13 @@ void Style::finishRender( Renderer &renderer, bool isNodeDrawable ) const
 	if( mSpecifiesStrokeWidth )
 		renderer.popStrokeWidth();
 	if( mSpecifiesFillRule )
-		renderer.popFillRule();		
+		renderer.popFillRule();
 	if( mSpecifiesLineCap )
 		renderer.popLineCap();
 	if( mSpecifiesLineJoin )
 		renderer.popLineJoin();
+	if( mSpecifiesMiterLimit )
+		renderer.popMiterLimit();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////
@@ -713,6 +731,13 @@ LineJoin Node::getLineJoin() const
 	if( mStyle.specifiesLineJoin() ) return mStyle.getLineJoin();
 	else if( mParent ) return mParent->getLineJoin();
 	else return Style::getLineJoinDefault();
+}
+
+float Node::getMiterLimit() const
+{
+	if( mStyle.specifiesMiterLimit() ) return mStyle.getMiterLimit();
+	else if( mParent ) return mParent->getMiterLimit();
+	else return Style::getMiterLimitDefault();
 }
 
 const vector<string>& Node::getFontFamilies() const
@@ -923,6 +948,7 @@ Style Node::calcInheritedStyle() const
 	result.setFillRule( getFillRule() );
 	result.setLineCap( getLineCap() );
 	result.setLineJoin( getLineJoin() );
+	result.setMiterLimit( getMiterLimit() );
 	result.setStrokeWidth( getStrokeWidth() );
 	result.setFontFamilies( getFontFamilies() );
 	result.setFontSize( getFontSize() );
@@ -1077,6 +1103,8 @@ Gradient::Stop::Stop( const Node *parent, const XmlTree &xml )
 Paint Gradient::asPaint() const
 {
 	Paint result;
+	result.mId = getId();
+
 	if( ! mStops.empty() ) {
 		result.mStops.clear();
 		for( vector<Stop>::const_iterator stopIt = mStops.begin(); stopIt != mStops.end(); ++stopIt )
@@ -2330,8 +2358,10 @@ void Doc::loadDoc( DataSourceRef source, fs::path filePath )
 	bool needsViewBoxMapping = mViewBox.getWidth() > 0 && mViewBox.getHeight() > 0 && mWidth > 0 && mHeight > 0;
 	if( needsViewBoxMapping ) {
 		mat3 m33;
-		m33[0][0] = mViewBox.getWidth() / (float)mWidth; m33[1][1] = mViewBox.getHeight() / (float)mHeight;
-		m33[2][0] = (float)-mViewBox.x1; m33[2][1] = (float)-mViewBox.y1;
+		m33[0][0] = mWidth / (float)mViewBox.getWidth();
+		m33[1][1] = mHeight / (float)mViewBox.getHeight();
+		m33[2][0] = (float)-mViewBox.x1;
+		m33[2][1] = (float)-mViewBox.y1;
 		mTransform = m33;
 		mSpecifiesTransform = true;
 	}
