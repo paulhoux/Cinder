@@ -1,0 +1,33 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.32929.386
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "NvPathSvg", "NvPathSvg.vcxproj", "{8B841264-6430-4466-A66E-8F1D32CFF7D9}"
+	ProjectSection(ProjectDependencies) = postProject
+		{92B5BE70-DCAA-40E4-92D8-CC2B95AA28BE} = {92B5BE70-DCAA-40E4-92D8-CC2B95AA28BE}
+	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "cinder", "..\..\..\..\proj\vc2019\cinder.vcxproj", "{92B5BE70-DCAA-40E4-92D8-CC2B95AA28BE}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|x64 = Debug|x64
+		Release|x64 = Release|x64
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{8B841264-6430-4466-A66E-8F1D32CFF7D9}.Debug|x64.ActiveCfg = Debug|x64
+		{8B841264-6430-4466-A66E-8F1D32CFF7D9}.Debug|x64.Build.0 = Debug|x64
+		{8B841264-6430-4466-A66E-8F1D32CFF7D9}.Release|x64.ActiveCfg = Release|x64
+		{8B841264-6430-4466-A66E-8F1D32CFF7D9}.Release|x64.Build.0 = Release|x64
+		{92B5BE70-DCAA-40E4-92D8-CC2B95AA28BE}.Debug|x64.ActiveCfg = Debug|x64
+		{92B5BE70-DCAA-40E4-92D8-CC2B95AA28BE}.Debug|x64.Build.0 = Debug|x64
+		{92B5BE70-DCAA-40E4-92D8-CC2B95AA28BE}.Release|x64.ActiveCfg = Release|x64
+		{92B5BE70-DCAA-40E4-92D8-CC2B95AA28BE}.Release|x64.Build.0 = Release|x64
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {9C5076F3-7D12-4693-8763-2A8B245FF679}
+	EndGlobalSection
+EndGlobal
