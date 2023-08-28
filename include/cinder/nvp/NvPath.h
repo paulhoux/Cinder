@@ -39,20 +39,39 @@ class Typesetter;
 
 namespace nvp {
 
+// Forward declarations.
+class Cache;
+class Canvas;
+class ClipRect;
+class Face;
+class Gradient;
+class Gradients;
+class Path;
+class Shader;
+
+using CanvasRef = std::shared_ptr<Canvas>;
+using PathRef = std::shared_ptr<Path>;
+using FaceRef = std::shared_ptr<Face>;
+using GradientRef = std::shared_ptr<Gradient>;
+using ShaderRef = std::shared_ptr<Shader>;
+
 //!
 CI_API enum class CapsStyle { FLAT = GL_FLAT, SQUARE = GL_SQUARE_NV, ROUND = GL_ROUND_NV, TRIANGULAR = GL_TRIANGULAR_NV, DEFAULT = GL_FLAT };
 //!
 CI_API enum class JoinStyle { ROUND = GL_ROUND_NV, BEVEL = GL_BEVEL_NV, MITER_REVERT = GL_MITER_REVERT_NV, MITER_TRUNCATE = GL_MITER_TRUNCATE_NV, DEFAULT = GL_MITER_REVERT_NV };
 //!
 CI_API enum class PathStyle { MOVETO_RESETS = GL_MOVE_TO_RESETS_NV, MOVETO_CONTINUES = GL_MOVE_TO_CONTINUES_NV, DEFAULT = GL_MOVE_TO_RESETS_NV };
-
-using PathRef = std::shared_ptr<class Path>;
+//! Defines the coordinate system used by the gradient.
+enum class GradientUnits { OBJECT_BOUNDING_BOX = GL_PATH_OBJECT_BOUNDING_BOX_NV, USER_SPACE_ON_USE = GL_OBJECT_LINEAR_NV, DEFAULT = GL_PATH_OBJECT_BOUNDING_BOX_NV };
+//! Defines the spread method used by the gradient.
+enum class GradientSpreadMethod { PAD = GL_CLAMP_TO_EDGE, REFLECT = GL_MIRRORED_REPEAT, REPEAT = GL_REPEAT, DEFAULT = PAD };
 
 //! Path represents a vector shape stored efficiently on the GPU.
 CI_API class Path {
   public:
 	virtual ~Path();
 
+	Path();
 	Path( const Path &other );
 	Path( Path &&other ) noexcept;
 	Path &operator=( const Path &other );
@@ -94,6 +113,8 @@ CI_API class Path {
 	void setDashCaps( CapsStyle caps ) const;
 	//! Sets the caps for dashed strokes.
 	void setDashCaps( CapsStyle initialCap, CapsStyle terminalCap ) const;
+	//! Sets the miter limit for stokes.
+	void setMiterLimit( float limit ) const;
 
 	//! Renders the path to the stencil buffer but does not cover the path.
 	//! Use the `stroke()` methods to stencil and cover the path in a single step.
@@ -134,18 +155,18 @@ CI_API class Path {
 	virtual void strokeInstanced( const std::vector<GLuint> &paths, const std::vector<glm::mat4x3> &transforms, const ColorA &color, CapsStyle caps, JoinStyle join, float strokeWidth = 1 );
 
 	//! Fills the path with a solid \a color.
-	virtual void fill( const ColorA &color );
+	virtual void fill( const ColorA &color ) const;
 	//! Fills the path with a \a texture, automatically centered within the path's bounding box.
-	virtual void fill( const gl::TextureRef &texture ) { fill( texture, getBounds() ); }
+	virtual void fill( const gl::TextureRef &texture ) const { fill( texture, getBounds() ); }
 	//! Fills the path with a \a texture, automatically centered within the specified \a bounding box.
-	virtual void fill( const gl::TextureRef &texture, const Rectf &bounds );
+	virtual void fill( const gl::TextureRef &texture, const Rectf &bounds ) const;
 	//! Fills the path with a \a texture.
-	virtual void fill( const gl::TextureRef &texture, const vec2 &upperLeftTexCoord, const vec2 &lowerRightTexCoord );
+	virtual void fill( const gl::TextureRef &texture, const vec2 &upperLeftTexCoord, const vec2 &lowerRightTexCoord ) const;
 
 	//! Fills the path instances with a solid \a color.
-	virtual void fillInstanced( const std::vector<GLuint> &paths, const std::vector<glm::mat3x2> &transforms, const ColorA &color );
+	virtual void fillInstanced( const std::vector<GLuint> &paths, const std::vector<glm::mat3x2> &transforms, const ColorA &color ) const;
 	//! Fills the path instances with a solid \a color.
-	virtual void fillInstanced( const std::vector<GLuint> &paths, const std::vector<glm::mat4x3> &transforms, const ColorA &color );
+	virtual void fillInstanced( const std::vector<GLuint> &paths, const std::vector<glm::mat4x3> &transforms, const ColorA &color ) const;
 
 	//! Creates a new path by adding paths together.
 	[[nodiscard]] Path operator+( const Path &other ) const;
@@ -160,14 +181,10 @@ CI_API class Path {
 	[[nodiscard]] Path transformed( const glm::mat3x2 &transform ) const;
 
   protected:
-	Path() = default;
-
 	static GLubyte toPathCommand( Path2d::SegmentType type );
 
 	GLuint mPathId{ 0 };
 };
-
-using FaceRef = std::shared_ptr<class Face>;
 
 //! Represents a font face stored efficiently on the GPU as a list of glyph paths.
 CI_API class Face {
@@ -204,65 +221,343 @@ CI_API class Face {
 	GLsizei           mNumGlyphs{ 0 }; //
 };
 
-//! Represents a rectangular region in 2D space outside of which no content should be drawn. Transformations are respected.
-struct CI_API ClipRect {
-	ClipRect() = default;
-
-	ClipRect( int x1, int y1, int x2, int y2 )
-		: mBounds( x1, y1, x2, y2 )
-	{
-	}
-
-	explicit ClipRect( const Area &bounds )
-		: mBounds( bounds )
-	{
-	}
-
-	const Area &get() const { return mBounds; }
-
-	void set( int x1, int y1, int x2, int y2 ) { mBounds = { x1, y1, x2, y2 }; }
-
-	void set( const Area &bounds ) { mBounds = bounds; }
-
-	bool push();
-
-	bool pop();
-
-  private:
-	Area         mBounds;
-	gl::Context *mCtx = nullptr;
-};
-
 //!
-struct CI_API ScopedClipRect : private Noncopyable {
-	ScopedClipRect( const ivec2 &position, const ivec2 &dimension )
-		: mClipRect( position.x, position.y, dimension.x, dimension.y )
-	{
-		mClipRect.push();
-	}
+class Gradient {
+  public:
+	class Stop {
+		float    mOffset{ 0 }; // normalized 0-1
+		ColorA8u mColor;
 
-	ScopedClipRect( int x, int y, int width, int height )
-		: mClipRect{ x, y, x + width, y + height }
-	{
-		mClipRect.push();
-	}
+	  public:
+		Stop() = default;
+		Stop( float t, const ColorA8u &color, unsigned char opacity = 255 )
+			: mOffset{ clamp( t, 0.0f, 1.0f ) }
+			, mColor{ color }
+		{
+			mColor.a = mColor.a * opacity / 255;
+		}
+		Stop( float t, const Color8u &color, unsigned char opacity = 255 )
+			: mOffset{ clamp( t, 0.0f, 1.0f ) }
+			, mColor{ color, unsigned char( 255 * opacity ) }
+		{
+		}
+		Stop( float t, unsigned char r, unsigned char g, unsigned char b, unsigned char a = 255 )
+			: mOffset{ clamp( t, 0.0f, 1.0f ) }
+			, mColor{ r, g, b, a }
+		{
+		}
+		~Stop() = default;
 
-	explicit ScopedClipRect( const Area &bounds )
-		: mClipRect{ bounds }
-	{
-		mClipRect.push();
-	}
+		Stop( const Stop & ) = default;
+		Stop( Stop && ) noexcept = default;
+		Stop &operator=( const Stop & ) = default;
+		Stop &operator=( Stop && ) noexcept = default;
 
-	~ScopedClipRect() { mClipRect.pop(); }
+		float offset() const { return mOffset; }
+
+		const ColorA8u &color() const { return mColor; }
+
+		bool operator<( const Stop &other ) const { return offset() < other.offset(); }
+		bool operator==( const Stop &other ) const { return approxEqual( offset(), other.offset() ) && mColor == other.mColor; }
+		bool operator!=( const Stop &other ) const { return !( *this == other ); }
+	};
+
+  public:
+	Gradient() = default;
+	virtual ~Gradient() = default;
+
+	Gradient( const Gradient & ) = default;
+	Gradient( Gradient && ) = default;
+	Gradient &operator=( const Gradient & ) = default;
+	Gradient &operator=( Gradient && ) = default;
+
+	bool operator==( const Gradient &other ) const { return mStops == other.mStops; }
+	bool operator!=( const Gradient &other ) const { return !( *this == other ); }
+
+	//!
+	virtual const std::string &getId() const = 0;
+	//!
+	const mat3 &getTransform() const { return mTransform; }
+	//!
+	const auto &getUnits() const { return mUnits; }
+	//!
+	const auto &getSpread() const { return mSpread; }
+
+	//! Returns the (interpolated) color at position \a t. Does not pre-multiply the RGB values.
+	ColorA8u at( float t ) const;
+
+	//! Returns the nearest stop lower than position \a t.
+	const Stop &floor( float t ) const;
+
+	//! Returns the nearest stop higher than position \a t.
+	const Stop &ceil( float t ) const;
+
+	//! Inserts a \a color at position \a t.
+	Gradient &stop( float t, const ColorA8u &color );
+	//! Inserts a \a color at position \a t.
+	Gradient &stop( float t, unsigned char r, unsigned char g, unsigned char b, unsigned char a = 255 );
+	//! Inserts a \a color at position \a t.
+	Gradient &stop( float t, const ColorA &color ) { return stop( t, ColorA8u( color ) ); }
+	//! Inserts a \a color at position \a t.
+	Gradient &stop( float t, float r, float g, float b, float a = 1 );
+
+	//! Inserts a \a color at offset \a t. If an additional \a opacity is given, it will be multiplied with the color's alpha value.
+	void insert( float t, const ColorA8u &color, unsigned char opacity = 255 ) { insert( Stop{ t, color, opacity } ); }
+	//! Inserts a \a color at offset \a t.
+	void insert( float t, const Color8u &color, unsigned char opacity = 255 ) { insert( Stop{ t, color, opacity } ); }
+	//! Inserts a \a color at offset \a t. If an additional \a opacity is given, it will be multiplied with the color's alpha value.
+	void insert( float t, const ColorA &color, float opacity = 1 ) { insert( Stop{ t, ColorA8u( color ), static_cast<unsigned char>( 255 * opacity ) } ); }
+	//! Inserts a \a color at offset \a t.
+	void insert( float t, const Color &color, float opacity = 1 ) { insert( Stop{ t, Color8u( color ), static_cast<unsigned char>( 255 * opacity ) } ); }
+	//! Inserts a stop.
+	void insert( const Stop &stop );
+	//! Removes all stops.
+	void clear() { mStops.clear(); }
+	//! Adds all stops of the \a other gradient without discarding existing stops.
+	void add( const Gradient &other );
+	//! Replaces all stops with those of the \a other gradient.
+	void replace( const Gradient &other ) { mStops = other.mStops; }
+
+	bool   empty() const { return mStops.empty(); }
+	size_t size() const { return mStops.size(); }
+
+	auto begin() const { return mStops.begin(); }
+	auto end() const { return mStops.end(); }
+
+	auto rbegin() const { return mStops.rbegin(); }
+	auto rend() const { return mStops.rend(); }
+
+	//! Returns raw 8-bit RGBA data. You can use this to construct a Surface.
+	std::unique_ptr<uint8_t[]> data( int32_t width, int32_t height, float from = 0.0f, float to = 1.0f ) const;
+
+  protected:
+	mat3                 mTransform;
+	GradientUnits        mUnits{ GradientUnits::DEFAULT };
+	GradientSpreadMethod mSpread{ GradientSpreadMethod::DEFAULT };
 
   private:
-	ClipRect mClipRect;
+	std::vector<Stop> mStops;
 };
 
-using ShaderRef = std::shared_ptr<struct Shader>;
+using LinearGradientRef = std::shared_ptr<class LinearGradient>;
+
+class LinearGradient : public Gradient {
+  public:
+	static LinearGradientRef create( const char *id ) { return std::make_shared<LinearGradient>( id ); }
+
+	explicit LinearGradient( std::string id )
+		: mId{ std::move( id ) }
+	{
+	}
+	explicit LinearGradient( const char *id )
+		: mId{ id }
+	{
+	}
+	explicit LinearGradient( const GradientRef &other );
+
+	const std::string &getId() const override { return mId; }
+
+	const auto &getX1() const { return mX1; }
+	const auto &getY1() const { return mY1; }
+	const auto &getX2() const { return mX2; }
+	const auto &getY2() const { return mY2; }
+
+	LinearGradientRef clone() { return std::make_shared<LinearGradient>( *this ); }
+
+	LinearGradient &id( const std::string &id )
+	{
+		mId = id;
+		return *this;
+	}
+	LinearGradient &transform( const mat3 &transform )
+	{
+		mTransform = transform;
+		return *this;
+	}
+	LinearGradient &units( GradientUnits units )
+	{
+		mUnits = units;
+		return *this;
+	}
+	LinearGradient &spread( GradientSpreadMethod spread )
+	{
+		mSpread = spread;
+		return *this;
+	}
+	LinearGradient &from( float x1, float y1 )
+	{
+		mX1 = x1;
+		mY1 = y1;
+		return *this;
+	}
+	LinearGradient &from( const vec2 &pt )
+	{
+		mX1 = pt.x;
+		mY1 = pt.y;
+		return *this;
+	}
+	LinearGradient &to( float x2, const float y2 )
+	{
+		mX2 = x2;
+		mY2 = y2;
+		return *this;
+	}
+	LinearGradient &to( const vec2 &pt )
+	{
+		mX2 = pt.x;
+		mY2 = pt.y;
+		return *this;
+	}
+
+	LinearGradient &operator<<( const LinearGradient &other );
+
+  private:
+	std::string mId;
+	float       mX1{ 0 };
+	float       mY1{ 0 };
+	float       mX2{ 1 };
+	float       mY2{ 0 };
+};
+
+using RadialGradientRef = std::shared_ptr<class RadialGradient>;
+
+class RadialGradient : public Gradient {
+  public:
+	static RadialGradientRef create( const char *id ) { return std::make_shared<RadialGradient>( id ); }
+
+	explicit RadialGradient( std::string id )
+		: mId{ std::move( id ) }
+	{
+	}
+	explicit RadialGradient( const char *id )
+		: mId{ id }
+	{
+	}
+	explicit RadialGradient( const GradientRef &other );
+
+	const std::string &getId() const override { return mId; }
+
+	const auto &getR() const { return mR; }
+	const auto &getCx() const { return mCx; }
+	const auto &getCy() const { return mCy; }
+	const auto &getFr() const { return mFr; }
+	const auto &getFx() const { return mFx; }
+	const auto &getFy() const { return mFy; }
+
+	RadialGradientRef clone() { return std::make_shared<RadialGradient>( *this ); }
+
+	RadialGradient &id( const std::string &id )
+	{
+		mId = id;
+		return *this;
+	}
+	RadialGradient &transform( const mat3 &transform )
+	{
+		mTransform = transform;
+		return *this;
+	}
+	RadialGradient &units( GradientUnits units )
+	{
+		mUnits = units;
+		return *this;
+	}
+	RadialGradient &spread( GradientSpreadMethod spread )
+	{
+		mSpread = spread;
+		return *this;
+	}
+	RadialGradient &radius( float r )
+	{
+		mR = r;
+		return *this;
+	}
+	RadialGradient &center( float cx, float cy )
+	{
+		mCx = cx;
+		mCy = cy;
+		return *this;
+	}
+	RadialGradient &center( const vec2 &center )
+	{
+		mCx = center.x;
+		mCy = center.y;
+		return *this;
+	}
+	RadialGradient &focal( float fx, float fy, float fr = 0 )
+	{
+		mFx = fx;
+		mFy = fy;
+		mFr = fr;
+		return *this;
+	}
+	RadialGradient &focal( const vec2 &focal, float fr = 0 )
+	{
+		mFx = focal.x;
+		mFy = focal.y;
+		mFr = fr;
+		return *this;
+	}
+
+	RadialGradient &operator<<( const RadialGradient &other );
+
+  private:
+	std::string mId;
+	float       mR{ 0.5f };  // Defaults to 50%.
+	float       mCx{ 0.5f }; // Defaults to 50%.
+	float       mCy{ 0.5f }; // Defaults to 50%.
+	float       mFr{ 0 };
+	float       mFx{ mCx };
+	float       mFy{ mCy };
+};
+
+//! Stores multiple gradients in a single texture for performance.
+class Gradients {
+  public:
+	Gradients() = default;
+	~Gradients() = default;
+
+	Gradients( const Gradients & ) = delete;
+	Gradients( Gradients && ) = default;
+	Gradients &operator=( const Gradients & ) = delete;
+	Gradients &operator=( Gradients && ) = default;
+
+	//!
+	bool empty() const { return mLookUp.empty(); }
+	//!
+	void clear()
+	{
+		mGradients.clear();
+		mLookUp.clear();
+		mDirty.clear();
+		mTexture.reset();
+	}
+	//!
+	size_t size() const { return mLookUp.size(); }
+
+	//! Returns a pointer to the gradient, if it exists. Returns nullptr otherwise.
+	const GradientRef &at( const std::string &id ) const;
+	//! Returns the coordinate of the gradient in the texture.
+	float index( const std::string &id ) const;
+
+	//! Sets or updates the gradient.
+	void set( const GradientRef &gradient );
+
+	//! Returns the texture containing all gradients. If no texture was created or if any of the gradients have been updated,
+	//! the texture will be (re)created in this call.
+	gl::Texture2dRef getTexture() const;
+
+  private:
+	gl::Texture2dRef create( int width, int height ) const;
+
+	std::vector<GradientRef>                mGradients{};
+	std::unordered_map<std::string, size_t> mLookUp{};
+	mutable std::set<size_t>                mDirty{};
+	mutable gl::Texture2dRef                mTexture{};
+};
 
 //! Shader for solid colors or gradients to be applied to paths.
-struct CI_API Shader {
+class CI_API Shader {
+  public:
 	enum class Type { SOLID_COLOR, LINEAR_GRADIENT, RADIAL_GRADIENT, CONICAL_GRADIENT, IMAGE, UNDEFINED };
 
 	static ShaderRef create( Type type ) { return std::make_shared<Shader>( type ); }
@@ -304,18 +599,9 @@ class CI_API ScopedShader : public Noncopyable {
 	//!
 	explicit ScopedShader( Shader::Type type );
 	//! Activates the solid color shader and sets the current color.
-	explicit ScopedShader( const ColorA &color )
-		: ScopedShader( Shader::Type::SOLID_COLOR )
-	{
-		if( mShader )
-			gl::programPathFragmentInputGenNV( mShader->mProgram, 0, GL_CONSTANT_NV, 4, color.premultiplied().ptr() );
-	}
+	explicit ScopedShader( const ColorA &color );
 
-	~ScopedShader()
-	{
-		if( mShader )
-			mShader->unbind();
-	}
+	~ScopedShader();
 
 	ScopedShader( const ScopedShader & ) = delete;
 	ScopedShader( ScopedShader && ) = delete;
@@ -329,10 +615,9 @@ class CI_API ScopedShader : public Noncopyable {
 			mShader->uniform( name, value );
 	}
 
-	//! Only works for solid color shaders! TODO
 	void setColor( const ColorA &color ) const
 	{
-		if( mShader && mShader->mType == Shader::Type::SOLID_COLOR )
+		if( mShader )
 			gl::programPathFragmentInputGenNV( mShader->mProgram, 0, GL_CONSTANT_NV, 4, color.premultiplied().ptr() );
 	}
 
@@ -344,7 +629,7 @@ class CI_API ScopedShader : public Noncopyable {
 
 		if( mShader && ( mShader->mType == Shader::Type::LINEAR_GRADIENT || mShader->mType == Shader::Type::RADIAL_GRADIENT || mShader->mType == Shader::Type::IMAGE ) ) {
 			const auto t = transpose( inverse( transform ) );
-			gl::programPathFragmentInputGenNV( mShader->mProgram, 0, genMode, 2, value_ptr( t ) );
+			gl::programPathFragmentInputGenNV( mShader->mProgram, 1, genMode, 2, value_ptr( t ) );
 		}
 	}
 
@@ -354,7 +639,7 @@ class CI_API ScopedShader : public Noncopyable {
 		assert( data.size() == 6 );
 
 		if( mShader && ( mShader->mType == Shader::Type::LINEAR_GRADIENT || mShader->mType == Shader::Type::RADIAL_GRADIENT || mShader->mType == Shader::Type::IMAGE ) ) {
-			gl::programPathFragmentInputGenNV( mShader->mProgram, 0, genMode, 2, data.data() );
+			gl::programPathFragmentInputGenNV( mShader->mProgram, 1, genMode, 2, data.data() );
 		}
 	}
 };
@@ -382,8 +667,6 @@ class Cache {
   private:
 	Cache() = default;
 };
-
-using CanvasRef = std::shared_ptr<class Canvas>;
 
 //! Sets up a canvas to render NvPath graphics to.
 class Canvas {
@@ -456,6 +739,62 @@ class ScopedCanvas {
 	ScopedCanvas &operator=( ScopedCanvas && ) = delete;
 };
 
+//! Represents a rectangular region in 2D space outside of which no content should be drawn. Transformations are respected.
+class CI_API ClipRect {
+  public:
+	ClipRect() = default;
+
+	ClipRect( int x1, int y1, int x2, int y2 )
+		: mBounds( x1, y1, x2, y2 )
+	{
+	}
+
+	explicit ClipRect( const Area &bounds )
+		: mBounds( bounds )
+	{
+	}
+
+	const Area &get() const { return mBounds; }
+
+	void set( int x1, int y1, int x2, int y2 ) { mBounds = { x1, y1, x2, y2 }; }
+
+	void set( const Area &bounds ) { mBounds = bounds; }
+
+	bool push();
+
+	bool pop();
+
+  private:
+	Area         mBounds;
+	gl::Context *mCtx = nullptr;
+};
+
+//!
+struct CI_API ScopedClipRect : private Noncopyable {
+	ScopedClipRect( const ivec2 &position, const ivec2 &dimension )
+		: mClipRect( position.x, position.y, dimension.x, dimension.y )
+	{
+		mClipRect.push();
+	}
+
+	ScopedClipRect( int x, int y, int width, int height )
+		: mClipRect{ x, y, x + width, y + height }
+	{
+		mClipRect.push();
+	}
+
+	explicit ScopedClipRect( const Area &bounds )
+		: mClipRect{ bounds }
+	{
+		mClipRect.push();
+	}
+
+	~ScopedClipRect() { mClipRect.pop(); }
+
+  private:
+	ClipRect mClipRect;
+};
+
 //! Returns whether NV Path Rendering is available on this system.
 CI_API inline bool hasNvPathRendering()
 {
@@ -465,6 +804,11 @@ CI_API inline bool hasNvPathRendering()
 
 //! Renders text using NV Path Rendering. Make sure a stencil buffer is available and cleared before calling, or alternatively use an nvp::Canvas to render to.
 CI_API void renderText( const text::Typesetter &typesetter, const vec2 &offset = vec2() );
+
+//!
+CI_API static GradientUnits toGradientUnits( std::string style );
+//!
+CI_API static GradientSpreadMethod toSpreadMethod( std::string style );
 
 } // namespace nvp
 } // namespace cinder

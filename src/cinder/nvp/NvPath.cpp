@@ -23,6 +23,7 @@ This code is intended for use with the Cinder C++ library: http://libcinder.org
 #include "cinder/nvp/NvPath.h"
 
 #include "cinder/Log.h"
+#include "cinder/Utilities.h"
 #include "cinder/gl/draw.h"
 #include "cinder/gl/scoped.h"
 #include "cinder/text/Text.h"
@@ -34,6 +35,11 @@ Path::~Path()
 {
 	if( mPathId > 0 )
 		gl::deletePathsNV( mPathId, 1 );
+}
+
+Path::Path()
+{
+	mPathId = gl::genPathsNV( 1 );
 }
 
 Path::Path( const Path &other )
@@ -202,6 +208,13 @@ void Path::setDashCaps( CapsStyle initialCap, CapsStyle terminalCap ) const
 	}
 }
 
+void Path::setMiterLimit( float limit ) const
+{
+	if( mPathId > 0 ) {
+		gl::pathParameteriNV( mPathId, GL_PATH_MITER_LIMIT_NV, GLfloat( limit ) );
+	}
+}
+
 void Path::stencilStroke( CapsStyle caps, JoinStyle join, float strokeWidth )
 {
 	gl::pathParameterfNV( mPathId, GL_PATH_STROKE_WIDTH_NV, strokeWidth );
@@ -300,7 +313,7 @@ void Path::strokeInstanced( const std::vector<GLuint> &paths, const std::vector<
 	gl::stencilThenCoverStrokePathInstancedNV( GLsizei( paths.size() ), GL_UNSIGNED_INT, paths.data(), mPathId, GL_COUNT_UP_NV, 0xFF, GL_BOUNDING_BOX_NV, GL_AFFINE_3D_NV, reinterpret_cast<const GLfloat *>( transforms.data() ) );
 }
 
-void Path::fill( const ColorA &color )
+void Path::fill( const ColorA &color ) const
 {
 	gl::ScopedState scpStencil( GL_STENCIL_TEST, GL_TRUE );
 	gl::stencilFunc( GL_NOTEQUAL, 0, 0xFF );
@@ -312,7 +325,7 @@ void Path::fill( const ColorA &color )
 	gl::stencilThenCoverFillPathNV( mPathId, GL_COUNT_UP_NV, 0xFF, GL_BOUNDING_BOX_NV );
 }
 
-void Path::fill( const gl::TextureRef &texture, const Rectf &bounds )
+void Path::fill( const gl::TextureRef &texture, const Rectf &bounds ) const
 {
 	const auto textureBounds = Rectf( texture->getBounds() );
 	const auto fit = bounds.getCenteredFit( textureBounds, true ).scaled( 1.0f / textureBounds.getSize() );
@@ -329,7 +342,7 @@ void Path::fill( const gl::TextureRef &texture, const Rectf &bounds )
 	fill( texture, upperLeftTexCoord, lowerRightTexCoord );
 }
 
-void Path::fill( const gl::TextureRef &texture, const vec2 &upperLeftTexCoord, const vec2 &lowerRightTexCoord )
+void Path::fill( const gl::TextureRef &texture, const vec2 &upperLeftTexCoord, const vec2 &lowerRightTexCoord ) const
 {
 	const GLfloat data[6] = { lowerRightTexCoord.x - upperLeftTexCoord.x, 0, upperLeftTexCoord.x, 0, lowerRightTexCoord.y - upperLeftTexCoord.y, upperLeftTexCoord.y };
 
@@ -347,7 +360,7 @@ void Path::fill( const gl::TextureRef &texture, const vec2 &upperLeftTexCoord, c
 	gl::stencilThenCoverFillPathNV( mPathId, GL_COUNT_UP_NV, 0xFF, GL_BOUNDING_BOX_NV );
 }
 
-void Path::fillInstanced( const std::vector<GLuint> &paths, const std::vector<glm::mat3x2> &transforms, const ColorA &color )
+void Path::fillInstanced( const std::vector<GLuint> &paths, const std::vector<glm::mat3x2> &transforms, const ColorA &color ) const
 {
 	gl::ScopedState scpStencil( GL_STENCIL_TEST, GL_TRUE );
 	gl::stencilFunc( GL_NOTEQUAL, 0, 0xFF );
@@ -359,7 +372,7 @@ void Path::fillInstanced( const std::vector<GLuint> &paths, const std::vector<gl
 	gl::stencilThenCoverFillPathInstancedNV( GLsizei( paths.size() ), GL_UNSIGNED_INT, paths.data(), mPathId, GL_COUNT_UP_NV, 0xFF, GL_BOUNDING_BOX_NV, GL_AFFINE_2D_NV, reinterpret_cast<const GLfloat *>( transforms.data() ) );
 }
 
-void Path::fillInstanced( const std::vector<GLuint> &paths, const std::vector<glm::mat4x3> &transforms, const ColorA &color )
+void Path::fillInstanced( const std::vector<GLuint> &paths, const std::vector<glm::mat4x3> &transforms, const ColorA &color ) const
 {
 	gl::ScopedState scpStencil( GL_STENCIL_TEST, GL_TRUE );
 	gl::stencilFunc( GL_NOTEQUAL, 0, 0xFF );
@@ -576,6 +589,144 @@ void Face::createPaths() const
 	mFace->getGlyphOutlines( 0, mNumGlyphs, functions, &glyph );
 }
 
+ColorA8u Gradient::at( float t ) const
+{
+	auto &lo = floor( t );
+	auto &hi = ceil( t );
+
+	if( lo == hi )
+		return lo.color();
+
+	float f = clamp( ( t - lo.offset() ) / ( hi.offset() - lo.offset() ), 0.0f, 1.0f );
+	return lo.color().lerp( static_cast<unsigned char>( f * 255 ), hi.color() );
+}
+
+const Gradient::Stop &Gradient::floor( float t ) const
+{
+	if( mStops.empty() ) {
+		static Stop kEmpty{ 0.0f, ColorA8u( 0, 0, 0, 0 ) };
+		return kEmpty;
+	}
+
+	for( auto itr = mStops.rbegin(); itr != mStops.rend(); ++itr ) {
+		if( itr->offset() <= t )
+			return *itr;
+	}
+
+	return mStops.front();
+}
+
+const Gradient::Stop &Gradient::ceil( float t ) const
+{
+	if( mStops.empty() ) {
+		static Stop kEmpty{ 0.0f, ColorA8u( 0, 0, 0, 0 ) };
+		return kEmpty;
+	}
+
+	for( auto itr = mStops.begin(); itr != mStops.end(); ++itr ) {
+		if( itr->offset() > t )
+			return *itr;
+	}
+
+	return mStops.back();
+}
+
+Gradient &Gradient::stop( float t, const ColorA8u &color )
+{
+	insert( t, color );
+	return *this;
+}
+
+Gradient &Gradient::stop( float t, unsigned char r, unsigned char g, unsigned char b, unsigned char a )
+{
+	insert( t, ColorA8u{ r, g, b, a } );
+	return *this;
+}
+
+Gradient &Gradient::stop( float t, float r, float g, float b, float a )
+{
+	insert( t, ColorA8u{ static_cast<unsigned char>( r * 255 ), static_cast<unsigned char>( g * 255 ), static_cast<unsigned char>( b * 255 ), static_cast<unsigned char>( a * 255 ) } );
+	return *this;
+}
+
+void Gradient::insert( const Stop &stop )
+{
+	// Keep sorted.
+	mStops.insert( std::upper_bound( mStops.begin(), mStops.end(), stop ), stop );
+}
+
+void Gradient::add( const Gradient &other )
+{
+	for( const auto &stop : other.mStops )
+		insert( stop );
+}
+
+std::unique_ptr<uint8_t[]> Gradient::data( int32_t width, int32_t height, float from, float to ) const
+{
+	auto result = std::make_unique<uint8_t[]>( size_t( width ) * size_t( height ) * sizeof( ColorA8u ) );
+
+	for( int y = 0; y < height; ++y ) {
+		for( int x = 0; x < width; ++x ) {
+			float t = mix( from, to, float( x ) / float( width - 1 ) );
+
+			const auto    c = at( t );
+			const int64_t i = ( int64_t( x ) + int64_t( y ) * int64_t( width ) ) * sizeof( ColorA8u );
+			result[size_t( i ) + 0] = uint8_t( c.r );
+			result[size_t( i ) + 1] = uint8_t( c.g );
+			result[size_t( i ) + 2] = uint8_t( c.b );
+			result[size_t( i ) + 3] = uint8_t( c.a );
+		}
+	}
+
+	return result;
+}
+
+LinearGradient::LinearGradient( const GradientRef &other )
+{
+	if( other ) {
+		if( const auto linear = std::dynamic_pointer_cast<LinearGradient>( other ) )
+			*this << *linear; // Copy all attributes.
+		else
+			replace( *other ); // Only copy stops.
+	}
+}
+
+LinearGradient &LinearGradient::operator<<( const LinearGradient &other )
+{
+	add( other );
+	mUnits = other.mUnits;
+	mSpread = other.mSpread;
+	mX1 = other.mX1;
+	mY1 = other.mY1;
+	mX2 = other.mX2;
+	mY2 = other.mY2;
+	return *this;
+}
+
+RadialGradient::RadialGradient( const GradientRef &other )
+{
+	if( other ) {
+		if( const auto radial = std::dynamic_pointer_cast<RadialGradient>( other ) )
+			*this << *radial; // Copy all attributes.
+		else
+			replace( *other ); // Only copy stops.
+	}
+}
+
+RadialGradient &RadialGradient::operator<<( const RadialGradient &other )
+{
+	add( other );
+	mUnits = other.mUnits;
+	mSpread = other.mSpread;
+	mR = other.mR;
+	mCx = other.mCx;
+	mCy = other.mCy;
+	mFr = other.mFr;
+	mFx = other.mFx;
+	mFy = other.mFy;
+	return *this;
+}
+
 bool ClipRect::push()
 {
 	if( mCtx == nullptr ) {
@@ -624,6 +775,72 @@ bool ClipRect::pop()
 	return false;
 }
 
+const GradientRef &Gradients::at( const std::string &id ) const
+{
+	if( mLookUp.count( id ) )
+		return mGradients.at( mLookUp.at( id ) );
+
+	static const GradientRef kEmpty;
+	return kEmpty;
+}
+
+float Gradients::index( const std::string &id ) const
+{
+	if( !mTexture || !mLookUp.count( id ) )
+		return 0.0f;
+
+	return ( float( mLookUp.at( id ) ) + 0.5f ) / float( mTexture->getHeight() );
+}
+
+void Gradients::set( const GradientRef &gradient )
+{
+	if( !mLookUp.count( gradient->getId() ) ) {
+		mLookUp.insert_or_assign( gradient->getId(), mGradients.size() );
+		mDirty.insert( mGradients.size() );
+		mGradients.emplace_back( gradient );
+	}
+	else if( auto index = mLookUp.at( gradient->getId() ); *mGradients.at( index ) != *gradient ) {
+		mDirty.insert( index );
+		mGradients.at( index ) = gradient;
+	}
+}
+
+gl::Texture2dRef Gradients::getTexture() const
+{
+	if( !mTexture )
+		mTexture = create( 128, 1 );
+
+	if( !mDirty.empty() ) {
+		// Resize texture if more space is needed.
+		if( const auto size = int( mGradients.size() ); mTexture->getHeight() < size ) {
+			const auto source = Surface8u( mTexture->createSource() );
+			const auto texture = create( mTexture->getWidth(), int( isPowerOf2( size ) ? size : nextPowerOf2( size ) ) );
+			texture->update( source );
+
+			mTexture = texture;
+		}
+
+		// Update gradients.
+		for( const auto index : mDirty ) {
+			const auto data = mGradients.at( index )->data( 128, 1 );
+			mTexture->update( data.get(), GL_RGBA, GL_UNSIGNED_BYTE, 0, 128, 1, { 0, index } );
+		}
+
+		// Done.
+		mDirty.clear();
+	}
+
+	return mTexture;
+}
+
+gl::Texture2dRef Gradients::create( int width, int height ) const
+{
+	static const gl::Texture2d::Format FORMAT = gl::Texture2d::Format().internalFormat( GL_RGBA ).target( GL_TEXTURE_2D ).loadTopDown();
+
+	gl::Texture2dRef texture = gl::Texture2d::create( width, height, FORMAT );
+	return texture;
+}
+
 Shader::Shader( Type type )
 	: mType( type )
 {
@@ -634,7 +851,7 @@ Shader::Shader( Type type )
 			  "#extension GL_ARB_separate_shader_objects : enable\n"
 			  "precision highp float;"
 			  "layout(location = 0) in vec4 color;"
-			  "uniform float opacity = 1;"
+			  "uniform float opacity = 1.0;"
 			  "out vec4 fragColor;"
 			  "void main() {"
 			  "  fragColor = color * opacity;"
@@ -648,18 +865,20 @@ Shader::Shader( Type type )
 			= "#version 330 core\n"
 			  "#extension GL_ARB_separate_shader_objects : enable\n"
 			  "precision highp float;"
-			  "layout(location = 0) in vec2 uv;"
+			  "layout(location = 0) in vec4 color;"
+			  "layout(location = 1) in vec2 uv;"
 			  "uniform float index = 0.5;"
-			  "uniform float opacity;"
+			  "uniform float opacity = 1.0;"
 			  "uniform sampler2D gradTab;"
 			  "uniform vec2 gradStart;"
 			  "uniform vec2 gradEnd;"
 			  "out vec4 fragColor;"
 			  "void main() {"
-			  "  vec2 gradVec = gradEnd - gradStart;"
-			  "  float gradTabIndex = dot(gradVec, uv - gradStart) / (gradVec.x * gradVec.x + gradVec.y * gradVec.y);"
-			  "  fragColor = texture(gradTab, vec2(gradTabIndex, index));"
+			  "    vec2 gradVec = gradEnd - gradStart;"
+			  "    float gradTabIndex = dot(gradVec, uv - gradStart) / (gradVec.x * gradVec.x + gradVec.y * gradVec.y);"
+			  "    fragColor = texture(gradTab, vec2(gradTabIndex, index));"
 			  "    fragColor.a *= opacity;"
+			  "    fragColor.rgb = mix( color.rgb, fragColor.rgb, fragColor.a );"
 			  "    fragColor.rgb *= fragColor.a;"
 			  "}";
 
@@ -673,12 +892,13 @@ Shader::Shader( Type type )
 			  "precision highp float;"
 			  "uniform sampler2D gradTab;"
 			  "uniform float index = 0.5;"
-			  "uniform float opacity;"
+			  "uniform float opacity = 1.0;"
 			  "uniform vec2 focalToCenter;"
 			  "uniform float centerRadius;"
 			  "uniform float focalRadius;"
 			  "uniform vec2 translationPoint;"
-			  "layout(location = 0) in vec2 uv;"
+			  "layout(location = 0) in vec4 color;"
+			  "layout(location = 1) in vec2 uv;"
 			  "out vec4 fragColor;"
 			  "void main() {"
 			  "    vec2 coord = uv - translationPoint;"
@@ -687,15 +907,16 @@ Shader::Shader( Type type )
 			  "    float fmp2_m_radius2 = -focalToCenter.x * focalToCenter.x - focalToCenter.y * focalToCenter.y + rd * rd;"
 			  "    float inverse_2_fmp2_m_radius2 = 1.0 / (2.0 * fmp2_m_radius2);"
 			  "    float det = b * b - 4.0 * fmp2_m_radius2 * ((focalRadius * focalRadius) - dot(coord, coord));"
-			  "    vec4 result = vec4(0.0);"
+			  "    fragColor = vec4(0.0);"
 			  "    if (det >= 0.0) {"
 			  "        float detSqrt = sqrt(det);"
 			  "        float w = max((-b - detSqrt) * inverse_2_fmp2_m_radius2, (-b + detSqrt) * inverse_2_fmp2_m_radius2);"
 			  "        if (focalRadius + w * (centerRadius - focalRadius) >= 0.0)"
-			  "            result = texture(gradTab, vec2(w, index));"
+			  "            fragColor = texture(gradTab, vec2(w, index));"
 			  "    }"
-			  "    fragColor.a = result.a * opacity;"
-			  "    fragColor.rgb = result.rgb * fragColor.a;"
+			  "    fragColor.a *= opacity;"
+			  "    fragColor.rgb = mix( color.rgb, fragColor.rgb, fragColor.a );"
+			  "    fragColor.rgb *= fragColor.a;"
 			  "}";
 
 		mProgram = glCreateShaderProgramv( GL_FRAGMENT_SHADER, 1, &glsl );
@@ -709,10 +930,11 @@ Shader::Shader( Type type )
 			  "#define INVERSE_2PI 0.1591549430918953358"
 			  "uniform sampler2D gradTab;"
 			  "uniform float index = 0.5;"
-			  "uniform float opacity;"
+			  "uniform float opacity = 1.0;"
 			  "uniform float angle;"
 			  "uniform vec2 translationPoint;"
-			  "layout(location = 0) in vec2 uv;"
+			  "layout(location = 0) in vec4 color;"
+			  "layout(location = 1) in vec2 uv;"
 			  "out vec4 fragColor;"
 			  "void main() {"
 			  "    vec2 coord = uv - translationPoint;"
@@ -723,6 +945,7 @@ Shader::Shader( Type type )
 			  "        t = (atan(-coord.y, coord.x) + angle) * INVERSE_2PI;"
 			  "    fragColor = texture(gradTab, vec2(t - floor(t), index));"
 			  "    fragColor.a *= opacity;"
+			  "    fragColor.rgb = mix( color.rgb, fragColor.rgb, fragColor.a );"
 			  "    fragColor.rgb *= fragColor.a;"
 			  "}";
 
@@ -734,17 +957,19 @@ Shader::Shader( Type type )
 			= "#version 330 core\n"
 			  "#extension GL_ARB_separate_shader_objects : enable\n"
 			  "precision highp float;"
-			  "layout(location = 0) in vec2 uv;"
+			  "layout(location = 0) in vec4 color;"
+			  "layout(location = 1) in vec2 uv;"
 			  "uniform sampler2D image;"
 			  "uniform float opacity = 1;"
 			  "out vec4 fragColor;"
 			  "void main() {"
-			  "  fragColor = texture(image, uv);"
-			  "  if( uv.x < 0 || uv.y < 0 || uv.x > 1 || uv.y > 1 ) {"
-			  "    fragColor.a = 0;"
-			  "  }"
-			  "  fragColor.a *= opacity;"
-			  "  fragColor.rgb *= fragColor.a;"
+			  "    fragColor = texture(image, uv);"
+			  "    if( uv.x < 0 || uv.y < 0 || uv.x > 1 || uv.y > 1 ) {"
+			  "        fragColor.a = 0;"
+			  "    }"
+			  "    fragColor.a *= opacity;"
+			  "    fragColor.rgb = mix( color.rgb, fragColor.rgb, fragColor.a );"
+			  "    fragColor.rgb *= fragColor.a;"
 			  "}";
 
 		mProgram = glCreateShaderProgramv( GL_FRAGMENT_SHADER, 1, &glsl );
@@ -892,6 +1117,19 @@ ScopedShader::ScopedShader( Shader::Type type )
 {
 	mShader = Cache::loadShader( type );
 	mShader->bind();
+}
+
+ScopedShader::ScopedShader( const ColorA &color )
+	: ScopedShader( Shader::Type::SOLID_COLOR )
+{
+	if( mShader )
+		gl::programPathFragmentInputGenNV( mShader->mProgram, 0, GL_CONSTANT_NV, 4, color.premultiplied().ptr() );
+}
+
+ScopedShader::~ScopedShader()
+{
+	if( mShader )
+		mShader->unbind();
 }
 
 FaceRef Cache::loadFace( const text::Face *face )
@@ -1111,6 +1349,24 @@ void renderText( const text::Typesetter &typesetter, const vec2 &offset )
 		gl::stencilThenCoverFillPathInstancedNV(
 			static_cast<GLsizei>( transforms.size() ), GL_UNSIGNED_INT, indices, face->getBaseId(), GL_PATH_FILL_MODE_NV, 0xFF, GL_BOUNDING_BOX_OF_BOUNDING_BOXES_NV, GL_AFFINE_2D_NV, reinterpret_cast<const GLfloat *>( transforms.data() ) );
 	}
+}
+
+GradientUnits toGradientUnits( std::string style )
+{
+	style = trim( style );
+	if( style == "userSpaceOnUse" )
+		return GradientUnits::USER_SPACE_ON_USE;
+	return GradientUnits::DEFAULT;
+}
+
+GradientSpreadMethod toSpreadMethod( std::string style )
+{
+	style = trim( toLower( style ) );
+	if( style == "reflect" )
+		return GradientSpreadMethod::REFLECT;
+	if( style == "repeat" )
+		return GradientSpreadMethod::REPEAT;
+	return GradientSpreadMethod::DEFAULT;
 }
 
 } // namespace nvp
