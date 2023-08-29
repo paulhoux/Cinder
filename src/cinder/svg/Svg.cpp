@@ -361,11 +361,11 @@ void Style::parseStyleAttribute( const std::string &stylePropertyString, const N
 		vector<string> valuePair = split( *pairIt, ':' );
 		if( valuePair.size() != 2 )
 			continue;
-	    // trim white space: TODO move inside parseProperty itself?
-		ltrim(valuePair[0]);
-		rtrim(valuePair[0]);
-		ltrim(valuePair[1]);
-		rtrim(valuePair[1]);
+		// trim white space: TODO move inside parseProperty itself?
+		ltrim( valuePair[0] );
+		rtrim( valuePair[0] );
+		ltrim( valuePair[1] );
+		rtrim( valuePair[1] );
 		parseProperty( valuePair[0], valuePair[1], parent );
 	}
 }
@@ -1036,7 +1036,7 @@ mat3 Node::getTransformAbsolute() const
 ////////////////////////////////////////////////////////////////////////////////////
 // Gradient
 Gradient::Gradient( Node *parent, const XmlTree &xml )
-	: Node( parent, xml ), mUseObjectBoundingBox( true ), mSpecifiesTransform( false )
+	: Node( parent, xml ), mUseObjectBoundingBox( true ), mSpecifiesSpreadMethod( false )
 {
 	parse( parent, xml );
 }
@@ -1056,7 +1056,7 @@ void Gradient::parse( const Node *parent, const XmlTree &xml )
 		}
 	}
 	for( XmlTree::ConstIter stopsIt = xml.begin( "stop" ); stopsIt != xml.end(); ++stopsIt ) {
-		mStops.push_back( Stop( parent, *stopsIt ) );
+		mStops.emplace_back( parent, *stopsIt );
 	}
 	if( xml.hasAttribute( "gradientUnits" ) )
 		mUseObjectBoundingBox = xml.getAttributeValue<string>( "gradientUnits" ) != string("userSpaceOnUse");
@@ -1069,8 +1069,6 @@ void Gradient::parse( const Node *parent, const XmlTree &xml )
 void Gradient::copyAttributesFrom( const Gradient &rhs )
 {
 	mStops = rhs.mStops;
-	mCoords0 = rhs.mCoords0;
-	mCoords1 = rhs.mCoords1;
 	mUseObjectBoundingBox = rhs.mUseObjectBoundingBox;
 	if( rhs.mSpecifiesTransform ) {
 		mSpecifiesTransform = true;
@@ -1079,7 +1077,11 @@ void Gradient::copyAttributesFrom( const Gradient &rhs )
 }
 
 Gradient::Stop::Stop( const Node *parent, const XmlTree &xml )
-	: mOffset( 0 ), mSpecifiesColor( false ), mSpecifiesOpacity( false )
+	: mOffset( 0 )
+	, mColor( 0, 0, 0 )
+	, mOpacity( 1 )
+	, mSpecifiesColor( false )
+	, mSpecifiesOpacity( false )
 {
 	if( xml.hasAttribute( "offset" ) )
 		mOffset = Value::parse( xml.getAttributeValue<string>( "offset" ) ).asUser();
@@ -1087,15 +1089,15 @@ Gradient::Stop::Stop( const Node *parent, const XmlTree &xml )
 		mColor = Node::parsePaint( xml.getAttributeValue<string>( "stop-color" ).c_str(), &mSpecifiesColor, parent ).getColor();
 	if( xml.hasAttribute( "stop-opacity" ) ) {
 		mSpecifiesOpacity = true;
-		mColor.a = (uint8_t)(Value::parse( xml.getAttributeValue<string>( "stop-opacity" ) ).asUser() * 255);
+		mColor.a = uint8_t( Value::parse( xml.getAttributeValue<string>( "stop-opacity" ) ).asUser() * 255 );
 	}
 	if( xml.hasAttribute( "style" ) ) {
 		string stopColorString = Node::findStyleValue( xml.getAttributeValue<string>( "style" ), "stop-color" );
 		if( ! stopColorString.empty() )
-			mColor = Node::parsePaint( stopColorString.c_str(), &mSpecifiesColor, parent ).getColor();	
+			mColor = Node::parsePaint( stopColorString.c_str(), &mSpecifiesColor, parent ).getColor();
 		string stopOpacityString = Node::findStyleValue( xml.getAttributeValue<string>( "style" ), "stop-opacity" );
 		if( ! stopOpacityString.empty() ) {
-			mColor.a = (uint8_t)(Value::parse( stopOpacityString ).asUser() * 255);
+			mColor.a = uint8_t( Value::parse( stopOpacityString ).asUser() * 255 );
 		}
 	}
 }
@@ -1108,10 +1110,8 @@ Paint Gradient::asPaint() const
 	if( ! mStops.empty() ) {
 		result.mStops.clear();
 		for( vector<Stop>::const_iterator stopIt = mStops.begin(); stopIt != mStops.end(); ++stopIt )
-			result.mStops.push_back( make_pair( stopIt->mOffset, stopIt->mColor ) );
+			result.mStops.emplace_back( stopIt->mOffset, stopIt->mColor );
 	}
-	result.mCoords0 = mCoords0;
-	result.mCoords1 = mCoords1;
 	result.mUseObjectBoundingBox = mUseObjectBoundingBox;
 	if( mSpecifiesTransform ) {
 		result.mSpecifiesTransform = true;
@@ -1125,22 +1125,55 @@ Paint Gradient::asPaint() const
 // LinearGradient
 LinearGradient::LinearGradient( Node *parent, const XmlTree &xml )
 	: Gradient( parent, xml )
+	, mX1( 0, Value::PERCENT )
+	, mY1( 0, Value::PERCENT )
+	, mX2( 100, Value::PERCENT )
+	, mY2( 0, Value::PERCENT )
 {
 	parse( xml );
 }
 
 void LinearGradient::parse( const XmlTree &xml )
 {
-	mCoords0.x = xml.getAttributeValue( "x1", 0.0f );
-	mCoords0.y = xml.getAttributeValue( "y1", 0.0f );
-	mCoords1.x = xml.getAttributeValue( "x2", 1.0f );
-	mCoords1.y = xml.getAttributeValue( "y2", 0.0f );
+	if( xml.hasAttribute( "xlink:href" ) ) {
+		string ref = xml.getAttributeValue<string>( "xlink:href" );
+		if( ref.size() > 1 ) {
+			if( ref[0] == '#' ) {
+				string                elementId = ref.substr( 1, string::npos );
+				const LinearGradient *referencedGrad = dynamic_cast<const LinearGradient *>( findInAncestors( elementId ) );
+				if( referencedGrad ) {
+					copyAttributesFrom( *referencedGrad );
+				}
+			}
+		}
+	}
+
+	if( xml.hasAttribute( "x1" ) )
+		mX1 = Value::parse( xml.getAttributeValue<string>( "x1" ) );
+	if( xml.hasAttribute( "y1" ) )
+		mY1 = Value::parse( xml.getAttributeValue<string>( "y1" ) );
+	if( xml.hasAttribute( "x2" ) )
+		mX2 = Value::parse( xml.getAttributeValue<string>( "x2" ) );
+	if( xml.hasAttribute( "y2" ) )
+		mY2 = Value::parse( xml.getAttributeValue<string>( "y2" ) );
+}
+
+void LinearGradient::copyAttributesFrom( const LinearGradient &rhs )
+{
+	mX1 = rhs.mX1;
+	mY1 = rhs.mY1;
+	mX2 = rhs.mX2;
+	mY2 = rhs.mY2;
 }
 
 Paint LinearGradient::asPaint() const
 {
 	Paint result = Gradient::asPaint();
 	result.mType = Paint::LINEAR_GRADIENT;
+	result.mCoords0.x = mX1.asUser(); // TODO: properly handle percentages
+	result.mCoords0.y = mY1.asUser();
+	result.mCoords1.x = mX2.asUser();
+	result.mCoords1.y = mY2.asUser();
 	return result;
 }
 
@@ -1148,24 +1181,69 @@ Paint LinearGradient::asPaint() const
 // RadialGradient
 RadialGradient::RadialGradient( Node *parent, const XmlTree &xml )
 	: Gradient( parent, xml )
+	, mCx( 50, Value::PERCENT )
+	, mCy( 50, Value::PERCENT )
+	, mR( 50, Value::PERCENT )
+	, mFx( mCx )
+	, mFy( mCy )
+	, mFr( 0, Value::PERCENT )
 {
 	parse( xml );
 }
 
 void RadialGradient::parse( const XmlTree &xml )
 {
-	mCoords0.x = xml.getAttributeValue( "cx", 0.5f );
-	mCoords0.y = xml.getAttributeValue( "cy", 0.5f );
-	mCoords1.x = xml.getAttributeValue( "fx", mCoords0.x );
-	mCoords1.y = xml.getAttributeValue( "fy", mCoords0.y );
-	mRadius = xml.getAttributeValue( "r", 0.5f );
+	if( xml.hasAttribute( "xlink:href" ) ) {
+		string ref = xml.getAttributeValue<string>( "xlink:href" );
+		if( ref.size() > 1 ) {
+			if( ref[0] == '#' ) {
+				string                elementId = ref.substr( 1, string::npos );
+				const RadialGradient *referencedGrad = dynamic_cast<const RadialGradient *>( findInAncestors( elementId ) );
+				if( referencedGrad ) {
+					copyAttributesFrom( *referencedGrad );
+				}
+			}
+		}
+	}
+
+	if( xml.hasAttribute( "cx" ) )
+		mCx = Value::parse( xml.getAttributeValue<string>( "cx" ) );
+	if( xml.hasAttribute( "cy" ) )
+		mCy = Value::parse( xml.getAttributeValue<string>( "cy" ) );
+	if( xml.hasAttribute( "r" ) )
+		mR = Value::parse( xml.getAttributeValue<string>( "r" ) );
+	if( xml.hasAttribute( "fx" ) )
+		mFx = Value::parse( xml.getAttributeValue<string>( "fx" ) );
+	else
+		mFx = mCx;
+	if( xml.hasAttribute( "fy" ) )
+		mFy = Value::parse( xml.getAttributeValue<string>( "fy" ) );
+	else
+		mFy = mCy;
+	if( xml.hasAttribute( "fr" ) )
+		mFr = Value::parse( xml.getAttributeValue<string>( "fr" ) );
+}
+
+void RadialGradient::copyAttributesFrom( const RadialGradient &rhs )
+{
+	mCx = rhs.mCx;
+	mCy = rhs.mCy;
+	mR = rhs.mR;
+	mFx = rhs.mFx;
+	mFy = rhs.mFy;
+	mFr = rhs.mFr;
 }
 
 Paint RadialGradient::asPaint() const
 {
 	Paint result = Gradient::asPaint();
 	result.mType = Paint::RADIAL_GRADIENT;
-	result.mRadius = mRadius;
+	result.mCoords0.x = mCx.asUser(); // TODO: properly handle percentages
+	result.mCoords0.y = mCy.asUser();
+	result.mCoords1.x = mFx.asUser();
+	result.mCoords1.y = mFy.asUser();
+	result.mRadius = mR.asUser();
+	// TODO: add 'fr' as well.
 	return result;
 }
 
@@ -1700,35 +1778,47 @@ Group::~Group()
 void Group::parse( const XmlTree &xml )
 {
 	for( XmlTree::ConstIter treeIt = xml.begin(); treeIt != xml.end(); ++treeIt ) {
-		if( treeIt->getTag() == "g" )
-			mChildren.push_back( new Group( this, *treeIt ) );
-		else if( treeIt->getTag() == "path" )
-			mChildren.push_back( new Path( this, *treeIt ) );
-		else if( treeIt->getTag() == "polygon" )
-			mChildren.push_back( new Polygon( this, *treeIt ) );
-		else if( treeIt->getTag() == "polyline" )
-			mChildren.push_back( new Polyline( this, *treeIt ) );
-		else if( treeIt->getTag() == "line" )
-			mChildren.push_back( new Line( this, *treeIt ) );
-		else if( treeIt->getTag() == "rect" )
-			mChildren.push_back( new Rect( this, *treeIt ) );
-		else if( treeIt->getTag() == "circle" )
-			mChildren.push_back( new Circle( this, *treeIt ) );
-		else if( treeIt->getTag() == "ellipse" )
-			mChildren.push_back( new Ellipse( this, *treeIt ) );
-		else if( treeIt->getTag() == "use" )
-			mChildren.push_back( new Use( this, *treeIt ) );
-		else if( treeIt->getTag() == "defs" )
-			mDefs = shared_ptr<Group>( new Group( this, *treeIt ) );
-		else if( treeIt->getTag() == "image" )
-			mChildren.push_back( new Image( this, *treeIt ) );
-		else if( treeIt->getTag() == "linearGradient" )
-			mChildren.push_back( new LinearGradient( this, *treeIt ) );
-		else if( treeIt->getTag() == "radialGradient" )
-			mChildren.push_back( new RadialGradient( this, *treeIt ) );
-		else if( treeIt->getTag() == "text" )
-			mChildren.push_back( new Text( this, *treeIt ) );
+		if( treeIt->getTag() == "defs" ) {
+			mDefs = std::make_shared<Defs>( this, *treeIt );
+		}
+		else {
+			Node *node = create( *treeIt );
+			if( node )
+				mChildren.push_back( node );
+		}
 	}
+}
+
+Node *Group::create( const XmlTree &xml )
+{	
+	if( xml.getTag() == "g" )
+		return new Group( this, xml );
+	if( xml.getTag() == "path" )
+		return new Path( this, xml );
+	if( xml.getTag() == "polygon" )
+		return new Polygon( this, xml );
+	if( xml.getTag() == "polyline" )
+		return new Polyline( this, xml );
+	if( xml.getTag() == "line" )
+		return new Line( this, xml );
+	if( xml.getTag() == "rect" )
+		return new Rect( this, xml );
+	if( xml.getTag() == "circle" )
+		return new Circle( this, xml );
+	if( xml.getTag() == "ellipse" )
+		return new Ellipse( this, xml );
+	if( xml.getTag() == "use" )
+		return new Use( this, xml );
+	if( xml.getTag() == "image" )
+		return new Image( this, xml );
+	if( xml.getTag() == "linearGradient" )
+		return new LinearGradient( this, xml );
+	if( xml.getTag() == "radialGradient" )
+		return new RadialGradient( this, xml );
+	if( xml.getTag() == "text" )
+		return new Text( this, xml );
+
+	return nullptr;
 }
 
 const Node* Group::findNodeByIdContains( const std::string &idPartial, bool recurse ) const
@@ -2279,6 +2369,38 @@ void TextSpan::Attributes::setTextPen( const vec2 &textPen )
 }
 
 ////////////////////////////////////////////////////////////////////////////////////
+// Defs
+Defs::Defs( Node *parent, const XmlTree &xml )
+	: Group( parent ), mXml( xml )
+{
+	parse( xml );
+}
+
+const Node *Defs::findNode( const std::string &id, bool recurse ) const
+{
+	const Node *result = Group::findNode( id, recurse );
+	if( !result ) {
+		// see if any immediate non-instantiated children are named 'id'
+		for( XmlTree::ConstIter treeIt = mXml.begin(); treeIt != mXml.end(); ++treeIt ) {
+			if( !treeIt->hasAttribute( "id" ) )
+				continue;
+			if( treeIt->getAttributeValue<std::string>( "id" ) != id )
+				continue;
+
+			// instantiate the requested node and return it
+			Defs *self = const_cast<Defs *>( this );
+			Node *node = self->create( *treeIt );
+			if( node )
+				self->mChildren.push_back( node );
+
+			return node;
+		}
+	}
+
+	return result;
+}
+
+////////////////////////////////////////////////////////////////////////////////////
 // Doc
 Doc::Doc( const fs::path &filePath )
 	: Group( 0 )
@@ -2368,11 +2490,11 @@ void Doc::loadDoc( DataSourceRef source, fs::path filePath )
 	else
 		mTransform = mat3();
 
-	// we can't parse the group w/o having parsed the viewBox, dimensions, etc, so we have to do this manually:
-	if( xml.hasChild( "switch" ) )		// when saved with "preserve Illustrator editing capabilities", svg data is inside a "switch"
-		Group::parse( xml.getChild( "switch" ) );
-	else
-		Group::parse( xml );
+	//// we can't parse the group w/o having parsed the viewBox, dimensions, etc, so we have to do this manually:
+	// if( xml.hasChild( "switch" ) )		// when saved with "preserve Illustrator editing capabilities", svg data is inside a "switch"
+	//	Group::parse( xml.getChild( "switch" ) );
+	// else
+	Group::parse( xml );
 }
 
 shared_ptr<Surface8u> Doc::loadImage( fs::path relativePath )

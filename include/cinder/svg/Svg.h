@@ -48,6 +48,7 @@ typedef enum { WEIGHT_100, WEIGHT_200, WEIGHT_300, WEIGHT_400, WEIGHT_NORMAL = W
 
 class Node;
 class Group;
+class Defs;
 class Rect;
 class Circle;
 class Path;
@@ -127,8 +128,8 @@ class CI_API Value {
   public:
 	enum Unit { USER, PX, PERCENT, PT, PC, MM, CM, INCH, EM, EX };
 	
-	Value() : mValue( 0 ), mUnit( USER ) {}
-	Value( float value, Unit unit = USER ) : mValue( value ), mUnit( unit ) {}
+	Value() : mUnit( USER ), mValue( 0 ) {}
+	Value( float value, Unit unit = USER ) : mUnit( unit ), mValue( value ) {}
 
 	float		asUser( float percentOf = 100, float dpi = 72, float fontSize = 12, float fontXHeight = 7 ) const;
 
@@ -442,60 +443,73 @@ class CI_API Node {
 //! Base class for SVG Gradients. See SVG Gradients: http://www.w3.org/TR/SVG/pservers.html#Gradients
 class CI_API Gradient : public Node {
   public:
-  	Gradient( Node *parent, const XmlTree &xml );
-	
+	Gradient( Node *parent, const XmlTree &xml );
+
 	class CI_API Stop {
 	  public:
-	  	Stop( const Node *parent, const XmlTree &xml );
-		
-		float		mOffset; // normalized 0-1
-		ColorA8u	mColor;
-		float		mOpacity;
-		bool		mSpecifiesColor, mSpecifiesOpacity;
+		Stop( const Node *parent, const XmlTree &xml );
+
+		float    mOffset; // normalized 0-1
+		ColorA8u mColor;
+		float    mOpacity;
+		bool     mSpecifiesColor, mSpecifiesOpacity;
 	};
 
-	bool			useObjectBoundingBox() const { return mUseObjectBoundingBox; }
-	bool			specifiesTransform() const { return mSpecifiesTransform; }
-	
+	bool useObjectBoundingBox() const { return mUseObjectBoundingBox; }
+
   protected:
-	virtual void	renderSelf( Renderer & /*renderer*/ ) const {}
+	void renderSelf( Renderer & /*renderer*/ ) const override {}
 
-	void 		parse( const Node *parent, const XmlTree &xml );
-	void		copyAttributesFrom( const Gradient &rhs );
-	Paint		asPaint() const;
-
-  	std::vector<Stop>	mStops;
-	vec2				mCoords0, mCoords1;
-	bool				mUseObjectBoundingBox;
-	bool				mSpecifiesTransform;
-	mat3				mTransform;
+	void          parse( const Node *parent, const XmlTree &xml );
+	void          copyAttributesFrom( const Gradient &rhs );
+	virtual Paint asPaint() const;
+	
+	std::vector<Stop> mStops;
+	bool              mUseObjectBoundingBox;
+	bool              mSpecifiesSpreadMethod;
+	/* TODO SpreadMethod mSpreadMethod; */
 };
 
 //! SVG Linear gradient
 class CI_API LinearGradient : public Gradient {
   public:
 	LinearGradient( Node *parent, const XmlTree &xml );
-	
-	Paint		asPaint() const;
-	
+
+	Paint asPaint() const override;
+
   protected:
-	void 		parse( const XmlTree &xml );
-	
-  	virtual bool	isDrawable() const { return false; }
+	void parse( const XmlTree &xml );
+	void copyAttributesFrom( const LinearGradient &rhs );
+	bool isDrawable() const override { return false; }
+
+	Value mX1;
+	Value mY1;
+	Value mX2;
+	Value mY2;
+
+	friend class Gradient;
 };
 
 //! SVG Radial gradient
 class CI_API RadialGradient : public Gradient {
   public:
 	RadialGradient( Node *parent, const XmlTree &xml );
-	
-	Paint		asPaint() const;
-	
-  protected:
-	void 		parse( const XmlTree &xml );
 
-	virtual bool	isDrawable() const { return false; }
-	float			mRadius;
+	Paint asPaint() const override;
+
+  protected:
+	void parse( const XmlTree &xml );
+	void copyAttributesFrom( const RadialGradient &rhs );
+	bool isDrawable() const override { return false; }
+
+	Value mCx;
+	Value mCy;
+	Value mR;
+	Value mFx;
+	Value mFy;
+	Value mFr;
+
+	friend class Gradient;
 };
 
 //! SVG Circle element: http://www.w3.org/TR/SVG/shapes.html#CircleElement
@@ -775,7 +789,7 @@ class CI_API Group : public Node, private Noncopyable {
     template<typename T>
 	T*						find( const std::string &id ) { return dynamic_cast<T*>( findNode( id ) ); }
 	//! Recursively searches for a child element named \a id. Returns NULL on failure.
-	const Node*				findNode( const std::string &id, bool recurse = true ) const;
+	virtual const Node*		findNode( const std::string &id, bool recurse = true ) const;
 	//! Recursively searches for a child element named \a id. Returns NULL on failure.
 	Node*					findNode( const std::string &id, bool recurse = true ) { return const_cast<Node*>( const_cast<const Group*>( this )->findNode( id, recurse ) ); }
 	//! Recursively searches for a child element of type <tt>svg::T</tt> whose name contains \a idPartial. Returns NULL on failure to find the object or if it is not of type T.
@@ -783,7 +797,7 @@ class CI_API Group : public Node, private Noncopyable {
 	const T*				findByIdContains( const std::string &idPartial ) const { return dynamic_cast<const T*>( findNodeByIdContains( idPartial ) ); }
 	//! Recursively searches for a child element whose name contains \a idPartial. Returns NULL on failure. (null_ptr later?)
 	const Node*				findNodeByIdContains( const std::string &idPartial, bool recurse = true ) const;
-	virtual const Node*		findInAncestors( const std::string &elementId ) const;
+	const Node*				findInAncestors( const std::string &elementId ) const override;
 	//! Returns a reference to the child named \a id. Throws svg::ExcChildNotFound if not found.
 	const Node&				getChild( const std::string &id ) const;
 	//! Returns a reference to the child named \a id. Throws svg::ExcChildNotFound if not found.
@@ -818,9 +832,23 @@ class CI_API Group : public Node, private Noncopyable {
 
 	virtual bool	isDrawable() const { return false; }
 	void 			parse( const XmlTree &xml );
+	Node*			create( const XmlTree &xml );
 
 	std::list<Node*>		mChildren;
-	std::shared_ptr<Group>	mDefs;
+	std::shared_ptr<Defs>	mDefs;
+};
+
+typedef std::shared_ptr<Defs>	DefsRef;
+//!
+class CI_API Defs : public Group {
+  public:
+	Defs( Node *parent ) : Group( parent ) {}
+	Defs( Node *parent, const XmlTree &xml );
+
+	const Node *findNode(const std::string &id, bool recurse) const override;
+
+  protected:
+	XmlTree mXml;
 };
 
 
