@@ -70,6 +70,9 @@ class CI_API Renderer {
 
 	void	setVisitor( const std::function<bool(const Node&, svg::Style *)> &visitor );
 
+	virtual void	start() {}
+	virtual void	finish() {}
+
 	virtual	void	pushGroup( const Group & /*group*/, float /*opacity*/ ) {}
 	virtual void	popGroup() {}
 	virtual void	drawPath( const svg::Path & /*path*/ ) {}
@@ -104,6 +107,10 @@ class CI_API Renderer {
 	virtual void	popLineJoin() {}
 	virtual void	pushMiterLimit(float  /*miterLimit*/ ) {}
 	virtual void	popMiterLimit() {}
+	virtual void	pushDashArray(const std::vector<float>&  /*dashArray*/ ) {}
+	virtual void	popDashArray() {}
+	virtual void	pushDashOffset(float  /*dashOffset*/ ) {}
+	virtual void	popDashOffset() {}
 	virtual void	pushTextPen(const vec2 &  /*penPos*/ ) {}
 	virtual void	popTextPen() {}
 	virtual void	pushTextRotation( float  /*rotation*/ ) {}
@@ -254,6 +261,18 @@ class CI_API Style {
 	float			getMiterLimit() const { return mMiterLimit; }
 	void			setMiterLimit( float miterLimit ) { mSpecifiesMiterLimit = true; mMiterLimit = miterLimit; }
 	static float	getMiterLimitDefault() { return 4; }
+
+	bool								specifiesDashArray() const { return mSpecifiesDashArray; }
+	void								unspecifyDashArray() { mSpecifiesDashArray = false; }
+	const std::vector<float>&			getDashArray() const { return mDashArray; }
+	void								setDashArray( const std::vector<float> &dashArray ) { mSpecifiesDashArray = true; mDashArray = dashArray; }
+	static const std::vector<float>&	getDashArrayDefault() { static std::vector<float> sNone; return sNone; }
+
+	bool			specifiesDashOffset() const { return mSpecifiesDashOffset; }
+	void			unspecifyDashOffset() { mSpecifiesDashOffset = false; }
+	float			getDashOffset() const { return mDashOffset; }
+	void			setDashOffset( float dashOffset ) { mSpecifiesDashOffset = true; mDashOffset = dashOffset; }
+	static float	getDashOffsetDefault() { return 0; }
 	
 	// fonts
 	bool									specifiesFontFamilies() const { return mSpecifiesFontFamilies; }
@@ -291,23 +310,27 @@ class CI_API Style {
 	bool		parseProperty( const std::string &key, const std::string &value, const Node *parent );
 
   protected:
-	bool			mSpecifiesOpacity;
-	float			mOpacity;
-	bool			mSpecifiesFillOpacity, mSpecifiesStrokeOpacity;
-	float			mFillOpacity, mStrokeOpacity;
+	bool				mSpecifiesOpacity;
+	float				mOpacity;
+	bool				mSpecifiesFillOpacity, mSpecifiesStrokeOpacity;
+	float				mFillOpacity, mStrokeOpacity;
 
-	bool			mSpecifiesFill, mSpecifiesStroke;
-	Paint			mFill, mStroke;
-	bool			mSpecifiesStrokeWidth;
-	float			mStrokeWidth;
-	bool			mSpecifiesFillRule;
-	FillRule		mFillRule;
-	bool			mSpecifiesLineCap;
-	LineCap			mLineCap;
-	bool			mSpecifiesLineJoin;
-	LineJoin		mLineJoin;
-	bool			mSpecifiesMiterLimit;
-	float			mMiterLimit;
+	bool				mSpecifiesFill, mSpecifiesStroke;
+	Paint				mFill, mStroke;
+	bool				mSpecifiesStrokeWidth;
+	float				mStrokeWidth;
+	bool				mSpecifiesFillRule;
+	FillRule			mFillRule;
+	bool				mSpecifiesLineCap;
+	LineCap				mLineCap;
+	bool				mSpecifiesLineJoin;
+	LineJoin			mLineJoin;
+	bool				mSpecifiesMiterLimit;
+	float				mMiterLimit;
+	bool				mSpecifiesDashArray;
+	std::vector<float>	mDashArray;
+	bool				mSpecifiesDashOffset;
+	float				mDashOffset;
 	
 	// fonts
 	bool			mSpecifiesFontFamilies, mSpecifiesFontSize, mSpecifiesFontWeight;
@@ -394,6 +417,10 @@ class CI_API Node {
 	LineJoin		getLineJoin() const;
 	//! Returns node's miter limit, or the first among its ancestors when it has none
 	float			getMiterLimit() const;
+	//! Returns node's dash array, or the first among its ancestors when it has none
+	const std::vector<float>&	getDashArray() const;
+	//! Returns node's dash offset, or the first among its ancestors when it has none
+	float			getDashOffset() const;
 	//! Returns node's stroke width, or the first among its ancestors when it has none
 	float			getStrokeWidth() const;
 	//! Returns node's font families, or the first among its ancestors when it has none

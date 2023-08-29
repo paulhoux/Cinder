@@ -45,6 +45,21 @@ bool isNumeric( char c )
 	return ( c >= '0' && c <= '9' ) || c == '.' || c == '-' || c == 'e' || c == 'E' || c == '+';
 }
 
+bool isNone( const char *s )
+{
+	while( s && ( isspace( *s ) ) )
+		s++;
+	if( !s || tolower( *s++ ) != 'n' )
+		return false;
+	if( !s || tolower( *s++ ) != 'o' )
+		return false;
+	if( !s || tolower( *s++ ) != 'n' )
+		return false;
+	if( !s || tolower( *s++ ) != 'e' )
+		return false;
+	return true;
+}
+
 float parseFloat( const char **sInOut )
 {
 	char temp[256];
@@ -307,6 +322,8 @@ Style Style::makeGlobalDefaults()
 	result.setLineCap( getLineCapDefault() );
 	result.setLineJoin( getLineJoinDefault() );
 	result.setMiterLimit( getMiterLimitDefault() );
+	result.setDashArray( getDashArrayDefault() );
+	result.setDashOffset( getDashOffsetDefault() );
 	
 	result.setFontFamilies( getFontFamiliesDefault() );
 	result.setFontSize( getFontSizeDefault() );
@@ -328,6 +345,8 @@ void Style::clear()
 	mSpecifiesLineCap = false;
 	mSpecifiesLineJoin = false;
 	mSpecifiesMiterLimit = false;
+	mSpecifiesDashArray = false;
+	mSpecifiesDashOffset = false;
 	mSpecifiesFontFamilies = mSpecifiesFontSize = mSpecifiesFontWeight = false;
 	mSpecifiesVisible = false;
 	mDisplayNone = false;
@@ -450,6 +469,25 @@ bool Style::parseProperty( const std::string &key, const std::string &value, con
 		}
 		return true;
 	}
+	else if( key == "stroke-dasharray" ) {
+        if( value != "inherit" ) {
+			mSpecifiesDashArray = true;
+			mDashArray.clear();
+			if( ! ( value == "none" || value.empty() ) ) {
+				const auto values = readValueList( value, false );
+				for( const auto &val : values )
+					mDashArray.push_back( val.asUser() );
+			}
+		}
+		return true;
+	}
+	else if( key == "stroke-dashoffset" ) {
+		if( value != "inherit" ) {
+			mSpecifiesDashOffset = true;
+			mDashOffset = Value::parse( value ).asUser();
+		}
+		return true;
+	}
 	else if( key == "font-family" ) {
 		mSpecifiesFontFamilies = true;
 		setFontFamilies( readStringList( value, true ) );
@@ -530,6 +568,10 @@ void Style::startRender( Renderer &renderer, bool isNodeDrawable ) const
 		renderer.pushLineJoin( mLineJoin );
 	if( mSpecifiesMiterLimit )
 		renderer.pushMiterLimit( mMiterLimit );
+	if( mSpecifiesDashArray )
+		renderer.pushDashArray( mDashArray );
+	if( mSpecifiesDashOffset )
+		renderer.pushDashOffset( mDashOffset );
 }
 
 void Style::finishRender( Renderer &renderer, bool isNodeDrawable ) const
@@ -552,6 +594,10 @@ void Style::finishRender( Renderer &renderer, bool isNodeDrawable ) const
 		renderer.popLineJoin();
 	if( mSpecifiesMiterLimit )
 		renderer.popMiterLimit();
+	if( mSpecifiesDashArray )
+		renderer.popDashArray();
+	if( mSpecifiesDashOffset )
+		renderer.popDashOffset();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////
@@ -738,6 +784,20 @@ float Node::getMiterLimit() const
 	if( mStyle.specifiesMiterLimit() ) return mStyle.getMiterLimit();
 	else if( mParent ) return mParent->getMiterLimit();
 	else return Style::getMiterLimitDefault();
+}
+
+const std::vector<float> & Node::getDashArray() const
+{
+	if( mStyle.specifiesDashArray() ) return mStyle.getDashArray();
+	else if( mParent ) return mParent->getDashArray();
+	else return Style::getDashArrayDefault();
+}
+
+float Node::getDashOffset() const
+{
+	if( mStyle.specifiesDashOffset() ) return mStyle.getDashOffset();
+	else if( mParent ) return mParent->getDashOffset();
+	else return Style::getDashOffsetDefault();
 }
 
 const vector<string>& Node::getFontFamilies() const
@@ -949,6 +1009,8 @@ Style Node::calcInheritedStyle() const
 	result.setLineCap( getLineCap() );
 	result.setLineJoin( getLineJoin() );
 	result.setMiterLimit( getMiterLimit() );
+	result.setDashArray( getDashArray() );
+	result.setDashOffset( getDashOffset() );
 	result.setStrokeWidth( getStrokeWidth() );
 	result.setFontFamilies( getFontFamilies() );
 	result.setFontSize( getFontSize() );
@@ -957,6 +1019,8 @@ Style Node::calcInheritedStyle() const
 
 void Node::render( Renderer &renderer ) const
 {
+	renderer.start();
+
 	Style style = calcInheritedStyle();
 	if( mParent )
 		renderer.pushMatrix( mParent->getTransformAbsolute() );
@@ -964,6 +1028,8 @@ void Node::render( Renderer &renderer ) const
 	startRender( renderer, style );
 	renderSelf( renderer );
 	finishRender( renderer, style );
+
+	renderer.finish();
 }
 
 void Node::firstStartRender( Renderer &renderer ) const

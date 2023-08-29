@@ -26,13 +26,12 @@ class SvgRendererNvp : public svg::Renderer {
 		mGroupOpacityStack.push_back( 1.0f );
 
 		mStrokeWidthStack.push_back( 1.0f );
-		// mCtx.setLineWidth( mStrokeWidthStack.back() );
-		// mFillRuleStack.push_back( cairo::FILL_RULE_WINDING );
-		// mCtx.setFillRule( mFillRuleStack.back() );
+		mFillRuleStack.push_back( 0xFF /* == svg::FILL_RULE_NONZERO */ );
 		mLineCapStack.push_back( nvp::CapsStyle::DEFAULT );
-		// mCtx.setFillRule( mLineCapStack.back() );
 		mLineJoinStack.push_back( nvp::JoinStyle::DEFAULT );
-		// mCtx.setLineJoin( mLineJoinStack.back() );
+		mMiterLimitStack.push_back( 4.0f );
+		mDashArrayStack.emplace_back();
+		mDashOffsetStack.push_back( 0.0f );
 
 		pushTextPen( vec2( 0 ) );
 		mTextRotationStack.push_back( 0 );
@@ -52,22 +51,46 @@ class SvgRendererNvp : public svg::Renderer {
 
 	bool shouldRender() const { return ( !mMatrixStackContainsIllegal ) && ( ( !mFillStack.back().isNone() ) || ( !mStrokeStack.back().isNone() ) ); }
 
-	void render( const nvp::PathRef &shape ) const
+	void start() override
 	{
-		gl::ScopedBlendPremult scpBlend;
-		gl::ScopedModelMatrix  scpModel;
-		gl::ScopedViewMatrix   scpView;
+		assert( nullptr == mCtx );
 
-		gl::matrixLoadfEXT( GL_MODELVIEW, value_ptr( gl::getModelView() ) );
-		gl::matrixMult3x3fNV( GL_MODELVIEW, value_ptr( mMatrixStack.back() ) );
+		mCtx = gl::context();
 
-		//
-		gl::ScopedTextureBind scpTex( mGradientsCache.getTexture(), 0 );
-
-		// TODO only call once at start of render
-		gl::ScopedState scpStencil( GL_STENCIL_TEST, GL_TRUE );
+		// Enable stencil buffer testing.
+		mCtx->pushBoolState( GL_STENCIL_TEST, GL_TRUE );
 		gl::stencilFunc( GL_NOTEQUAL, 0, 0xFF );
 		gl::stencilOp( GL_KEEP, GL_KEEP, GL_ZERO );
+
+		// Enable premultiplied alpha.
+		mCtx->pushBoolState( GL_BLEND, GL_TRUE );
+		mCtx->pushBlendFuncSeparate( GL_ONE, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA );
+
+		// Bind gradient texture.
+		const auto &tex = mGradientsCache.getTexture();
+		mCtx->pushTextureBinding( tex->getTarget(), tex->getId(), 0 );
+	}
+
+	void finish() override
+	{
+		assert( nullptr != mCtx );
+
+		const auto &tex = mGradientsCache.getTexture();
+		mCtx->popTextureBinding( tex->getTarget(), 0 );
+
+		mCtx->popBlendFuncSeparate();
+		mCtx->popBoolState( GL_BLEND );
+
+		mCtx->popBoolState( GL_STENCIL_TEST );
+
+		mCtx = nullptr;
+	}
+
+	void render( const nvp::PathRef &shape ) const
+	{
+		gl::pushModelView();
+		gl::matrixLoadfEXT( GL_MODELVIEW, value_ptr( gl::getModelView() ) );
+		gl::matrixMult3x3fNV( GL_MODELVIEW, value_ptr( mMatrixStack.back() ) );
 
 		if( !mFillStack.back().isNone() ) {
 			ColorA solidColor = mFillStack.back().getColor();
@@ -78,7 +101,8 @@ class SvgRendererNvp : public svg::Renderer {
 			nvp::ScopedShader scpShader( type );
 			scpShader.setColor( solidColor );
 
-			gl::stencilThenCoverFillPathNV( shape->getId(), GL_COUNT_UP_NV, 0xFF, GL_BOUNDING_BOX_NV );
+			gl::stencilFunc( GL_NOTEQUAL, 0, mFillRuleStack.back() );
+			gl::stencilThenCoverFillPathNV( shape->getId(), GL_COUNT_UP_NV, mFillRuleStack.back(), GL_BOUNDING_BOX_NV );
 		}
 
 		if( !mStrokeStack.back().isNone() ) {
@@ -94,8 +118,11 @@ class SvgRendererNvp : public svg::Renderer {
 			nvp::ScopedShader scpShader( type );
 			scpShader.setColor( solidColor );
 
+			gl::stencilFunc( GL_NOTEQUAL, 0, 0xFF );
 			gl::stencilThenCoverStrokePathNV( shape->getId(), GL_COUNT_UP_NV, 0xFF, GL_BOUNDING_BOX_NV );
 		}
+
+		gl::popModelView();
 	}
 
 	void pushGroup( const svg::Group &group, float opacity ) override { mGroupOpacityStack.push_back( opacity ); }
@@ -110,6 +137,8 @@ class SvgRendererNvp : public svg::Renderer {
 
 		auto shape = std::make_shared<nvp::Path>( path.getShape2d() );
 		shape->setMiterLimit( mMiterLimitStack.back() );
+		shape->setDashPattern( mDashArrayStack.back() );
+		shape->setDashOffset( mDashOffsetStack.back() );
 		mPathCache.insert_or_assign( &path, shape );
 
 		render( shape );
@@ -124,6 +153,8 @@ class SvgRendererNvp : public svg::Renderer {
 
 		auto shape = std::make_shared<nvp::Path>( polyline.getPolyLine() );
 		shape->setMiterLimit( mMiterLimitStack.back() );
+		shape->setDashPattern( mDashArrayStack.back() );
+		shape->setDashOffset( mDashOffsetStack.back() );
 		mPathCache.insert_or_assign( &polyline, shape );
 
 		render( shape );
@@ -138,6 +169,8 @@ class SvgRendererNvp : public svg::Renderer {
 
 		auto shape = std::make_shared<nvp::Path>( polygon.getPolyLine() );
 		shape->setMiterLimit( mMiterLimitStack.back() );
+		shape->setDashPattern( mDashArrayStack.back() );
+		shape->setDashOffset( mDashOffsetStack.back() );
 		mPathCache.insert_or_assign( &polygon, shape );
 
 		render( shape );
@@ -152,6 +185,8 @@ class SvgRendererNvp : public svg::Renderer {
 
 		auto shape = std::make_shared<nvp::Path>( line.getShape() );
 		shape->setMiterLimit( mMiterLimitStack.back() );
+		shape->setDashPattern( mDashArrayStack.back() );
+		shape->setDashOffset( mDashOffsetStack.back() );
 		mPathCache.insert_or_assign( &line, shape );
 
 		render( shape );
@@ -166,6 +201,8 @@ class SvgRendererNvp : public svg::Renderer {
 
 		auto shape = std::make_shared<nvp::Path>( Path2d::rectangle( rect.getRect() ) );
 		shape->setMiterLimit( mMiterLimitStack.back() );
+		shape->setDashPattern( mDashArrayStack.back() );
+		shape->setDashOffset( mDashOffsetStack.back() );
 		mPathCache.insert_or_assign( &rect, shape );
 
 		render( shape );
@@ -180,6 +217,8 @@ class SvgRendererNvp : public svg::Renderer {
 
 		auto shape = std::make_shared<nvp::Path>( circle.getShape() );
 		shape->setMiterLimit( mMiterLimitStack.back() );
+		shape->setDashPattern( mDashArrayStack.back() );
+		shape->setDashOffset( mDashOffsetStack.back() );
 		mPathCache.insert_or_assign( &circle, shape );
 
 		render( shape );
@@ -194,6 +233,8 @@ class SvgRendererNvp : public svg::Renderer {
 
 		auto shape = std::make_shared<nvp::Path>( ellipse.getShape() );
 		shape->setMiterLimit( mMiterLimitStack.back() );
+		shape->setDashPattern( mDashArrayStack.back() );
+		shape->setDashOffset( mDashOffsetStack.back() );
 		mPathCache.insert_or_assign( &ellipse, shape );
 
 		render( shape );
@@ -214,7 +255,7 @@ class SvgRendererNvp : public svg::Renderer {
 	void popStrokeOpacity() override { mStrokeOpacityStack.pop_back(); }
 	void pushStrokeWidth( float width ) override { mStrokeWidthStack.push_back( width ); }
 	void popStrokeWidth() override { mStrokeWidthStack.pop_back(); }
-	void pushFillRule( svg::FillRule rule ) override { mFillRuleStack.push_back( rule ); }
+	void pushFillRule( svg::FillRule rule ) override { mFillRuleStack.push_back( rule == svg::FILL_RULE_EVENODD ? 0x1 : 0xFF ); }
 	void popFillRule() override { mFillRuleStack.pop_back(); }
 	void pushLineCap( svg::LineCap cap ) override
 	{
@@ -242,6 +283,10 @@ class SvgRendererNvp : public svg::Renderer {
 	void popLineJoin() override { mLineJoinStack.pop_back(); }
 	void pushMiterLimit( float miterLimit ) override { mMiterLimitStack.push_back( miterLimit ); }
 	void popMiterLimit() override { mMiterLimitStack.pop_back(); }
+	void pushDashArray( const std::vector<float> &dashArray ) override { mDashArrayStack.push_back( dashArray ); }
+	void popDashArray() override { mDashArrayStack.pop_back(); }
+	void pushDashOffset( float dashOffset ) override { mDashOffsetStack.push_back( dashOffset ); }
+	void popDashOffset() override { mDashOffsetStack.pop_back(); }
 	void pushTextPen( const vec2 &penPos ) override { mTextPenStack.push_back( penPos ); }
 	void popTextPen() override { mTextPenStack.pop_back(); }
 	void pushTextRotation( float ) override {}
@@ -323,19 +368,23 @@ class SvgRendererNvp : public svg::Renderer {
 		return nvp::Shader::Type::RADIAL_GRADIENT;
 	}
 
-	std::vector<mat3>           mMatrixStack;
-	bool                        mMatrixStackContainsIllegal{ false };
-	std::vector<svg::Style>     mStyleStack;
-	std::vector<svg::Paint>     mFillStack, mStrokeStack;
-	std::vector<float>          mFillOpacityStack, mStrokeOpacityStack;
-	std::vector<float>          mGroupOpacityStack;
-	std::vector<float>          mStrokeWidthStack;
-	std::vector<int32_t>        mFillRuleStack;
-	std::vector<nvp::CapsStyle> mLineCapStack;
-	std::vector<nvp::JoinStyle> mLineJoinStack;
-	std::vector<float>          mMiterLimitStack;
-	std::vector<vec2>           mTextPenStack;
-	std::vector<float>          mTextRotationStack;
+	gl::Context *mCtx{ nullptr };
+
+	std::vector<mat3>               mMatrixStack;
+	bool                            mMatrixStackContainsIllegal{ false };
+	std::vector<svg::Style>         mStyleStack;
+	std::vector<svg::Paint>         mFillStack, mStrokeStack;
+	std::vector<float>              mFillOpacityStack, mStrokeOpacityStack;
+	std::vector<float>              mGroupOpacityStack;
+	std::vector<float>              mStrokeWidthStack;
+	std::vector<GLuint>             mFillRuleStack;
+	std::vector<nvp::CapsStyle>     mLineCapStack;
+	std::vector<nvp::JoinStyle>     mLineJoinStack;
+	std::vector<float>              mMiterLimitStack;
+	std::vector<std::vector<float>> mDashArrayStack;
+	std::vector<float>              mDashOffsetStack;
+	std::vector<vec2>               mTextPenStack;
+	std::vector<float>              mTextRotationStack;
 
 	using Cache = std::unordered_map<const svg::Node *, nvp::PathRef>;
 	mutable Cache          mPathCache;
