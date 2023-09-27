@@ -105,6 +105,15 @@ CI_API void ltrim( std::string &str, const std::string &characters );
 //! removes all specified \a characters from the end of \a str.
 CI_API void rtrim( std::string &str, const std::string &characters );
 
+//! returns a copy of \a str with all whitespace (as defined by std::isspace()) removed from the beginning of \a str. Unicode aware.
+CI_API inline std::string ltrim_copy( std::string str ) { ltrim(str); return str; }
+//! returns a copy of \a str with all whitespace (as defined by std::isspace()) removed from the end of \a str. Unicode aware.
+CI_API inline std::string rtrim_copy( std::string str ) { rtrim(str); return str; }
+//! returns a copy of \a str with all specified \a characters removed from the beginning of \a str. Unicode aware.
+CI_API inline std::string ltrim_copy( std::string str, const std::string &characters ) { ltrim(str, characters); return str; }
+//! returns a copy of \a str with all specified \a characters removed from the end of \a str. Unicode aware.
+CI_API inline std::string rtrim_copy( std::string str, const std::string &characters ) { rtrim(str, characters); return str; }
+
 //! returns a copy of \a str with all whitespace (as defined by std::isspace()) removed from beginning and end. Unicode aware.
 CI_API std::string trim( std::string str );
 
