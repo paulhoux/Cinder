@@ -155,6 +155,9 @@ bool Area::operator<( const Area &aArea ) const
 
 Area Area::proportionalFit( const Area &srcArea, const Area &dstArea, bool center, bool expand )
 {
+	if( srcArea.getWidth() <= 0 || srcArea.getHeight() <= 0 )
+		return srcArea;
+
 	int32_t resultWidth, resultHeight;
 	if( srcArea.getWidth() >= srcArea.getHeight() ) { // wider than tall
 		resultWidth = ( expand ) ? dstArea.getWidth() : std::min( dstArea.getWidth(), srcArea.getWidth() );
