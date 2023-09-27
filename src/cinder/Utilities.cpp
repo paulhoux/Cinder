@@ -174,22 +174,26 @@ int asciiCaseCmp( const char *a, const char *b )
 
 void ltrim( std::string &str )
 {
-	str.erase( str.begin(), str.begin() + str.find_first_not_of( " \f\n\r\t\v" ) );
+	if( !str.empty() )
+		str.erase( str.begin(), str.begin() + str.find_first_not_of( " \f\n\r\t\v" ) );
 }
 
 void rtrim( std::string &str )
 {
-	str.erase( str.begin() + str.find_last_not_of( " \f\n\r\t\v" ) + 1, str.end() );
+	if( !str.empty() )
+		str.erase( str.begin() + str.find_last_not_of( " \f\n\r\t\v" ) + 1, str.end() );
 }
 
 void ltrim( std::string &str, const std::string &characters )
 {
-	str.erase( str.begin(), str.begin() + str.find_first_not_of( characters ) );
+	if( !str.empty() )
+		str.erase( str.begin(), str.begin() + str.find_first_not_of( characters ) );
 }
 
 void rtrim( std::string &str, const std::string &characters )
 {
-	str.erase( str.begin() + str.find_last_not_of( characters ) + 1, str.end() );
+	if( !str.empty() )
+		str.erase( str.begin() + str.find_last_not_of( characters ) + 1, str.end() );
 }
 
 std::string trim( std::string str )
