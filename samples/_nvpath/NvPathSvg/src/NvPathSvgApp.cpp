@@ -27,8 +27,8 @@ class SvgRendererNvp : public svg::Renderer {
 
 		mStrokeWidthStack.push_back( 1.0f );
 		mFillRuleStack.push_back( 0xFF /* == svg::FILL_RULE_NONZERO */ );
-		mLineCapStack.push_back( nvp::CapsStyle::DEFAULT );
-		mLineJoinStack.push_back( nvp::JoinStyle::DEFAULT );
+		mLineCapStack.push_back( svg::LineCap::LINE_CAP_BUTT );
+		mLineJoinStack.push_back( svg::LineJoin::LINE_JOIN_MITER );
 		mMiterLimitStack.push_back( 4.0f );
 		mDashArrayStack.emplace_back();
 		mDashOffsetStack.push_back( 0.0f );
@@ -66,6 +66,9 @@ class SvgRendererNvp : public svg::Renderer {
 		mCtx->pushBoolState( GL_BLEND, GL_TRUE );
 		mCtx->pushBlendFuncSeparate( GL_ONE, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA );
 
+		// Enable sRGB correct rendering.
+		mCtx->pushBoolState( GL_FRAMEBUFFER_SRGB, GL_TRUE );
+
 		// Bind gradient texture.
 		const auto &tex = mGradientsCache.getTexture();
 		mCtx->pushTextureBinding( tex->getTarget(), tex->getId(), 0 );
@@ -77,6 +80,8 @@ class SvgRendererNvp : public svg::Renderer {
 
 		const auto &tex = mGradientsCache.getTexture();
 		mCtx->popTextureBinding( tex->getTarget(), 0 );
+
+		mCtx->popBoolState( GL_FRAMEBUFFER_SRGB );
 
 		mCtx->popBlendFuncSeparate();
 		mCtx->popBoolState( GL_BLEND );
@@ -94,7 +99,7 @@ class SvgRendererNvp : public svg::Renderer {
 
 		if( !mFillStack.back().isNone() ) {
 			ColorA solidColor = mFillStack.back().getColor();
-			solidColor.a = mFillOpacityStack.back() * mGroupOpacityStack.back(); // TODO: check if group opacity should be applied here.
+			solidColor.a *= mFillOpacityStack.back() * mGroupOpacityStack.back();
 
 			const auto type = preparePaint( mFillStack.back(), mFillOpacityStack.back() );
 
@@ -106,12 +111,8 @@ class SvgRendererNvp : public svg::Renderer {
 		}
 
 		if( !mStrokeStack.back().isNone() ) {
-			gl::pathParameteriNV( shape->getId(), GL_PATH_END_CAPS_NV, GLint( mLineCapStack.back() ) );
-			gl::pathParameteriNV( shape->getId(), GL_PATH_JOIN_STYLE_NV, GLint( mLineJoinStack.back() ) );
-			gl::pathParameterfNV( shape->getId(), GL_PATH_STROKE_WIDTH_NV, mStrokeWidthStack.back() );
-
 			ColorA solidColor = mStrokeStack.back().getColor();
-			solidColor.a = mStrokeOpacityStack.back() * mGroupOpacityStack.back(); // TODO: check if group opacity should be applied here.
+			solidColor.a *= mStrokeOpacityStack.back() * mGroupOpacityStack.back();
 
 			const auto type = preparePaint( mStrokeStack.back(), mStrokeOpacityStack.back() );
 
@@ -139,6 +140,9 @@ class SvgRendererNvp : public svg::Renderer {
 		shape->setMiterLimit( mMiterLimitStack.back() );
 		shape->setDashPattern( mDashArrayStack.back() );
 		shape->setDashOffset( mDashOffsetStack.back() );
+		shape->setEndCaps( nvp::toCapsStyle( mLineCapStack.back() ) );
+		shape->setJoinStyle( nvp::toJoinStyle( mLineJoinStack.back() ) );
+		shape->setStrokeWidth( mStrokeWidthStack.back() );
 		mPathCache.insert_or_assign( &path, shape );
 
 		render( shape );
@@ -257,29 +261,9 @@ class SvgRendererNvp : public svg::Renderer {
 	void popStrokeWidth() override { mStrokeWidthStack.pop_back(); }
 	void pushFillRule( svg::FillRule rule ) override { mFillRuleStack.push_back( rule == svg::FILL_RULE_EVENODD ? 0x1 : 0xFF ); }
 	void popFillRule() override { mFillRuleStack.pop_back(); }
-	void pushLineCap( svg::LineCap cap ) override
-	{
-		if( cap == svg::LINE_CAP_BUTT )
-			mLineCapStack.push_back( nvp::CapsStyle::FLAT );
-		else if( cap == svg::LINE_CAP_ROUND )
-			mLineCapStack.push_back( nvp::CapsStyle::ROUND );
-		else if( cap == svg::LINE_CAP_SQUARE )
-			mLineCapStack.push_back( nvp::CapsStyle::SQUARE );
-		else
-			mLineCapStack.push_back( nvp::CapsStyle::DEFAULT );
-	}
+	void pushLineCap( svg::LineCap cap ) override { mLineCapStack.push_back( cap ); }
 	void popLineCap() override { mLineCapStack.pop_back(); }
-	void pushLineJoin( svg::LineJoin join ) override
-	{
-		if( join == svg::LINE_JOIN_BEVEL )
-			mLineJoinStack.push_back( nvp::JoinStyle::BEVEL );
-		else if( join == svg::LINE_JOIN_MITER )
-			mLineJoinStack.push_back( nvp::JoinStyle::MITER_TRUNCATE );
-		else if( join == svg::LINE_JOIN_ROUND )
-			mLineJoinStack.push_back( nvp::JoinStyle::ROUND );
-		else
-			mLineJoinStack.push_back( nvp::JoinStyle::DEFAULT );
-	}
+	void pushLineJoin( svg::LineJoin join ) override { mLineJoinStack.push_back( join ); }
 	void popLineJoin() override { mLineJoinStack.pop_back(); }
 	void pushMiterLimit( float miterLimit ) override { mMiterLimitStack.push_back( miterLimit ); }
 	void popMiterLimit() override { mMiterLimitStack.pop_back(); }
@@ -298,6 +282,8 @@ class SvgRendererNvp : public svg::Renderer {
 		mPathCache.clear();
 		mGradientsCache.clear();
 	}
+	//!
+	bool empty() const { return mPathCache.empty(); }
 	//! Returns the number of cached paths.
 	size_t size() const { return mPathCache.size(); }
 
@@ -317,7 +303,6 @@ class SvgRendererNvp : public svg::Renderer {
 		auto gradient = std::dynamic_pointer_cast<nvp::LinearGradient>( mGradientsCache.at( paint.getId() ) );
 		if( !gradient ) {
 			gradient = nvp::LinearGradient::create( paint.getId().c_str() );
-			gradient->spread( nvp::GradientSpreadMethod::DEFAULT );                                                                           // TODO
 			gradient->units( paint.mUseObjectBoundingBox ? nvp::GradientUnits::OBJECT_BOUNDING_BOX : nvp::GradientUnits::USER_SPACE_ON_USE ); //
 			gradient->transform( paint.getTransform() );
 			gradient->from( paint.getCoords0() );
@@ -343,12 +328,11 @@ class SvgRendererNvp : public svg::Renderer {
 		auto gradient = std::dynamic_pointer_cast<nvp::RadialGradient>( mGradientsCache.at( paint.getId() ) );
 		if( !gradient ) {
 			gradient = nvp::RadialGradient::create( paint.getId().c_str() );
-			gradient->spread( nvp::GradientSpreadMethod::DEFAULT );                                                                           // TODO
-			gradient->units( paint.mUseObjectBoundingBox ? nvp::GradientUnits::OBJECT_BOUNDING_BOX : nvp::GradientUnits::USER_SPACE_ON_USE ); //
+			gradient->units( paint.useObjectBoundingBox() ? nvp::GradientUnits::OBJECT_BOUNDING_BOX : nvp::GradientUnits::USER_SPACE_ON_USE ); //
 			gradient->transform( paint.getTransform() );
 			gradient->center( paint.getCoords0() );
-			gradient->radius( paint.getRadius() );
-			gradient->focal( paint.getCoords1(), 0.5f /* focal radius not present in Paint */ );
+			gradient->radius( paint.getRadius0() );
+			gradient->focal( paint.getCoords1(), paint.getRadius1() );
 			for( size_t i = 0; i < paint.getNumColors(); ++i )
 				gradient->stop( paint.getOffset( i ), paint.getColor( i ) );
 
@@ -368,8 +352,7 @@ class SvgRendererNvp : public svg::Renderer {
 		return nvp::Shader::Type::RADIAL_GRADIENT;
 	}
 
-	gl::Context *mCtx{ nullptr };
-
+	gl::Context *                   mCtx{ nullptr };
 	std::vector<mat3>               mMatrixStack;
 	bool                            mMatrixStackContainsIllegal{ false };
 	std::vector<svg::Style>         mStyleStack;
@@ -378,8 +361,8 @@ class SvgRendererNvp : public svg::Renderer {
 	std::vector<float>              mGroupOpacityStack;
 	std::vector<float>              mStrokeWidthStack;
 	std::vector<GLuint>             mFillRuleStack;
-	std::vector<nvp::CapsStyle>     mLineCapStack;
-	std::vector<nvp::JoinStyle>     mLineJoinStack;
+	std::vector<svg::LineCap>       mLineCapStack;
+	std::vector<svg::LineJoin>      mLineJoinStack;
 	std::vector<float>              mMiterLimitStack;
 	std::vector<std::vector<float>> mDashArrayStack;
 	std::vector<float>              mDashOffsetStack;
@@ -389,9 +372,6 @@ class SvgRendererNvp : public svg::Renderer {
 	using Cache = std::unordered_map<const svg::Node *, nvp::PathRef>;
 	mutable Cache          mPathCache;
 	mutable nvp::Gradients mGradientsCache;
-
-	bool  mRenderingDisabled{ false };
-	float mGroupOpacity{ 1 };
 };
 
 class NvPathSvgApp : public App {
@@ -407,11 +387,15 @@ class NvPathSvgApp : public App {
 	void loadPreviousSvgFile();
 	void loadNextSvgFile();
 
+  private:
 	CanvasUi       mCanvasUi;
 	nvp::Canvas    mCanvas; //{ 32, 16, false };
+	nvp::Svg       mSvg;
 	svg::DocRef    mDoc;
 	SvgRendererNvp mRenderer;
 	ci::fs::path   mFilePath;
+	size_t         mPathCount = 0;
+	bool           mUseSvg = true;
 };
 
 void NvPathSvgApp::setup()
@@ -426,9 +410,13 @@ void NvPathSvgApp::update()
 	// Show application name and frame rate in the window title bar.
 	std::string name = app::getAppPath().stem().string();
 
+	// Use filename instead if available.
+	if( !mFilePath.empty() )
+		name = mFilePath.stem().string();
+
 	std::string title;
 	title.resize( 255 );
-	snprintf( title.data(), title.size(), "%s (%.0f FPS)", name.c_str(), static_cast<double>( getAverageFps() ) );
+	snprintf( title.data(), title.size(), "%s (%.0f FPS) : %s - %d paths", name.c_str(), static_cast<double>( getAverageFps() ), mUseSvg ? "nvp::Svg" : "svg::Doc", mPathCount );
 
 	getWindow()->setTitle( title );
 }
@@ -437,31 +425,50 @@ void NvPathSvgApp::draw()
 {
 	gl::clear( Color::white() );
 
-	// Use premultiplied alpha!
-	gl::ScopedBlendPremult scpBlend;
-	gl::ScopedColor        scpColor( 1, 1, 1 );
-
 	{
 		nvp::ScopedCanvas     scpCanvas( mCanvas );
 		gl::ScopedModelMatrix scpModel( mCanvasUi.getModelMatrix() );
 
-		gl::clear( ColorA( 0, 0, 0, 0 ) );
-
-		if( mDoc ) {
-			// Scale viewbox to canvas.
-			auto bounds = Area::proportionalFit( Area( mDoc->getBounds() ), mCanvas.getBounds(), true, true );
-			auto scale = vec2( bounds.getSize() ) / vec2( mDoc->getSize() );
-			auto offset = bounds.getUL();
-
+		if( mDoc && !mUseSvg ) {
 			gl::ScopedModelMatrix sm;
-			gl::translate( offset );
-			gl::scale( scale );
 
+			// Scale SVG to canvas.
+			if( mDoc->getWidth() > 0 && mDoc->getHeight() > 0 ) {
+				auto bounds = Area::proportionalFit( Area( mDoc->getBounds() ), mCanvas.getBounds(), true, true );
+				auto scale = vec2( bounds.getSize() ) / vec2( mDoc->getSize() );
+				auto offset = bounds.getUL();
 
-			//
+				gl::translate( offset );
+				gl::scale( scale );
+			}
+
+			// Send SVG document to our renderer.
 			mDoc->render( mRenderer );
+
+			mPathCount = mRenderer.size();
+		}
+		else if( mUseSvg ) {
+			gl::ScopedModelMatrix sm;
+
+			// Scale SVG to canvas.
+			if( mSvg.getWidth() > 0 && mSvg.getHeight() > 0 ) {
+				auto bounds = Area::proportionalFit( mSvg.getBounds(), mCanvas.getBounds(), true, true );
+				auto scale = vec2( bounds.getSize() ) / vec2( mSvg.getSize() );
+				auto offset = bounds.getUL();
+
+				gl::translate( offset );
+				gl::scale( scale );
+			}
+
+			mSvg.draw();
+
+			mPathCount = mSvg.size();
 		}
 	}
+
+	// Use premultiplied alpha!
+	gl::ScopedBlendPremult scpBlend;
+	gl::ScopedColor        scpColor( 1, 1, 1 );
 
 	mCanvas.draw();
 }
@@ -486,11 +493,19 @@ void NvPathSvgApp::keyDown( KeyEvent event )
 	case KeyEvent::KEY_RIGHT:
 		loadNextSvgFile();
 		break;
+	case KeyEvent::KEY_UP:
+	case KeyEvent::KEY_DOWN:
+		if( !mFilePath.empty() )
+			loadSvgFile( mFilePath );
+		break;
 	case KeyEvent::KEY_ESCAPE:
 		if( isFullScreen() )
 			setFullScreen( false );
 		else
 			quit();
+		break;
+	case KeyEvent::KEY_SPACE:
+		mUseSvg = !mUseSvg;
 		break;
 	default:
 		App::keyDown( event );
@@ -521,6 +536,8 @@ bool NvPathSvgApp::loadSvgFile( const fs::path &file )
 
 	mCanvasUi.reset();
 	mRenderer.clear();
+
+	mSvg = nvp::Svg( mDoc );
 
 	return true;
 }
