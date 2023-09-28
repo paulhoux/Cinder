@@ -260,7 +260,7 @@ void Path::setStrokeWidth( float width ) const
 void Path::setMiterLimit( float limit ) const
 {
 	if( mPathId > 0 ) {
-		gl::pathParameteriNV( mPathId, GL_PATH_MITER_LIMIT_NV, GLfloat( limit ) );
+		gl::pathParameterfNV( mPathId, GL_PATH_MITER_LIMIT_NV, GLfloat( limit ) );
 	}
 }
 

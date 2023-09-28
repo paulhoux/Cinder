@@ -406,26 +406,14 @@ const std::vector<std::string> &Style::getFontFamiliesDefault()
 
 void Style::parseClassAttribute( const std::string &stylePropertyString, const Node *parent )
 {
-	// Find styles information. TODO: optimize.
+	// Find styles information.
 	std::shared_ptr<Styles> styles;
 
-	while( parent ) {
-		const Group *group = dynamic_cast<const Group *>( parent );
-		if( group && group->hasStyles() ) {
-			styles = group->getStyles();
-			break;
-		}
-		else if( group && group->hasDefs() ) {
-			const auto &defs = group->getDefs();
-			if( defs && defs->hasStyles() ) {
-				styles = defs->getStyles();
-				break;
-			}
-		}
-		parent = parent->getParent();
-	}
+	const Defs *defs = parent->findDefsInAncestors();
+	if( defs )
+		styles = defs->getStyles();
 
-	//
+	// Merge styles.
 	if( styles )
 		*this += styles->findStyle( stylePropertyString );
 }
@@ -1269,6 +1257,17 @@ Paint Node::findPaintInAncestors( const std::string &paintName ) const
 		return Paint();
 }
 
+const Defs * Node::findDefsInAncestors() const
+{
+	const Group* group = dynamic_cast<const Group*>(this);
+	if( group && group->mDefs )
+		return group->mDefs.get();
+	else if( mParent )
+		return mParent->findDefsInAncestors();
+	else
+		return 0;
+}
+
 mat3 Node::getTransformAbsolute() const
 {
 	mat3 result;
@@ -2052,8 +2051,8 @@ void Group::parse( const XmlTree &xml )
 		if( treeIt->getTag() == "defs" ) {
 			mDefs = std::make_shared<Defs>( this, *treeIt );
 		}
-		else if( treeIt->getTag() == "style" ) {
-			mStyles = std::make_shared<Styles>( this, *treeIt );
+		else if(treeIt->getTag() == "style") {
+			// Skip <style> nodes.
 		}
 		else {
 			Node *node = create( *treeIt );
@@ -2284,16 +2283,6 @@ void Group::iterate( const std::function<void( Node * )> &fn )
 		if( typeid( **childIt ) == typeid( svg::Group ) )
 			static_cast<svg::Group *>( *childIt )->iterate( fn );
 	}
-}
-
-bool Group::hasStyles() const
-{
-	return bool( mStyles ) && !mStyles->empty();
-}
-
-bool Group::hasDefs() const
-{
-	return bool( mDefs );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////
@@ -2682,6 +2671,20 @@ const Node *Defs::findNode( const std::string &id, bool recurse ) const
 	}
 
 	return result;
+}
+
+void Defs::parse( const XmlTree &xml )
+{
+	for( XmlTree::ConstIter treeIt = xml.begin(); treeIt != xml.end(); ++treeIt ) {
+		if( treeIt->getTag() == "style" ) {
+			mStyles = std::make_shared<Styles>( this, *treeIt );
+		}
+		else {
+			Node *node = create( *treeIt );
+			if( node )
+				mChildren.push_back( node );
+		}
+	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////////

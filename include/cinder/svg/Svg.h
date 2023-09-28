@@ -400,6 +400,8 @@ class CI_API Node {
 	virtual const Node *findInAncestors( const std::string &elementId ) const;
 	//! Finds the svg::Paint node with ID \a elementId amongst this Node's ancestors. Returns a default svg::Paint instance on failure.
 	Paint findPaintInAncestors( const std::string &paintName ) const;
+	//! Recursively searches for a <defs> node and returns it if found. Returns NULL on failure.
+	const Defs *findDefsInAncestors() const;
 
 	//! Returns whether this Node specifies a transformation
 	bool specifiesTransform() const { return mSpecifiesTransform; }
@@ -859,14 +861,14 @@ class CI_API Group : public Node, private Noncopyable {
 	const Node*				findNodeByIdContains( const std::string &idPartial, bool recurse = true ) const;
 	const Node*				findInAncestors( const std::string &elementId ) const override;
 	//! Returns a reference to the child named \a id. Throws svg::ExcChildNotFound if not found.
-	const Node &getChild( const std::string &id ) const;
+	const Node &			getChild( const std::string &id ) const;
 	//! Returns a reference to the child named \a id. Throws svg::ExcChildNotFound if not found.
-	Node &getChild( const std::string &id ) { return const_cast<Node &>( const_cast<const Group *>( this )->getChild( id ) ); }
+	Node &					getChild( const std::string &id ) { return const_cast<Node &>( const_cast<const Group *>( this )->getChild( id ) ); }
 	//! Returns a reference to the child named \a id. Throws svg::ExcChildNotFound if not found.
-	const Node &operator/( const std::string &id ) const { return getChild( id ); }
+	const Node &			operator/( const std::string &id ) const { return getChild( id ); }
 
 	//! Returns the merged Shape2d for all children of the group
-	virtual Shape2d getShape() const { return getMergedShape2d(); }
+	Shape2d getShape() const override { return getMergedShape2d(); }
 
 	//! Appends the merged Shape2d for the group to \a appentTo.
 	void appendMergedShape2d( Shape2d *appendTo ) const;
@@ -883,15 +885,6 @@ class CI_API Group : public Node, private Noncopyable {
 	//! Recursively iterates all Nodes in Group or Doc, passing each to \a fn to be optionally manipulated
 	virtual void iterate( const std::function<void( Node * )> &fn );
 
-	//!
-	bool hasStyles() const;
-	//!
-	const std::shared_ptr<Styles> &getStyles() const { return mStyles; }
-	//!
-	bool hasDefs() const;
-	//!
-	const std::shared_ptr<Defs> &getDefs() const { return mDefs; }
-
   protected:
 	Node *  nodeUnderPoint( const vec2 &absolutePoint, const mat3 &parentInverseMatrix ) const;
 	Shape2d getMergedShape2d() const;
@@ -900,12 +893,13 @@ class CI_API Group : public Node, private Noncopyable {
 	virtual Rectf calcBoundingBox() const;
 
 	virtual bool isDrawable() const { return false; }
-	void         parse( const XmlTree &xml );
+	virtual void parse( const XmlTree &xml );
 	Node *       create( const XmlTree &xml );
 
 	std::list<Node *>       mChildren;
 	std::shared_ptr<Defs>   mDefs;
-	std::shared_ptr<Styles> mStyles;
+
+	friend class Node;
 };
 
 typedef std::shared_ptr<Defs> DefsRef;
@@ -917,8 +911,13 @@ class CI_API Defs : public Group {
 
 	const Node *findNode( const std::string &id, bool recurse ) const override;
 
+	const std::shared_ptr<Styles> &getStyles() const { return mStyles; }
+
   protected:
+	void parse(const XmlTree &xml) override;
+
 	XmlTree mXml;
+	std::shared_ptr<Styles> mStyles;
 };
 
 typedef std::shared_ptr<Styles> StylesRef;
