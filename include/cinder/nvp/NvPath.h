@@ -27,6 +27,7 @@ This code is intended for use with the Cinder C++ library: http://libcinder.org
 #include "cinder/Shape2d.h"
 #include "cinder/gl/Context.h"
 #include "cinder/gl/Fbo.h"
+#include "cinder/svg/Svg.h"
 
 namespace cinder {
 
@@ -65,6 +66,11 @@ CI_API enum class PathStyle { MOVETO_RESETS = GL_MOVE_TO_RESETS_NV, MOVETO_CONTI
 enum class GradientUnits { OBJECT_BOUNDING_BOX = GL_PATH_OBJECT_BOUNDING_BOX_NV, USER_SPACE_ON_USE = GL_OBJECT_LINEAR_NV, DEFAULT = GL_PATH_OBJECT_BOUNDING_BOX_NV };
 //! Defines the spread method used by the gradient.
 enum class GradientSpreadMethod { PAD = GL_CLAMP_TO_EDGE, REFLECT = GL_MIRRORED_REPEAT, REPEAT = GL_REPEAT, DEFAULT = PAD };
+
+//!
+CapsStyle toCapsStyle( ci::svg::LineCap lineCap );
+//!
+JoinStyle toJoinStyle( ci::svg::LineJoin lineJoin );
 
 //! Path represents a vector shape stored efficiently on the GPU.
 CI_API class Path {
@@ -113,6 +119,12 @@ CI_API class Path {
 	void setDashCaps( CapsStyle caps ) const;
 	//! Sets the caps for dashed strokes.
 	void setDashCaps( CapsStyle initialCap, CapsStyle terminalCap ) const;
+	//! Sets the path's end caps for strokes.
+	void setEndCaps( CapsStyle caps ) const;
+	//! Sets the join style for strokes.
+	void setJoinStyle( JoinStyle joins ) const;
+	//! Sets the stroke width.
+	void setStrokeWidth( float width ) const;
 	//! Sets the miter limit for stokes.
 	void setMiterLimit( float limit ) const;
 
@@ -179,6 +191,9 @@ CI_API class Path {
 
 	//! Returns the result of this path's transformation as a new path.
 	[[nodiscard]] Path transformed( const glm::mat3x2 &transform ) const;
+
+	//! Reverses the order of the points and segments, effectively changing the winding. NOT THOROUGHLY TESTED, USE WITH CARE!
+	void reverse() const;
 
   protected:
 	static GLubyte toPathCommand( Path2d::SegmentType type );
@@ -505,7 +520,7 @@ class RadialGradient : public Gradient {
 	float       mR{ 0.5f };  // Defaults to 50%.
 	float       mCx{ 0.5f }; // Defaults to 50%.
 	float       mCy{ 0.5f }; // Defaults to 50%.
-	float       mFr{ 0 };
+	float       mFr{ 0 };    // Defaults to 0%.
 	float       mFx{ mCx };
 	float       mFy{ mCy };
 };
@@ -642,6 +657,125 @@ class CI_API ScopedShader : public Noncopyable {
 			gl::programPathFragmentInputGenNV( mShader->mProgram, 1, genMode, 2, data.data() );
 		}
 	}
+};
+
+//!
+class CI_API Svg {
+  public:
+	Svg() = default;
+
+	explicit Svg( const DataSourceRef &src );
+	explicit Svg( const svg::DocRef &svg );
+
+	int32_t getWidth() const { return mDoc ? mDoc->getWidth() : 0; }
+	int32_t getHeight() const { return mDoc ? mDoc->getHeight() : 0; }
+	ivec2   getSize() const { return mDoc ? mDoc->getSize() : ivec2{}; }
+	Area    getBounds() const { return mDoc ? mDoc->getBounds() : Area{}; }
+
+	//! Returns whether any paths are defined.
+	bool empty() const { return mPaths.empty(); }
+	//! Returns the number of paths.
+	size_t size() const { return mPaths.size(); }
+
+	void draw();
+
+  private:
+	//!
+	nvp::Shader::Type prepareLinearGradient( const svg::Paint &paint, float opacity );
+	//!
+	nvp::Shader::Type prepareRadialGradient( const svg::Paint &paint, float opacity );
+	//!
+	nvp::Shader::Type preparePaint( const svg::Paint &paint, float opacity );
+
+	class Renderer : public svg::Renderer {
+	  public:
+		Renderer( Svg *svg );
+
+		void start() override {}
+		void finish() override {}
+		void pushGroup( const svg::Group &group, float opacity ) override;
+		void popGroup() override;
+		void drawPath( const svg::Path & ) override;
+		void drawPolyline( const svg::Polyline & ) override;
+		void drawPolygon( const svg::Polygon & ) override;
+		void drawLine( const svg::Line & ) override;
+		void drawRect( const svg::Rect & ) override;
+		void drawCircle( const svg::Circle & ) override;
+		void drawEllipse( const svg::Ellipse & ) override;
+		void drawImage( const svg::Image & ) override {}
+		void drawTextSpan( const svg::TextSpan & ) override {}
+		void pushMatrix( const mat3 & ) override;
+		void popMatrix() override;
+		// void pushStyle( const svg::Style & ) override;
+		// void popStyle() override;
+		void pushFill( const svg::Paint & ) override;
+		void popFill() override;
+		void pushStroke( const svg::Paint & ) override;
+		void popStroke() override;
+		void pushFillOpacity( float ) override;
+		void popFillOpacity() override;
+		void pushStrokeOpacity( float ) override;
+		void popStrokeOpacity() override;
+		void pushStrokeWidth( float ) override;
+		void popStrokeWidth() override;
+		void pushFillRule( svg::FillRule ) override;
+		void popFillRule() override;
+		void pushLineCap( svg::LineCap ) override;
+		void popLineCap() override;
+		void pushLineJoin( svg::LineJoin ) override;
+		void popLineJoin() override;
+		void pushMiterLimit( float miterLimit ) override;
+		void popMiterLimit() override;
+		void pushDashArray( const std::vector<float> &dashArray ) override;
+		void popDashArray() override;
+		void pushDashOffset( float dashOffset ) override;
+		void popDashOffset() override;
+		void pushTextPen( const vec2 & ) override {}
+		void popTextPen() override {}
+		void pushTextRotation( float ) override {}
+		void popTextRotation() override {}
+
+	  private:
+		//!
+		svg::Style getCurrentStyle() const;
+		//!
+		bool shouldRender() const { return !( mFillStack.back().isNone() && mStrokeStack.back().isNone() ); }
+		//!
+		void render( const Shape2d &shape ) const;
+
+		Svg *                           mSvg = nullptr;
+		std::vector<svg::Style>         mStyleStack;
+		std::vector<mat3>               mMatrixStack;
+		std::vector<svg::Paint>         mFillStack, mStrokeStack;
+		std::vector<float>              mFillOpacityStack, mStrokeOpacityStack;
+		std::vector<float>              mGroupOpacityStack;
+		std::vector<float>              mStrokeWidthStack;
+		std::vector<svg::FillRule>      mFillRuleStack;
+		std::vector<svg::LineCap>       mLineCapStack;
+		std::vector<svg::LineJoin>      mLineJoinStack;
+		std::vector<float>              mMiterLimitStack;
+		std::vector<std::vector<float>> mDashArrayStack;
+		std::vector<float>              mDashOffsetStack;
+	};
+
+	struct DrawCall {
+		GLuint     pathId{ 0 };
+		svg::Paint fill;
+		svg::Paint stroke;
+		float      fillOpacity{ 1 };
+		float      strokeOpacity{ 1 };
+		GLuint     fillRule{ 0xFF };
+		mat3       matrix;
+	};
+
+	svg::DocRef             mDoc;
+	Renderer                mRenderer{ this };
+	Gradients               mGradients;
+	std::vector<Path>       mPaths;
+	std::vector<DrawCall>   mDrawCalls;
+	//std::vector<svg::Style> mStyles;
+
+	friend class Renderer;
 };
 
 //! Stores font faces and shaders so they can be easily reused by other parts of your code.
@@ -809,6 +943,12 @@ CI_API void renderText( const text::Typesetter &typesetter, const vec2 &offset =
 CI_API static GradientUnits toGradientUnits( std::string style );
 //!
 CI_API static GradientSpreadMethod toSpreadMethod( std::string style );
+
+//!
+CI_API inline glm::mat3x2 toMat3x2( const glm::mat3x3 &m )
+{
+	return glm::mat3x2{ m[0][0], m[0][1], m[1][0], m[1][1], m[2][0], m[2][1] };
+}
 
 } // namespace nvp
 } // namespace cinder

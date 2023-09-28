@@ -31,6 +31,34 @@ This code is intended for use with the Cinder C++ library: http://libcinder.org
 namespace cinder {
 namespace nvp {
 
+CapsStyle toCapsStyle( svg::LineCap lineCap )
+{
+	switch( lineCap ) {
+	case svg::LineCap::LINE_CAP_BUTT:
+		return CapsStyle::FLAT;
+	case svg::LineCap::LINE_CAP_ROUND:
+		return CapsStyle::ROUND;
+	case svg::LineCap::LINE_CAP_SQUARE:
+		return CapsStyle::SQUARE;
+	}
+
+	return CapsStyle::DEFAULT;
+}
+
+JoinStyle toJoinStyle( svg::LineJoin lineJoin )
+{
+	switch( lineJoin ) {
+	case svg::LineJoin::LINE_JOIN_BEVEL:
+		return JoinStyle::BEVEL;
+	case svg::LineJoin::LINE_JOIN_MITER:
+		return JoinStyle::MITER_REVERT;
+	case svg::LineJoin::LINE_JOIN_ROUND:
+		return JoinStyle::ROUND;
+	}
+
+	return JoinStyle::DEFAULT;
+}
+
 Path::~Path()
 {
 	if( mPathId > 0 )
@@ -205,6 +233,27 @@ void Path::setDashCaps( CapsStyle initialCap, CapsStyle terminalCap ) const
 	if( mPathId > 0 ) {
 		gl::pathParameteriNV( mPathId, GL_PATH_INITIAL_DASH_CAP_NV, GLint( initialCap ) );
 		gl::pathParameteriNV( mPathId, GL_PATH_TERMINAL_DASH_CAP_NV, GLint( terminalCap ) );
+	}
+}
+
+void Path::setEndCaps( CapsStyle caps ) const
+{
+	if( mPathId > 0 ) {
+		gl::pathParameteriNV( mPathId, GL_PATH_END_CAPS_NV, GLint( caps ) );
+	}
+}
+
+void Path::setJoinStyle( JoinStyle joins ) const
+{
+	if( mPathId > 0 ) {
+		gl::pathParameteriNV( mPathId, GL_PATH_JOIN_STYLE_NV, GLint( joins ) );
+	}
+}
+
+void Path::setStrokeWidth( float width ) const
+{
+	if( mPathId > 0 ) {
+		gl::pathParameterfNV( mPathId, GL_PATH_STROKE_WIDTH_NV, GLfloat( width ) );
 	}
 }
 
@@ -446,6 +495,44 @@ Path Path::transformed( const glm::mat3x2 &transform ) const
 	Path path( *this );
 	path.transform( transform );
 	return path;
+}
+
+void Path::reverse() const
+{
+	GLint numCommands = 0;
+	GLint numCoords = 0;
+	gl::getPathParameterivNV( mPathId, GL_PATH_COMMAND_COUNT_NV, &numCommands );
+	gl::getPathParameterivNV( mPathId, GL_PATH_COORD_COUNT_NV, &numCoords );
+
+	std::vector<GLubyte> commands;
+	commands.resize( numCommands );
+	gl::getPathCommandsNV( mPathId, commands.data() );
+
+	std::vector<GLfloat> coords;
+	coords.resize( numCoords );
+	gl::getPathCoordsNV( mPathId, coords.data() );
+
+	// Reverse all coords.
+	std::reverse( coords.begin(), coords.end() );
+
+	// Reverse all commands, but change move-to's into close and close into move-to's.
+	std::reverse( commands.begin(), commands.end() );
+	for( auto &command : commands ) {
+		switch( command ) {
+		case GL_MOVE_TO_NV:
+		case GL_RELATIVE_MOVE_TO_NV:
+			command = GL_CLOSE_PATH_NV;
+			break;
+		case GL_CLOSE_PATH_NV:
+			command = GL_MOVE_TO_NV;
+			break;
+		default: // do nothing
+			break;
+		}
+	}
+
+	gl::getPathCoordsNV( mPathId, coords.data() );
+	gl::getPathCommandsNV( mPathId, commands.data() );
 }
 
 GLubyte Path::toPathCommand( Path2d::SegmentType type )
@@ -840,6 +927,425 @@ gl::Texture2dRef Gradients::create( int width, int height ) const
 	gl::Texture2dRef texture = gl::Texture2d::create( width, height, FORMAT );
 	return texture;
 }
+
+Svg::Svg( const DataSourceRef &src )
+	: Svg( svg::Doc::create( src ) )
+{
+}
+
+Svg::Svg( const svg::DocRef &svg )
+	: mDoc( svg )
+{
+	mDoc->render( mRenderer );
+}
+
+Shader::Type Svg::prepareLinearGradient( const svg::Paint &paint, float opacity )
+{
+	auto gradient = std::dynamic_pointer_cast<LinearGradient>( mGradients.at( paint.getId() ) );
+	if( !gradient ) {
+		gradient = LinearGradient::create( paint.getId().c_str() );
+		gradient->units( paint.mUseObjectBoundingBox ? GradientUnits::OBJECT_BOUNDING_BOX : GradientUnits::USER_SPACE_ON_USE ); //
+		gradient->transform( paint.getTransform() );
+		gradient->from( paint.getCoords0() );
+		gradient->to( paint.getCoords1() );
+		for( size_t i = 0; i < paint.getNumColors(); ++i )
+			gradient->stop( paint.getOffset( i ), paint.getColor( i ) );
+
+		mGradients.set( gradient );
+	}
+
+	ScopedShader scpShader( Shader::Type::LINEAR_GRADIENT );
+	scpShader.setCoords( GLenum( gradient->getUnits() ), mat3{ gradient->getTransform() } );
+	scpShader.uniform( "index", mGradients.index( paint.getId() ) );
+	scpShader.uniform( "gradTab", 0 );
+	scpShader.uniform( "gradStart", vec2( gradient->getX1(), gradient->getY1() ) );
+	scpShader.uniform( "gradEnd", vec2( gradient->getX2(), gradient->getY2() ) );
+	scpShader.uniform( "opacity", opacity );
+
+	return Shader::Type::LINEAR_GRADIENT;
+}
+
+Shader::Type Svg::prepareRadialGradient( const svg::Paint &paint, float opacity )
+{
+	auto gradient = std::dynamic_pointer_cast<RadialGradient>( mGradients.at( paint.getId() ) );
+	if( !gradient ) {
+		gradient = RadialGradient::create( paint.getId().c_str() );
+		gradient->units( paint.useObjectBoundingBox() ? GradientUnits::OBJECT_BOUNDING_BOX : GradientUnits::USER_SPACE_ON_USE ); //
+		gradient->transform( paint.getTransform() );
+		gradient->center( paint.getCoords0() );
+		gradient->radius( paint.getRadius0() );
+		gradient->focal( paint.getCoords1(), paint.getRadius1() );
+		for( size_t i = 0; i < paint.getNumColors(); ++i )
+			gradient->stop( paint.getOffset( i ), paint.getColor( i ) );
+
+		mGradients.set( gradient );
+	}
+
+	ScopedShader scpShader( Shader::Type::RADIAL_GRADIENT );
+	scpShader.setCoords( GLenum( gradient->getUnits() ), mat3{ gradient->getTransform() } );
+	scpShader.uniform( "index", mGradients.index( paint.getId() ) );
+	scpShader.uniform( "gradTab", 0 );
+	scpShader.uniform( "focalToCenter", vec2( gradient->getCx() - gradient->getFx(), gradient->getCy() - gradient->getFy() ) );
+	scpShader.uniform( "centerRadius", gradient->getR() );
+	scpShader.uniform( "focalRadius", gradient->getFr() );
+	scpShader.uniform( "translationPoint", vec2( gradient->getFx(), gradient->getFy() ) );
+	scpShader.uniform( "opacity", opacity );
+
+	return Shader::Type::RADIAL_GRADIENT;
+}
+
+Shader::Type Svg::preparePaint( const svg::Paint &paint, float opacity )
+{
+	if( paint.isLinearGradient() )
+		return prepareLinearGradient( paint, opacity );
+
+	if( paint.isRadialGradient() )
+		return prepareRadialGradient( paint, opacity );
+
+	return Shader::Type::SOLID_COLOR;
+}
+
+void Svg::draw()
+{
+	auto ctx = gl::context();
+
+	// Enable stencil buffer testing.
+	ctx->pushBoolState( GL_STENCIL_TEST, GL_TRUE );
+	// gl::stencilFunc( GL_NOTEQUAL, 0, 0xFF );
+	gl::stencilOp( GL_ZERO, GL_ZERO, GL_ZERO );
+
+	// Enable premultiplied alpha.
+	ctx->pushBoolState( GL_BLEND, GL_TRUE );
+	ctx->pushBlendFuncSeparate( GL_ONE, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA );
+
+	// Enable sRGB correct rendering.
+	ctx->pushBoolState( GL_FRAMEBUFFER_SRGB, GL_TRUE );
+
+	// Bind gradient texture.
+	const auto &tex = mGradients.getTexture();
+	ctx->pushTextureBinding( tex->getTarget(), tex->getId(), 0 );
+
+	for( const auto &call : mDrawCalls ) {
+		gl::pushModelView();
+		gl::matrixLoadfEXT( GL_MODELVIEW, value_ptr( gl::getModelView() ) );
+		gl::matrixMult3x3fNV( GL_MODELVIEW, value_ptr( call.matrix ) );
+
+		if( !call.fill.isNone() ) {
+			ColorA solidColor = call.fill.getColor();
+			solidColor.a *= call.fillOpacity;
+
+			const auto type = preparePaint( call.fill, call.fillOpacity );
+
+			ScopedShader scpShader( type );
+			scpShader.setColor( solidColor );
+
+			gl::stencilFunc( GL_NOTEQUAL, 0, call.fillRule );
+			gl::stencilThenCoverFillPathNV( call.pathId, GL_COUNT_UP_NV, call.fillRule, GL_CONVEX_HULL_NV );
+		}
+
+		if( !call.stroke.isNone() ) {
+			ColorA solidColor = call.stroke.getColor();
+			solidColor.a *= call.strokeOpacity;
+
+			const auto type = preparePaint( call.stroke, call.strokeOpacity );
+
+			ScopedShader scpShader( type );
+			scpShader.setColor( solidColor );
+
+			gl::stencilFunc( GL_NOTEQUAL, 0, 0xFF );
+			gl::stencilThenCoverStrokePathNV( call.pathId, GL_COUNT_UP_NV, 0xFF, GL_CONVEX_HULL_NV );
+		}
+
+		gl::popModelView();
+	}
+
+	ctx->popTextureBinding( tex->getTarget(), 0 );
+
+	ctx->popBoolState( GL_FRAMEBUFFER_SRGB );
+
+	ctx->popBlendFuncSeparate();
+	ctx->popBoolState( GL_BLEND );
+
+	ctx->popBoolState( GL_STENCIL_TEST );
+}
+
+Svg::Renderer::Renderer( Svg *svg )
+	: mSvg{ svg }
+{
+	mStyleStack.emplace_back();
+	mMatrixStack.emplace_back();
+	mFillStack.emplace_back( Color::black() );
+	mStrokeStack.emplace_back();
+	mFillOpacityStack.push_back( 1.0f );
+	mStrokeOpacityStack.push_back( 1.0f );
+	mGroupOpacityStack.push_back( 1.0f );
+	mStrokeWidthStack.push_back( 1.0f );
+	mFillRuleStack.push_back( svg::FILL_RULE_NONZERO );
+	mLineCapStack.push_back( svg::LineCap::LINE_CAP_BUTT );
+	mLineJoinStack.push_back( svg::LineJoin::LINE_JOIN_MITER );
+	mMiterLimitStack.push_back( 4.0f );
+	mDashArrayStack.emplace_back();
+	mDashOffsetStack.push_back( 0.0f );
+}
+
+void Svg::Renderer::pushGroup( const svg::Group &group, float opacity )
+{
+	mGroupOpacityStack.push_back( opacity );
+}
+
+void Svg::Renderer::popGroup()
+{
+	mGroupOpacityStack.pop_back();
+}
+
+void Svg::Renderer::drawPath( const svg::Path &path )
+{
+	render( path.getShape2d() );
+}
+
+void Svg::Renderer::drawPolyline( const svg::Polyline &polyline )
+{
+	render( polyline.getShape() );
+}
+
+void Svg::Renderer::drawPolygon( const svg::Polygon &polygon )
+{
+	render( polygon.getShape() );
+}
+
+void Svg::Renderer::drawLine( const svg::Line &line )
+{
+	render( line.getShape() );
+}
+
+void Svg::Renderer::drawRect( const svg::Rect &rect )
+{
+	render( rect.getShape() );
+}
+
+void Svg::Renderer::drawCircle( const svg::Circle &circle )
+{
+	render( circle.getShape() );
+}
+
+void Svg::Renderer::drawEllipse( const svg::Ellipse &ellipse )
+{
+	render( ellipse.getShape() );
+}
+
+void Svg::Renderer::pushMatrix( const mat3 &m )
+{
+	mMatrixStack.push_back( mMatrixStack.back() * m );
+}
+
+void Svg::Renderer::popMatrix()
+{
+	mMatrixStack.pop_back();
+}
+
+// void Svg::Renderer::pushStyle( const svg::Style &style )
+//{
+//	mStyleStack.push_back( mStyleStack.back() + style );
+//}
+//
+// void Svg::Renderer::popStyle()
+//{
+//	mStyleStack.pop_back();
+//}
+
+void Svg::Renderer::pushFill( const svg::Paint &paint )
+{
+	mFillStack.push_back( paint );
+}
+
+void Svg::Renderer::popFill()
+{
+	mFillStack.pop_back();
+}
+
+void Svg::Renderer::pushStroke( const svg::Paint &paint )
+{
+	mStrokeStack.push_back( paint );
+}
+
+void Svg::Renderer::popStroke()
+{
+	mStrokeStack.pop_back();
+}
+
+void Svg::Renderer::pushFillOpacity( float opacity )
+{
+	mFillOpacityStack.push_back( opacity );
+}
+
+void Svg::Renderer::popFillOpacity()
+{
+	mFillOpacityStack.pop_back();
+}
+
+void Svg::Renderer::pushStrokeOpacity( float opacity )
+{
+	mStrokeOpacityStack.push_back( opacity );
+}
+
+void Svg::Renderer::popStrokeOpacity()
+{
+	mStrokeOpacityStack.pop_back();
+}
+
+void Svg::Renderer::pushStrokeWidth( float x )
+{
+	mStrokeWidthStack.push_back( x );
+}
+
+void Svg::Renderer::popStrokeWidth()
+{
+	mStrokeWidthStack.pop_back();
+}
+
+void Svg::Renderer::pushFillRule( svg::FillRule fillRule )
+{
+	mFillRuleStack.push_back( fillRule );
+}
+
+void Svg::Renderer::popFillRule()
+{
+	mFillRuleStack.pop_back();
+}
+
+void Svg::Renderer::pushLineCap( svg::LineCap lineCap )
+{
+	mLineCapStack.push_back( lineCap );
+}
+
+void Svg::Renderer::popLineCap()
+{
+	mLineCapStack.pop_back();
+}
+
+void Svg::Renderer::pushLineJoin( svg::LineJoin lineJoin )
+{
+	mLineJoinStack.push_back( lineJoin );
+}
+
+void Svg::Renderer::popLineJoin()
+{
+	mLineJoinStack.pop_back();
+}
+
+void Svg::Renderer::pushMiterLimit( float miterLimit )
+{
+	mMiterLimitStack.push_back( miterLimit );
+}
+
+void Svg::Renderer::popMiterLimit()
+{
+	mMiterLimitStack.pop_back();
+}
+
+void Svg::Renderer::pushDashArray( const std::vector<float> &dashArray )
+{
+	mDashArrayStack.push_back( dashArray );
+}
+
+void Svg::Renderer::popDashArray()
+{
+	mDashArrayStack.pop_back();
+}
+
+void Svg::Renderer::pushDashOffset( float dashOffset )
+{
+	mDashOffsetStack.push_back( dashOffset );
+}
+
+void Svg::Renderer::popDashOffset()
+{
+	mDashOffsetStack.pop_back();
+}
+
+svg::Style Svg::Renderer::getCurrentStyle() const
+{
+	svg::Style result;
+	result.setDashArray( mDashArrayStack.back() );
+	result.setDashOffset( mDashOffsetStack.back() );
+	result.setFill( mFillStack.back() );
+	result.setFillOpacity( mFillOpacityStack.back() );
+	result.setFillRule( mFillRuleStack.back() );
+	result.setLineCap( mLineCapStack.back() );
+	result.setLineJoin( mLineJoinStack.back() );
+	result.setMiterLimit( mMiterLimitStack.back() );
+	result.setOpacity( mGroupOpacityStack.back() );
+	result.setStroke( mStrokeStack.back() );
+	result.setStrokeOpacity( mStrokeOpacityStack.back() );
+	result.setStrokeWidth( mStrokeWidthStack.back() );
+	return result;
+}
+
+void Svg::Renderer::render( const Shape2d &shape ) const
+{
+	if( !shouldRender() )
+		return;
+
+	// Create path.
+	Path path( shape );
+
+	// Determine current style.
+	//auto style = getCurrentStyle();
+
+	//// Perform path merging.
+	//if( !mSvg->mPaths.empty() && !mSvg->mStyles.empty() && !mSvg->mDrawCalls.empty() ) {
+	//	if( mSvg->mStyles.back() == style ) {
+	//		const auto matrix = toMat3x2( inverse( mSvg->mDrawCalls.back().matrix ) * mMatrixStack.back() );
+
+	//		bool pathsIntersect = mSvg->mPaths.back().getBounds().intersects( path.getBounds() );
+	//		bool usesEvenOdd = style.getFillRule() == svg::FILL_RULE_EVENODD;
+	//		bool usesStrokes = !style.getStroke().isNone();
+	//		bool usesDashing = mDashArrayStack.back() != svg::Style::getDashArrayDefault() || mDashOffsetStack.back() != svg::Style::getDashOffsetDefault();
+	//		bool usesGradient = style.getFill().isLinearGradient() || style.getFill().isRadialGradient();
+
+	//		if( usesGradient ) {
+	//			// Gradients can not be merged.
+	//		}
+	//		if( pathsIntersect ) {
+	//			// Paths generally can not be merged if they intersect.
+	//		}
+	//		// else if( usesStrokes && ( pathsIntersect || usesDashing ) ) {
+	//		//	// Paths can not be merged if they intersect when using stroking, or if the path is dashed.
+	//		//}
+	//		// else if( usesEvenOdd && pathsIntersect ) {
+	//		//	// Paths can not be merged if they intersect when using even-odd rendering.
+	//		//}
+	//		else {
+	//			path.transform( matrix );
+
+	//			mSvg->mPaths.back() += path;
+	//			return;
+	//		}
+	//	}
+	//}
+
+	path.setMiterLimit( mMiterLimitStack.back() );
+	path.setDashPattern( mDashArrayStack.back() );
+	path.setDashOffset( mDashOffsetStack.back() );
+	path.setEndCaps( toCapsStyle( mLineCapStack.back() ) );
+	path.setDashCaps( toCapsStyle( mLineCapStack.back() ), toCapsStyle( mLineCapStack.back() ) );
+	path.setJoinStyle( toJoinStyle( mLineJoinStack.back() ) );
+	path.setStrokeWidth( mStrokeWidthStack.back() );
+
+	DrawCall dc;
+	dc.matrix = mMatrixStack.back();
+	dc.fill = mFillStack.back();
+	dc.fillOpacity = mFillOpacityStack.back() * mGroupOpacityStack.back();
+	dc.fillRule = mFillRuleStack.back() == svg::FILL_RULE_NONZERO ? 0xFF : 0x01;
+	dc.stroke = mStrokeStack.back();
+	dc.strokeOpacity = mStrokeOpacityStack.back() * mGroupOpacityStack.back();
+	dc.pathId = path.getId();
+
+	mSvg->mDrawCalls.push_back( std::move( dc ) );
+	mSvg->mPaths.push_back( std::move( path ) );
+	//mSvg->mStyles.push_back( style );
+}
+
 
 Shader::Shader( Type type )
 	: mType( type )
