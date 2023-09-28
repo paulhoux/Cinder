@@ -1,7 +1,7 @@
 /*
  Copyright (c) 2012, The Cinder Project
  All rights reserved.
- 
+
  This code is designed for use with the Cinder C++ library, http://libcinder.org
 
  Redistribution and use in source and binary forms, with or without modification, are permitted provided that
@@ -49,6 +49,7 @@ typedef enum { WEIGHT_100, WEIGHT_200, WEIGHT_300, WEIGHT_400, WEIGHT_NORMAL = W
 class Node;
 class Group;
 class Defs;
+class Styles;
 class Rect;
 class Circle;
 class Path;
@@ -61,71 +62,71 @@ class Polygon;
 class Image;
 class ExcChildNotFound;
 
-typedef std::function<bool(const Node&, svg::Style *)> RenderVisitor;
+typedef std::function<bool( const Node &, svg::Style * )> RenderVisitor;
 
 //! Base class from which Renderers are derived.
 class CI_API Renderer {
   public:
 	virtual ~Renderer() = default;
 
-	void	setVisitor( const std::function<bool(const Node&, svg::Style *)> &visitor );
+	void setVisitor( const std::function<bool( const Node &, svg::Style * )> &visitor );
 
-	virtual void	start() {}
-	virtual void	finish() {}
+	virtual void start() {}
+	virtual void finish() {}
 
-	virtual	void	pushGroup( const Group & /*group*/, float /*opacity*/ ) {}
-	virtual void	popGroup() {}
-	virtual void	drawPath( const svg::Path & /*path*/ ) {}
-	virtual void	drawPolyline( const svg::Polyline & /*polyline*/ ) {}
-	virtual void	drawPolygon( const svg::Polygon & /*polygon*/ ) {}
-	virtual void	drawLine( const svg::Line & /*line*/ ) {}
-	virtual void	drawRect( const svg::Rect & /*rect*/ ) {}
-	virtual void	drawCircle( const svg::Circle & /*circle*/ ) {}
-	virtual void	drawEllipse( const svg::Ellipse & /*ellipse*/ ) {}
-	virtual void	drawImage( const svg::Image & /*image*/ ) {}
-	virtual void	drawTextSpan( const svg::TextSpan & /*span*/ ) {}
+	virtual void pushGroup( const Group & /*group*/, float /*opacity*/ ) {}
+	virtual void popGroup() {}
+	virtual void drawPath( const svg::Path & /*path*/ ) {}
+	virtual void drawPolyline( const svg::Polyline & /*polyline*/ ) {}
+	virtual void drawPolygon( const svg::Polygon & /*polygon*/ ) {}
+	virtual void drawLine( const svg::Line & /*line*/ ) {}
+	virtual void drawRect( const svg::Rect & /*rect*/ ) {}
+	virtual void drawCircle( const svg::Circle & /*circle*/ ) {}
+	virtual void drawEllipse( const svg::Ellipse & /*ellipse*/ ) {}
+	virtual void drawImage( const svg::Image & /*image*/ ) {}
+	virtual void drawTextSpan( const svg::TextSpan & /*span*/ ) {}
 
-	virtual void	pushMatrix( const mat3 & /*m*/ ) {}
-	virtual void	popMatrix() {}
-	virtual void	pushStyle( const svg::Style & /*style*/ ) {}
-	virtual void	popStyle() {}
-	virtual void	pushFill( const class Paint & /*paint*/ ) {}
-	virtual void	popFill() {}
-	virtual void	pushStroke( const class Paint & /*paint*/ ) {}
-	virtual void	popStroke() {}
-	virtual void	pushFillOpacity( float  /*opacity*/ ) {}
-	virtual void	popFillOpacity() {}
-	virtual void	pushStrokeOpacity( float  /*opacity*/ ) {}
-	virtual void	popStrokeOpacity() {}
-	virtual void	pushStrokeWidth( float  /*width*/ ) {}
-	virtual void	popStrokeWidth() {}
-	virtual void	pushFillRule( FillRule  /*rule*/ ) {}
-	virtual void	popFillRule() {}
-	virtual void	pushLineCap( LineCap  /*lineCap*/ ) {}
-	virtual void	popLineCap() {}
-	virtual void	pushLineJoin(LineJoin  /*lineJoin*/ ) {}
-	virtual void	popLineJoin() {}
-	virtual void	pushMiterLimit(float  /*miterLimit*/ ) {}
-	virtual void	popMiterLimit() {}
-	virtual void	pushDashArray(const std::vector<float>&  /*dashArray*/ ) {}
-	virtual void	popDashArray() {}
-	virtual void	pushDashOffset(float  /*dashOffset*/ ) {}
-	virtual void	popDashOffset() {}
-	virtual void	pushTextPen(const vec2 &  /*penPos*/ ) {}
-	virtual void	popTextPen() {}
-	virtual void	pushTextRotation( float  /*rotation*/ ) {}
-	virtual void	popTextRotation() {}
+	virtual void pushMatrix( const mat3 & /*m*/ ) {}
+	virtual void popMatrix() {}
+	virtual void pushStyle( const svg::Style & /*style*/ ) {}
+	virtual void popStyle() {}
+	virtual void pushFill( const class Paint & /*paint*/ ) {}
+	virtual void popFill() {}
+	virtual void pushStroke( const class Paint & /*paint*/ ) {}
+	virtual void popStroke() {}
+	virtual void pushFillOpacity( float /*opacity*/ ) {}
+	virtual void popFillOpacity() {}
+	virtual void pushStrokeOpacity( float /*opacity*/ ) {}
+	virtual void popStrokeOpacity() {}
+	virtual void pushStrokeWidth( float /*width*/ ) {}
+	virtual void popStrokeWidth() {}
+	virtual void pushFillRule( FillRule /*rule*/ ) {}
+	virtual void popFillRule() {}
+	virtual void pushLineCap( LineCap /*lineCap*/ ) {}
+	virtual void popLineCap() {}
+	virtual void pushLineJoin( LineJoin /*lineJoin*/ ) {}
+	virtual void popLineJoin() {}
+	virtual void pushMiterLimit( float /*miterLimit*/ ) {}
+	virtual void popMiterLimit() {}
+	virtual void pushDashArray( const std::vector<float> & /*dashArray*/ ) {}
+	virtual void popDashArray() {}
+	virtual void pushDashOffset( float /*dashOffset*/ ) {}
+	virtual void popDashOffset() {}
+	virtual void pushTextPen( const vec2 & /*penPos*/ ) {}
+	virtual void popTextPen() {}
+	virtual void pushTextRotation( float /*rotation*/ ) {}
+	virtual void popTextRotation() {}
 
 	bool		visit( const Node &node, svg::Style *style ) const {
 		if( mVisitor )
-			return (*mVisitor)( node, style );
+			return ( *mVisitor )( node, style );
 		else
 			return true;
 	}
 
   protected:
 	// this is a shared_ptr to work around a bug in Clang 4.0
-	std::shared_ptr<std::function<bool(const Node&, svg::Style *)> >		mVisitor;
+	std::shared_ptr<std::function<bool( const Node &, svg::Style * )>> mVisitor;
 
 	friend class svg::Node;
 };
@@ -134,61 +135,71 @@ class CI_API Renderer {
 class CI_API Value {
   public:
 	enum Unit { USER, PX, PERCENT, PT, PC, MM, CM, INCH, EM, EX };
-	
+
 	Value() : mUnit( USER ), mValue( 0 ) {}
 	Value( float value, Unit unit = USER ) : mUnit( unit ), mValue( value ) {}
 
-	float		asUser( float percentOf = 100, float dpi = 72, float fontSize = 12, float fontXHeight = 7 ) const;
+	float asUser( float percentOf = 100, float dpi = 72, float fontSize = 12, float fontXHeight = 7 ) const;
 
-	bool		isUser() const { return mUnit == USER; }
-	bool		isPercent() const { return mUnit == PERCENT; }
-	bool		isPixels() const { return mUnit == PX; }
+	bool isUser() const { return mUnit == USER; }
+	bool isPercent() const { return mUnit == PERCENT; }
+	bool isPixels() const { return mUnit == PX; }
 
-	static Value		parse( const char **sInOut );
-	static Value		parse( const std::string &s );
-	
-	Unit		mUnit;
-	float		mValue;
+	static Value parse( const char **sInOut );
+	static Value parse( const std::string &s );
+
+	Unit  mUnit;
+	float mValue;
 };
 
 //! SVG Paint specification for fill or stroke, including solids and gradients
 class CI_API Paint {
   public:
 	enum { NONE, COLOR, LINEAR_GRADIENT, RADIAL_GRADIENT };
-	
+
 	Paint();
 	Paint( uint8_t type );
 	Paint( const ColorA8u &color );
-	
-	static Paint 	parse( const char *value, bool *specified, const Node *parentNode );
-	
-	bool			isNone() const { return mType == NONE; }
-	bool			isLinearGradient() const { return mType == LINEAR_GRADIENT; }
-	bool			isRadialGradient() const { return mType == RADIAL_GRADIENT; }
-	const ColorA8u&	getColor( size_t idx = 0 ) const { return mStops[idx].second; }
-	float			getOffset( size_t idx ) const { return mStops[idx].first; }
-	size_t			getNumColors() const { return mStops.size(); }
-	
+	Paint( const std::string &url ); // Marks Paint as "needs resolve".
+
+	static Paint parse( const char *value, bool *specified, const Node *parentNode );
+
+	bool            isNone() const { return mType == NONE; }
+	bool            isLinearGradient() const { return mType == LINEAR_GRADIENT; }
+	bool            isRadialGradient() const { return mType == RADIAL_GRADIENT; }
+	const ColorA8u &getColor( size_t idx = 0 ) const { return mStops[idx].second; }
+	float           getOffset( size_t idx ) const { return mStops[idx].first; }
+	size_t          getNumColors() const { return mStops.size(); }
+
 	// only apply to gradients
-	vec2			getCoords0() const { return mCoords0; } // (x1,y1) on linear, (cx,cy) on radial
-	vec2			getCoords1() const { return mCoords1; } // (x2,y2) on linear, (fx,fy) on radial
-	float			getRadius() const { return mRadius; } // radial-only
-	bool			useObjectBoundingBox() const { return mUseObjectBoundingBox; }
-	bool			specifiesTransform() const { return mSpecifiesTransform; }
-	mat3			getTransform() const { return mTransform; }
+	vec2    getCoords0() const { return mCoords0; } // (x1,y1) on linear, (cx,cy) on radial
+	vec2    getCoords1() const { return mCoords1; } // (x2,y2) on linear, (fx,fy) on radial
+	float   getRadius0() const { return mRadius0; }   // (r) on radial
+	float   getRadius1() const { return mRadius1; }   // (fr) on radial
+	bool    useObjectBoundingBox() const { return mUseObjectBoundingBox; }
+	bool    specifiesTransform() const { return mSpecifiesTransform; }
+	mat3    getTransform() const { return mTransform; }
+	bool    specifiesSpreadMethod() const { return mSpecifiesSpreadMethod; }
+	uint8_t getSpreadMethod() const { return mSpreadMethod; }
 
-	const std::string& getId() const { return mId; }
+	const std::string &getId() const { return mId; }
 
-	uint8_t									mType;
-	std::vector<std::pair<float,ColorA8u> >	mStops;
-	
-	vec2				mCoords0, mCoords1;
-	float				mRadius;
-	bool				mUseObjectBoundingBox;
-	mat3				mTransform;
-	bool				mSpecifiesTransform;
+	bool operator==( const Paint &rhs ) const { return mType == rhs.mType && mStops == rhs.mStops; }
+	bool operator!=( const Paint &rhs ) const { return !( *this == rhs ); }
 
-	std::string			mId;
+	uint8_t                                 mType;
+	std::vector<std::pair<float, ColorA8u>> mStops;
+
+	vec2    mCoords0, mCoords1;
+	float   mRadius0, mRadius1;
+	bool    mUseObjectBoundingBox;
+	mat3    mTransform;
+	bool    mSpecifiesTransform;
+	uint8_t mSpreadMethod;
+	bool    mSpecifiesSpreadMethod;
+	bool    mNeedsResolve;
+
+	std::string mId;
 };
 
 //! SVG Style for a node. Corresponds to SVG Styling: http://www.w3.org/TR/SVG/styling.html
@@ -198,9 +209,9 @@ class CI_API Style {
 	Style( const XmlTree &xml, const Node *parent );
 
 	//! Returns a Style set appropriately for global defaults
-	static Style	makeGlobalDefaults();
+	static Style makeGlobalDefaults();
 	//! Marks all styles as unspecified
-	void			clear();
+	void clear();
 
 	bool				specifiesFill() const { return mSpecifiesFill; }
 	void				unspecifyFill() { mSpecifiesFill = false; }
@@ -275,8 +286,8 @@ class CI_API Style {
 	static float	getDashOffsetDefault() { return 0; }
 	
 	// fonts
-	bool									specifiesFontFamilies() const { return mSpecifiesFontFamilies; }
-	void									unspecifyFontFamilies() { mSpecifiesFontFamilies = false; }
+	bool                            specifiesFontFamilies() const { return mSpecifiesFontFamilies; }
+	void                            unspecifyFontFamilies() { mSpecifiesFontFamilies = false; }
 	const std::vector<std::string>&			getFontFamilies() const { return mFontFamilies; }
 	std::vector<std::string>&				getFontFamilies() { return mFontFamilies; }
 	void									setFontFamily( const std::string &family ) { mSpecifiesFontFamilies = true; mFontFamilies.clear(); mFontFamilies.push_back( family ); }
@@ -303,43 +314,55 @@ class CI_API Style {
 	bool			isDisplayNone() const { return mDisplayNone; }
 	void			setDisplayNone( bool displayNone ) { mDisplayNone = displayNone; }
 
-	void 		startRender( Renderer &renderer, bool isNodeDrawable ) const;
-	void 		finishRender( Renderer &renderer, bool isNodeDrawable ) const;
+	void startRender( Renderer &renderer, bool isNodeDrawable ) const;
+	void finishRender( Renderer &renderer, bool isNodeDrawable ) const;
 
-	void		parseStyleAttribute( const std::string &stylePropertyString, const Node *parent );
-	bool		parseProperty( const std::string &key, const std::string &value, const Node *parent );
+	void parseClassAttribute( const std::string &stylePropertyString, const Node *parent );
+	void parseStyleAttribute( const std::string &stylePropertyString, const Node *parent );
+	bool parseProperty( const std::string &key, const std::string &value, const Node *parent );
+
+	// Attempts to find a Style definition in one of its parents for the value stored in mId.
+	void resolve( const Node *node ) const;
+
+	bool operator==( const Style &other ) const;
+	bool operator!=( const Style &other ) const { return !( *this == other ); }
+
+	// Merges the right-hand Style into the left-hand one.
+	void operator+=( const Style &other );
+	// Merges the two styles.
+	Style operator+( const Style &other ) const;
 
   protected:
-	bool				mSpecifiesOpacity;
-	float				mOpacity;
-	bool				mSpecifiesFillOpacity, mSpecifiesStrokeOpacity;
-	float				mFillOpacity, mStrokeOpacity;
+	bool  mSpecifiesOpacity;
+	float mOpacity;
+	bool  mSpecifiesFillOpacity, mSpecifiesStrokeOpacity;
+	float mFillOpacity, mStrokeOpacity;
 
-	bool				mSpecifiesFill, mSpecifiesStroke;
-	Paint				mFill, mStroke;
-	bool				mSpecifiesStrokeWidth;
-	float				mStrokeWidth;
-	bool				mSpecifiesFillRule;
-	FillRule			mFillRule;
-	bool				mSpecifiesLineCap;
-	LineCap				mLineCap;
-	bool				mSpecifiesLineJoin;
-	LineJoin			mLineJoin;
-	bool				mSpecifiesMiterLimit;
-	float				mMiterLimit;
-	bool				mSpecifiesDashArray;
-	std::vector<float>	mDashArray;
-	bool				mSpecifiesDashOffset;
-	float				mDashOffset;
-	
+	bool               mSpecifiesFill, mSpecifiesStroke;
+	mutable Paint      mFill, mStroke; // Paint might need to be resolved from a 'const' method.
+	bool               mSpecifiesStrokeWidth;
+	float              mStrokeWidth;
+	bool               mSpecifiesFillRule;
+	FillRule           mFillRule;
+	bool               mSpecifiesLineCap;
+	LineCap            mLineCap;
+	bool               mSpecifiesLineJoin;
+	LineJoin           mLineJoin;
+	bool               mSpecifiesMiterLimit;
+	float              mMiterLimit;
+	bool               mSpecifiesDashArray;
+	std::vector<float> mDashArray;
+	bool               mSpecifiesDashOffset;
+	float              mDashOffset;
+
 	// fonts
-	bool			mSpecifiesFontFamilies, mSpecifiesFontSize, mSpecifiesFontWeight;
-	std::vector<std::string>	mFontFamilies;
-	Value			mFontSize;
-	FontWeight		mFontWeight;
-	
+	bool                     mSpecifiesFontFamilies, mSpecifiesFontSize, mSpecifiesFontWeight;
+	std::vector<std::string> mFontFamilies;
+	Value                    mFontSize;
+	FontWeight               mFontWeight;
+
 	// visibility
-	bool			mSpecifiesVisible, mVisible, mDisplayNone;
+	bool mSpecifiesVisible, mVisible, mDisplayNone;
 };
 
 //! Base class for an element of an SVG Document
@@ -347,121 +370,125 @@ class CI_API Node {
   public:
 	Node( Node *parent ) : mParent( parent ),  mSpecifiesTransform( false ), mBoundingBoxCached( false ) {}
 	virtual ~Node() {}
-	
+
 	//! Returns the svg::Doc this Node is an element of
-	class Doc*			getDoc() const;
+	class Doc *getDoc() const;
 	//! Returns the immediate parent of this node
-	const Node*			getParent() const { return mParent; }
-	//! Returns the ID of this Node when present. 
-	const std::string&	getId() const { return mId; }
+	const Node *getParent() const { return mParent; }
+	//! Returns the ID of this Node when present.
+	const std::string &getId() const { return mId; }
 	//! Returns a DOM-style path to this node.
-	std::string			getDomPath() const;
+	std::string getDomPath() const;
 	//! Returns the style elements defined on this Node but not inherited from ancestors.
-	const Style&		getStyle() const { return mStyle; }
+	const Style &getStyle() const
+	{
+		mStyle.resolve( this );
+		return mStyle;
+	}
 	//! Sets the style defined on this Node but not inherited from ancestors.
-	void				setStyle( const Style &style ) { mStyle = style; }
+	void setStyle( const Style &style ) { mStyle = style; }
 	//! Returns the node's Style, including attributes inherited from its ancestors for attributes it does not specify
-	Style				calcInheritedStyle() const;
+	Style calcInheritedStyle() const;
 
 	//! Returns whether the point \a pt is inside of the Node's shape.
-	virtual bool	containsPoint( const vec2 & /*pt*/ ) const { return false; }
-	
+	virtual bool containsPoint( const vec2 & /*pt*/ ) const { return false; }
+
 	//! Renders the node and its descendants.
-	void			render( Renderer &renderer ) const;
+	void render( Renderer &renderer ) const;
 
 	//! Finds the node with ID \a elementId amongst this Node's ancestors. Returns NULL on failure.
-	virtual const Node*		findInAncestors( const std::string &elementId ) const;
+	virtual const Node *findInAncestors( const std::string &elementId ) const;
 	//! Finds the svg::Paint node with ID \a elementId amongst this Node's ancestors. Returns a default svg::Paint instance on failure.
-	Paint					findPaintInAncestors( const std::string &paintName ) const;
+	Paint findPaintInAncestors( const std::string &paintName ) const;
 
 	//! Returns whether this Node specifies a transformation
-	bool				specifiesTransform() const { return mSpecifiesTransform; }
+	bool specifiesTransform() const { return mSpecifiesTransform; }
 	//! Returns the local transformation of this node. Returns identity if the Node's transform isn't specified.
-	mat3				getTransform() const { return mTransform; }
+	mat3 getTransform() const { return mTransform; }
 	//! Sets the local transformation of this node.
 	void				setTransform( const mat3 &transform ) { mTransform = transform; mSpecifiesTransform = true; }
 	//! Removes the local transformation of this node, effectively making it the identity matrix.
-	void				unspecifyTransform() { mSpecifiesTransform = false; }
+	void unspecifyTransform() { mSpecifiesTransform = false; }
 	//! Returns the inverse of the local transformation of this node. Returns identity if the Node's transform isn't specified.
-	mat3				getTransformInverse() const { return ( mSpecifiesTransform ) ? inverse( mTransform ) : mat3(); }
+	mat3 getTransformInverse() const { return ( mSpecifiesTransform ) ? inverse( mTransform ) : mat3(); }
 	//! Returns the absolute transformation of this node, which includes inherited transformations.
-	mat3				getTransformAbsolute() const;
+	mat3 getTransformAbsolute() const;
 	//! Returns the inverse of the absolute transformation of this node, which includes inherited transformations.
-	mat3				getTransformAbsoluteInverse() const { return inverse( getTransformAbsolute() ); }
+	mat3 getTransformAbsoluteInverse() const { return inverse( getTransformAbsolute() ); }
 
 	//! Returns the local bounding box of the Node. Calculated and cached the first time it is requested.
 	Rectf			getBoundingBox() const { if( ! mBoundingBoxCached ) { mBoundingBox = calcBoundingBox(); mBoundingBoxCached = true; } return mBoundingBox;  }
 	//! Returns the absolute bounding box of the Node. Calculated and cached the first time it is requested.
-	Rectf			getBoundingBoxAbsolute() const { return getBoundingBox().transformed( getTransformAbsolute() ); }
+	Rectf getBoundingBoxAbsolute() const { return getBoundingBox().transformed( getTransformAbsolute() ); }
 
 	//! Returns a Shape2d representing the node in local coordinates. Not supported for Text.
-	virtual Shape2d	getShape() const { return Shape2d(); }
+	virtual Shape2d getShape() const { return Shape2d(); }
 	//! Returns a Shape2d representing the node in absolute coordinates. Not supported for Text.
-	Shape2d			getShapeAbsolute() const { return getShape().transformed( getTransformAbsolute() ); }
+	Shape2d getShapeAbsolute() const { return getShape().transformed( getTransformAbsolute() ); }
 
 	//! Returns node's fill, or the first among its ancestors when it has none
-	const Paint&	getFill() const;
+	const Paint &getFill() const;
 	//! Returns node's stroke, or the first among its ancestors when it has none
-	const Paint&	getStroke() const;
+	const Paint &getStroke() const;
 	//! Returns node's opacity, or the first among its ancestors when it has none
-	float			getOpacity() const;
+	float getOpacity() const;
 	//! Returns node's fill opacity, or the first among its ancestors when it has none
-	float			getFillOpacity() const;
+	float getFillOpacity() const;
 	//! Returns node's stroke opacity, or the first among its ancestors when it has none
-	float			getStrokeOpacity() const;
+	float getStrokeOpacity() const;
 	//! Returns node's fill rule, or the first among its ancestors when it has none
-	FillRule		getFillRule() const;
+	FillRule getFillRule() const;
 	//! Returns node's line cap, or the first among its ancestors when it has none
-	LineCap			getLineCap() const;
+	LineCap getLineCap() const;
 	//! Returns node's line join, or the first among its ancestors when it has none
-	LineJoin		getLineJoin() const;
+	LineJoin getLineJoin() const;
 	//! Returns node's miter limit, or the first among its ancestors when it has none
-	float			getMiterLimit() const;
+	float getMiterLimit() const;
 	//! Returns node's dash array, or the first among its ancestors when it has none
-	const std::vector<float>&	getDashArray() const;
+	const std::vector<float> &getDashArray() const;
 	//! Returns node's dash offset, or the first among its ancestors when it has none
-	float			getDashOffset() const;
+	float getDashOffset() const;
 	//! Returns node's stroke width, or the first among its ancestors when it has none
-	float			getStrokeWidth() const;
+	float getStrokeWidth() const;
 	//! Returns node's font families, or the first among its ancestors when it has none
-	const std::vector<std::string>&		getFontFamilies() const;
+	const std::vector<std::string> &getFontFamilies() const;
 	//! Returns node's font size, or the first among its ancestors when it has none
-	Value			getFontSize() const;
+	Value getFontSize() const;
 	//! Returns whether this Node is visible, or the first among its ancestors when unspecified
-	bool			isVisible() const;
+	bool isVisible() const;
 	//! Returns whether the Display property of this Node is set to 'None', preventing rendering of the node and its children
-	bool			isDisplayNone() const { return mStyle.isDisplayNone(); }
+	bool			isDisplayNone() const { return getStyle().isDisplayNone(); }
 
 
   protected:
 	Node( Node *parent, const XmlTree &xml );
 	// returns whether this type of node directly renders anything. Everything but groups.
-	virtual bool	isDrawable() const { return true; }
+	virtual bool isDrawable() const { return true; }
 
-	void			startRender( Renderer &renderer, const Style &style ) const;
-	void			finishRender( Renderer &renderer, const Style &style ) const;
-	virtual void	renderSelf( Renderer &renderer ) const = 0;
-	
-	virtual Rectf	calcBoundingBox() const { return Rectf( 0, 0, 0, 0 ); }
+	void         startRender( Renderer &renderer, const Style &style ) const;
+	void         finishRender( Renderer &renderer, const Style &style ) const;
+	virtual void renderSelf( Renderer &renderer ) const = 0;
 
-	static Paint		parsePaint( const char *value, bool *specified, const Node *parentNode );
-	static mat3			parseTransform( const std::string &value );
-	static bool			parseTransformComponent( const char **c, mat3 *result );
+	virtual Rectf calcBoundingBox() const { return Rectf( 0, 0, 0, 0 ); }
+
+	static Paint parsePaint( const char *value, bool *specified, const Node *parentNode );
+	static mat3  parseTransform( const std::string &value );
+	static bool  parseTransformComponent( const char **c, mat3 *result );
+
+	static std::string findStyleValue( const std::string &styleString, const std::string &key );
+	void               parseStyle( const std::string &value );
 	
-	static std::string	findStyleValue( const std::string &styleString, const std::string &key );
-	void				parseStyle( const std::string &value );
-    
-  protected:
-	Node			*mParent;
-	std::string		mId;
-	Style			mStyle;
-	bool			mSpecifiesTransform;
-	mat3			mTransform;
-	mutable bool	mBoundingBoxCached;
-	mutable Rectf	mBoundingBox;
-	
+	Node *        mParent;
+	std::string   mId;
+	bool          mSpecifiesTransform;
+	mat3          mTransform;
+	mutable bool  mBoundingBoxCached;
+	mutable Rectf mBoundingBox;
+
   private:
-  	void			firstStartRender( Renderer &renderer ) const;
+	void firstStartRender( Renderer &renderer ) const;
+
+	Style mStyle; // Try avoiding directly accessing this variable, use getStyle() instead if possible.
 
 	friend class Group;
 	friend class Use;
@@ -470,6 +497,8 @@ class CI_API Node {
 //! Base class for SVG Gradients. See SVG Gradients: http://www.w3.org/TR/SVG/pservers.html#Gradients
 class CI_API Gradient : public Node {
   public:
+	typedef enum { PAD, REFLECT, REPEAT } SpreadMethod;
+
 	Gradient( Node *parent, const XmlTree &xml );
 
 	class CI_API Stop {
@@ -484,17 +513,21 @@ class CI_API Gradient : public Node {
 
 	bool useObjectBoundingBox() const { return mUseObjectBoundingBox; }
 
+	SpreadMethod getSpreadMethod() const { return mSpreadMethod; }
+
+	static SpreadMethod parseSpreadMethod( const std::string &s );
+
   protected:
 	void renderSelf( Renderer & /*renderer*/ ) const override {}
 
 	void          parse( const Node *parent, const XmlTree &xml );
 	void          copyAttributesFrom( const Gradient &rhs );
 	virtual Paint asPaint() const;
-	
+
 	std::vector<Stop> mStops;
 	bool              mUseObjectBoundingBox;
 	bool              mSpecifiesSpreadMethod;
-	/* TODO SpreadMethod mSpreadMethod; */
+	SpreadMethod      mSpreadMethod;
 };
 
 //! SVG Linear gradient
@@ -509,10 +542,10 @@ class CI_API LinearGradient : public Gradient {
 	void copyAttributesFrom( const LinearGradient &rhs );
 	bool isDrawable() const override { return false; }
 
-	Value mX1;
-	Value mY1;
-	Value mX2;
-	Value mY2;
+	Value mX1{ 0, Value::PERCENT };
+	Value mY1{ 0, Value::PERCENT };
+	Value mX2{ 100, Value::PERCENT };
+	Value mY2{ 0, Value::PERCENT };
 
 	friend class Gradient;
 };
@@ -529,12 +562,12 @@ class CI_API RadialGradient : public Gradient {
 	void copyAttributesFrom( const RadialGradient &rhs );
 	bool isDrawable() const override { return false; }
 
-	Value mCx;
-	Value mCy;
-	Value mR;
-	Value mFx;
-	Value mFy;
-	Value mFr;
+	Value mCx{ 50, Value::PERCENT };
+	Value mCy{ 50, Value::PERCENT };
+	Value mR{ 50, Value::PERCENT };
+	Value mFx{ mCx };
+	Value mFy{ mCy };
+	Value mFr{ 0, Value::PERCENT };
 
 	friend class Gradient;
 };
@@ -544,22 +577,22 @@ class CI_API Circle : public Node {
   public:
 	Circle( Node *parent ) : Node( parent ) {}
 	Circle( Node *parent, const XmlTree &xml );
-	
-	vec2		getCenter() const { return mCenter; }
-	void		setCenter( const vec2 &center ) { mCenter = center; }
-	float		getRadius() const { return mRadius; }
-	void		setRadius( float radius ) { mRadius = radius; }
 
-	virtual bool	containsPoint( const vec2 &pt ) const { return distance2( pt, mCenter ) < mRadius * mRadius; }
+	vec2  getCenter() const { return mCenter; }
+	void  setCenter( const vec2 &center ) { mCenter = center; }
+	float getRadius() const { return mRadius; }
+	void  setRadius( float radius ) { mRadius = radius; }
 
-	virtual Shape2d	getShape() const;
+	virtual bool containsPoint( const vec2 &pt ) const { return distance2( pt, mCenter ) < mRadius * mRadius; }
 
-  protected:	
-	virtual void	renderSelf( Renderer &renderer ) const;
-	virtual Rectf	calcBoundingBox() const { return Rectf( mCenter.x - mRadius, mCenter.y - mRadius, mCenter.x + mRadius, mCenter.y + mRadius ); }
+	virtual Shape2d getShape() const;
 
-	vec2		mCenter;
-	float		mRadius;	
+  protected:
+	virtual void  renderSelf( Renderer &renderer ) const;
+	virtual Rectf calcBoundingBox() const { return Rectf( mCenter.x - mRadius, mCenter.y - mRadius, mCenter.x + mRadius, mCenter.y + mRadius ); }
+
+	vec2  mCenter;
+	float mRadius;
 };
 
 //! SVG Ellipse element: http://www.w3.org/TR/SVG/shapes.html#EllipseElement
@@ -567,24 +600,24 @@ class CI_API Ellipse : public Node {
   public:
 	Ellipse( Node *parent ) : Node( parent ) {}
 	Ellipse( Node *parent, const XmlTree &xml );
-	
-	vec2		getCenter() const { return mCenter; }
-	void		setCenter( const vec2 &center ) { mCenter = center; }
-	float		getRadiusX() const { return mRadiusX; }
-	void		setRadiusX( float radiusX ) { mRadiusX = radiusX; }
-	float		getRadiusY() const { return mRadiusY; }
-	void		setRadiusY( float radiusY ) { mRadiusY = radiusY; }
 
-	bool 			containsPoint( const vec2 &pt ) const;
+	vec2  getCenter() const { return mCenter; }
+	void  setCenter( const vec2 &center ) { mCenter = center; }
+	float getRadiusX() const { return mRadiusX; }
+	void  setRadiusX( float radiusX ) { mRadiusX = radiusX; }
+	float getRadiusY() const { return mRadiusY; }
+	void  setRadiusY( float radiusY ) { mRadiusY = radiusY; }
 
-	virtual Shape2d	getShape() const;
+	bool containsPoint( const vec2 &pt ) const;
+
+	virtual Shape2d getShape() const;
 
   protected:
-	virtual void	renderSelf( Renderer &renderer ) const;
-	virtual Rectf	calcBoundingBox() const { return Rectf( mCenter.x - mRadiusX, mCenter.y - mRadiusY, mCenter.x + mRadiusX, mCenter.y + mRadiusY ); }
-  
-	vec2		mCenter;
-	float		mRadiusX, mRadiusY;
+	virtual void  renderSelf( Renderer &renderer ) const;
+	virtual Rectf calcBoundingBox() const { return Rectf( mCenter.x - mRadiusX, mCenter.y - mRadiusY, mCenter.x + mRadiusX, mCenter.y + mRadiusY ); }
+
+	vec2  mCenter;
+	float mRadiusX, mRadiusY;
 };
 
 //! SVG Path element: http://www.w3.org/TR/SVG/paths.html#PathElement
@@ -685,7 +718,7 @@ class CI_API Polyline : public Node {
 	virtual void	renderSelf( Renderer &renderer ) const;
 	virtual Rectf	calcBoundingBox() const { return Rectf( mPolyLine.getPoints() ); }
 		
-	PolyLine2f	mPolyLine;
+	PolyLine2f mPolyLine;
 };
 
 //! SVG Use Element, which instantiates a different element: http://www.w3.org/TR/SVG/struct.html#UseElement
@@ -711,23 +744,23 @@ class CI_API Image : public Node {
   public:
 	Image( Node *parent, const XmlTree &xml );
 
-	const Rectf&						getRect() const { return mRect; }
-	const std::shared_ptr<Surface8u>	getSurface() const { return mImage; }
+	const Rectf &                    getRect() const { return mRect; }
+	const std::shared_ptr<Surface8u> getSurface() const { return mImage; }
 
-	virtual bool	containsPoint( const vec2 &pt ) const { return mRect.contains( pt ); }
+	virtual bool containsPoint( const vec2 &pt ) const { return mRect.contains( pt ); }
 
   protected:
-	virtual void	renderSelf( Renderer &renderer ) const;
-	virtual Rectf	calcBoundingBox() const { return mRect; }
-  
-	static std::shared_ptr<Surface8u>	parseDataImage( const std::string &data );
+	virtual void  renderSelf( Renderer &renderer ) const;
+	virtual Rectf calcBoundingBox() const { return mRect; }
 
-	Rectf		mRect;
-	fs::path	mFilePath;
-	std::shared_ptr<Surface8u>	mImage;
+	static std::shared_ptr<Surface8u> parseDataImage( const std::string &data );
+
+	Rectf                      mRect;
+	fs::path                   mFilePath;
+	std::shared_ptr<Surface8u> mImage;
 };
 
-typedef std::shared_ptr<TextSpan>	TextSpanRef;
+typedef std::shared_ptr<TextSpan> TextSpanRef;
 
 //! SVG tspan Element. Generally owned by a svg::Text Node. http://www.w3.org/TR/SVG/text.html#TSpanElement
 class CI_API TextSpan : public Node {
@@ -737,69 +770,69 @@ class CI_API TextSpan : public Node {
 		Attributes() {}
 		Attributes( const XmlTree &xml );
 
-		void 	startRender( Renderer &renderer ) const;
-		void 	finishRender( Renderer &renderer ) const;
+		void startRender( Renderer &renderer ) const;
+		void finishRender( Renderer &renderer ) const;
 
-		void	setTextPen( const vec2 &textPen );
+		void setTextPen( const vec2 &textPen );
 
-		std::vector<Value>	mX, mY;
-		float				mDx, mDy;
-		std::vector<Value>	mRotate;
-		float				mTextLength;
-		float				mLengthAdjust;
-		std::vector<Value>	mLetterSpacing;
+		std::vector<Value> mX, mY;
+		float              mDx, mDy;
+		std::vector<Value> mRotate;
+		float              mTextLength;
+		float              mLengthAdjust;
+		std::vector<Value> mLetterSpacing;
 	};
 
 	TextSpan( Node *parent, const XmlTree &xml );
 	TextSpan( Node *parent, const std::string &spanString );
-	
-	const std::string&						getString() const { return mString; }
-	void									setString( const std::string &s ) { mString = s; }
-	text::Font*								getFont() const;
-	//! Returns a vector of glyph IDs and positions for the string, ignoring rotation. Cached and lazily calculated.
-	std::vector<std::pair<uint16_t,vec2>> 	getGlyphMeasures() const;
-	vec2									getTextPen() const;
-	void									setTextPen( const vec2 &textPen );
-	float									getRotation() const;
-	Value									getLetterSpacing() const;
 
-	std::vector<TextSpanRef>&				getSpans() { return mSpans; }
-	const std::vector<TextSpanRef>&			getSpans() const { return mSpans; }
+	const std::string &getString() const { return mString; }
+	void               setString( const std::string &s ) { mString = s; }
+	text::Font *       getFont() const;
+	//! Returns a vector of glyph IDs and positions for the string, ignoring rotation. Cached and lazily calculated.
+	std::vector<std::pair<uint16_t, vec2>> getGlyphMeasures() const;
+	vec2                                   getTextPen() const;
+	void                                   setTextPen( const vec2 &textPen );
+	float                                  getRotation() const;
+	Value                                  getLetterSpacing() const;
+
+	std::vector<TextSpanRef> &      getSpans() { return mSpans; }
+	const std::vector<TextSpanRef> &getSpans() const { return mSpans; }
 
   protected:
-	virtual void	renderSelf( Renderer &renderer ) const;
+	virtual void renderSelf( Renderer &renderer ) const;
 
-	bool							mIgnoreAttributes; // TextSpans that are actually the contents of Text's attributes should be ignored
-	Attributes						mAttributes;
-	std::string						mString;
-	mutable text::Font				*mFont;
-	mutable std::shared_ptr<std::vector<std::pair<uint16_t,vec2>>> mGlyphMeasures;
-	mutable std::shared_ptr<Shape2d>		mShape;
-	
-	std::vector<TextSpanRef>		mSpans;
-	
+	bool                                                            mIgnoreAttributes; // TextSpans that are actually the contents of Text's attributes should be ignored
+	Attributes                                                      mAttributes;
+	std::string                                                     mString;
+	mutable text::Font *                                            mFont;
+	mutable std::shared_ptr<std::vector<std::pair<uint16_t, vec2>>> mGlyphMeasures;
+	mutable std::shared_ptr<Shape2d>                                mShape;
+
+	std::vector<TextSpanRef> mSpans;
+
 	friend class Text;
 };
 
 //! SVG Text element. http://www.w3.org/TR/SVG/text.html#TextElement
 class CI_API Text : public Node {
   public:
-  	Text( Node *parent, const XmlTree &xml );
+	Text( Node *parent, const XmlTree &xml );
 
-	vec2 	getTextPen() const;
-	void	setTextPen( const vec2 &textPen ) { mAttributes.setTextPen( textPen ); }  
-	float	getRotation() const;
-	Value	getLetterSpacing() const;
-	
-	std::vector<TextSpanRef>&		getSpans() { return mSpans; }
-	const std::vector<TextSpanRef>&	getSpans() const { return mSpans; }
-	
+	vec2  getTextPen() const;
+	void  setTextPen( const vec2 &textPen ) { mAttributes.setTextPen( textPen ); }
+	float getRotation() const;
+	Value getLetterSpacing() const;
+
+	std::vector<TextSpanRef> &      getSpans() { return mSpans; }
+	const std::vector<TextSpanRef> &getSpans() const { return mSpans; }
+
   protected:
-	virtual void	renderSelf( Renderer &renderer ) const;
+	virtual void renderSelf( Renderer &renderer ) const;
 
-	TextSpan::Attributes		mAttributes;
+	TextSpan::Attributes mAttributes;
 
-	std::vector<TextSpanRef>	mSpans;
+	std::vector<TextSpanRef> mSpans;
 };
 
 //! Represents a group of SVG elements. http://www.w3.org/TR/SVG/struct.html#Groups
@@ -826,60 +859,89 @@ class CI_API Group : public Node, private Noncopyable {
 	const Node*				findNodeByIdContains( const std::string &idPartial, bool recurse = true ) const;
 	const Node*				findInAncestors( const std::string &elementId ) const override;
 	//! Returns a reference to the child named \a id. Throws svg::ExcChildNotFound if not found.
-	const Node&				getChild( const std::string &id ) const;
+	const Node &getChild( const std::string &id ) const;
 	//! Returns a reference to the child named \a id. Throws svg::ExcChildNotFound if not found.
-	Node&					getChild( const std::string &id ) { return const_cast<Node&>( const_cast<const Group*>( this )->getChild( id ) ); }
+	Node &getChild( const std::string &id ) { return const_cast<Node &>( const_cast<const Group *>( this )->getChild( id ) ); }
 	//! Returns a reference to the child named \a id. Throws svg::ExcChildNotFound if not found.
-	const Node&				operator/( const std::string &id ) const { return getChild( id ); }
-	
+	const Node &operator/( const std::string &id ) const { return getChild( id ); }
+
 	//! Returns the merged Shape2d for all children of the group
-	virtual Shape2d	getShape() const { return getMergedShape2d(); }
+	virtual Shape2d getShape() const { return getMergedShape2d(); }
 
-	//! Appends the merged Shape2d for the group to \a appentTo.	
-	void					appendMergedShape2d( Shape2d *appendTo ) const;
+	//! Appends the merged Shape2d for the group to \a appentTo.
+	void appendMergedShape2d( Shape2d *appendTo ) const;
 
 	//! Returns a reference to the list of the Group's children.
-	const std::list<Node*>&	getChildren() const { return mChildren; }
+	const std::list<Node *> &getChildren() const { return mChildren; }
 	//! Returns a reference to the list of the Group's children.
-	std::list<Node*>&		getChildren() { return mChildren; }
+	std::list<Node *> &getChildren() { return mChildren; }
 	//! Returns a reference to the child at \a index. Throws svg::ExcChildNotFound if \a index is out of range.
-	const Node&				getChild( size_t index ) const;
+	const Node &getChild( size_t index ) const;
 	//! Returns a reference to the child at \a index. Throws svg::ExcChildNotFound if \a index is out of range.
-	Node&					getChild( size_t index ) { return const_cast<Node&>( const_cast<const Group*>( this )->getChild( index ) ); }
+	Node &getChild( size_t index ) { return const_cast<Node &>( const_cast<const Group *>( this )->getChild( index ) ); }
 
 	//! Recursively iterates all Nodes in Group or Doc, passing each to \a fn to be optionally manipulated
-	virtual void		iterate( const std::function<void(Node*)> &fn );
+	virtual void iterate( const std::function<void( Node * )> &fn );
+
+	//!
+	bool hasStyles() const;
+	//!
+	const std::shared_ptr<Styles> &getStyles() const { return mStyles; }
+	//!
+	bool hasDefs() const;
+	//!
+	const std::shared_ptr<Defs> &getDefs() const { return mDefs; }
 
   protected:
-	Node*		nodeUnderPoint( const vec2 &absolutePoint, const mat3 &parentInverseMatrix ) const;
-	Shape2d		getMergedShape2d() const;
+	Node *  nodeUnderPoint( const vec2 &absolutePoint, const mat3 &parentInverseMatrix ) const;
+	Shape2d getMergedShape2d() const;
 
-	virtual void	renderSelf( Renderer &renderer ) const;
-	virtual Rectf	calcBoundingBox() const;
+	virtual void  renderSelf( Renderer &renderer ) const;
+	virtual Rectf calcBoundingBox() const;
 
-	virtual bool	isDrawable() const { return false; }
-	void 			parse( const XmlTree &xml );
-	Node*			create( const XmlTree &xml );
+	virtual bool isDrawable() const { return false; }
+	void         parse( const XmlTree &xml );
+	Node *       create( const XmlTree &xml );
 
-	std::list<Node*>		mChildren;
-	std::shared_ptr<Defs>	mDefs;
+	std::list<Node *>       mChildren;
+	std::shared_ptr<Defs>   mDefs;
+	std::shared_ptr<Styles> mStyles;
 };
 
-typedef std::shared_ptr<Defs>	DefsRef;
+typedef std::shared_ptr<Defs> DefsRef;
 //!
 class CI_API Defs : public Group {
   public:
 	Defs( Node *parent ) : Group( parent ) {}
 	Defs( Node *parent, const XmlTree &xml );
 
-	const Node *findNode(const std::string &id, bool recurse) const override;
+	const Node *findNode( const std::string &id, bool recurse ) const override;
 
   protected:
 	XmlTree mXml;
 };
 
+typedef std::shared_ptr<Styles> StylesRef;
+//!
+class CI_API Styles : public Group {
+  public:
+	Styles( Node *parent )
+		: Group( parent )
+	{
+	}
+	Styles( Node *parent, const XmlTree &xml );
 
-typedef std::shared_ptr<Doc>	DocRef;
+	bool   empty() const { return mStyleList.empty(); }
+	size_t size() const { return mStyleList.size(); }
+
+	Style findStyle( const std::string &id ) const;
+
+  protected:
+	std::unordered_map<std::string, Style> mStyleList;
+};
+
+
+typedef std::shared_ptr<Doc> DocRef;
 //! Represents an SVG Document. See SVG Document Structure http://www.w3.org/TR/SVG/struct.html
 class CI_API Doc : public Group {
   public:
@@ -887,31 +949,31 @@ class CI_API Doc : public Group {
 	Doc( const fs::path &filePath );
 	Doc( DataSourceRef dataSource, const fs::path &filePath = fs::path() );
 
-	static DocRef	create( const fs::path &filePath );
-	static DocRef	create( DataSourceRef dataSource, const fs::path &filePath = fs::path() );
-	static DocRef	createFromSvgz( DataSourceRef dataSource, const fs::path &filePath = fs::path() );
+	static DocRef create( const fs::path &filePath );
+	static DocRef create( DataSourceRef dataSource, const fs::path &filePath = fs::path() );
+	static DocRef createFromSvgz( DataSourceRef dataSource, const fs::path &filePath = fs::path() );
 
 	//! Returns the width of the document in pixels
-	int32_t		getWidth() const { return mWidth; }
+	int32_t getWidth() const { return mWidth; }
 	//! Returns the height of the document in pixels
-	int32_t		getHeight() const { return mHeight; }
+	int32_t getHeight() const { return mHeight; }
 	//! Returns the size of the document in pixels
-	ivec2		getSize() const { return ivec2( getWidth(), getHeight() ); }	
+	ivec2 getSize() const { return ivec2( getWidth(), getHeight() ); }
 	//! Returns the aspect ratio of the Doc (width / height)
-	float		getAspectRatio() const { return getWidth() / (float)getHeight(); }
+	float getAspectRatio() const { return getWidth() / (float)getHeight(); }
 	//! Returns the bounds of the Doc (0,0,width,height)
-	Area		getBounds() const { return Area( 0, 0, mWidth, mHeight ); }
-	
+	Area getBounds() const { return Area( 0, 0, mWidth, mHeight ); }
+
 	//! Returns the document's dots-per-inch. Currently hardcoded to 72.
-	float		getDpi() const { return 72.0f; }
-	
+	float getDpi() const { return 72.0f; }
+
 	//! Returns the top-most Node which contains \a pt. Returns NULL if no Node contains the point.
-	Node*		nodeUnderPoint( const vec2 &pt );
-	
+	Node *nodeUnderPoint( const vec2 &pt );
+
 	//! Utility function to load an image relative to the document. Caches results.
-	std::shared_ptr<Surface8u>	loadImage( fs::path relativePath );
+	std::shared_ptr<Surface8u> loadImage( fs::path relativePath );
   private:
-  	void 	loadDoc( DataSourceRef source, fs::path filePath );
+	void loadDoc( DataSourceRef source, fs::path filePath );
 
 	virtual void		renderSelf( Renderer &renderer ) const;
   

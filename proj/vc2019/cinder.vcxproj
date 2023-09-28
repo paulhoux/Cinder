@@ -761,6 +761,8 @@
     <ClCompile Include="..\..\src\cinder\CinderImGui.cpp" />
     <ClCompile Include="..\..\src\cinder\Clipboard.cpp" />
     <ClCompile Include="..\..\src\cinder\Color.cpp" />
+    <ClCompile Include="..\..\src\cinder\css\CSSParser.cpp" />
+    <ClCompile Include="..\..\src\cinder\css\CSSProperties.cpp" />
     <ClCompile Include="..\..\src\cinder\DataSource.cpp" />
     <ClCompile Include="..\..\src\cinder\DataTarget.cpp" />
     <ClCompile Include="..\..\src\cinder\Display.cpp" />
@@ -1088,6 +1090,8 @@
     <ClInclude Include="..\..\include\cinder\CaptureImplDirectShow.h" />
     <ClInclude Include="..\..\include\cinder\CinderAssert.h" />
     <ClInclude Include="..\..\include\cinder\CinderImGui.h" />
+    <ClInclude Include="..\..\include\cinder\css\CSSParser.h" />
+    <ClInclude Include="..\..\include\cinder\css\CSSProperties.h" />
     <ClInclude Include="..\..\include\cinder\Export.h" />
     <ClInclude Include="..\..\include\cinder\CinderGlm.h" />
     <ClInclude Include="..\..\include\cinder\Clipboard.h" />

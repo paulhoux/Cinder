@@ -271,6 +271,12 @@
     <Filter Include="Source Files\harfbuzz">
       <UniqueIdentifier>{ba777c45-0631-4b62-b679-33beafe4f382}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Header Files\css">
+      <UniqueIdentifier>{0dff649c-478e-45f8-ae42-c7fe5e387deb}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\css">
+      <UniqueIdentifier>{7f3cf5b2-f027-4d90-9012-421dfc795dc9}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\src\cinder\Area.cpp">
@@ -1142,6 +1148,12 @@
     </ClCompile>
     <ClCompile Include="..\..\src\cinder\nvp\NvPath.cpp">
       <Filter>Source Files\nvp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\cinder\css\CSSParser.cpp">
+      <Filter>Source Files\css</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\cinder\css\CSSProperties.cpp">
+      <Filter>Source Files\css</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -2353,6 +2365,12 @@
     </ClInclude>
     <ClInclude Include="..\..\include\cinder\nvp\NvPath.h">
       <Filter>Header Files\nvp</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\cinder\css\CSSParser.h">
+      <Filter>Header Files\css</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\cinder\css\CSSProperties.h">
+      <Filter>Header Files\css</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
