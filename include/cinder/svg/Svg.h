@@ -375,6 +375,8 @@ class CI_API Node {
 	class Doc *getDoc() const;
 	//! Returns the immediate parent of this node
 	const Node *getParent() const { return mParent; }
+	//! Returns the tag of this Node when present (e.g. 'svg').
+	const std::string &getTag() const { return mTag; }
 	//! Returns the ID of this Node when present.
 	const std::string &getId() const { return mId; }
 	//! Returns a DOM-style path to this node.
@@ -400,15 +402,15 @@ class CI_API Node {
 	virtual const Node *findInAncestors( const std::string &elementId ) const;
 	//! Finds the svg::Paint node with ID \a elementId amongst this Node's ancestors. Returns a default svg::Paint instance on failure.
 	Paint findPaintInAncestors( const std::string &paintName ) const;
-	//! Recursively searches for a <defs> node and returns it if found. Returns NULL on failure.
-	const Defs *findDefsInAncestors() const;
+	//! Recursively searches for a <tag> node and returns the first it finds. Returns NULL on failure.
+	virtual const Node *findTagInAncestors( const std::string &tag ) const;
 
 	//! Returns whether this Node specifies a transformation
 	bool specifiesTransform() const { return mSpecifiesTransform; }
 	//! Returns the local transformation of this node. Returns identity if the Node's transform isn't specified.
 	mat3 getTransform() const { return mTransform; }
 	//! Sets the local transformation of this node.
-	void				setTransform( const mat3 &transform ) { mTransform = transform; mSpecifiesTransform = true; }
+	void setTransform( const mat3 &transform ) { mTransform = transform; mSpecifiesTransform = true; }
 	//! Removes the local transformation of this node, effectively making it the identity matrix.
 	void unspecifyTransform() { mSpecifiesTransform = false; }
 	//! Returns the inverse of the local transformation of this node. Returns identity if the Node's transform isn't specified.
@@ -481,6 +483,7 @@ class CI_API Node {
 	void               parseStyle( const std::string &value );
 	
 	Node *        mParent;
+	std::string   mTag;
 	std::string   mId;
 	bool          mSpecifiesTransform;
 	mat3          mTransform;
@@ -859,7 +862,12 @@ class CI_API Group : public Node, private Noncopyable {
 	const T*				findByIdContains( const std::string &idPartial ) const { return dynamic_cast<const T*>( findNodeByIdContains( idPartial ) ); }
 	//! Recursively searches for a child element whose name contains \a idPartial. Returns NULL on failure. (null_ptr later?)
 	const Node*				findNodeByIdContains( const std::string &idPartial, bool recurse = true ) const;
+	//! Recursively searches for a child element with the specified \a tag. Returns NULL on failure.
+	virtual const Node*		findNodeByTag( const std::string &tag, bool recurse = true ) const;
+	//! Finds the node with ID \a elementId amongst this Node's ancestors. Returns NULL on failure.
 	const Node*				findInAncestors( const std::string &elementId ) const override;
+	//! Recursively searches for a <tag> node and returns the first it finds. Returns NULL on failure.
+	const Node*				findTagInAncestors( const std::string &elementTag ) const override;
 	//! Returns a reference to the child named \a id. Throws svg::ExcChildNotFound if not found.
 	const Node &			getChild( const std::string &id ) const;
 	//! Returns a reference to the child named \a id. Throws svg::ExcChildNotFound if not found.
@@ -896,8 +904,7 @@ class CI_API Group : public Node, private Noncopyable {
 	virtual void parse( const XmlTree &xml );
 	Node *       create( const XmlTree &xml );
 
-	std::list<Node *>       mChildren;
-	std::shared_ptr<Defs>   mDefs;
+	std::list<Node *> mChildren;
 
 	friend class Node;
 };
@@ -910,30 +917,24 @@ class CI_API Defs : public Group {
 	Defs( Node *parent, const XmlTree &xml );
 
 	const Node *findNode( const std::string &id, bool recurse ) const override;
-
-	const std::shared_ptr<Styles> &getStyles() const { return mStyles; }
-
+	
   protected:
-	void parse(const XmlTree &xml) override;
-
 	XmlTree mXml;
-	std::shared_ptr<Styles> mStyles;
 };
 
 typedef std::shared_ptr<Styles> StylesRef;
 //!
-class CI_API Styles : public Group {
+class CI_API Styles : public Node {
   public:
-	Styles( Node *parent )
-		: Group( parent )
-	{
-	}
+	Styles( Node *parent ) : Node( parent ) {}
 	Styles( Node *parent, const XmlTree &xml );
 
 	bool   empty() const { return mStyleList.empty(); }
 	size_t size() const { return mStyleList.size(); }
 
 	Style findStyle( const std::string &id ) const;
+
+	void renderSelf( Renderer &renderer ) const override {}
 
   protected:
 	std::unordered_map<std::string, Style> mStyleList;

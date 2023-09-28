@@ -406,12 +406,8 @@ const std::vector<std::string> &Style::getFontFamiliesDefault()
 
 void Style::parseClassAttribute( const std::string &stylePropertyString, const Node *parent )
 {
-	// Find styles information.
-	std::shared_ptr<Styles> styles;
-
-	const Defs *defs = parent->findDefsInAncestors();
-	if( defs )
-		styles = defs->getStyles();
+	// Find <style> tag in ancestors.
+	auto styles = dynamic_cast<const Styles*>( parent->findTagInAncestors( "style") );
 
 	// Merge styles.
 	if( styles )
@@ -799,6 +795,7 @@ Node::Node( Node *parent, const XmlTree &xml )
 	: mParent( parent ), mStyle( xml, this ), mBoundingBoxCached( false )
 {
 	mSpecifiesTransform = false;
+	mTag = xml.getTag();
 	mId = xml["id"];
 	if( xml.hasAttribute( "transform" ) ) {
 		mSpecifiesTransform = true;
@@ -1257,13 +1254,12 @@ Paint Node::findPaintInAncestors( const std::string &paintName ) const
 		return Paint();
 }
 
-const Defs * Node::findDefsInAncestors() const
+const Node * Node::findTagInAncestors( const std::string &elementTag ) const
 {
-	const Group* group = dynamic_cast<const Group*>(this);
-	if( group && group->mDefs )
-		return group->mDefs.get();
+	if( mTag == elementTag )
+		return this;
 	else if( mParent )
-		return mParent->findDefsInAncestors();
+		return mParent->findTagInAncestors( elementTag );
 	else
 		return 0;
 }
@@ -2048,22 +2044,16 @@ Group::~Group()
 void Group::parse( const XmlTree &xml )
 {
 	for( XmlTree::ConstIter treeIt = xml.begin(); treeIt != xml.end(); ++treeIt ) {
-		if( treeIt->getTag() == "defs" ) {
-			mDefs = std::make_shared<Defs>( this, *treeIt );
-		}
-		else if(treeIt->getTag() == "style") {
-			// Skip <style> nodes.
-		}
-		else {
-			Node *node = create( *treeIt );
-			if( node )
-				mChildren.push_back( node );
-		}
+		Node *node = create( *treeIt );
+		if( node )
+			mChildren.push_back( node );
 	}
 }
 
 Node *Group::create( const XmlTree &xml )
 {
+	if( xml.getTag() == "defs" )
+		return new Defs( this, xml );
 	if( xml.getTag() == "g" )
 		return new Group( this, xml );
 	if( xml.getTag() == "path" )
@@ -2088,6 +2078,8 @@ Node *Group::create( const XmlTree &xml )
 		return new LinearGradient( this, xml );
 	if( xml.getTag() == "radialGradient" )
 		return new RadialGradient( this, xml );
+	if( xml.getTag() == "style" )
+		return new Styles( this, xml );
 	if( xml.getTag() == "text" )
 		return new Text( this, xml );
 
@@ -2100,12 +2092,6 @@ const Node *Group::findNodeByIdContains( const std::string &idPartial, bool recu
 		if( ( *childIt )->getId().find( idPartial ) != string::npos ) {
 			return *childIt;
 		}
-	}
-
-	if( mDefs ) {
-		const Node *result = mDefs->findNodeByIdContains( idPartial, recurse );
-		if( result )
-			return result;
 	}
 
 	if( recurse ) {
@@ -2122,6 +2108,33 @@ const Node *Group::findNodeByIdContains( const std::string &idPartial, bool recu
 	return NULL;
 }
 
+const Node * Group::findNodeByTag( const std::string &tag, bool recurse ) const
+{
+	// see if any immediate children have tag 'tag'
+	for( list<Node *>::const_iterator childIt = mChildren.begin(); childIt != mChildren.end(); ++childIt ) {
+		if( ( *childIt )->getTag() == tag ) {
+			return *childIt;
+		}
+	}
+
+	// see if any groups contain children with tag 'tag'
+	if( recurse ) {
+		for( list<Node *>::const_iterator childIt = mChildren.begin(); childIt != mChildren.end(); ++childIt ) {
+			auto childItPtr = *childIt;
+			// Using typeid is faster than dynamic cast, but does not match derived classes. So,
+			// we have to explicitly check for Defs as well.
+			if( typeid( *childItPtr ) == typeid( Group ) || typeid( *childItPtr ) == typeid( Defs ) ) {
+				Group *     group = static_cast<Group *>( *childIt );
+				const Node *result = group->findNodeByTag( tag );
+				if( result )
+					return result;
+			}
+		}
+	}
+
+	return NULL;
+}
+
 const Node *Group::findNode( const std::string &id, bool recurse ) const
 {
 	// see if any immediate children are named 'id'
@@ -2131,18 +2144,13 @@ const Node *Group::findNode( const std::string &id, bool recurse ) const
 		}
 	}
 
-	// see if any members of our defs are named 'id'
-	if( mDefs ) {
-		const Node *result = mDefs->findNode( id, true );
-		if( result )
-			return result;
-	}
-
 	// see if any groups contain children named 'id'
 	if( recurse ) {
 		for( list<Node *>::const_iterator childIt = mChildren.begin(); childIt != mChildren.end(); ++childIt ) {
 			auto childItPtr = *childIt;
-			if( typeid( *childItPtr ) == typeid( Group ) ) {
+			// Using typeid is faster than dynamic cast, but does not match derived classes. So,
+			// we have to explicitly check for Defs as well.
+			if( typeid( *childItPtr ) == typeid( Group ) || typeid( *childItPtr ) == typeid( Defs ) ) {
 				Group *     group = static_cast<Group *>( *childIt );
 				const Node *result = group->findNode( id );
 				if( result )
@@ -2188,10 +2196,24 @@ const Node *Group::findInAncestors( const std::string &elementId ) const
 
 	if( getId() == elementId )
 		return this;
-	else if( ( result = findNode( elementId, false ) ) != 0 )
+	else if( ( result = findNode( elementId, true ) ) != 0 )
 		return result;
 	else if( getParent() )
 		return getParent()->findInAncestors( elementId );
+	else
+		return 0;
+}
+
+const Node * Group::findTagInAncestors( const std::string &elementTag ) const
+{
+	const Node *result;
+
+	if( getTag() == elementTag )
+		return this;
+	else if( ( result = findNodeByTag( elementTag, true ) ) != 0 )
+		return result;
+	else if( getParent() )
+		return getParent()->findTagInAncestors( elementTag );
 	else
 		return 0;
 }
@@ -2673,24 +2695,10 @@ const Node *Defs::findNode( const std::string &id, bool recurse ) const
 	return result;
 }
 
-void Defs::parse( const XmlTree &xml )
-{
-	for( XmlTree::ConstIter treeIt = xml.begin(); treeIt != xml.end(); ++treeIt ) {
-		if( treeIt->getTag() == "style" ) {
-			mStyles = std::make_shared<Styles>( this, *treeIt );
-		}
-		else {
-			Node *node = create( *treeIt );
-			if( node )
-				mChildren.push_back( node );
-		}
-	}
-}
-
 ////////////////////////////////////////////////////////////////////////////////////
 // Styles
 Styles::Styles( Node *parent, const XmlTree &xml )
-	: Group( parent )
+	: Node( parent, xml )
 {
 	const auto value = trim( xml.getValue() );
 
