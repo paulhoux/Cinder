@@ -41,10 +41,13 @@
 
 namespace cinder { namespace svg {
 
-typedef enum { FILL_RULE_NONZERO, FILL_RULE_EVENODD } FillRule;
-typedef enum { LINE_CAP_BUTT, LINE_CAP_ROUND, LINE_CAP_SQUARE } LineCap;
-typedef enum { LINE_JOIN_MITER, LINE_JOIN_ROUND, LINE_JOIN_BEVEL } LineJoin;
-typedef enum { WEIGHT_100, WEIGHT_200, WEIGHT_300, WEIGHT_400, WEIGHT_NORMAL = WEIGHT_400, WEIGHT_500, WEIGHT_600, WEIGHT_700, WEIGHT_BOLD = WEIGHT_700, WEIGHT_800, WEIGHT_900 } FontWeight;
+using FillRule = enum { FILL_RULE_NONZERO, FILL_RULE_EVENODD };
+using LineCap = enum { LINE_CAP_BUTT, LINE_CAP_ROUND, LINE_CAP_SQUARE };
+using LineJoin = enum { LINE_JOIN_MITER, LINE_JOIN_ROUND, LINE_JOIN_BEVEL };
+using FontWeight = enum { WEIGHT_100, WEIGHT_200, WEIGHT_300, WEIGHT_400, WEIGHT_NORMAL = WEIGHT_400, WEIGHT_500, WEIGHT_600, WEIGHT_700, WEIGHT_BOLD = WEIGHT_700, WEIGHT_800, WEIGHT_900 };
+
+using Align = enum { NONE, X_MIN_Y_MIN, X_MID_Y_MIN, X_MAX_Y_MIN, X_MIN_Y_MID, X_MID_Y_MID, X_MAX_Y_MID, X_MIN_Y_MAX, X_MID_Y_MAX, X_MAX_Y_MAX };
+using MeetOrSlice = enum { MEET, SLICE };
 
 class Circle;
 class ClipPath;
@@ -58,12 +61,13 @@ class Node;
 class Path;
 class Polygon;
 class Polyline;
+class PreserveAspectRatio;
 class Rect;
 class Style;
 class Styles;
 class TextSpan;
 
-typedef std::function<bool( const Node &, svg::Style * )> RenderVisitor;
+using RenderVisitor = std::function<bool ( const Node &, svg::Style * )>;
 
 //! Base class from which Renderers are derived.
 class CI_API Renderer {
@@ -505,7 +509,7 @@ class CI_API Node {
 //! Base class for SVG Gradients. See SVG Gradients: http://www.w3.org/TR/SVG/pservers.html#Gradients
 class CI_API Gradient : public Node {
   public:
-	typedef enum { PAD, REFLECT, REPEAT } SpreadMethod;
+	using SpreadMethod = enum { PAD, REFLECT, REPEAT };
 
 	Gradient( Node *parent, const XmlTree &xml );
 
@@ -752,15 +756,34 @@ class CI_API Use : public Node {
 	const Node *mReferenced;
 };
 
+//!
+class CI_API PreserveAspectRatio {
+public:
+	PreserveAspectRatio() = default;
+
+	explicit PreserveAspectRatio( Align align, MeetOrSlice meetOrSlice = MEET )
+		: align( align )
+		, meetOrSlice( meetOrSlice )
+	{
+	}
+
+	explicit PreserveAspectRatio( const std::string &value );
+
+	mat3 calcTransform( const Rectf &element, const Rectf &viewBox ) const;
+
+	Align       align{ X_MID_Y_MID };
+	MeetOrSlice meetOrSlice{ MEET };
+};
+
 //! SVG Image Element. Represents an unpremultiplied bitmap. http://www.w3.org/TR/SVG/struct.html#ImageElement
 class CI_API Image : public Node {
   public:
 	Image( Node *parent, const XmlTree &xml );
 
-	const Rectf &              getRect() const { return mRect; }
+	const Rectf &              getRect() const { return mBounds; }
 	std::shared_ptr<Surface8u> getSurface() const { return mImage; }
 
-	bool containsPoint( const vec2 &pt ) const override { return mRect.contains( pt ); }
+	bool containsPoint( const vec2 &pt ) const override { return mBounds.contains( pt ); }
 
 	//! Returns whether a clip-path was defined for this image.
 	bool specifiesClipPath() const { return !mClipPathId.empty(); }
@@ -769,19 +792,17 @@ class CI_API Image : public Node {
 
   protected:
 	void  renderSelf( Renderer &renderer ) const override;
-	Rectf calcBoundingBox() const override { return mRect; }
+	Rectf calcBoundingBox() const override { return mBounds; }
 
 	static std::shared_ptr<Surface8u> parseDataImage( const std::string &data );
 
-	Rectf                      mRect;
+	Rectf                      mBounds;
 	fs::path                   mFilePath;
 	std::shared_ptr<Surface8u> mImage;
 	std::string                mClipPathId;
-
-	// TODO preserveAspectRatio
 };
 
-typedef std::shared_ptr<TextSpan> TextSpanRef;
+using TextSpanRef = std::shared_ptr<TextSpan>;
 
 //! SVG tspan Element. Generally owned by a svg::Text Node. http://www.w3.org/TR/SVG/text.html#TSpanElement
 class CI_API TextSpan : public Node {
@@ -993,11 +1014,11 @@ class CI_API Styles : public Node {
 };
 
 
-typedef std::shared_ptr<Doc> DocRef;
+using DocRef = std::shared_ptr<Doc>;
 //! Represents an SVG Document. See SVG Document Structure http://www.w3.org/TR/SVG/struct.html
 class CI_API Doc : public Group {
   public:
-	Doc() : Group( 0 ), mWidth( 0 ), mHeight( 0 ) {}
+	Doc();
 	Doc( const fs::path &filePath );
 	Doc( const DataSourceRef &dataSource, const fs::path &filePath = fs::path() );
 
@@ -1006,15 +1027,15 @@ class CI_API Doc : public Group {
 	static DocRef createFromSvgz( const DataSourceRef &dataSource, const fs::path &filePath = fs::path() );
 
 	//! Returns the width of the document in pixels
-	int32_t getWidth() const { return mWidth; }
+	float getWidth() const { return mBounds.getWidth(); }
 	//! Returns the height of the document in pixels
-	int32_t getHeight() const { return mHeight; }
+	float getHeight() const { return mBounds.getHeight(); }
 	//! Returns the size of the document in pixels
-	ivec2 getSize() const { return ivec2( getWidth(), getHeight() ); }
+	vec2 getSize() const { return { getWidth(), getHeight() }; }
 	//! Returns the aspect ratio of the Doc (width / height)
-	float getAspectRatio() const { return getWidth() / (float)getHeight(); }
+	float getAspectRatio() const { return getWidth() / getHeight(); }
 	//! Returns the bounds of the Doc (0,0,width,height)
-	Area getBounds() const { return Area( 0, 0, mWidth, mHeight ); }
+	const Rectf &getBounds() const { return mBounds; }
 
 	//! Returns the document's dots-per-inch. Currently hardcoded to 72.
 	float getDpi() const { return 72.0f; }
@@ -1033,9 +1054,9 @@ class CI_API Doc : public Group {
 	std::shared_ptr<XmlTree>                       mXmlTree;
 	std::map<fs::path, std::shared_ptr<Surface8u>> mImageCache;
 
-	fs::path mFilePath;
-	Area     mViewBox;
-	int32_t			mWidth, mHeight;
+	fs::path            mFilePath;
+	Rectf               mBounds;
+	Rectf               mViewBox;
 };
 
 //! SVG Exception base-class

@@ -667,10 +667,10 @@ class CI_API Svg {
 	explicit Svg( const DataSourceRef &src );
 	explicit Svg( const svg::DocRef &svg );
 
-	int32_t getWidth() const { return mDoc ? mDoc->getWidth() : 0; }
-	int32_t getHeight() const { return mDoc ? mDoc->getHeight() : 0; }
-	ivec2   getSize() const { return mDoc ? mDoc->getSize() : ivec2{}; }
-	Area    getBounds() const { return mDoc ? mDoc->getBounds() : Area{}; }
+	float getWidth() const { return mDoc ? mDoc->getWidth() : 0.0f; }
+	float getHeight() const { return mDoc ? mDoc->getHeight() : 0.0f; }
+	vec2  getSize() const { return mDoc ? mDoc->getSize() : vec2{}; }
+	Rectf getBounds() const { return mDoc ? mDoc->getBounds() : Rectf{}; }
 
 	//! Returns whether any paths are defined.
 	bool empty() const { return mPaths.empty(); }

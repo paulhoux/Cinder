@@ -1423,7 +1423,7 @@ void LinearGradient::parse( const XmlTree &xml )
 			}
 		}
 	}
-	
+
 	if( xml.hasAttribute( "x1" ) )
 		mX1 = Value::parse( xml.getAttributeValue<string>( "x1" ) );
 	if( xml.hasAttribute( "y1" ) )
@@ -2442,16 +2442,77 @@ void Use::renderSelf( Renderer &renderer ) const
 }
 
 ////////////////////////////////////////////////////////////////////////////////////
+// PreserveAspectRatio
+PreserveAspectRatio::PreserveAspectRatio( const std::string &value )
+{
+	const auto keywords = split( trim( toLower( value ) ), ' ', true );
+	if( keywords.empty() )
+		return; // Error!
+
+	if( keywords[0] == "none" )
+		align = NONE;
+	else if( keywords[0] == "xminymin" )
+		align = X_MIN_Y_MIN;
+	else if( keywords[0] == "xmidymin" )
+		align = X_MID_Y_MIN;
+	else if( keywords[0] == "xmaxymin" )
+		align = X_MAX_Y_MIN;
+	else if( keywords[0] == "xminymid" )
+		align = X_MIN_Y_MID;
+	else if( keywords[0] == "xmidymid" )
+		align = X_MID_Y_MID;
+	else if( keywords[0] == "xmaxymid" )
+		align = X_MAX_Y_MID;
+	else if( keywords[0] == "xminymax" )
+		align = X_MIN_Y_MIN;
+	else if( keywords[0] == "xmidymaxn" )
+		align = X_MID_Y_MAX;
+	else if( keywords[0] == "xmaxymax" )
+		align = X_MAX_Y_MAX;
+
+	if( keywords.size() > 1 ) {
+		if( keywords[1] == "slice" )
+			meetOrSlice = SLICE;
+	}
+}
+
+mat3 PreserveAspectRatio::calcTransform( const Rectf &element, const Rectf &viewBox ) const
+{
+	// See: https://svgwg.org/svg2-draft/coords.html#ComputingAViewportsTransform
+	mat3 m33;
+
+	m33[0][0] = element.getWidth() / viewBox.getWidth();          // scale-x
+	m33[1][1] = element.getHeight() / viewBox.getHeight();        // scale-y
+	if( align != NONE && meetOrSlice == MEET )                    //
+		m33[0][0] = m33[1][1] = glm::min( m33[0][0], m33[1][1] ); //
+	else if( align != NONE && meetOrSlice == SLICE )              //
+		m33[0][0] = m33[1][1] = glm::max( m33[0][0], m33[1][1] ); //
+	m33[2][0] = element.x1 - ( viewBox.x1 * m33[0][0] );          // translate-x
+	m33[2][1] = element.y1 - ( viewBox.y1 * m33[1][1] );          // translate-y
+
+	if( align == X_MID_Y_MIN || align == X_MID_Y_MID || align == X_MID_Y_MAX )
+		m33[2][0] += ( element.getWidth() - viewBox.getWidth() * m33[0][0] ) * 0.5f;
+	else if( align == X_MAX_Y_MIN || align == X_MAX_Y_MID || align == X_MAX_Y_MAX )
+		m33[2][0] += element.getWidth() - viewBox.getWidth() * m33[0][0];
+	if( align == X_MIN_Y_MID || align == X_MID_Y_MID || align == X_MAX_Y_MID )
+		m33[2][1] += ( element.getHeight() - viewBox.getHeight() * m33[1][1] ) * 0.5f;
+	else if( align == X_MIN_Y_MAX || align == X_MID_Y_MAX || align == X_MAX_Y_MAX )
+		m33[2][1] += element.getHeight() - viewBox.getHeight() * m33[1][1];
+
+	return m33;
+}
+
+////////////////////////////////////////////////////////////////////////////////////
 // Image
 Image::Image( Node *parent, const XmlTree &xml )
 	: Node( parent, xml )
 {
-	mRect.x1 = xml.getAttributeValue<float>( "x", 0 );
-	mRect.y1 = xml.getAttributeValue<float>( "y", 0 );
+	mBounds.x1 = xml.getAttributeValue<float>( "x", 0 );
+	mBounds.y1 = xml.getAttributeValue<float>( "y", 0 );
 	auto width = xml.getAttributeValue<float>( "width", 0 );
 	auto height = xml.getAttributeValue<float>( "height", 0 );
-	mRect.x2 = mRect.x1 + width;
-	mRect.y2 = mRect.y1 + height;
+	mBounds.x2 = mBounds.x1 + width;
+	mBounds.y2 = mBounds.y1 + height;
 
 	std::string ref;
 	if( xml.hasAttribute( "xlink:href" ) )
@@ -2466,7 +2527,13 @@ Image::Image( Node *parent, const XmlTree &xml )
 
 	if( !mFilePath.empty() )
 		mImage = getDoc()->loadImage( mFilePath );
-	
+
+	// TODO: NOT WORKING YET, NEED TO FIGURE OUT THE CORRECT TRANSFORM MATRIX
+	//if( xml.hasAttribute( "preserveAspectRatio" ) )
+	//	setTransform( PreserveAspectRatio( xml.getAttributeValue<string>( "preserveAspectRatio" ) ).calcTransform( mBounds, mImage->getBounds() ) );
+	//else
+	//	setTransform( PreserveAspectRatio().calcTransform( mBounds, mImage->getBounds() ) );
+
 	if( xml.hasAttribute( "clip-path" ) ) {
 		auto value = xml.getAttributeValue<std::string>( "clip-path" );
 
@@ -2859,7 +2926,7 @@ const Node *Defs::findNode( const std::string &id, bool recurse ) const
 ClipPath::ClipPath( Node *parent, const XmlTree &xml )
 	: Path( parent, xml )
 {
-	CI_LOG_W("SVG contains clip paths, which are not fully implemented yet.");
+	CI_LOG_W( "SVG contains clip paths, which are not fully implemented yet." );
 
 	parse( xml );
 }
@@ -2937,14 +3004,21 @@ Style Styles::findStyle( const std::string &id ) const
 
 ////////////////////////////////////////////////////////////////////////////////////
 // Doc
+Doc::Doc(): Group( nullptr )
+            , mBounds( 0, 0, 0, 0 )
+{
+}
+
 Doc::Doc( const fs::path &filePath )
 	: Group( nullptr )
+	, mBounds( 0, 0, 0, 0 )
 {
 	loadDoc( loadFile( filePath ), filePath );
 }
 
 Doc::Doc( const DataSourceRef &dataSource, const fs::path &filePath )
 	: Group( nullptr )
+	, mBounds( 0, 0, 0, 0 )
 {
 	fs::path relativePath = filePath;
 	if( filePath.empty() )
@@ -2985,45 +3059,54 @@ void Doc::loadDoc( const DataSourceRef &source, const fs::path &filePath )
 	if( xml.hasAttribute( "viewBox" ) ) {
 		auto        vbox = xml.getAttributeValue<string>( "viewBox" );
 		const char *vbCPtr = vbox.c_str();
-		mViewBox.x1 = static_cast<int>( parseFloat( &vbCPtr ) );
-		mViewBox.y1 = static_cast<int>( parseFloat( &vbCPtr ) );
-		mViewBox.x2 = mViewBox.x1 + static_cast<int>( parseFloat( &vbCPtr ) );
-		mViewBox.y2 = mViewBox.y1 + static_cast<int>( parseFloat( &vbCPtr ) );
+		mViewBox.x1 = parseFloat( &vbCPtr );
+		mViewBox.y1 = parseFloat( &vbCPtr );
+		mViewBox.x2 = mViewBox.x1 + parseFloat( &vbCPtr );
+		mViewBox.y2 = mViewBox.y1 + parseFloat( &vbCPtr );
 	}
 	else {
-		mViewBox = Area( 0, 0, 0, 0 );
+		mViewBox = Rectf( 0, 0, 0, 0 );
+	}
+	if( xml.hasAttribute( "x" ) ) {
+		Value val = Value::parse( xml.getAttributeValue<string>( "x" ) );
+		if( val.isPercent() )
+			mBounds.x1 = val.asUser( 1 ) * mViewBox.getWidth();
+		else
+			mBounds.x1 = val.asUser( 100, getDpi() );
+	}
+	if( xml.hasAttribute( "y" ) ) {
+		Value val = Value::parse( xml.getAttributeValue<string>( "y" ) );
+		if( val.isPercent() )
+			mBounds.y1 = val.asUser( 1 ) * mViewBox.getHeight();
+		else
+			mBounds.y1 = val.asUser( 100, getDpi() );
 	}
 	if( xml.hasAttribute( "width" ) ) {
 		Value val = Value::parse( xml.getAttributeValue<string>( "width" ) );
 		if( val.isPercent() )
-			mWidth = static_cast<int>( val.asUser() * mViewBox.getWidth() / 100 );
+			mBounds.x2 = mBounds.x1 + val.asUser( 1 ) * mViewBox.getWidth();
 		else
-			mWidth = static_cast<int>( val.asUser( 100, getDpi() ) );
+			mBounds.x2 = mBounds.x1 + val.asUser( 100, getDpi() );
 	}
 	else
-		mWidth = mViewBox.getWidth();
+		mBounds.x2 = mBounds.x1 + mViewBox.getWidth();
 	if( xml.hasAttribute( "height" ) ) {
 		Value val = Value::parse( xml.getAttributeValue<string>( "height" ) );
 		if( val.isPercent() )
-			mHeight = static_cast<int>( val.asUser() * mViewBox.getHeight() / 100 );
+			mBounds.y2 = mBounds.y1 + val.asUser( 1 ) * mViewBox.getHeight();
 		else
-			mHeight = static_cast<int>( val.asUser( 100, getDpi() ) );
+			mBounds.y2 = mBounds.y1 + val.asUser( 100, getDpi() );
 	}
 	else
-		mHeight = mViewBox.getHeight();
+		mBounds.y2 = mBounds.y1 + mViewBox.getHeight();
 
-	bool needsViewBoxMapping = mViewBox.getWidth() > 0 && mViewBox.getHeight() > 0 && mWidth > 0 && mHeight > 0;
+	bool needsViewBoxMapping = mViewBox.getWidth() > 0 && mViewBox.getHeight() > 0 && getWidth() > 0 && getHeight() > 0;
 	if( needsViewBoxMapping ) {
-		mat3 m33;
-		m33[0][0] = mWidth / float( mViewBox.getWidth() );
-		m33[1][1] = mHeight / float( mViewBox.getHeight() );
-		m33[2][0] = float( -mViewBox.x1 );
-		m33[2][1] = float( -mViewBox.y1 );
-		mTransform = m33;
-		mSpecifiesTransform = true;
+		if( xml.hasAttribute( "preserveAspectRatio" ) )
+			setTransform( PreserveAspectRatio( xml.getAttributeValue<string>( "preserveAspectRatio" ) ).calcTransform( mBounds, mViewBox ) );
+		else
+			setTransform( PreserveAspectRatio().calcTransform( mBounds, mViewBox ) );
 	}
-	else
-		mTransform = mat3();
 
 	//// we can't parse the group w/o having parsed the viewBox, dimensions, etc, so we have to do this manually:
 	// if( xml.hasChild( "switch" ) )		// when saved with "preserve Illustrator editing capabilities", svg data is inside a "switch"

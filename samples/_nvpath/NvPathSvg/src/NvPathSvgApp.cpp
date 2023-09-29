@@ -1,4 +1,5 @@
 #include "cinder/CanvasUi.h"
+#include "cinder/Log.h"
 #include "cinder/app/App.h"
 #include "cinder/app/RendererGl.h"
 #include "cinder/gl/gl.h"
@@ -452,7 +453,7 @@ void NvPathSvgApp::draw()
 
 			// Scale SVG to canvas.
 			if( mSvg.getWidth() > 0 && mSvg.getHeight() > 0 ) {
-				auto bounds = Area::proportionalFit( mSvg.getBounds(), mCanvas.getBounds(), true, true );
+				auto bounds = Area::proportionalFit( Area( mSvg.getBounds() ), mCanvas.getBounds(), true, true );
 				auto scale = vec2( bounds.getSize() ) / vec2( mSvg.getSize() );
 				auto offset = bounds.getUL();
 
@@ -525,6 +526,8 @@ void NvPathSvgApp::fileDrop( FileDropEvent event )
 
 bool NvPathSvgApp::loadSvgFile( const fs::path &file )
 {
+	Timer t(true);
+
 	if( file.extension() == ".svgz" )
 		mDoc = svg::Doc::createFromSvgz( loadFile( file ) );
 	else if( file.extension() == ".svg" )
@@ -532,12 +535,16 @@ bool NvPathSvgApp::loadSvgFile( const fs::path &file )
 	else
 		return false;
 
+	CI_LOG_I("Parsing SVG took " << t.getSeconds() << "s.");
+
 	mFilePath = file;
 
 	mCanvasUi.reset();
 	mRenderer.clear();
 
+	t.start();
 	mSvg = nvp::Svg( mDoc );
+	CI_LOG_I("Preparing SVG for path rendering took " << t.getSeconds() << "s.");
 
 	return true;
 }
