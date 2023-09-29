@@ -537,9 +537,7 @@ Path2d Path2d::roundedRectangle( float x, float y, float width, float height, fl
 {
 	if( approxZero( rx ) || approxZero( ry ) )
 		return rectangle( x, y, width, height );
-
-	const float s = sqrtf( 2.0f );
-
+	
 	Path2d shape;
 	shape.moveTo( x + rx, y );
 	shape.lineTo( x + width - rx, y );
