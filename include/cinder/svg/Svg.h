@@ -46,21 +46,22 @@ typedef enum { LINE_CAP_BUTT, LINE_CAP_ROUND, LINE_CAP_SQUARE } LineCap;
 typedef enum { LINE_JOIN_MITER, LINE_JOIN_ROUND, LINE_JOIN_BEVEL } LineJoin;
 typedef enum { WEIGHT_100, WEIGHT_200, WEIGHT_300, WEIGHT_400, WEIGHT_NORMAL = WEIGHT_400, WEIGHT_500, WEIGHT_600, WEIGHT_700, WEIGHT_BOLD = WEIGHT_700, WEIGHT_800, WEIGHT_900 } FontWeight;
 
-class Node;
-class Group;
-class Defs;
-class Styles;
-class Rect;
 class Circle;
-class Path;
-class TextSpan;
-class Style;
-class Line;
+class ClipPath;
+class Defs;
 class Ellipse;
-class Polyline;
-class Polygon;
-class Image;
 class ExcChildNotFound;
+class Group;
+class Image;
+class Line;
+class Node;
+class Path;
+class Polygon;
+class Polyline;
+class Rect;
+class Style;
+class Styles;
+class TextSpan;
 
 typedef std::function<bool( const Node &, svg::Style * )> RenderVisitor;
 
@@ -76,6 +77,8 @@ class CI_API Renderer {
 
 	virtual void pushGroup( const Group & /*group*/, float /*opacity*/ ) {}
 	virtual void popGroup() {}
+	virtual void pushClipPath( const ClipPath & /* clippath */ ) {}
+	virtual void popClipPath() {}
 	virtual void drawPath( const svg::Path & /*path*/ ) {}
 	virtual void drawPolyline( const svg::Polyline & /*polyline*/ ) {}
 	virtual void drawPolygon( const svg::Polygon & /*polygon*/ ) {}
@@ -174,8 +177,8 @@ class CI_API Paint {
 	// only apply to gradients
 	vec2    getCoords0() const { return mCoords0; } // (x1,y1) on linear, (cx,cy) on radial
 	vec2    getCoords1() const { return mCoords1; } // (x2,y2) on linear, (fx,fy) on radial
-	float   getRadius0() const { return mRadius0; }   // (r) on radial
-	float   getRadius1() const { return mRadius1; }   // (fr) on radial
+	float   getRadius0() const { return mRadius0; } // (r) on radial
+	float   getRadius1() const { return mRadius1; } // (fr) on radial
 	bool    useObjectBoundingBox() const { return mUseObjectBoundingBox; }
 	bool    specifiesTransform() const { return mSpecifiesTransform; }
 	mat3    getTransform() const { return mTransform; }
@@ -461,7 +464,7 @@ class CI_API Node {
 	//! Returns whether this Node is visible, or the first among its ancestors when unspecified
 	bool isVisible() const;
 	//! Returns whether the Display property of this Node is set to 'None', preventing rendering of the node and its children
-	bool			isDisplayNone() const { return getStyle().isDisplayNone(); }
+	bool isDisplayNone() const { return getStyle().isDisplayNone(); }
 
 
   protected:
@@ -481,7 +484,7 @@ class CI_API Node {
 
 	static std::string findStyleValue( const std::string &styleString, const std::string &key );
 	void               parseStyle( const std::string &value );
-	
+
 	Node *        mParent;
 	std::string   mTag;
 	std::string   mId;
@@ -588,13 +591,13 @@ class CI_API Circle : public Node {
 	float getRadius() const { return mRadius; }
 	void  setRadius( float radius ) { mRadius = radius; }
 
-	virtual bool containsPoint( const vec2 &pt ) const { return distance2( pt, mCenter ) < mRadius * mRadius; }
+	bool containsPoint( const vec2 &pt ) const override { return distance2( pt, mCenter ) < mRadius * mRadius; }
 
-	virtual Shape2d getShape() const;
+	Shape2d getShape() const override;
 
   protected:
-	virtual void  renderSelf( Renderer &renderer ) const;
-	virtual Rectf calcBoundingBox() const { return Rectf( mCenter.x - mRadius, mCenter.y - mRadius, mCenter.x + mRadius, mCenter.y + mRadius ); }
+	void  renderSelf( Renderer &renderer ) const override;
+	Rectf calcBoundingBox() const override { return Rectf( mCenter.x - mRadius, mCenter.y - mRadius, mCenter.x + mRadius, mCenter.y + mRadius ); }
 
 	vec2  mCenter;
 	float mRadius;
@@ -613,13 +616,13 @@ class CI_API Ellipse : public Node {
 	float getRadiusY() const { return mRadiusY; }
 	void  setRadiusY( float radiusY ) { mRadiusY = radiusY; }
 
-	bool containsPoint( const vec2 &pt ) const;
+	bool containsPoint( const vec2 &pt ) const override;
 
-	virtual Shape2d getShape() const;
+	Shape2d getShape() const override;
 
   protected:
-	virtual void  renderSelf( Renderer &renderer ) const;
-	virtual Rectf calcBoundingBox() const { return Rectf( mCenter.x - mRadiusX, mCenter.y - mRadiusY, mCenter.x + mRadiusX, mCenter.y + mRadiusY ); }
+	void  renderSelf( Renderer &renderer ) const override;
+	Rectf calcBoundingBox() const override { return Rectf( mCenter.x - mRadiusX, mCenter.y - mRadiusY, mCenter.x + mRadiusX, mCenter.y + mRadiusY ); }
 
 	vec2  mCenter;
 	float mRadiusX, mRadiusY;
@@ -630,20 +633,20 @@ class CI_API Path : public Node {
   public:
 	Path( Node *parent ) : Node( parent ) {}
 	Path( Node *parent, const XmlTree &xml );
-	
-	const Shape2d&		getShape2d() const { return mPath; }
-	void				appendShape2d( Shape2d *appendTo ) const;
 
-	bool		containsPoint( const vec2 &pt ) const override { return mPath.contains( pt ); }
+	const Shape2d &getShape2d() const { return mPath; }
+	void           appendShape2d( Shape2d *appendTo ) const;
 
-	Shape2d		getShape() const override { return mPath; }
-	void		setShape( const Shape2d &shape ) { mPath = shape; }
+	bool containsPoint( const vec2 &pt ) const override { return mPath.contains( pt ); }
+
+	Shape2d getShape() const override { return mPath; }
+	void    setShape( const Shape2d &shape ) { mPath = shape; }
 
   protected:
-	void	renderSelf( Renderer &renderer ) const override;
-	Rectf	calcBoundingBox() const override { return mPath.calcPreciseBoundingBox(); }
-		
-	Shape2d		mPath;
+	void  renderSelf( Renderer &renderer ) const override;
+	Rectf calcBoundingBox() const override { return mPath.calcPreciseBoundingBox(); }
+
+	Shape2d mPath;
 };
 
 //! SVG Line element: http://www.w3.org/TR/SVG/shapes.html#LineElement
@@ -651,17 +654,17 @@ class CI_API Line : public Node {
   public:
 	Line( Node *parent ) : Node( parent ) {}
 	Line( Node *parent, const XmlTree &xml );
-	
-	const vec2&	getPoint1() const { return mPoint1; }
-	const vec2&	getPoint2() const { return mPoint2; }
 
-	virtual Shape2d	getShape() const;
-	
+	const vec2 &getPoint1() const { return mPoint1; }
+	const vec2 &getPoint2() const { return mPoint2; }
+
+	Shape2d getShape() const override;
+
   protected:
-	virtual void	renderSelf( Renderer &renderer ) const;  
-	virtual Rectf	calcBoundingBox() const { return Rectf( std::min( mPoint1.x, mPoint2.x ), std::min( mPoint1.y, mPoint2.y ), std::max( mPoint1.x, mPoint2.x ), std::max( mPoint1.y, mPoint2.y ) ); }	
-	
-	vec2		mPoint1, mPoint2;
+	void  renderSelf( Renderer &renderer ) const override;
+	Rectf calcBoundingBox() const override { return Rectf( std::min( mPoint1.x, mPoint2.x ), std::min( mPoint1.y, mPoint2.y ), std::max( mPoint1.x, mPoint2.x ), std::max( mPoint1.y, mPoint2.y ) ); }
+
+	vec2 mPoint1, mPoint2;
 };
 
 //! SVG Rect element: http://www.w3.org/TR/SVG/shapes.html#RectElement
@@ -669,21 +672,26 @@ class CI_API Rect : public Node {
   public:
 	Rect( Node *parent ) : Node( parent ) {}
 	Rect( Node *parent, const XmlTree &xml );
-	
-	const Rectf&	getRect() const { return mRect; }
-	void			setRect( const Rectf &rect ) { mRect = rect; }
-	void			setWidth( float width ) { mRect = Rectf( mRect.x1, mRect.y1, mRect.x1 + width, mRect.y2 ); }
-	void			setHeight( float height ) { mRect = Rectf( mRect.x1, mRect.y1, mRect.x2, mRect.y1 + height ); }
 
-	virtual bool	containsPoint( const vec2 &pt ) const { return mRect.contains( pt ); }	
+	const Rectf &getRect() const { return mRect; }
+	void         setRect( const Rectf &rect ) { mRect = rect; }
+	void         setWidth( float width ) { mRect = Rectf( mRect.x1, mRect.y1, mRect.x1 + width, mRect.y2 ); }
+	void         setHeight( float height ) { mRect = Rectf( mRect.x1, mRect.y1, mRect.x2, mRect.y1 + height ); }
 
-	virtual Shape2d	getShape() const;
+	float        getRx() const;
+	float        getRy() const;
+
+	bool containsPoint( const vec2 &pt ) const override { return mRect.contains( pt ); }
+
+	Shape2d getShape() const override;
 
   protected:
-	virtual void	renderSelf( Renderer &renderer ) const;
-	virtual Rectf	calcBoundingBox() const { return mRect; }	
-		
-	Rectf			mRect;
+	void  renderSelf( Renderer &renderer ) const override;
+	Rectf calcBoundingBox() const override { return mRect; }
+
+	Rectf mRect;
+	Value mRx; // No default value.
+	Value mRy; // No default value.
 };
 
 //! SVG Polygon Element: http://www.w3.org/TR/SVG/shapes.html#PolygonElement
@@ -692,18 +700,18 @@ class CI_API Polygon : public Node {
 	Polygon( Node *parent ) : Node( parent ) {}
 	Polygon( Node *parent, const XmlTree &xml );
 
-	const PolyLine2f&	getPolyLine() const { return mPolyLine; }
-	PolyLine2f&			getPolyLine() { return mPolyLine; }
+	const PolyLine2f &getPolyLine() const { return mPolyLine; }
+	PolyLine2f &      getPolyLine() { return mPolyLine; }
 
-	virtual bool	containsPoint( const vec2 &pt ) const { return mPolyLine.contains( pt ); }		
+	bool containsPoint( const vec2 &pt ) const override { return mPolyLine.contains( pt ); }
 
-	virtual Shape2d	getShape() const;
-		
+	Shape2d getShape() const override;
+
   protected:
-	virtual void	renderSelf( Renderer &renderer ) const;  
-	virtual Rectf	calcBoundingBox() const { return Rectf( mPolyLine.getPoints() ); }
-	
-	PolyLine2f	mPolyLine;
+	void  renderSelf( Renderer &renderer ) const override;
+	Rectf calcBoundingBox() const override { return Rectf( mPolyLine.getPoints() ); }
+
+	PolyLine2f mPolyLine;
 };
 
 //! SVG Polyline Element: http://www.w3.org/TR/SVG/shapes.html#PolylineElement
@@ -712,17 +720,17 @@ class CI_API Polyline : public Node {
 	Polyline( Node *parent ) : Node( parent ) {}
 	Polyline( Node *parent, const XmlTree &xml );
 
-	const PolyLine2f&	getPolyLine() const { return mPolyLine; }
-	PolyLine2f&			getPolyLine() { return mPolyLine; }
+	const PolyLine2f &getPolyLine() const { return mPolyLine; }
+	PolyLine2f &      getPolyLine() { return mPolyLine; }
 
-	virtual bool	containsPoint( const vec2 &pt ) const { return mPolyLine.contains( pt ); }
+	bool containsPoint( const vec2 &pt ) const override { return mPolyLine.contains( pt ); }
 
-	virtual Shape2d	getShape() const;
+	Shape2d getShape() const override;
 
   protected:
-	virtual void	renderSelf( Renderer &renderer ) const;
-	virtual Rectf	calcBoundingBox() const { return Rectf( mPolyLine.getPoints() ); }
-		
+	void  renderSelf( Renderer &renderer ) const override;
+	Rectf calcBoundingBox() const override { return Rectf( mPolyLine.getPoints() ); }
+
 	PolyLine2f mPolyLine;
 };
 
@@ -730,18 +738,18 @@ class CI_API Polyline : public Node {
 class CI_API Use : public Node {
   public:
 	Use( Node *parent, const XmlTree &xml );
-	
-	virtual bool	isDrawable() const { return false; }
-	
-	virtual Shape2d	getShape() const{ if( mReferenced ) return mReferenced->getShape(); else return Shape2d(); }
+
+	bool isDrawable() const override { return false; }
+
+	Shape2d	getShape() const override { if( mReferenced ) return mReferenced->getShape(); else return Shape2d(); }
 
   protected:
-	virtual void	renderSelf( Renderer &renderer ) const;  
-	virtual Rectf	calcBoundingBox() const { if( mReferenced ) return mReferenced->getBoundingBox(); else return Rectf(0,0,0,0); }
-	
+	void  renderSelf( Renderer &renderer ) const override;
+	Rectf calcBoundingBox() const override { if( mReferenced ) return mReferenced->getBoundingBox(); else return Rectf(0,0,0,0); }
+
 	void parse( const XmlTree &xml );
-	
-	const Node		*mReferenced;
+
+	const Node *mReferenced;
 };
 
 //! SVG Image Element. Represents an unpremultiplied bitmap. http://www.w3.org/TR/SVG/struct.html#ImageElement
@@ -749,20 +757,28 @@ class CI_API Image : public Node {
   public:
 	Image( Node *parent, const XmlTree &xml );
 
-	const Rectf &                    getRect() const { return mRect; }
-	const std::shared_ptr<Surface8u> getSurface() const { return mImage; }
+	const Rectf &              getRect() const { return mRect; }
+	std::shared_ptr<Surface8u> getSurface() const { return mImage; }
 
-	virtual bool containsPoint( const vec2 &pt ) const { return mRect.contains( pt ); }
+	bool containsPoint( const vec2 &pt ) const override { return mRect.contains( pt ); }
+
+	//! Returns whether a clip-path was defined for this image.
+	bool specifiesClipPath() const { return !mClipPathId.empty(); }
+	//! Returns the ClipPath for this image. Returns NULL on failure.
+	const ClipPath *getClipPath() const;
 
   protected:
-	virtual void  renderSelf( Renderer &renderer ) const;
-	virtual Rectf calcBoundingBox() const { return mRect; }
+	void  renderSelf( Renderer &renderer ) const override;
+	Rectf calcBoundingBox() const override { return mRect; }
 
 	static std::shared_ptr<Surface8u> parseDataImage( const std::string &data );
 
 	Rectf                      mRect;
 	fs::path                   mFilePath;
 	std::shared_ptr<Surface8u> mImage;
+	std::string                mClipPathId;
+
+	// TODO preserveAspectRatio
 };
 
 typedef std::shared_ptr<TextSpan> TextSpanRef;
@@ -805,7 +821,7 @@ class CI_API TextSpan : public Node {
 	const std::vector<TextSpanRef> &getSpans() const { return mSpans; }
 
   protected:
-	virtual void renderSelf( Renderer &renderer ) const;
+	void renderSelf( Renderer &renderer ) const override;
 
 	bool                                                            mIgnoreAttributes; // TextSpans that are actually the contents of Text's attributes should be ignored
 	Attributes                                                      mAttributes;
@@ -833,7 +849,7 @@ class CI_API Text : public Node {
 	const std::vector<TextSpanRef> &getSpans() const { return mSpans; }
 
   protected:
-	virtual void renderSelf( Renderer &renderer ) const;
+	void renderSelf( Renderer &renderer ) const override;
 
 	TextSpan::Attributes mAttributes;
 
@@ -845,7 +861,7 @@ class CI_API Group : public Node, private Noncopyable {
   public:
 	Group( Node *parent ) : Node( parent ) {}
 	Group( Node *parent, const XmlTree &xml );
-	~Group();
+	~Group() override;
 
 	//! Recursively searches for a child element of type <tt>svg::T</tt> named \a id. Returns NULL on failure to find the object or if it is not of type T.
     template<typename T>
@@ -865,15 +881,15 @@ class CI_API Group : public Node, private Noncopyable {
 	//! Recursively searches for a child element with the specified \a tag. Returns NULL on failure.
 	virtual const Node*		findNodeByTag( const std::string &tag, bool recurse = true ) const;
 	//! Finds the node with ID \a elementId amongst this Node's ancestors. Returns NULL on failure.
-	const Node*				findInAncestors( const std::string &elementId ) const override;
+	const Node *findInAncestors( const std::string &elementId ) const override;
 	//! Recursively searches for a <tag> node and returns the first it finds. Returns NULL on failure.
-	const Node*				findTagInAncestors( const std::string &elementTag ) const override;
+	const Node *findTagInAncestors( const std::string &elementTag ) const override;
 	//! Returns a reference to the child named \a id. Throws svg::ExcChildNotFound if not found.
-	const Node &			getChild( const std::string &id ) const;
+	const Node &getChild( const std::string &id ) const;
 	//! Returns a reference to the child named \a id. Throws svg::ExcChildNotFound if not found.
-	Node &					getChild( const std::string &id ) { return const_cast<Node &>( const_cast<const Group *>( this )->getChild( id ) ); }
+	Node &getChild( const std::string &id ) { return const_cast<Node &>( const_cast<const Group *>( this )->getChild( id ) ); }
 	//! Returns a reference to the child named \a id. Throws svg::ExcChildNotFound if not found.
-	const Node &			operator/( const std::string &id ) const { return getChild( id ); }
+	const Node &operator/( const std::string &id ) const { return getChild( id ); }
 
 	//! Returns the merged Shape2d for all children of the group
 	Shape2d getShape() const override { return getMergedShape2d(); }
@@ -890,26 +906,33 @@ class CI_API Group : public Node, private Noncopyable {
 	//! Returns a reference to the child at \a index. Throws svg::ExcChildNotFound if \a index is out of range.
 	Node &getChild( size_t index ) { return const_cast<Node &>( const_cast<const Group *>( this )->getChild( index ) ); }
 
+	//! Returns whether a clip-path was defined for this group.
+	bool specifiesClipPath() const { return !mClipPathId.empty(); }
+	//! Returns the ClipPath for this group. Returns NULL on failure.
+	const ClipPath *getClipPath() const;
+
 	//! Recursively iterates all Nodes in Group or Doc, passing each to \a fn to be optionally manipulated
 	virtual void iterate( const std::function<void( Node * )> &fn );
+
+	//!
+	static Node *create( Node *parent, const XmlTree &xml );
 
   protected:
 	Node *  nodeUnderPoint( const vec2 &absolutePoint, const mat3 &parentInverseMatrix ) const;
 	Shape2d getMergedShape2d() const;
 
-	virtual void  renderSelf( Renderer &renderer ) const;
-	virtual Rectf calcBoundingBox() const;
+	void  renderSelf( Renderer &renderer ) const override;
+	Rectf calcBoundingBox() const override;
 
-	virtual bool isDrawable() const { return false; }
+	bool         isDrawable() const override { return false; }
 	virtual void parse( const XmlTree &xml );
-	Node *       create( const XmlTree &xml );
 
 	std::list<Node *> mChildren;
+	std::string       mClipPathId;
 
 	friend class Node;
 };
 
-typedef std::shared_ptr<Defs> DefsRef;
 //!
 class CI_API Defs : public Group {
   public:
@@ -917,12 +940,41 @@ class CI_API Defs : public Group {
 	Defs( Node *parent, const XmlTree &xml );
 
 	const Node *findNode( const std::string &id, bool recurse ) const override;
-	
+
   protected:
+	void renderSelf( Renderer &renderer ) const override
+	{ /* never render */
+	}
+
 	XmlTree mXml;
 };
 
-typedef std::shared_ptr<Styles> StylesRef;
+//! SVG ClipPath element: https://www.w3.org/TR/SVG/render.html#ClippingAndMasking
+class CI_API ClipPath : public Path {
+  public:
+	ClipPath( Node *parent )
+		: Path( parent )
+	{
+	}
+	ClipPath( Node *parent, const XmlTree &xml );
+
+	ClipPath( const ClipPath & ) = default;
+	ClipPath( ClipPath && ) = default;
+	ClipPath &operator=( const ClipPath & ) = default;
+	ClipPath &operator=( ClipPath && ) = default;
+
+	~ClipPath() override = default;
+
+  protected:
+	void renderSelf( Renderer &renderer ) const override
+	{ /* never render */
+		//renderer.pushFillOpacity( 0.5f );
+		//renderer.drawPath( *this );
+		//renderer.popFillOpacity();
+	}
+	void parse( const XmlTree &xml );
+};
+
 //!
 class CI_API Styles : public Node {
   public:
@@ -947,11 +999,11 @@ class CI_API Doc : public Group {
   public:
 	Doc() : Group( 0 ), mWidth( 0 ), mHeight( 0 ) {}
 	Doc( const fs::path &filePath );
-	Doc( DataSourceRef dataSource, const fs::path &filePath = fs::path() );
+	Doc( const DataSourceRef &dataSource, const fs::path &filePath = fs::path() );
 
 	static DocRef create( const fs::path &filePath );
-	static DocRef create( DataSourceRef dataSource, const fs::path &filePath = fs::path() );
-	static DocRef createFromSvgz( DataSourceRef dataSource, const fs::path &filePath = fs::path() );
+	static DocRef create( const DataSourceRef &dataSource, const fs::path &filePath = fs::path() );
+	static DocRef createFromSvgz( const DataSourceRef &dataSource, const fs::path &filePath = fs::path() );
 
 	//! Returns the width of the document in pixels
 	int32_t getWidth() const { return mWidth; }
@@ -968,20 +1020,21 @@ class CI_API Doc : public Group {
 	float getDpi() const { return 72.0f; }
 
 	//! Returns the top-most Node which contains \a pt. Returns NULL if no Node contains the point.
-	Node *nodeUnderPoint( const vec2 &pt );
+	Node *nodeUnderPoint( const vec2 &pt ) const;
 
 	//! Utility function to load an image relative to the document. Caches results.
-	std::shared_ptr<Surface8u> loadImage( fs::path relativePath );
-  private:
-	void loadDoc( DataSourceRef source, fs::path filePath );
+	std::shared_ptr<Surface8u> loadImage( const fs::path &relativePath );
 
-	virtual void		renderSelf( Renderer &renderer ) const;
-  
-	std::shared_ptr<XmlTree>	mXmlTree;
-	std::map<fs::path,std::shared_ptr<Surface8u> >	mImageCache;
-	
-	fs::path		mFilePath;
-	Area			mViewBox;
+  private:
+	void loadDoc( const DataSourceRef &source, const fs::path &filePath );
+
+	void renderSelf( Renderer &renderer ) const override;
+
+	std::shared_ptr<XmlTree>                       mXmlTree;
+	std::map<fs::path, std::shared_ptr<Surface8u>> mImageCache;
+
+	fs::path mFilePath;
+	Area     mViewBox;
 	int32_t			mWidth, mHeight;
 };
 
