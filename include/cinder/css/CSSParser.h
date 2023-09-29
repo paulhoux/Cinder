@@ -82,36 +82,6 @@ class Parser {
 
   private:
 	//!
-	static char charToLower( const char c )
-	{
-		if( c >= 'A' && c <= 'Z' )
-			return char( c + 32 );
-		return c;
-	}
-	//!
-	static char charToUpper( const char c )
-	{
-		if( c >= 'a' && c <= 'z' )
-			return char( c - 32 );
-		return c;
-	}
-	//!
-	static bool isWhiteSpace( const char c ) { return c == ' ' || c == '\t' || c == '\r' || c == '\n' || c == 11; }
-	//!
-	static bool isDigit( const char c ) { return c >= '0' && c <= '9'; }
-	//!
-	static bool isHexDigit( char c )
-	{
-		c = charToLower( c );
-		return isDigit( c ) || c == 'a' || c == 'b' || c == 'c' || c == 'd' || c == 'e' || c == 'f';
-	}
-	//!
-	static bool isAlpha( char c )
-	{
-		c = charToLower( c );
-		return c >= 'a' && c <= 'z';
-	}
-	//!
 	double hexdec( std::string istring )
 	{
 		double ret = 0;
@@ -137,12 +107,12 @@ class Parser {
 		return ind;
 	}
 	//!
-	static bool escaped( const std::string &istring, std::string::size_type pos ) { return !( charAt( istring, pos - 1 ) != '\\' || escaped( istring, pos - 1 ) ); }
+	static bool escaped( const std::string &str, std::string::size_type pos ) { return !( charAt( str, pos - 1 ) != '\\' || escaped( str, pos - 1 ) ); }
 	//! Safe replacement for .at()
-	static char charAt( const std::string &istring, size_t pos )
+	static char charAt( const std::string &str, size_t pos )
 	{
-		if( pos < istring.length() )
-			return istring[pos];
+		if( pos < str.length() )
+			return str[pos];
 
 		return 0;
 	}
@@ -196,25 +166,7 @@ class Parser {
 		return ret;
 	}
 	//!
-	static std::string strReplace( const std::string &find, const std::string &replace, std::string str )
-	{
-		auto pos = str.find( find );
-		while( pos != std::string::npos ) {
-			str.replace( pos, find.length(), replace );
-			pos = str.find( find, pos + replace.length() );
-		}
-		return str;
-	}
-	//!
-	static bool inCharArray( const char *haystack, const char needle )
-	{
-		for( size_t i = 0; i < strlen( haystack ); ++i ) {
-			if( haystack[i] == needle ) {
-				return true;
-			}
-		}
-		return false;
-	}
+	static bool inCharArray( const char *haystack, const char needle ) { return inStringArray( std::string( haystack ), needle ); }
 	//!
 	static bool inStringArray( const std::string &haystack, const char needle ) { return haystack.find_first_of( needle, 0 ) != std::string::npos; }
 

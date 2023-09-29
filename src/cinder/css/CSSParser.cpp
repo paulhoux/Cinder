@@ -707,7 +707,7 @@ void Parser::parseInString( std::string &css, std::string::size_type &i, ParseSt
 void Parser::parse( std::string css )
 {
 	resetParser();
-	css = strReplace( "\r\n", "\n", css ); // Replace newlines
+	css = findReplace( "\r\n", "\n", css ); // Replace newlines
 	css += "\n";
 	ParseStatus astatus = IN_SELECTOR;
 	ParseStatus afrom = IN_SELECTOR;
