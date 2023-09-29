@@ -28,6 +28,8 @@
 #include "cinder/gl/Texture.h"
 #include "cinder/svg/Svg.h"
 #include "cinder/Triangulate.h"
+#include "cinder/gl/draw.h"
+#include "cinder/gl/wrapper.h"
 
 namespace cinder {
 
