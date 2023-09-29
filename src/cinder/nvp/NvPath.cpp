@@ -1033,7 +1033,7 @@ void Svg::draw()
 		if( call.image ) {
 			ScopedShader scpShader( Shader::Type::IMAGE );
 			scpShader.setColor( ColorA::white() );
-			scpShader.setCoords( GL_PATH_OBJECT_BOUNDING_BOX_NV ); //, call.transform );
+			scpShader.setCoords( GL_PATH_OBJECT_BOUNDING_BOX_NV, call.coords );
 			scpShader.uniform( "image", 2 );
 			scpShader.uniform( "opacity", 0.5f ); // TEMP for debugging
 
@@ -1169,6 +1169,7 @@ void Svg::Renderer::drawImage( const svg::Image &image )
 	dc.stroke = mStrokeStack.back();
 	dc.strokeOpacity = mStrokeOpacityStack.back() * mGroupOpacityStack.back();
 	dc.image = gl::Texture2d::create( *image.getSurface(), gl::Texture2d::Format().loadTopDown() ); // TODO: cache textures.
+	dc.coords = image.getTextureMatrix();
 
 	if( !mClipPathStack.empty() ) {
 		// TODO: combine all clip paths into one (hard!). We could e.g. add all paths to a vector,
@@ -1178,12 +1179,6 @@ void Svg::Renderer::drawImage( const svg::Image &image )
 		Path path( mClipPathStack.back().getShape2d() );
 		dc.pathId = path.getId();
 		mSvg->mPaths.push_back( std::move( path ) );
-
-		// Undo the last transform, as that one is for the texture only.
-		if( mMatrixStack.size() > 1 ) {
-			dc.matrix = mMatrixStack.at( mMatrixStack.size() - 2 );
-			// texture transform = inverse( dc.matrix ) * mMatrixStack.back();
-		}
 	}
 	else {
 		Path path( Path2d::rectangle( image.getRect() ) );

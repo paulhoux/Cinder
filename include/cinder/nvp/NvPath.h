@@ -769,6 +769,7 @@ class CI_API Svg {
 		float            strokeOpacity{ 1 };
 		GLuint           fillRule{ 0xFF };
 		mat3             matrix;
+		mat3             coords;
 	};
 
 	svg::DocRef           mDoc;

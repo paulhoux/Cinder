@@ -790,6 +790,9 @@ class CI_API Image : public Node {
 	//! Returns the ClipPath for this image. Returns NULL on failure.
 	const ClipPath *getClipPath() const;
 
+	//! Returns a transformation matrix for the texture coordinates.
+	const mat3 &getTextureMatrix() const { return mTextureMatrix; }
+
   protected:
 	void  renderSelf( Renderer &renderer ) const override;
 	Rectf calcBoundingBox() const override { return mBounds; }
@@ -800,6 +803,7 @@ class CI_API Image : public Node {
 	fs::path                   mFilePath;
 	std::shared_ptr<Surface8u> mImage;
 	std::string                mClipPathId;
+	mat3                       mTextureMatrix;
 };
 
 using TextSpanRef = std::shared_ptr<TextSpan>;

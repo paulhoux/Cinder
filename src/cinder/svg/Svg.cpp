@@ -2465,7 +2465,7 @@ PreserveAspectRatio::PreserveAspectRatio( const std::string &value )
 		align = X_MAX_Y_MID;
 	else if( keywords[0] == "xminymax" )
 		align = X_MIN_Y_MIN;
-	else if( keywords[0] == "xmidymaxn" )
+	else if( keywords[0] == "xmidymax" )
 		align = X_MID_Y_MAX;
 	else if( keywords[0] == "xmaxymax" )
 		align = X_MAX_Y_MAX;
@@ -2528,12 +2528,6 @@ Image::Image( Node *parent, const XmlTree &xml )
 	if( !mFilePath.empty() )
 		mImage = getDoc()->loadImage( mFilePath );
 
-	// TODO: NOT WORKING YET, NEED TO FIGURE OUT THE CORRECT TRANSFORM MATRIX
-	//if( xml.hasAttribute( "preserveAspectRatio" ) )
-	//	setTransform( PreserveAspectRatio( xml.getAttributeValue<string>( "preserveAspectRatio" ) ).calcTransform( mBounds, mImage->getBounds() ) );
-	//else
-	//	setTransform( PreserveAspectRatio().calcTransform( mBounds, mImage->getBounds() ) );
-
 	if( xml.hasAttribute( "clip-path" ) ) {
 		auto value = xml.getAttributeValue<std::string>( "clip-path" );
 
@@ -2541,7 +2535,7 @@ Image::Image( Node *parent, const XmlTree &xml )
 			char        id[1024];
 			const char *hash = strchr( value.c_str(), '#' );
 			const char *closeParen = strchr( value.c_str(), ')' );
-			if( ( closeParen ) && ( hash ) && ( closeParen - hash < 1024 ) ) {
+			if( closeParen && hash && closeParen - hash < 1024 ) {
 				strncpy( id, hash + 1, closeParen - hash - 1 );
 				id[closeParen - hash - 1] = 0;
 
@@ -2549,6 +2543,22 @@ Image::Image( Node *parent, const XmlTree &xml )
 			}
 		}
 	}
+
+	// Calculate texture transform matrix.
+	if( xml.hasAttribute( "preserveAspectRatio" ) )
+		mTextureMatrix = PreserveAspectRatio( xml.getAttributeValue<string>( "preserveAspectRatio" ) ).calcTransform( mBounds, mImage->getBounds() );
+	else
+		mTextureMatrix = PreserveAspectRatio().calcTransform( mBounds, mImage->getBounds() );
+
+	// Normalize.
+	mTextureMatrix[0][0] = float( mImage->getWidth() ) * mTextureMatrix[0][0] / mBounds.getWidth();
+	mTextureMatrix[1][1] = float( mImage->getHeight() ) * mTextureMatrix[1][1] / mBounds.getHeight();
+	mTextureMatrix[2][0] = mTextureMatrix[2][0] / mBounds.getWidth();
+	mTextureMatrix[2][1] = mTextureMatrix[2][1] / mBounds.getHeight();
+
+	// Undo transformations of the path used to render the image.
+	mTransform = glm::identity<mat3>();
+	mSpecifiesTransform = false;
 }
 
 std::shared_ptr<Surface8u> Image::parseDataImage( const string &data )
@@ -3004,8 +3014,9 @@ Style Styles::findStyle( const std::string &id ) const
 
 ////////////////////////////////////////////////////////////////////////////////////
 // Doc
-Doc::Doc(): Group( nullptr )
-            , mBounds( 0, 0, 0, 0 )
+Doc::Doc()
+	: Group( nullptr )
+	, mBounds( 0, 0, 0, 0 )
 {
 }
 
