@@ -1030,32 +1030,45 @@ void Svg::draw()
 		gl::matrixLoadfEXT( GL_MODELVIEW, value_ptr( gl::getModelView() ) );
 		gl::matrixMult3x3fNV( GL_MODELVIEW, value_ptr( call.matrix ) );
 
-		if( !call.fill.isNone() ) {
-			ColorA solidColor = call.fill.getColor();
-			solidColor.a *= call.fillOpacity;
+		if( call.image ) {
+			ScopedShader scpShader( Shader::Type::IMAGE );
+			scpShader.setColor( ColorA::white() );
+			scpShader.setCoords( GL_PATH_OBJECT_BOUNDING_BOX_NV ); //, call.transform );
+			scpShader.uniform( "image", 2 );
+			scpShader.uniform( "opacity", 0.5f ); // TEMP for debugging
 
-			const auto type = preparePaint( call.fill, call.fillOpacity );
-
-			ScopedShader scpShader( type );
-			scpShader.setColor( solidColor );
+			gl::ScopedTextureBind scpImage( call.image, 2 );
 
 			gl::stencilFunc( GL_NOTEQUAL, 0, call.fillRule );
 			gl::stencilThenCoverFillPathNV( call.pathId, GL_COUNT_UP_NV, call.fillRule, GL_CONVEX_HULL_NV );
 		}
+		else {
+			if( !call.fill.isNone() ) {
+				ColorA solidColor = call.fill.getColor();
+				solidColor.a *= call.fillOpacity;
 
-		if( !call.stroke.isNone() ) {
-			ColorA solidColor = call.stroke.getColor();
-			solidColor.a *= call.strokeOpacity;
+				const auto type = preparePaint( call.fill, call.fillOpacity );
 
-			const auto type = preparePaint( call.stroke, call.strokeOpacity );
+				ScopedShader scpShader( type );
+				scpShader.setColor( solidColor );
 
-			ScopedShader scpShader( type );
-			scpShader.setColor( solidColor );
+				gl::stencilFunc( GL_NOTEQUAL, 0, call.fillRule );
+				gl::stencilThenCoverFillPathNV( call.pathId, GL_COUNT_UP_NV, call.fillRule, GL_CONVEX_HULL_NV );
+			}
 
-			gl::stencilFunc( GL_NOTEQUAL, 0, 0xFF );
-			gl::stencilThenCoverStrokePathNV( call.pathId, GL_COUNT_UP_NV, 0xFF, GL_CONVEX_HULL_NV );
+			if( !call.stroke.isNone() ) {
+				ColorA solidColor = call.stroke.getColor();
+				solidColor.a *= call.strokeOpacity;
+
+				const auto type = preparePaint( call.stroke, call.strokeOpacity );
+
+				ScopedShader scpShader( type );
+				scpShader.setColor( solidColor );
+
+				gl::stencilFunc( GL_NOTEQUAL, 0, 0xFF );
+				gl::stencilThenCoverStrokePathNV( call.pathId, GL_COUNT_UP_NV, 0xFF, GL_CONVEX_HULL_NV );
+			}
 		}
-
 		gl::popModelView();
 	}
 
@@ -1072,7 +1085,6 @@ void Svg::draw()
 Svg::Renderer::Renderer( Svg *svg )
 	: mSvg{ svg }
 {
-	mStyleStack.emplace_back();
 	mMatrixStack.emplace_back();
 	mFillStack.emplace_back( Color::black() );
 	mStrokeStack.emplace_back();
@@ -1086,6 +1098,7 @@ Svg::Renderer::Renderer( Svg *svg )
 	mMiterLimitStack.push_back( 4.0f );
 	mDashArrayStack.emplace_back();
 	mDashOffsetStack.push_back( 0.0f );
+	// mClipPathStack.clear();
 }
 
 void Svg::Renderer::pushGroup( const svg::Group &group, float opacity )
@@ -1096,6 +1109,16 @@ void Svg::Renderer::pushGroup( const svg::Group &group, float opacity )
 void Svg::Renderer::popGroup()
 {
 	mGroupOpacityStack.pop_back();
+}
+
+void Svg::Renderer::pushClipPath( const svg::ClipPath &clippath )
+{
+	mClipPathStack.push_back( clippath );
+}
+
+void Svg::Renderer::popClipPath()
+{
+	mClipPathStack.pop_back();
 }
 
 void Svg::Renderer::drawPath( const svg::Path &path )
@@ -1131,6 +1154,44 @@ void Svg::Renderer::drawCircle( const svg::Circle &circle )
 void Svg::Renderer::drawEllipse( const svg::Ellipse &ellipse )
 {
 	render( ellipse.getShape() );
+}
+
+void Svg::Renderer::drawImage( const svg::Image &image )
+{
+	if( !shouldRender() )
+		return;
+
+	DrawCall dc;
+	dc.matrix = mMatrixStack.back();
+	dc.fill = mFillStack.back();
+	dc.fillOpacity = mFillOpacityStack.back() * mGroupOpacityStack.back();
+	dc.fillRule = mFillRuleStack.back() == svg::FILL_RULE_NONZERO ? 0xFF : 0x01;
+	dc.stroke = mStrokeStack.back();
+	dc.strokeOpacity = mStrokeOpacityStack.back() * mGroupOpacityStack.back();
+	dc.image = gl::Texture2d::create( *image.getSurface(), gl::Texture2d::Format().loadTopDown() ); // TODO: cache textures.
+
+	if( !mClipPathStack.empty() ) {
+		// TODO: combine all clip paths into one (hard!). We could e.g. add all paths to a vector,
+		// then render them to the stencil buffer prior to rendering the image.
+		// For now, simply use the last clip path to render the image.
+
+		Path path( mClipPathStack.back().getShape2d() );
+		dc.pathId = path.getId();
+		mSvg->mPaths.push_back( std::move( path ) );
+
+		// Undo the last transform, as that one is for the texture only.
+		if( mMatrixStack.size() > 1 ) {
+			dc.matrix = mMatrixStack.at( mMatrixStack.size() - 2 );
+			// texture transform = inverse( dc.matrix ) * mMatrixStack.back();
+		}
+	}
+	else {
+		Path path( Path2d::rectangle( image.getRect() ) );
+		dc.pathId = path.getId();
+		mSvg->mPaths.push_back( std::move( path ) );
+	}
+
+	mSvg->mDrawCalls.push_back( std::move( dc ) );
 }
 
 void Svg::Renderer::pushMatrix( const mat3 &m )
@@ -1290,10 +1351,10 @@ void Svg::Renderer::render( const Shape2d &shape ) const
 	Path path( shape );
 
 	// Determine current style.
-	//auto style = getCurrentStyle();
+	// auto style = getCurrentStyle();
 
 	//// Perform path merging.
-	//if( !mSvg->mPaths.empty() && !mSvg->mStyles.empty() && !mSvg->mDrawCalls.empty() ) {
+	// if( !mSvg->mPaths.empty() && !mSvg->mStyles.empty() && !mSvg->mDrawCalls.empty() ) {
 	//	if( mSvg->mStyles.back() == style ) {
 	//		const auto matrix = toMat3x2( inverse( mSvg->mDrawCalls.back().matrix ) * mMatrixStack.back() );
 
@@ -1343,7 +1404,6 @@ void Svg::Renderer::render( const Shape2d &shape ) const
 
 	mSvg->mDrawCalls.push_back( std::move( dc ) );
 	mSvg->mPaths.push_back( std::move( path ) );
-	//mSvg->mStyles.push_back( style );
 }
 
 

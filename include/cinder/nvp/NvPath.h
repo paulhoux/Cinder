@@ -695,6 +695,8 @@ class CI_API Svg {
 		void finish() override {}
 		void pushGroup( const svg::Group &group, float opacity ) override;
 		void popGroup() override;
+		void pushClipPath( const svg::ClipPath &clippath ) override;
+		void popClipPath() override;
 		void drawPath( const svg::Path & ) override;
 		void drawPolyline( const svg::Polyline & ) override;
 		void drawPolygon( const svg::Polygon & ) override;
@@ -702,7 +704,7 @@ class CI_API Svg {
 		void drawRect( const svg::Rect & ) override;
 		void drawCircle( const svg::Circle & ) override;
 		void drawEllipse( const svg::Ellipse & ) override;
-		void drawImage( const svg::Image & ) override {}
+		void drawImage( const svg::Image & ) override;
 		void drawTextSpan( const svg::TextSpan & ) override {}
 		void pushMatrix( const mat3 & ) override;
 		void popMatrix() override;
@@ -744,7 +746,6 @@ class CI_API Svg {
 		void render( const Shape2d &shape ) const;
 
 		Svg *                           mSvg = nullptr;
-		std::vector<svg::Style>         mStyleStack;
 		std::vector<mat3>               mMatrixStack;
 		std::vector<svg::Paint>         mFillStack, mStrokeStack;
 		std::vector<float>              mFillOpacityStack, mStrokeOpacityStack;
@@ -756,24 +757,25 @@ class CI_API Svg {
 		std::vector<float>              mMiterLimitStack;
 		std::vector<std::vector<float>> mDashArrayStack;
 		std::vector<float>              mDashOffsetStack;
+		std::vector<svg::ClipPath>      mClipPathStack;
 	};
 
 	struct DrawCall {
-		GLuint     pathId{ 0 };
-		svg::Paint fill;
-		svg::Paint stroke;
-		float      fillOpacity{ 1 };
-		float      strokeOpacity{ 1 };
-		GLuint     fillRule{ 0xFF };
-		mat3       matrix;
+		GLuint           pathId{ 0 };
+		svg::Paint       fill;
+		svg::Paint       stroke;
+		gl::Texture2dRef image;
+		float            fillOpacity{ 1 };
+		float            strokeOpacity{ 1 };
+		GLuint           fillRule{ 0xFF };
+		mat3             matrix;
 	};
 
-	svg::DocRef             mDoc;
-	Renderer                mRenderer{ this };
-	Gradients               mGradients;
-	std::vector<Path>       mPaths;
-	std::vector<DrawCall>   mDrawCalls;
-	//std::vector<svg::Style> mStyles;
+	svg::DocRef           mDoc;
+	Renderer              mRenderer{ this };
+	Gradients             mGradients;
+	std::vector<Path>     mPaths;
+	std::vector<DrawCall> mDrawCalls;
 
 	friend class Renderer;
 };
