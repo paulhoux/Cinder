@@ -174,20 +174,20 @@ int asciiCaseCmp( const char *a, const char *b )
 
 void ltrim( std::string &str )
 {
-	if( !str.empty() )
-		str.erase( str.begin(), str.begin() + str.find_first_not_of( " \f\n\r\t\v" ) );
+	if( auto offset = str.find_first_not_of( " \f\n\r\t\v" ); offset != std::string::npos )
+		str.erase( str.begin(), str.begin() + offset );
 }
 
 void rtrim( std::string &str )
 {
 	if( !str.empty() )
-		str.erase( str.begin() + str.find_last_not_of( " \f\n\r\t\v" ) + 1, str.end() );
+		str.erase( str.find_last_not_of( " \f\n\r\t\v" ) + 1 );
 }
 
 void ltrim( std::string &str, const std::string &characters )
 {
-	if( !str.empty() )
-		str.erase( str.begin(), str.begin() + str.find_first_not_of( characters ) );
+	if( auto offset = str.find_first_not_of( characters ); offset != std::string::npos )
+		str.erase( str.begin(), str.begin() + offset );
 }
 
 void rtrim( std::string &str, const std::string &characters )
@@ -201,6 +201,20 @@ std::string trim( std::string str )
 	ltrim( str );
 	rtrim( str );
 	return str;
+}
+
+char charToLower( const char c )
+{
+	if( c >= 'A' && c <= 'Z' )
+		return char( c + 32 );
+	return c;
+}
+
+char charToUpper( const char c )
+{
+	if( c >= 'a' && c <= 'z' )
+		return char( c - 32 );
+	return c;
 }
 
 std::string toLower( std::string str )
@@ -229,6 +243,43 @@ std::u16string toUpper( std::u16string str )
 	std::setlocale( LC_ALL, "" );
 	std::transform( str.begin(), str.end(), str.begin(), []( char16_t c ) { return std::towupper( c ); } );
 	return str;
+}
+
+std::string findReplace( const std::string &find, const std::string &replace, std::string str )
+{
+	auto pos = str.find( find );
+	while( pos != std::string::npos ) {
+		str.replace( pos, find.length(), replace );
+		pos = str.find( find, pos + replace.length() );
+	}
+	return str;
+}
+
+bool isWhiteSpace( char c )
+{
+	return c == ' ' || c == '\t' || c == '\r' || c == '\n' || c == '\v' || c == '\f';
+}
+
+bool isDigit( char c )
+{
+	return !( c < '0' || c > '9' );
+}
+
+bool isHexDigit( char c )
+{
+	c = charToLower( c );
+	return isDigit( c ) || c == 'a' || c == 'b' || c == 'c' || c == 'd' || c == 'e' || c == 'f';
+}
+
+bool isAlpha( char c )
+{
+	c = charToLower( c );
+	return !( c < 'a' || c > 'z' );
+}
+
+bool isNumeric( char c )
+{
+	return isDigit( c ) || c == '.' || c == '-' || c == 'e' || c == 'E' || c == '+';
 }
 
 std::string valueToString( int value )

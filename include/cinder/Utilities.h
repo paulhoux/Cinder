@@ -117,6 +117,11 @@ CI_API inline std::string rtrim_copy( std::string str, const std::string &charac
 //! returns a copy of \a str with all whitespace (as defined by std::isspace()) removed from beginning and end. Unicode aware.
 CI_API std::string trim( std::string str );
 
+//! Converts the character \a c to lowercase.
+CI_API char charToLower( const char c );
+//! Converts the character \a c to uppercase.
+CI_API char charToUpper( const char c );
+
 //! returns a copy of \a str with all characters converted to lowercase (using std::tolower()). 
 CI_API std::string toLower( std::string str );
 //! returns a copy of \a str with all characters converted to uppercase (using std::toupper()).
@@ -126,6 +131,20 @@ CI_API std::string toUpper( std::string str );
 CI_API std::u16string toLower( std::u16string str );
 //! returns a copy of \a str with all characters converted to uppercase (using std::towupper()). Unicode aware.
 CI_API std::u16string toUpper( std::u16string str );
+
+//! replaces all instances of \a find with \a replace in \a str and returns a copy.
+CI_API std::string findReplace( const std::string &find, const std::string &replace, std::string str );
+
+//! returns whether character \a c is considered white space.
+CI_API bool isWhiteSpace( char c );
+//! returns whether character \a c is a digit (0-9).
+CI_API bool isDigit( char c );
+//! returns whether character \a c is a hexadecimal digit (0-9)+(a-f).
+CI_API bool isHexDigit( char c );
+//! returns whether character \a c is alphabetic (a-z).
+CI_API bool isAlpha( char c );
+//! returns whether character \a c is numeric (0-9)+(.+-eE).
+CI_API bool isNumeric( char c );
 
 //! converts the value to a string without leading and trailing zeroes.
 CI_API std::string valueToString( int value );
