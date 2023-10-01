@@ -1028,9 +1028,10 @@ void Svg::draw()
 	for( const auto &call : mDrawCalls ) {
 		gl::pushModelView();
 		gl::matrixLoadfEXT( GL_MODELVIEW, value_ptr( gl::getModelView() ) );
-		gl::matrixMult3x3fNV( GL_MODELVIEW, value_ptr( call.matrix ) );
 
 		if( call.image ) {
+			assert( call.count == 1 );
+
 			ScopedShader scpShader( Shader::Type::IMAGE );
 			scpShader.setColor( ColorA::white() );
 			scpShader.setCoords( GL_PATH_OBJECT_BOUNDING_BOX_NV, call.coords );
@@ -1039,10 +1040,14 @@ void Svg::draw()
 
 			gl::ScopedTextureBind scpImage( call.image, 2 );
 
+			gl::matrixMult3x3fNV( GL_MODELVIEW, value_ptr( mTransforms.at( call.offset ) ) );
 			gl::stencilFunc( GL_NOTEQUAL, 0, call.fillRule );
-			gl::stencilThenCoverFillPathNV( call.pathId, GL_COUNT_UP_NV, call.fillRule, GL_CONVEX_HULL_NV );
+			gl::stencilThenCoverFillPathNV( mInstances.at( call.offset ), GL_COUNT_UP_NV, call.fillRule, GL_CONVEX_HULL_NV );
 		}
 		else {
+			if( call.count == 1 )
+				gl::matrixMult3x2fNV( GL_MODELVIEW, value_ptr( mTransforms.at( call.offset ) ) );
+
 			if( !call.fill.isNone() ) {
 				ColorA solidColor = call.fill.getColor();
 				solidColor.a *= call.fillOpacity;
@@ -1053,7 +1058,14 @@ void Svg::draw()
 				scpShader.setColor( solidColor );
 
 				gl::stencilFunc( GL_NOTEQUAL, 0, call.fillRule );
-				gl::stencilThenCoverFillPathNV( call.pathId, GL_COUNT_UP_NV, call.fillRule, GL_CONVEX_HULL_NV );
+
+				if( call.count == 1 ) {
+					gl::stencilThenCoverFillPathNV( mInstances.at( call.offset ), GL_COUNT_UP_NV, call.fillRule, GL_CONVEX_HULL_NV );
+				}
+				else {
+					gl::stencilThenCoverFillPathInstancedNV(
+						call.count, GL_UNSIGNED_INT, &mInstances.at( call.offset ), 0, GL_COUNT_UP_NV, call.fillRule, GL_BOUNDING_BOX_NV, GL_AFFINE_2D_NV, reinterpret_cast<const GLfloat *>( &mTransforms.at( call.offset ) ) );
+				}
 			}
 
 			if( !call.stroke.isNone() ) {
@@ -1066,7 +1078,7 @@ void Svg::draw()
 				scpShader.setColor( solidColor );
 
 				gl::stencilFunc( GL_NOTEQUAL, 0, 0xFF );
-				gl::stencilThenCoverStrokePathNV( call.pathId, GL_COUNT_UP_NV, 0xFF, GL_CONVEX_HULL_NV );
+				gl::stencilThenCoverStrokePathNV( mInstances.at( call.offset ), GL_COUNT_UP_NV, 0xFF, GL_CONVEX_HULL_NV );
 			}
 		}
 		gl::popModelView();
@@ -1099,6 +1111,14 @@ Svg::Renderer::Renderer( Svg *svg )
 	mDashArrayStack.emplace_back();
 	mDashOffsetStack.push_back( 0.0f );
 	// mClipPathStack.clear();
+}
+
+void Svg::Renderer::start()
+{
+	mSvg->mPaths.clear();
+	mSvg->mDrawCalls.clear();
+	mSvg->mInstances.clear();
+	mSvg->mTransforms.clear();
 }
 
 void Svg::Renderer::pushGroup( const svg::Group &group, float opacity )
@@ -1162,7 +1182,8 @@ void Svg::Renderer::drawImage( const svg::Image &image )
 		return;
 
 	DrawCall dc;
-	dc.matrix = mMatrixStack.back();
+	dc.count = 1;
+	dc.offset = GLsizei( mSvg->mInstances.size() );
 	dc.fill = mFillStack.back();
 	dc.fillOpacity = mFillOpacityStack.back() * mGroupOpacityStack.back();
 	dc.fillRule = mFillRuleStack.back() == svg::FILL_RULE_NONZERO ? 0xFF : 0x01;
@@ -1171,18 +1192,20 @@ void Svg::Renderer::drawImage( const svg::Image &image )
 	dc.image = gl::Texture2d::create( *image.getSurface(), gl::Texture2d::Format().loadTopDown() ); // TODO: cache textures.
 	dc.coords = image.getTextureMatrix();
 
+	mSvg->mTransforms.push_back( mMatrixStack.back() );
+
 	if( !mClipPathStack.empty() ) {
-		// TODO: combine all clip paths into one (hard!). We could e.g. add all paths to a vector,
+		// TODO: combine all clip paths into one intersection (hard!). We could e.g. add all paths to a vector,
 		// then render them to the stencil buffer prior to rendering the image.
 		// For now, simply use the last clip path to render the image.
 
 		Path path( mClipPathStack.back().getShape2d() );
-		dc.pathId = path.getId();
+		mSvg->mInstances.push_back( path.getId() );
 		mSvg->mPaths.push_back( std::move( path ) );
 	}
 	else {
 		Path path( Path2d::rectangle( image.getRect() ) );
-		dc.pathId = path.getId();
+		mSvg->mInstances.push_back( path.getId() );
 		mSvg->mPaths.push_back( std::move( path ) );
 	}
 
@@ -1342,43 +1365,12 @@ void Svg::Renderer::render( const Shape2d &shape ) const
 	if( !shouldRender() )
 		return;
 
+	//
+	if( shape.empty() )
+		return;
+
 	// Create path.
 	Path path( shape );
-
-	// Determine current style.
-	// auto style = getCurrentStyle();
-
-	//// Perform path merging.
-	// if( !mSvg->mPaths.empty() && !mSvg->mStyles.empty() && !mSvg->mDrawCalls.empty() ) {
-	//	if( mSvg->mStyles.back() == style ) {
-	//		const auto matrix = toMat3x2( inverse( mSvg->mDrawCalls.back().matrix ) * mMatrixStack.back() );
-
-	//		bool pathsIntersect = mSvg->mPaths.back().getBounds().intersects( path.getBounds() );
-	//		bool usesEvenOdd = style.getFillRule() == svg::FILL_RULE_EVENODD;
-	//		bool usesStrokes = !style.getStroke().isNone();
-	//		bool usesDashing = mDashArrayStack.back() != svg::Style::getDashArrayDefault() || mDashOffsetStack.back() != svg::Style::getDashOffsetDefault();
-	//		bool usesGradient = style.getFill().isLinearGradient() || style.getFill().isRadialGradient();
-
-	//		if( usesGradient ) {
-	//			// Gradients can not be merged.
-	//		}
-	//		if( pathsIntersect ) {
-	//			// Paths generally can not be merged if they intersect.
-	//		}
-	//		// else if( usesStrokes && ( pathsIntersect || usesDashing ) ) {
-	//		//	// Paths can not be merged if they intersect when using stroking, or if the path is dashed.
-	//		//}
-	//		// else if( usesEvenOdd && pathsIntersect ) {
-	//		//	// Paths can not be merged if they intersect when using even-odd rendering.
-	//		//}
-	//		else {
-	//			path.transform( matrix );
-
-	//			mSvg->mPaths.back() += path;
-	//			return;
-	//		}
-	//	}
-	//}
 
 	path.setMiterLimit( mMiterLimitStack.back() );
 	path.setDashPattern( mDashArrayStack.back() );
@@ -1389,16 +1381,47 @@ void Svg::Renderer::render( const Shape2d &shape ) const
 	path.setStrokeWidth( mStrokeWidthStack.back() );
 
 	DrawCall dc;
-	dc.matrix = mMatrixStack.back();
+	dc.count = 1;
+	dc.offset = GLsizei( mSvg->mInstances.size() );
 	dc.fill = mFillStack.back();
 	dc.fillOpacity = mFillOpacityStack.back() * mGroupOpacityStack.back();
 	dc.fillRule = mFillRuleStack.back() == svg::FILL_RULE_NONZERO ? 0xFF : 0x01;
 	dc.stroke = mStrokeStack.back();
 	dc.strokeOpacity = mStrokeOpacityStack.back() * mGroupOpacityStack.back();
-	dc.pathId = path.getId();
+
+	// Determine current style.
+	auto style = getCurrentStyle();
+
+	// Perform path merging.
+	if( !mSvg->mDrawCalls.empty() ) {
+		if( mSvg->mPreviousStyle == style && !mSvg->mDrawCalls.back().image ) {
+			bool usesTransparency = style.getFillOpacity() < 1 || style.getFill().isTransparent();
+			bool usesGradient = style.getFill().isLinearGradient() || style.getFill().isRadialGradient();
+			bool usesEvenOdd = style.getFillRule() == svg::FILL_RULE_EVENODD;
+			bool usesStrokes = !style.getStroke().isNone();
+
+			if( usesTransparency || usesGradient || usesEvenOdd || usesStrokes ) {
+				// Paths can not be merged if they use transparency, gradients, even-odd rendering or strokes.
+			}
+			else {
+				mSvg->mInstances.push_back( path.getId() );
+				mSvg->mTransforms.push_back( toMat3x2( mMatrixStack.back() ) );
+				mSvg->mPaths.push_back( std::move( path ) );
+
+				mSvg->mDrawCalls.back().count++;
+				return;
+			}
+		}
+	}
+
+	// Keep track of current style, so we can compare with the next draw call.
+	mSvg->mPreviousStyle = style;
+
+	mSvg->mInstances.push_back( path.getId() );
+	mSvg->mTransforms.push_back( toMat3x2( mMatrixStack.back() ) );
+	mSvg->mPaths.push_back( std::move( path ) );
 
 	mSvg->mDrawCalls.push_back( std::move( dc ) );
-	mSvg->mPaths.push_back( std::move( path ) );
 }
 
 

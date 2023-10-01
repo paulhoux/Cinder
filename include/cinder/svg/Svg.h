@@ -174,6 +174,7 @@ class CI_API Paint {
 	bool            isNone() const { return mType == NONE; }
 	bool            isLinearGradient() const { return mType == LINEAR_GRADIENT; }
 	bool            isRadialGradient() const { return mType == RADIAL_GRADIENT; }
+	bool            isTransparent() const;
 	const ColorA8u &getColor( size_t idx = 0 ) const { return mStops[idx].second; }
 	float           getOffset( size_t idx ) const { return mStops[idx].first; }
 	size_t          getNumColors() const { return mStops.size(); }

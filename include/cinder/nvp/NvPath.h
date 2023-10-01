@@ -673,9 +673,9 @@ class CI_API Svg {
 	Rectf getBounds() const { return mDoc ? mDoc->getBounds() : Rectf{}; }
 
 	//! Returns whether any paths are defined.
-	bool empty() const { return mPaths.empty(); }
+	bool empty() const { return mDrawCalls.empty(); }
 	//! Returns the number of paths.
-	size_t size() const { return mPaths.size(); }
+	size_t size() const { return mDrawCalls.size(); }
 
 	void draw();
 
@@ -691,7 +691,7 @@ class CI_API Svg {
 	  public:
 		Renderer( Svg *svg );
 
-		void start() override {}
+		void start() override;
 		void finish() override {}
 		void pushGroup( const svg::Group &group, float opacity ) override;
 		void popGroup() override;
@@ -761,22 +761,25 @@ class CI_API Svg {
 	};
 
 	struct DrawCall {
-		GLuint           pathId{ 0 };
+		GLsizei          offset; // Offset into instance buffers.
+		GLsizei          count;  // Number of paths to draw.
 		svg::Paint       fill;
 		svg::Paint       stroke;
 		gl::Texture2dRef image;
 		float            fillOpacity{ 1 };
 		float            strokeOpacity{ 1 };
 		GLuint           fillRule{ 0xFF };
-		mat3             matrix;
 		mat3             coords;
 	};
 
-	svg::DocRef           mDoc;
-	Renderer              mRenderer{ this };
-	Gradients             mGradients;
-	std::vector<Path>     mPaths;
-	std::vector<DrawCall> mDrawCalls;
+	svg::DocRef              mDoc;
+	Renderer                 mRenderer{ this };
+	Gradients                mGradients;
+	std::vector<Path>        mPaths;
+	std::vector<GLuint>      mInstances;
+	std::vector<glm::mat3x2> mTransforms;
+	std::vector<DrawCall>    mDrawCalls;
+	svg::Style               mPreviousStyle;
 
 	friend class Renderer;
 };

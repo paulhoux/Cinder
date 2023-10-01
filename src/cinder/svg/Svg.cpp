@@ -308,6 +308,15 @@ Paint Paint::parse( const char *value, bool *specified, const Node *parentNode )
 	}
 }
 
+bool Paint::isTransparent() const
+{
+	for( const auto &[offset, color] : mStops )
+		if( color.a < 1 )
+			return true;
+
+	return false;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////
 // Style
 Style::Style()
@@ -1882,6 +1891,12 @@ Shape2d parsePath( const std::string &p )
 		firstCmd = false;
 		prevCmd = cmd;
 	}
+
+	// For consistency, make sure paths are defined in CCW order for filled sections, CW for holes.
+	// This is especially important when using instanced rendering.
+	bool isClockwise = result.getContour( 0 ).calcClockwise();
+	if(isClockwise)
+		result.reverse();
 
 	return result;
 }
