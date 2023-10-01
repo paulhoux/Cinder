@@ -649,24 +649,19 @@ Path2d Path2d::spiral( const vec2 &center, float innerRadius, float outerRadius,
 
 void Path2d::reverse()
 {
-    // The path is empty: nothing to do.
-    if( empty() )
-        return;
+	// The path is empty: nothing to do.
+	if( empty() )
+		return;
 
-    // Reverse all points.
-    std::reverse( mPoints.begin(), mPoints.end() );
-
-    // Reverse the segments, but skip the "moveto" and "close":
-	if( isClosed() ) {
-        // There should be at least 4 segments: "moveto", "close" and two other segments.
-        if( mSegments.size() > 3 )
-            std::reverse( mSegments.begin() + 1, mSegments.end() - 1 );
-    }
-    else {
-        // There should be at least 3 segments: "moveto" and two other segments.
-        if( mSegments.size() > 2 )
-            std::reverse( mSegments.begin() + 1, mSegments.end() );
-    }
+	// Reverse all points.
+	std::reverse( mPoints.begin(), mPoints.end() );
+	
+	if( isClosed() && mSegments.size() > 2 ) {
+		std::reverse( mSegments.begin(), mSegments.end() - 1 );
+	}
+	else if( mSegments.size() > 1 ) {
+		std::reverse( mSegments.begin(), mSegments.end() );
+	}
 }
 
 void Path2d::appendSegment( SegmentType segmentType, const vec2 *points )
@@ -1311,6 +1306,23 @@ Rectf Path2d::calcPreciseBoundingBox() const
 	}
 
 	return result;
+}
+
+bool Path2d::calcClockwise() const
+{
+	// See: https://en.wikipedia.org/wiki/Curve_orientation
+	size_t index = 0;
+	for( size_t i = 1; i < mPoints.size(); ++i ) {
+		if( mPoints.at( i ).x < mPoints.at( index ).x || ( approxEqual( mPoints.at( i ).x, mPoints.at( index ).x ) && mPoints.at( i ).y < mPoints.at( index ).y ) )
+			index = i;
+	}
+
+	const auto &a = getPoint(index);
+	const auto &b = getPointBefore(index);
+	const auto &c = getPointAfter(index);
+	const auto sign = glm::sign( (b.x-a.x)*(c.y-a.y)-(c.x-a.x)*(b.y-a.y)  );
+
+	return sign < 0;
 }
 
 namespace {

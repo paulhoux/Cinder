@@ -70,6 +70,9 @@ class CI_API Shape2d {
 	void	relativeArcTo( float rx, float ry, float phi, bool largeArcFlag, bool sweepFlag, float px, float py ) { relativeArcTo( rx, ry, phi, largeArcFlag, sweepFlag, vec2( px, py ) ); }
 	void	relativeArcTo( float rx, float ry, float phi, bool largeArcFlag, bool sweepFlag, const vec2 &p2 );
 	void	close();
+    
+	//! Reverses the orientation of the shape's contours, changing CW to CCW and vice versa.
+    void	reverse();
 	
 	bool	empty() const { return mContours.empty(); }
 	void	clear() { mContours.clear(); }

@@ -148,6 +148,12 @@ void Shape2d::close()
 		mContours.back().close();
 }
 
+void Shape2d::reverse()
+{
+	for( auto &contour : mContours )
+		contour.reverse();
+}
+
 void Shape2d::append( const Shape2d &shape )
 {
 	for( vector<Path2d>::const_iterator pathIt = shape.getContours().begin(); pathIt != shape.getContours().end(); ++pathIt )

@@ -92,7 +92,7 @@ class CI_API Path2d {
 	//! You can provide an optional radial \a offset.
 	static Path2d spiral( const vec2 &center, float innerRadius, float outerRadius, float spacing, float offset = 0 );
     
-	//! Reverses the order of the path's points, inverting its winding order
+	//! Reverses the orientation of the path, changing CW to CCW and vice versa.
     void	reverse();
 	
 	bool	empty() const { return mPoints.empty(); }
@@ -153,7 +153,12 @@ class CI_API Path2d {
 	//! Returns the bounding box around all control points. As with Shape2d, note this is not necessarily the bounding box of the Path's shape.
 	Rectf	calcBoundingBox() const;
 	//! Returns the precise bounding box around the curve itself. Slower to calculate than calcBoundingBox().
-	Rectf	calcPreciseBoundingBox() const;	
+	Rectf	calcPreciseBoundingBox() const;
+
+	//! Returns whether the path is defined in clockwise order.
+	bool calcClockwise() const;
+	//! Returns whether the path is defined in counter-clockwise order.
+	bool calcCounterClockwise() const { return !calcClockwise(); }
 
 	//! Returns whether the point \a pt is contained within the boundaries of the Path2d. If \a evenOddFill is \c true (the default) then Even-Odd fill rule is used, otherwise, the Winding fill rule is applied.
 	bool	contains( const vec2 &pt, bool evenOddFill = true ) const;
