@@ -142,6 +142,7 @@ class SvgRendererNvp : public svg::Renderer {
 		shape->setDashPattern( mDashArrayStack.back() );
 		shape->setDashOffset( mDashOffsetStack.back() );
 		shape->setEndCaps( nvp::toCapsStyle( mLineCapStack.back() ) );
+		shape->setDashCaps( nvp::toCapsStyle( mLineCapStack.back() ), nvp::toCapsStyle( mLineCapStack.back() ) );
 		shape->setJoinStyle( nvp::toJoinStyle( mLineJoinStack.back() ) );
 		shape->setStrokeWidth( mStrokeWidthStack.back() );
 		mPathCache.insert_or_assign( &path, shape );
@@ -395,7 +396,7 @@ class NvPathSvgApp : public App {
 	svg::DocRef    mDoc;
 	SvgRendererNvp mRenderer;
 	ci::fs::path   mFilePath;
-	size_t         mPathCount = 0;
+	size_t         mNumDrawCalls = 0;
 	bool           mUseSvg = true;
 };
 
@@ -417,7 +418,7 @@ void NvPathSvgApp::update()
 
 	std::string title;
 	title.resize( 255 );
-	snprintf( title.data(), title.size(), "%s (%.0f FPS) : %s - %d paths", name.c_str(), static_cast<double>( getAverageFps() ), mUseSvg ? "nvp::Svg" : "svg::Doc", mPathCount );
+	snprintf( title.data(), title.size(), "%s (%.0f FPS) : %s - %d draw calls", name.c_str(), static_cast<double>( getAverageFps() ), mUseSvg ? "nvp::Svg" : "svg::Doc", mNumDrawCalls );
 
 	getWindow()->setTitle( title );
 }
@@ -446,7 +447,7 @@ void NvPathSvgApp::draw()
 			// Send SVG document to our renderer.
 			mDoc->render( mRenderer );
 
-			mPathCount = mRenderer.size();
+			mNumDrawCalls = mRenderer.size();
 		}
 		else if( mUseSvg ) {
 			gl::ScopedModelMatrix sm;
@@ -463,7 +464,7 @@ void NvPathSvgApp::draw()
 
 			mSvg.draw();
 
-			mPathCount = mSvg.size();
+			mNumDrawCalls = mSvg.size();
 		}
 	}
 
@@ -476,6 +477,7 @@ void NvPathSvgApp::draw()
 
 void NvPathSvgApp::resize()
 {
+	mCanvasUi.resize( getWindowSize() );
 	mCanvas.resize( getWindowSize() );
 }
 
