@@ -5,9 +5,9 @@ This code is intended for use with the Cinder C++ library: http://libcinder.org
  Redistribution and use in source and binary forms, with or without modification, are permitted provided that
  the following conditions are met:
 
-    * Redistributions of source code must retain the above copyright notice, this list of conditions and
+	* Redistributions of source code must retain the above copyright notice, this list of conditions and
 	the following disclaimer.
-    * Redistributions in binary form must reproduce the above copyright notice, this list of conditions and
+	* Redistributions in binary form must reproduce the above copyright notice, this list of conditions and
 	the following disclaimer in the documentation and/or other materials provided with the distribution.
 
  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED
@@ -65,6 +65,7 @@ class CanvasUi {
 		disconnect();
 
 		mWindow = window;
+		mWindowSize = window->getSize();
 		mSignalPriority = signalPriority;
 		if( window ) {
 			mConnections.push_back( window->getSignalDraw().connect( signalPriority, [this]() { update(); } ) );
@@ -125,6 +126,14 @@ class CanvasUi {
 		mPosition = mAnchor = vec2( 0 );
 		mScale = mScaleTarget = 1.0f;
 		mIsDirty = mIsInvDirty = true;
+	}
+
+	void resize( const ivec2 &size )
+	{
+		mPosition += 0.5f * vec2( size - mWindowSize ) / mScaleTarget;
+		mAnchor += 0.5f * vec2( size - mWindowSize ) / mScaleTarget;
+		mIsDirty = mIsInvDirty = true;
+		mWindowSize = size;
 	}
 
 	void mouseDown( app::MouseEvent &event )
@@ -192,9 +201,10 @@ class CanvasUi {
 		mPosition += vec2( getModelMatrix() * vec4( anchor - mAnchor, 0, 0 ) );
 		mAnchor = anchor;
 	}
-	
+
 	std::vector<signals::Connection> mConnections;
 	app::WindowRef                   mWindow;
+	ivec2                            mWindowSize;
 	vec2                             mMouse{ 0 };
 	vec2                             mClick{ 0 };
 	vec2                             mAnchor{ 0 };
