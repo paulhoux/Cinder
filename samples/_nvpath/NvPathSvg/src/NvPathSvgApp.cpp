@@ -60,8 +60,6 @@ class SvgRendererNvp : public svg::Renderer {
 
 		// Enable stencil buffer testing.
 		mCtx->pushBoolState( GL_STENCIL_TEST, GL_TRUE );
-		gl::stencilFunc( GL_NOTEQUAL, 0, 0xFF );
-		gl::stencilOp( GL_KEEP, GL_KEEP, GL_ZERO );
 
 		// Enable premultiplied alpha.
 		mCtx->pushBoolState( GL_BLEND, GL_TRUE );
@@ -108,6 +106,7 @@ class SvgRendererNvp : public svg::Renderer {
 			scpShader.setColor( solidColor );
 
 			gl::stencilFunc( GL_NOTEQUAL, 0, mFillRuleStack.back() );
+			gl::stencilOp( GL_KEEP, GL_KEEP, GL_ZERO );
 			gl::stencilThenCoverFillPathNV( shape->getId(), GL_COUNT_UP_NV, mFillRuleStack.back(), GL_BOUNDING_BOX_NV );
 		}
 
@@ -121,6 +120,7 @@ class SvgRendererNvp : public svg::Renderer {
 			scpShader.setColor( solidColor );
 
 			gl::stencilFunc( GL_NOTEQUAL, 0, 0xFF );
+			gl::stencilOp( GL_KEEP, GL_KEEP, GL_ZERO );
 			gl::stencilThenCoverStrokePathNV( shape->getId(), GL_COUNT_UP_NV, 0xFF, GL_BOUNDING_BOX_NV );
 		}
 
@@ -354,7 +354,7 @@ class SvgRendererNvp : public svg::Renderer {
 		return nvp::Shader::Type::RADIAL_GRADIENT;
 	}
 
-	gl::Context *                   mCtx{ nullptr };
+	gl::Context                    *mCtx{ nullptr };
 	std::vector<mat3>               mMatrixStack;
 	bool                            mMatrixStackContainsIllegal{ false };
 	std::vector<svg::Style>         mStyleStack;
@@ -528,7 +528,7 @@ void NvPathSvgApp::fileDrop( FileDropEvent event )
 
 bool NvPathSvgApp::loadSvgFile( const fs::path &file )
 {
-	Timer t(true);
+	Timer t( true );
 
 	if( file.extension() == ".svgz" )
 		mDoc = svg::Doc::createFromSvgz( loadFile( file ) );
@@ -537,7 +537,7 @@ bool NvPathSvgApp::loadSvgFile( const fs::path &file )
 	else
 		return false;
 
-	CI_LOG_I("Parsing SVG took " << t.getSeconds() << "s.");
+	CI_LOG_I( "Parsing SVG took " << t.getSeconds() << "s." );
 
 	mFilePath = file;
 
@@ -546,7 +546,7 @@ bool NvPathSvgApp::loadSvgFile( const fs::path &file )
 
 	t.start();
 	mSvg = nvp::Svg( mDoc );
-	CI_LOG_I("Preparing SVG for path rendering took " << t.getSeconds() << "s.");
+	CI_LOG_I( "Preparing SVG for path rendering took " << t.getSeconds() << "s." );
 
 	return true;
 }

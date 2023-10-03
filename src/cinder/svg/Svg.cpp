@@ -377,6 +377,7 @@ void Style::clear()
 	mSpecifiesMiterLimit = false;
 	mSpecifiesDashArray = false;
 	mSpecifiesDashOffset = false;
+	mSpecifiesClipPath = false;
 	mSpecifiesFontFamilies = mSpecifiesFontSize = mSpecifiesFontWeight = false;
 	mSpecifiesVisible = false;
 	mVisible = true;
@@ -525,6 +526,24 @@ bool Style::parseProperty( const std::string &key, const std::string &value, con
 		}
 		return true;
 	}
+	else if( key == "clip-path" ) {
+		if( value != "inherit" ) {
+			if( !strncmp( value.c_str(), "url", 3 ) ) {
+				char        id[1024];
+				const char *hash = strchr( value.c_str(), '#' );
+				const char *closeParen = strchr( value.c_str(), ')' );
+				if( ( !closeParen ) || ( !hash ) || ( closeParen - hash >= 1024 ) )
+					return false;
+				strncpy( id, hash + 1, closeParen - hash - 1 );
+				id[closeParen - hash - 1] = 0;
+				mSpecifiesClipPath = true;
+				mClipPath = id;
+				return true;
+			}
+			return false;
+		}
+		return true;
+	}
 	else if( key == "font-family" ) {
 		mSpecifiesFontFamilies = true;
 		setFontFamilies( readStringList( value, true ) );
@@ -614,6 +633,8 @@ bool Style::operator==( const Style &other ) const
 		return false;
 	if( mSpecifiesDashOffset && !approxEqual( mDashOffset, other.mDashOffset ) )
 		return false;
+	if( mSpecifiesClipPath && mClipPath != other.mClipPath )
+		return false;
 	return true;
 }
 
@@ -643,6 +664,8 @@ void Style::operator+=( const Style &other )
 		setDashArray( other.mDashArray );
 	if( other.mSpecifiesDashOffset )
 		setDashOffset( other.mDashOffset );
+	if( other.mSpecifiesClipPath )
+		setClipPath( other.mClipPath );
 }
 
 Style Style::operator+( const Style &other ) const
@@ -684,7 +707,7 @@ void Style::startRender( Renderer &renderer, bool isNodeDrawable ) const
 	if( mSpecifiesDashArray )
 		renderer.pushDashArray( mDashArray );
 	if( mSpecifiesDashOffset )
-		renderer.pushDashOffset( mDashOffset );
+		renderer.pushDashOffset( mDashOffset );		
 }
 
 void Style::finishRender( Renderer &renderer, bool isNodeDrawable ) const
@@ -1193,6 +1216,14 @@ Style Node::calcInheritedStyle() const
 	return result;
 }
 
+const ClipPath * Node::getClipPath() const
+{
+	if( getStyle().specifiesClipPath() )
+		return dynamic_cast<const ClipPath *>( findInAncestors( getStyle().getClipPath() ) );
+
+	return nullptr;
+}
+
 void Node::render( Renderer &renderer ) const
 {
 	renderer.start();
@@ -1219,14 +1250,22 @@ void Node::startRender( Renderer &renderer, const Style &style ) const
 		renderer.pushMatrix( mTransform );
 	renderer.pushStyle( style );
 	style.startRender( renderer, this->isDrawable() );
+
+	const ClipPath *clip = getClipPath();
+	if(clip)
+		renderer.pushClipPath( *clip );
 }
 
 void Node::finishRender( Renderer &renderer, const Style &style ) const
 {
+	const ClipPath *clip = getClipPath();
+	if( clip )
+		renderer.popClipPath();
+
+	style.finishRender( renderer, this->isDrawable() );
+	renderer.popStyle();
 	if( mSpecifiesTransform )
 		renderer.popMatrix();
-	renderer.popStyle();
-	style.finishRender( renderer, this->isDrawable() );
 }
 
 const Node *Node::findInAncestors( const std::string &elementId ) const
@@ -2140,7 +2179,7 @@ void Group::parse( const XmlTree &xml )
 				strncpy( id, hash + 1, closeParen - hash - 1 );
 				id[closeParen - hash - 1] = 0;
 
-				mClipPathId = id;
+				mStyle.setClipPath( id );
 			}
 		}
 	}
@@ -2288,6 +2327,9 @@ Node *Group::nodeUnderPoint( const vec2 &absolutePoint, const mat3 &parentInvers
 
 const Node *Group::findInAncestors( const std::string &elementId ) const
 {
+	if( elementId.empty() )
+		return nullptr;
+
 	const Node *result;
 
 	if( getId() == elementId )
@@ -2333,8 +2375,9 @@ Shape2d Group::getMergedShape2d() const
 void Group::appendMergedShape2d( Shape2d *appendTo ) const
 {
 	for( auto child : mChildren ) {
-		if( typeid( *child ) == typeid( Group ) )
-			reinterpret_cast<Group *>( child )->appendMergedShape2d( appendTo );
+		const auto *group = dynamic_cast<const Group *>( child );
+		if( group )
+			group->appendMergedShape2d( appendTo );
 		else
 			appendTo->append( child->getShape() );
 	}
@@ -2359,10 +2402,6 @@ void Group::renderSelf( Renderer &renderer ) const
 {
 	renderer.pushGroup( *this, getStyle().getOpacity() );
 
-	const ClipPath *clip = getClipPath();
-	if( clip )
-		renderer.pushClipPath( *clip );
-
 	for( auto child : mChildren ) {
 		Style style = child->getStyle();
 		if( !renderer.visit( *child, &style ) )
@@ -2375,9 +2414,6 @@ void Group::renderSelf( Renderer &renderer ) const
 		child->renderSelf( renderer );
 		child->finishRender( renderer, style );
 	}
-
-	if( clip )
-		renderer.popClipPath();
 
 	renderer.popGroup();
 }
@@ -2400,14 +2436,6 @@ Rectf Group::calcBoundingBox() const
 		}
 	}
 	return result;
-}
-
-const ClipPath *Group::getClipPath() const
-{
-	if( !mClipPathId.empty() )
-		return dynamic_cast<const ClipPath *>( mParent->findInAncestors( mClipPathId ) );
-
-	return nullptr;
 }
 
 void Group::iterate( const std::function<void( Node * )> &fn )
@@ -2554,7 +2582,7 @@ Image::Image( Node *parent, const XmlTree &xml )
 				strncpy( id, hash + 1, closeParen - hash - 1 );
 				id[closeParen - hash - 1] = 0;
 
-				mClipPathId = id;
+				mStyle.setClipPath( id );
 			}
 		}
 	}
@@ -2601,25 +2629,10 @@ std::shared_ptr<Surface8u> Image::parseDataImage( const string &data )
 	return {};
 }
 
-const ClipPath *Image::getClipPath() const
-{
-	if( !mClipPathId.empty() )
-		return dynamic_cast<const ClipPath *>( mParent->findInAncestors( mClipPathId ) );
-
-	return nullptr;
-}
-
 void Image::renderSelf( Renderer &renderer ) const
 {
 	if( mImage ) {
-		const ClipPath *clip = getClipPath();
-		if( clip )
-			renderer.pushClipPath( *clip );
-
 		renderer.drawImage( *this );
-
-		if( clip )
-			renderer.popClipPath();
 	}
 }
 
@@ -2949,26 +2962,8 @@ const Node *Defs::findNode( const std::string &id, bool recurse ) const
 ////////////////////////////////////////////////////////////////////////////////////
 // ClipPath
 ClipPath::ClipPath( Node *parent, const XmlTree &xml )
-	: Path( parent, xml )
+	: Group( parent, xml )
 {
-	CI_LOG_W( "SVG contains clip paths, which are not fully implemented yet." );
-
-	parse( xml );
-}
-
-void ClipPath::parse( const XmlTree &xml )
-{
-	for( XmlTree::ConstIter treeIt = xml.begin(); treeIt != xml.end(); ++treeIt ) {
-		const Node *node = Group::create( this, *treeIt );
-		if( node ) {
-			const auto shape = node->getShape();
-			if( !shape.empty() ) {
-				for( const auto &contour : shape.getContours() ) {
-					mPath.appendContour( contour );
-				}
-			}
-		}
-	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////////

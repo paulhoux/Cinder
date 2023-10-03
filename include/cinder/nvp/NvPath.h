@@ -128,21 +128,19 @@ CI_API class Path {
 	//! Sets the miter limit for stokes.
 	void setMiterLimit( float limit ) const;
 
+	//! Sets multiple stroke parameters at once.
+	void setStroke( CapsStyle caps, float strokeWidth ) const { setStroke( caps, JoinStyle::DEFAULT, strokeWidth ); }
+	//! Sets multiple stroke parameters at once.
+	void setStroke( JoinStyle join, float strokeWidth ) const { setStroke( CapsStyle::DEFAULT, join, strokeWidth ); }
+	//! Sets multiple stroke parameters at once.
+	void setStroke( CapsStyle caps, JoinStyle join, float strokeWidth ) const;
+
 	//! Renders the path to the stencil buffer but does not cover the path.
 	//! Use the `stroke()` methods to stencil and cover the path in a single step.
-	virtual void stencilStroke( float strokeWidth ) { stencilStroke( CapsStyle::DEFAULT, JoinStyle::DEFAULT, strokeWidth ); }
-	//! Renders the path to the stencil buffer but does not cover the path.
-	//! Use the `stroke()` methods to stencil and cover the path in a single step.
-	virtual void stencilStroke( CapsStyle caps, float strokeWidth ) { stencilStroke( caps, JoinStyle::DEFAULT, strokeWidth ); }
-	//! Renders the path to the stencil buffer but does not cover the path.
-	//! Use the `stroke()` methods to stencil and cover the path in a single step.
-	virtual void stencilStroke( JoinStyle join, float strokeWidth ) { stencilStroke( CapsStyle::DEFAULT, join, strokeWidth ); }
-	//! Renders the path to the stencil buffer but does not cover the path.
-	//! Use the `stroke()` methods to stencil and cover the path in a single step.
-	virtual void stencilStroke( CapsStyle caps, JoinStyle join, float strokeWidth );
+	virtual void stencilStroke( GLuint stencilMask = 0xFF );
 	//! Renders the path to the stencil buffer but does not cover the path.
 	//! Use the `fill()` methods to stencil and cover the path in a single step.
-	virtual void stencilFill();
+	virtual void stencilFill( GLuint stencilMask = 0xFF, GLenum fillMode = GL_COUNT_UP_NV );
 
 	//! Covers the paths that have already been rendered to the stencil buffer using a solid \a color. Clears the affected region of the stencil buffer by default, but this can be overridden.
 	//! Use the `fill()` or `stroke()` methods to stencil and cover the path in a single step.
@@ -153,32 +151,26 @@ CI_API class Path {
 	virtual void cover( const gl::Texture2dRef &texture, const Rectf &bounds, bool clearStencil = true );
 
 	//! Strokes the path with a solid \a color.
-	virtual void stroke( const ColorA &color, float strokeWidth = 1 ) const { stroke( color, CapsStyle::DEFAULT, JoinStyle::DEFAULT, strokeWidth ); }
-	//! Strokes the path with a solid \a color and the specified \a caps style.
-	virtual void stroke( const ColorA &color, CapsStyle caps, float strokeWidth = 1 ) const { stroke( color, caps, JoinStyle::DEFAULT, strokeWidth ); }
-	//! Strokes the path with a solid \a color and the specified \a join style.
-	virtual void stroke( const ColorA &color, JoinStyle join, float strokeWidth = 1 ) const { stroke( color, CapsStyle::DEFAULT, join, strokeWidth ); }
-	//! Strokes the path with a solid \a color and the specified \a caps and \a join styles.
-	virtual void stroke( const ColorA &color, CapsStyle caps, JoinStyle join, float strokeWidth = 1 ) const;
+	virtual void stroke( const ColorA &color, bool clearStencil = true ) const;
 
 	//! Strokes the path instances with a solid \a color and the specified \a caps and \a join styles.
-	virtual void strokeInstanced( const std::vector<GLuint> &paths, const std::vector<glm::mat3x2> &transforms, const ColorA &color, CapsStyle caps, JoinStyle join, float strokeWidth = 1 );
+	virtual void strokeInstanced( const std::vector<GLuint> &paths, const std::vector<glm::mat3x2> &transforms, const ColorA &color, bool clearStencil = true );
 	//! Strokes the path instances with a solid \a color and the specified \a caps and \a join styles.
-	virtual void strokeInstanced( const std::vector<GLuint> &paths, const std::vector<glm::mat4x3> &transforms, const ColorA &color, CapsStyle caps, JoinStyle join, float strokeWidth = 1 );
+	virtual void strokeInstanced( const std::vector<GLuint> &paths, const std::vector<glm::mat4x3> &transforms, const ColorA &color, bool clearStencil = true );
 
 	//! Fills the path with a solid \a color.
-	virtual void fill( const ColorA &color ) const;
+	virtual void fill( const ColorA &color, bool clearStencil = true ) const;
 	//! Fills the path with a \a texture, automatically centered within the path's bounding box.
-	virtual void fill( const gl::TextureRef &texture ) const { fill( texture, getBounds() ); }
+	virtual void fill( const gl::TextureRef &texture, bool clearStencil = true ) const { fill( texture, getBounds(), clearStencil ); }
 	//! Fills the path with a \a texture, automatically centered within the specified \a bounding box.
-	virtual void fill( const gl::TextureRef &texture, const Rectf &bounds ) const;
+	virtual void fill( const gl::TextureRef &texture, const Rectf &bounds, bool clearStencil = true ) const;
 	//! Fills the path with a \a texture.
-	virtual void fill( const gl::TextureRef &texture, const vec2 &upperLeftTexCoord, const vec2 &lowerRightTexCoord ) const;
+	virtual void fill( const gl::TextureRef &texture, const vec2 &upperLeftTexCoord, const vec2 &lowerRightTexCoord, bool clearStencil = true ) const;
 
 	//! Fills the path instances with a solid \a color.
-	virtual void fillInstanced( const std::vector<GLuint> &paths, const std::vector<glm::mat3x2> &transforms, const ColorA &color ) const;
+	virtual void fillInstanced( const std::vector<GLuint> &paths, const std::vector<glm::mat3x2> &transforms, const ColorA &color, bool clearStencil = true ) const;
 	//! Fills the path instances with a solid \a color.
-	virtual void fillInstanced( const std::vector<GLuint> &paths, const std::vector<glm::mat4x3> &transforms, const ColorA &color ) const;
+	virtual void fillInstanced( const std::vector<GLuint> &paths, const std::vector<glm::mat4x3> &transforms, const ColorA &color, bool clearStencil = true ) const;
 
 	//! Creates a new path by adding paths together.
 	[[nodiscard]] Path operator+( const Path &other ) const;
@@ -745,31 +737,32 @@ class CI_API Svg {
 		//!
 		void render( const Shape2d &shape ) const;
 
-		Svg *                           mSvg = nullptr;
-		std::vector<mat3>               mMatrixStack;
-		std::vector<svg::Paint>         mFillStack, mStrokeStack;
-		std::vector<float>              mFillOpacityStack, mStrokeOpacityStack;
-		std::vector<float>              mGroupOpacityStack;
-		std::vector<float>              mStrokeWidthStack;
-		std::vector<svg::FillRule>      mFillRuleStack;
-		std::vector<svg::LineCap>       mLineCapStack;
-		std::vector<svg::LineJoin>      mLineJoinStack;
-		std::vector<float>              mMiterLimitStack;
-		std::vector<std::vector<float>> mDashArrayStack;
-		std::vector<float>              mDashOffsetStack;
-		std::vector<svg::ClipPath>      mClipPathStack;
+		Svg                               *mSvg = nullptr;
+		std::vector<mat3>                  mMatrixStack;
+		std::vector<svg::Paint>            mFillStack, mStrokeStack;
+		std::vector<float>                 mFillOpacityStack, mStrokeOpacityStack;
+		std::vector<float>                 mGroupOpacityStack;
+		std::vector<float>                 mStrokeWidthStack;
+		std::vector<svg::FillRule>         mFillRuleStack;
+		std::vector<svg::LineCap>          mLineCapStack;
+		std::vector<svg::LineJoin>         mLineJoinStack;
+		std::vector<float>                 mMiterLimitStack;
+		std::vector<std::vector<float>>    mDashArrayStack;
+		std::vector<float>                 mDashOffsetStack;
+		std::vector<const svg::ClipPath *> mClipPathStack;
 	};
 
 	struct DrawCall {
-		GLsizei          offset; // Offset into instance buffers.
-		GLsizei          count;  // Number of paths to draw.
-		svg::Paint       fill;
-		svg::Paint       stroke;
-		gl::Texture2dRef image;
-		float            fillOpacity{ 1 };
-		float            strokeOpacity{ 1 };
-		GLuint           fillRule{ 0xFF };
-		mat3             coords;
+		GLsizei          offset{ 0 };        // Offset into instance buffers.
+		GLsizei          count{ 1 };         // Number of paths to draw.
+		svg::Paint       fill;               //
+		svg::Paint       stroke;             //
+		gl::Texture2dRef image;              //
+		float            fillOpacity{ 1 };   //
+		float            strokeOpacity{ 1 }; //
+		GLuint           fillRule{ 0xFF };   // Used for non-zero (0xFF) or even-odd (0x01) rendering.
+		GLuint           clipMask{ 0x00 };   // If non-zero, path will be used as a clip-path.
+		GLuint           coverMask{ 0x00 };  // If non-zero, path will be clipped.
 	};
 
 	svg::DocRef              mDoc;

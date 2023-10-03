@@ -292,7 +292,13 @@ class CI_API Style {
 	float			getDashOffset() const { return mDashOffset; }
 	void			setDashOffset( float dashOffset ) { mSpecifiesDashOffset = true; mDashOffset = dashOffset; }
 	static float	getDashOffsetDefault() { return 0; }
-	
+
+	// clip path
+	bool               specifiesClipPath() const { return mSpecifiesClipPath; }
+	void               unspecifyClipPath() { mSpecifiesClipPath = false; }
+	const std::string &getClipPath() const { return mClipPath; }
+	void               setClipPath( const std::string &clipPath ) { mSpecifiesClipPath = true; mClipPath = clipPath; }
+
 	// fonts
 	bool                            specifiesFontFamilies() const { return mSpecifiesFontFamilies; }
 	void                            unspecifyFontFamilies() { mSpecifiesFontFamilies = false; }
@@ -362,6 +368,8 @@ class CI_API Style {
 	std::vector<float> mDashArray;
 	bool               mSpecifiesDashOffset;
 	float              mDashOffset;
+	bool               mSpecifiesClipPath;
+	std::string        mClipPath;
 
 	// fonts
 	bool                     mSpecifiesFontFamilies, mSpecifiesFontSize, mSpecifiesFontWeight;
@@ -399,6 +407,9 @@ class CI_API Node {
 	void setStyle( const Style &style ) { mStyle = style; }
 	//! Returns the node's Style, including attributes inherited from its ancestors for attributes it does not specify
 	Style calcInheritedStyle() const;
+
+	//! Returns the ClipPath for this node. Returns NULL on failure.
+	virtual const ClipPath *getClipPath() const;
 
 	//! Returns whether the point \a pt is inside of the Node's shape.
 	virtual bool containsPoint( const vec2 & /*pt*/ ) const { return false; }
@@ -490,18 +501,17 @@ class CI_API Node {
 	static std::string findStyleValue( const std::string &styleString, const std::string &key );
 	void               parseStyle( const std::string &value );
 
-	Node *        mParent;
+	Node         *mParent;
 	std::string   mTag;
 	std::string   mId;
 	bool          mSpecifiesTransform;
 	mat3          mTransform;
 	mutable bool  mBoundingBoxCached;
 	mutable Rectf mBoundingBox;
+	Style         mStyle; // Try avoiding directly accessing this variable, use getStyle() instead if possible.
 
   private:
 	void firstStartRender( Renderer &renderer ) const;
-
-	Style mStyle; // Try avoiding directly accessing this variable, use getStyle() instead if possible.
 
 	friend class Group;
 	friend class Use;
@@ -786,11 +796,6 @@ class CI_API Image : public Node {
 
 	bool containsPoint( const vec2 &pt ) const override { return mBounds.contains( pt ); }
 
-	//! Returns whether a clip-path was defined for this image.
-	bool specifiesClipPath() const { return !mClipPathId.empty(); }
-	//! Returns the ClipPath for this image. Returns NULL on failure.
-	const ClipPath *getClipPath() const;
-
 	//! Returns a transformation matrix for the texture coordinates.
 	const mat3 &getTextureMatrix() const { return mTextureMatrix; }
 
@@ -803,7 +808,6 @@ class CI_API Image : public Node {
 	Rectf                      mBounds;
 	fs::path                   mFilePath;
 	std::shared_ptr<Surface8u> mImage;
-	std::string                mClipPathId;
 	mat3                       mTextureMatrix;
 };
 
@@ -932,11 +936,6 @@ class CI_API Group : public Node, private Noncopyable {
 	//! Returns a reference to the child at \a index. Throws svg::ExcChildNotFound if \a index is out of range.
 	Node &getChild( size_t index ) { return const_cast<Node &>( const_cast<const Group *>( this )->getChild( index ) ); }
 
-	//! Returns whether a clip-path was defined for this group.
-	bool specifiesClipPath() const { return !mClipPathId.empty(); }
-	//! Returns the ClipPath for this group. Returns NULL on failure.
-	const ClipPath *getClipPath() const;
-
 	//! Recursively iterates all Nodes in Group or Doc, passing each to \a fn to be optionally manipulated
 	virtual void iterate( const std::function<void( Node * )> &fn );
 
@@ -954,7 +953,6 @@ class CI_API Group : public Node, private Noncopyable {
 	virtual void parse( const XmlTree &xml );
 
 	std::list<Node *> mChildren;
-	std::string       mClipPathId;
 
 	friend class Node;
 };
@@ -976,29 +974,13 @@ class CI_API Defs : public Group {
 };
 
 //! SVG ClipPath element: https://www.w3.org/TR/SVG/render.html#ClippingAndMasking
-class CI_API ClipPath : public Path {
+class CI_API ClipPath : public Group {
   public:
 	ClipPath( Node *parent )
-		: Path( parent )
+		: Group( parent )
 	{
 	}
 	ClipPath( Node *parent, const XmlTree &xml );
-
-	ClipPath( const ClipPath & ) = default;
-	ClipPath( ClipPath && ) = default;
-	ClipPath &operator=( const ClipPath & ) = default;
-	ClipPath &operator=( ClipPath && ) = default;
-
-	~ClipPath() override = default;
-
-  protected:
-	void renderSelf( Renderer &renderer ) const override
-	{ /* never render */
-		//renderer.pushFillOpacity( 0.5f );
-		//renderer.drawPath( *this );
-		//renderer.popFillOpacity();
-	}
-	void parse( const XmlTree &xml );
 };
 
 //!
