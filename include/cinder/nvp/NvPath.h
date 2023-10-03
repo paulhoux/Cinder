@@ -49,6 +49,7 @@ class Gradient;
 class Gradients;
 class Path;
 class Shader;
+class Svg;
 
 using CanvasRef = std::shared_ptr<Canvas>;
 using PathRef = std::shared_ptr<Path>;
@@ -62,10 +63,11 @@ CI_API enum class CapsStyle { FLAT = GL_FLAT, SQUARE = GL_SQUARE_NV, ROUND = GL_
 CI_API enum class JoinStyle { ROUND = GL_ROUND_NV, BEVEL = GL_BEVEL_NV, MITER_REVERT = GL_MITER_REVERT_NV, MITER_TRUNCATE = GL_MITER_TRUNCATE_NV, DEFAULT = GL_MITER_REVERT_NV };
 //!
 CI_API enum class PathStyle { MOVETO_RESETS = GL_MOVE_TO_RESETS_NV, MOVETO_CONTINUES = GL_MOVE_TO_CONTINUES_NV, DEFAULT = GL_MOVE_TO_RESETS_NV };
-//! Defines the coordinate system used by the gradient.
-enum class GradientUnits { OBJECT_BOUNDING_BOX = GL_PATH_OBJECT_BOUNDING_BOX_NV, USER_SPACE_ON_USE = GL_OBJECT_LINEAR_NV, DEFAULT = GL_PATH_OBJECT_BOUNDING_BOX_NV };
-//! Defines the spread method used by the gradient.
-enum class GradientSpreadMethod { PAD = GL_CLAMP_TO_EDGE, REFLECT = GL_MIRRORED_REPEAT, REPEAT = GL_REPEAT, DEFAULT = PAD };
+
+//! Defines the coordinate system used by gradients and images.
+enum class CoordinateSpace { OBJECT_BOUNDING_BOX = GL_PATH_OBJECT_BOUNDING_BOX_NV, USER_SPACE_ON_USE = GL_OBJECT_LINEAR_NV, DEFAULT = GL_PATH_OBJECT_BOUNDING_BOX_NV };
+//! Defines the spread method used by gradient and images.
+enum class SpreadMethod { PAD = GL_CLAMP_TO_EDGE, REFLECT = GL_MIRRORED_REPEAT, REPEAT = GL_REPEAT, DEFAULT = PAD };
 
 //!
 CapsStyle toCapsStyle( ci::svg::LineCap lineCap );
@@ -338,9 +340,9 @@ class Gradient {
 	std::unique_ptr<uint8_t[]> data( int32_t width, int32_t height, float from = 0.0f, float to = 1.0f ) const;
 
   protected:
-	mat3                 mTransform;
-	GradientUnits        mUnits{ GradientUnits::DEFAULT };
-	GradientSpreadMethod mSpread{ GradientSpreadMethod::DEFAULT };
+	mat3            mTransform;
+	CoordinateSpace mUnits{ CoordinateSpace::DEFAULT };
+	SpreadMethod    mSpread{ SpreadMethod::DEFAULT };
 
   private:
 	std::vector<Stop> mStops;
@@ -381,12 +383,12 @@ class LinearGradient : public Gradient {
 		mTransform = transform;
 		return *this;
 	}
-	LinearGradient &units( GradientUnits units )
+	LinearGradient &units( CoordinateSpace units )
 	{
 		mUnits = units;
 		return *this;
 	}
-	LinearGradient &spread( GradientSpreadMethod spread )
+	LinearGradient &spread( SpreadMethod spread )
 	{
 		mSpread = spread;
 		return *this;
@@ -463,12 +465,12 @@ class RadialGradient : public Gradient {
 		mTransform = transform;
 		return *this;
 	}
-	RadialGradient &units( GradientUnits units )
+	RadialGradient &units( CoordinateSpace units )
 	{
 		mUnits = units;
 		return *this;
 	}
-	RadialGradient &spread( GradientSpreadMethod spread )
+	RadialGradient &spread( SpreadMethod spread )
 	{
 		mSpread = spread;
 		return *this;
@@ -652,6 +654,81 @@ class CI_API ScopedShader : public Noncopyable {
 };
 
 //!
+class Renderer : public svg::Renderer {
+  public:
+	Renderer( Svg *svg );
+
+	void start() override;
+	void finish() override {}
+	void pushGroup( const svg::Group &group, float opacity ) override;
+	void popGroup() override;
+	void pushClipPath( const svg::ClipPath &clippath ) override;
+	void popClipPath() override;
+	void drawPath( const svg::Path & ) override;
+	void drawPolyline( const svg::Polyline & ) override;
+	void drawPolygon( const svg::Polygon & ) override;
+	void drawLine( const svg::Line & ) override;
+	void drawRect( const svg::Rect & ) override;
+	void drawCircle( const svg::Circle & ) override;
+	void drawEllipse( const svg::Ellipse & ) override;
+	void drawImage( const svg::Image & ) override;
+	void drawTextSpan( const svg::TextSpan & ) override {}
+	void pushMatrix( const mat3 & ) override;
+	void popMatrix() override;
+	// void pushStyle( const svg::Style & ) override;
+	// void popStyle() override;
+	void pushFill( const svg::Paint & ) override;
+	void popFill() override;
+	void pushStroke( const svg::Paint & ) override;
+	void popStroke() override;
+	void pushFillOpacity( float ) override;
+	void popFillOpacity() override;
+	void pushStrokeOpacity( float ) override;
+	void popStrokeOpacity() override;
+	void pushStrokeWidth( float ) override;
+	void popStrokeWidth() override;
+	void pushFillRule( svg::FillRule ) override;
+	void popFillRule() override;
+	void pushLineCap( svg::LineCap ) override;
+	void popLineCap() override;
+	void pushLineJoin( svg::LineJoin ) override;
+	void popLineJoin() override;
+	void pushMiterLimit( float miterLimit ) override;
+	void popMiterLimit() override;
+	void pushDashArray( const std::vector<float> &dashArray ) override;
+	void popDashArray() override;
+	void pushDashOffset( float dashOffset ) override;
+	void popDashOffset() override;
+	void pushTextPen( const vec2 & ) override {}
+	void popTextPen() override {}
+	void pushTextRotation( float ) override {}
+	void popTextRotation() override {}
+
+  private:
+	//!
+	svg::Style getCurrentStyle() const;
+	//!
+	bool shouldRender() const { return !( mFillStack.back().isNone() && mStrokeStack.back().isNone() ); }
+	//!
+	void render( const Path &path ) const;
+
+	Svg                               *mSvg = nullptr;
+	std::vector<mat3>                  mMatrixStack;
+	std::vector<svg::Paint>            mFillStack, mStrokeStack;
+	std::vector<float>                 mFillOpacityStack, mStrokeOpacityStack;
+	std::vector<float>                 mGroupOpacityStack;
+	std::vector<float>                 mStrokeWidthStack;
+	std::vector<svg::FillRule>         mFillRuleStack;
+	std::vector<svg::LineCap>          mLineCapStack;
+	std::vector<svg::LineJoin>         mLineJoinStack;
+	std::vector<float>                 mMiterLimitStack;
+	std::vector<std::vector<float>>    mDashArrayStack;
+	std::vector<float>                 mDashOffsetStack;
+	std::vector<const svg::ClipPath *> mClipPathStack;
+	//mutable svg::Style                 mPreviousStyle;
+	//mutable bool                       mPreviousWasImage = false;
+};
+
 class CI_API Svg {
   public:
 	Svg() = default;
@@ -668,8 +745,92 @@ class CI_API Svg {
 	bool empty() const { return mDrawCalls.empty(); }
 	//! Returns the number of paths.
 	size_t size() const { return mDrawCalls.size(); }
+	//!
+	void clear()
+	{
+		mPathsLookup.clear();
+		mPaths.clear();
+		mDrawCalls.clear();
+		mInstances.clear();
+		mTransforms.clear();
+	}
 
 	void draw();
+
+	//!
+	bool findPath( size_t uuid, size_t &index ) const;
+	//!
+	size_t insertOrReplacePath( size_t uuid, Path &&path );
+	//
+	const Path &getPathAt( size_t index ) const { return mPaths.at( index ); }
+
+	//! Adds a clip-mask to the draw calls.
+	void startClipPath( GLuint pathId, glm::mat3x2 transform, GLuint clipMask )
+	{
+		DrawCall dc;
+		dc.count = 1;
+		dc.offset = GLsizei( mInstances.size() );
+		dc.clipMask = clipMask;
+
+		GLuint mask = clipMask;
+		while( mask & 0xFF ) {
+			dc.coverMask |= mask;
+			mask <<= 1;
+		}
+
+		mInstances.push_back( pathId );
+		mTransforms.push_back( std::move( transform ) );
+		mDrawCalls.push_back( std::move( dc ) );
+	}
+	//! Adds a clip-mask to the draw calls.
+	void finishClipPath( GLuint pathId, glm::mat3x2 transform, GLuint clipMask )
+	{
+		DrawCall dc;
+		dc.count = 1;
+		dc.offset = GLsizei( mInstances.size() );
+		dc.clipMask = clipMask;
+
+		mInstances.push_back( pathId );
+		mTransforms.push_back( std::move( transform ) );
+		mDrawCalls.push_back( std::move( dc ) );
+	}
+	//! Adds a path to the draw calls.
+	void addDrawCall( GLuint pathId, glm::mat3x2 transform, svg::Paint fill, svg::Paint stroke, float fillOpacity = 1, float strokeOpacity = 1, svg::FillRule fillRule = svg::FILL_RULE_NONZERO, const svg::Image &image = {} )
+	{
+		DrawCall dc;
+		dc.count = 1;
+		dc.offset = GLsizei( mInstances.size() );
+		dc.fill = std::move( fill );
+		dc.fillOpacity = fillOpacity;
+		dc.fillRule = fillRule == svg::FILL_RULE_NONZERO ? 0xFF : 0x01;
+		dc.stroke = std::move( stroke );
+		dc.strokeOpacity = strokeOpacity;
+
+		if( image ) {
+			dc.image = gl::Texture2d::create( *image.getSurface(), gl::Texture2d::Format().loadTopDown( true ) ); // TODO: cache textures.
+			dc.fill.mTransform *= image.getTextureMatrix();
+			dc.fill.mSpecifiesTransform = true;
+		}
+
+		// Use the same cover mask as the previous draw call.
+		if( !mDrawCalls.empty() ) {
+			dc.coverMask = mDrawCalls.back().coverMask;
+		}
+
+		//
+		mInstances.push_back( pathId );
+		mTransforms.push_back( std::move( transform ) );
+		mDrawCalls.push_back( std::move( dc ) );
+	}
+	//! Appends an instanced path to the draw calls.
+	void appendDrawCall( GLuint pathId, glm::mat3x2 transform )
+	{
+		assert( !mDrawCalls.empty() );
+
+		mInstances.push_back( pathId );
+		mTransforms.push_back( std::move( transform ) );
+		mDrawCalls.back().count++;
+	}
 
   private:
 	//!
@@ -678,79 +839,6 @@ class CI_API Svg {
 	nvp::Shader::Type prepareRadialGradient( const svg::Paint &paint, float opacity );
 	//!
 	nvp::Shader::Type preparePaint( const svg::Paint &paint, float opacity );
-
-	class Renderer : public svg::Renderer {
-	  public:
-		Renderer( Svg *svg );
-
-		void start() override;
-		void finish() override {}
-		void pushGroup( const svg::Group &group, float opacity ) override;
-		void popGroup() override;
-		void pushClipPath( const svg::ClipPath &clippath ) override;
-		void popClipPath() override;
-		void drawPath( const svg::Path & ) override;
-		void drawPolyline( const svg::Polyline & ) override;
-		void drawPolygon( const svg::Polygon & ) override;
-		void drawLine( const svg::Line & ) override;
-		void drawRect( const svg::Rect & ) override;
-		void drawCircle( const svg::Circle & ) override;
-		void drawEllipse( const svg::Ellipse & ) override;
-		void drawImage( const svg::Image & ) override;
-		void drawTextSpan( const svg::TextSpan & ) override {}
-		void pushMatrix( const mat3 & ) override;
-		void popMatrix() override;
-		// void pushStyle( const svg::Style & ) override;
-		// void popStyle() override;
-		void pushFill( const svg::Paint & ) override;
-		void popFill() override;
-		void pushStroke( const svg::Paint & ) override;
-		void popStroke() override;
-		void pushFillOpacity( float ) override;
-		void popFillOpacity() override;
-		void pushStrokeOpacity( float ) override;
-		void popStrokeOpacity() override;
-		void pushStrokeWidth( float ) override;
-		void popStrokeWidth() override;
-		void pushFillRule( svg::FillRule ) override;
-		void popFillRule() override;
-		void pushLineCap( svg::LineCap ) override;
-		void popLineCap() override;
-		void pushLineJoin( svg::LineJoin ) override;
-		void popLineJoin() override;
-		void pushMiterLimit( float miterLimit ) override;
-		void popMiterLimit() override;
-		void pushDashArray( const std::vector<float> &dashArray ) override;
-		void popDashArray() override;
-		void pushDashOffset( float dashOffset ) override;
-		void popDashOffset() override;
-		void pushTextPen( const vec2 & ) override {}
-		void popTextPen() override {}
-		void pushTextRotation( float ) override {}
-		void popTextRotation() override {}
-
-	  private:
-		//!
-		svg::Style getCurrentStyle() const;
-		//!
-		bool shouldRender() const { return !( mFillStack.back().isNone() && mStrokeStack.back().isNone() ); }
-		//!
-		void render( const Shape2d &shape ) const;
-
-		Svg                               *mSvg = nullptr;
-		std::vector<mat3>                  mMatrixStack;
-		std::vector<svg::Paint>            mFillStack, mStrokeStack;
-		std::vector<float>                 mFillOpacityStack, mStrokeOpacityStack;
-		std::vector<float>                 mGroupOpacityStack;
-		std::vector<float>                 mStrokeWidthStack;
-		std::vector<svg::FillRule>         mFillRuleStack;
-		std::vector<svg::LineCap>          mLineCapStack;
-		std::vector<svg::LineJoin>         mLineJoinStack;
-		std::vector<float>                 mMiterLimitStack;
-		std::vector<std::vector<float>>    mDashArrayStack;
-		std::vector<float>                 mDashOffsetStack;
-		std::vector<const svg::ClipPath *> mClipPathStack;
-	};
 
 	struct DrawCall {
 		GLsizei          offset{ 0 };        // Offset into instance buffers.
@@ -765,16 +853,14 @@ class CI_API Svg {
 		GLuint           coverMask{ 0x00 };  // If non-zero, path will be clipped.
 	};
 
-	svg::DocRef              mDoc;
-	Renderer                 mRenderer{ this };
-	Gradients                mGradients;
-	std::vector<Path>        mPaths;
-	std::vector<GLuint>      mInstances;
-	std::vector<glm::mat3x2> mTransforms;
-	std::vector<DrawCall>    mDrawCalls;
-	svg::Style               mPreviousStyle;
-
-	friend class Renderer;
+	svg::DocRef                        mDoc;
+	Renderer                           mRenderer{ this };
+	Gradients                          mGradients;
+	std::unordered_map<size_t, size_t> mPathsLookup;
+	std::vector<Path>                  mPaths;
+	std::vector<GLuint>                mInstances;
+	std::vector<glm::mat3x2>           mTransforms;
+	std::vector<DrawCall>              mDrawCalls;
 };
 
 //! Stores font faces and shaders so they can be easily reused by other parts of your code.
@@ -939,9 +1025,9 @@ CI_API inline bool hasNvPathRendering()
 CI_API void renderText( const text::Typesetter &typesetter, const vec2 &offset = vec2() );
 
 //!
-CI_API static GradientUnits toGradientUnits( std::string style );
+CI_API static CoordinateSpace toGradientUnits( std::string style );
 //!
-CI_API static GradientSpreadMethod toSpreadMethod( std::string style );
+CI_API static SpreadMethod toSpreadMethod( std::string style );
 
 //!
 CI_API inline glm::mat3x2 toMat3x2( const glm::mat3x3 &m )

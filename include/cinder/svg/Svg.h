@@ -49,6 +49,9 @@ using FontWeight = enum { WEIGHT_100, WEIGHT_200, WEIGHT_300, WEIGHT_400, WEIGHT
 using Align = enum { NONE, X_MIN_Y_MIN, X_MID_Y_MIN, X_MAX_Y_MIN, X_MIN_Y_MID, X_MID_Y_MID, X_MAX_Y_MID, X_MIN_Y_MAX, X_MID_Y_MAX, X_MAX_Y_MAX };
 using MeetOrSlice = enum { MEET, SLICE };
 
+//! Defines the coordinate system used by gradients and images.
+using CoordinateSpace = enum { USER_SPACE_ON_USE, OBJECT_BOUNDING_BOX };
+
 class Circle;
 class ClipPath;
 class Defs;
@@ -328,8 +331,8 @@ class CI_API Style {
 	bool			isDisplayNone() const { return mDisplayNone; }
 	void			setDisplayNone( bool displayNone ) { mDisplayNone = displayNone; }
 
-	void startRender( Renderer &renderer, bool isNodeDrawable ) const;
-	void finishRender( Renderer &renderer, bool isNodeDrawable ) const;
+	void startRender( Renderer &renderer, const Node *node ) const;
+	void finishRender( Renderer &renderer, const Node *node ) const;
 
 	void parseClassAttribute( const std::string &stylePropertyString, const Node *parent );
 	void parseStyleAttribute( const std::string &stylePropertyString, const Node *parent );
@@ -384,9 +387,14 @@ class CI_API Style {
 //! Base class for an element of an SVG Document
 class CI_API Node {
   public:
-	Node( Node *parent ) : mParent( parent ),  mSpecifiesTransform( false ), mBoundingBoxCached( false ) {}
+	Node( Node *parent ) : mParent( parent ),  mSpecifiesTransform( false ), mBoundingBoxCached( false )
+	{
+		mUuid = nextUuid();
+	}
 	virtual ~Node() {}
 
+	//! Returns the unique id for this node.
+	size_t getUuid() const { return mUuid; }
 	//! Returns the svg::Doc this Node is an element of
 	class Doc *getDoc() const;
 	//! Returns the immediate parent of this node
@@ -410,6 +418,8 @@ class CI_API Node {
 
 	//! Returns the ClipPath for this node. Returns NULL on failure.
 	virtual const ClipPath *getClipPath() const;
+		//! Returns the ClipPath for the specified \a style. Returns NULL on failure.
+	virtual const ClipPath *getClipPath( const Style &style ) const;
 
 	//! Returns whether the point \a pt is inside of the Node's shape.
 	virtual bool containsPoint( const vec2 & /*pt*/ ) const { return false; }
@@ -481,12 +491,18 @@ class CI_API Node {
 	bool isVisible() const;
 	//! Returns whether the Display property of this Node is set to 'None', preventing rendering of the node and its children
 	bool isDisplayNone() const { return getStyle().isDisplayNone(); }
+	//! Returns whether this type of node directly renders anything. Everything but groups and gradients.
+	virtual bool isDrawable() const { return true; }
 
+	//
+	static size_t nextUuid()
+	{
+		static size_t uuid = 0;
+		return ++uuid;
+	}
 
   protected:
 	Node( Node *parent, const XmlTree &xml );
-	// returns whether this type of node directly renders anything. Everything but groups.
-	virtual bool isDrawable() const { return true; }
 
 	void         startRender( Renderer &renderer, const Style &style ) const;
 	void         finishRender( Renderer &renderer, const Style &style ) const;
@@ -501,6 +517,7 @@ class CI_API Node {
 	static std::string findStyleValue( const std::string &styleString, const std::string &key );
 	void               parseStyle( const std::string &value );
 
+	size_t        mUuid;
 	Node         *mParent;
 	std::string   mTag;
 	std::string   mId;
@@ -560,10 +577,11 @@ class CI_API LinearGradient : public Gradient {
 
 	Paint asPaint() const override;
 
+	bool isDrawable() const override { return false; }
+
   protected:
 	void parse( const XmlTree &xml );
 	void copyAttributesFrom( const LinearGradient &rhs );
-	bool isDrawable() const override { return false; }
 
 	Value mX1{ 0, Value::PERCENT };
 	Value mY1{ 0, Value::PERCENT };
@@ -580,10 +598,11 @@ class CI_API RadialGradient : public Gradient {
 
 	Paint asPaint() const override;
 
+	bool isDrawable() const override { return false; }
+
   protected:
 	void parse( const XmlTree &xml );
 	void copyAttributesFrom( const RadialGradient &rhs );
-	bool isDrawable() const override { return false; }
 
 	Value mCx{ 50, Value::PERCENT };
 	Value mCy{ 50, Value::PERCENT };
@@ -780,7 +799,7 @@ public:
 
 	explicit PreserveAspectRatio( const std::string &value );
 
-	mat3 calcTransform( const Rectf &element, const Rectf &viewBox ) const;
+	mat3 calcTransform( const Rectf &element, const Rectf &viewBox, bool normalized = false ) const;
 
 	Align       align{ X_MID_Y_MID };
 	MeetOrSlice meetOrSlice{ MEET };
@@ -789,7 +808,10 @@ public:
 //! SVG Image Element. Represents an unpremultiplied bitmap. http://www.w3.org/TR/SVG/struct.html#ImageElement
 class CI_API Image : public Node {
   public:
+	Image() : Node(nullptr) {}
 	Image( Node *parent, const XmlTree &xml );
+
+	operator bool() const { return bool(mImage); }
 
 	const Rectf &              getRect() const { return mBounds; }
 	std::shared_ptr<Surface8u> getSurface() const { return mImage; }
@@ -941,6 +963,8 @@ class CI_API Group : public Node, private Noncopyable {
 
 	//!
 	static Node *create( Node *parent, const XmlTree &xml );
+	
+	bool isDrawable() const override { return false; }
 
   protected:
 	Node *  nodeUnderPoint( const vec2 &absolutePoint, const mat3 &parentInverseMatrix ) const;
@@ -949,7 +973,6 @@ class CI_API Group : public Node, private Noncopyable {
 	void  renderSelf( Renderer &renderer ) const override;
 	Rectf calcBoundingBox() const override;
 
-	bool         isDrawable() const override { return false; }
 	virtual void parse( const XmlTree &xml );
 
 	std::list<Node *> mChildren;
@@ -981,6 +1004,11 @@ class CI_API ClipPath : public Group {
 	{
 	}
 	ClipPath( Node *parent, const XmlTree &xml );
+
+protected:
+	void renderSelf( Renderer &renderer ) const override
+	{ /* never render */
+	}
 };
 
 //!

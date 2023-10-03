@@ -42,7 +42,7 @@ float parseFloat( const char **sInOut )
 {
 	char          temp[256];
 	unsigned char i = 0;
-	const char *  s = *sInOut;
+	const char   *s = *sInOut;
 	while( *s && ( isspace( *s ) || *s == ',' ) )
 		s++;
 	if( !s )
@@ -675,7 +675,7 @@ Style Style::operator+( const Style &other ) const
 	return result;
 }
 
-void Style::startRender( Renderer &renderer, bool isNodeDrawable ) const
+void Style::startRender( Renderer &renderer, const Node *node ) const
 {
 	if( mSpecifiesFill )
 		renderer.pushFill( mFill );
@@ -683,7 +683,7 @@ void Style::startRender( Renderer &renderer, bool isNodeDrawable ) const
 		renderer.pushStroke( mStroke );
 	if( mSpecifiesOpacity ) {
 		// if this node draws, we'll force both fill opacity and stroke opacity to be 'opacity'
-		if( isNodeDrawable ) {
+		if( node->isDrawable() ) {
 			renderer.pushFillOpacity( mOpacity );
 			renderer.pushStrokeOpacity( mOpacity );
 		}
@@ -707,33 +707,39 @@ void Style::startRender( Renderer &renderer, bool isNodeDrawable ) const
 	if( mSpecifiesDashArray )
 		renderer.pushDashArray( mDashArray );
 	if( mSpecifiesDashOffset )
-		renderer.pushDashOffset( mDashOffset );		
+		renderer.pushDashOffset( mDashOffset );
+	if( mSpecifiesClipPath ) {
+		const ClipPath *clip = node->getClipPath( *this ); // Assumes the clip-path is available.
+		renderer.pushClipPath( *clip );
+	}
 }
 
-void Style::finishRender( Renderer &renderer, bool isNodeDrawable ) const
+void Style::finishRender( Renderer &renderer, const Node *node ) const
 {
-	if( mSpecifiesFill )
-		renderer.popFill();
-	if( mSpecifiesStroke )
-		renderer.popStroke();
-	if( ( mSpecifiesOpacity && isNodeDrawable ) || ( ( !mSpecifiesOpacity ) && mSpecifiesFillOpacity ) )
-		renderer.popFillOpacity();
-	if( ( mSpecifiesOpacity && isNodeDrawable ) || ( ( !mSpecifiesOpacity ) && mSpecifiesStrokeOpacity ) )
-		renderer.popStrokeOpacity();
-	if( mSpecifiesStrokeWidth )
-		renderer.popStrokeWidth();
-	if( mSpecifiesFillRule )
-		renderer.popFillRule();
-	if( mSpecifiesLineCap )
-		renderer.popLineCap();
-	if( mSpecifiesLineJoin )
-		renderer.popLineJoin();
-	if( mSpecifiesMiterLimit )
-		renderer.popMiterLimit();
-	if( mSpecifiesDashArray )
-		renderer.popDashArray();
+	if( mSpecifiesClipPath )
+		renderer.popClipPath();
 	if( mSpecifiesDashOffset )
 		renderer.popDashOffset();
+	if( mSpecifiesDashArray )
+		renderer.popDashArray();
+	if( mSpecifiesMiterLimit )
+		renderer.popMiterLimit();
+	if( mSpecifiesLineJoin )
+		renderer.popLineJoin();
+	if( mSpecifiesLineCap )
+		renderer.popLineCap();
+	if( mSpecifiesFillRule )
+		renderer.popFillRule();
+	if( mSpecifiesStrokeWidth )
+		renderer.popStrokeWidth();
+	if( ( mSpecifiesOpacity && node->isDrawable() ) || ( ( !mSpecifiesOpacity ) && mSpecifiesStrokeOpacity ) )
+		renderer.popStrokeOpacity();
+	if( ( mSpecifiesOpacity && node->isDrawable() ) || ( ( !mSpecifiesOpacity ) && mSpecifiesFillOpacity ) )
+		renderer.popFillOpacity();
+	if( mSpecifiesStroke )
+		renderer.popStroke();
+	if( mSpecifiesFill )
+		renderer.popFill();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////
@@ -822,6 +828,7 @@ Node::Node( Node *parent, const XmlTree &xml )
 	, mBoundingBoxCached( false )
 	, mStyle( xml, this )
 {
+	mUuid = nextUuid();
 	mSpecifiesTransform = false;
 	mTag = xml.getTag();
 	mId = xml["id"];
@@ -1216,10 +1223,18 @@ Style Node::calcInheritedStyle() const
 	return result;
 }
 
-const ClipPath * Node::getClipPath() const
+const ClipPath *Node::getClipPath() const
 {
 	if( getStyle().specifiesClipPath() )
 		return dynamic_cast<const ClipPath *>( findInAncestors( getStyle().getClipPath() ) );
+
+	return nullptr;
+}
+
+const ClipPath *Node::getClipPath( const Style &style ) const
+{
+	if( style.specifiesClipPath() )
+		return dynamic_cast<const ClipPath *>( findInAncestors( style.getClipPath() ) );
 
 	return nullptr;
 }
@@ -1249,20 +1264,12 @@ void Node::startRender( Renderer &renderer, const Style &style ) const
 	if( mSpecifiesTransform )
 		renderer.pushMatrix( mTransform );
 	renderer.pushStyle( style );
-	style.startRender( renderer, this->isDrawable() );
-
-	const ClipPath *clip = getClipPath();
-	if(clip)
-		renderer.pushClipPath( *clip );
+	style.startRender( renderer, this );
 }
 
 void Node::finishRender( Renderer &renderer, const Style &style ) const
 {
-	const ClipPath *clip = getClipPath();
-	if( clip )
-		renderer.popClipPath();
-
-	style.finishRender( renderer, this->isDrawable() );
+	style.finishRender( renderer, this );
 	renderer.popStyle();
 	if( mSpecifiesTransform )
 		renderer.popMatrix();
@@ -1934,7 +1941,7 @@ Shape2d parsePath( const std::string &p )
 	// For consistency, make sure paths are defined in CCW order for filled sections, CW for holes.
 	// This is especially important when using instanced rendering.
 	bool isClockwise = result.getContour( 0 ).calcClockwise();
-	if(isClockwise)
+	if( isClockwise )
 		result.reverse();
 
 	return result;
@@ -2519,28 +2526,38 @@ PreserveAspectRatio::PreserveAspectRatio( const std::string &value )
 	}
 }
 
-mat3 PreserveAspectRatio::calcTransform( const Rectf &element, const Rectf &viewBox ) const
+mat3 PreserveAspectRatio::calcTransform( const Rectf &element, const Rectf &viewBox, bool normalized ) const
 {
 	// See: https://svgwg.org/svg2-draft/coords.html#ComputingAViewportsTransform
 	mat3 m33;
 
-	m33[0][0] = element.getWidth() / viewBox.getWidth();          // scale-x
-	m33[1][1] = element.getHeight() / viewBox.getHeight();        // scale-y
-	if( align != NONE && meetOrSlice == MEET )                    //
-		m33[0][0] = m33[1][1] = glm::min( m33[0][0], m33[1][1] ); //
-	else if( align != NONE && meetOrSlice == SLICE )              //
-		m33[0][0] = m33[1][1] = glm::max( m33[0][0], m33[1][1] ); //
-	m33[2][0] = element.x1 - ( viewBox.x1 * m33[0][0] );          // translate-x
-	m33[2][1] = element.y1 - ( viewBox.y1 * m33[1][1] );          // translate-y
+	if( viewBox.getWidth() > 0 && viewBox.getHeight() > 0 ) {
+		m33[0][0] = element.getWidth() / viewBox.getWidth();          // scale-x
+		m33[1][1] = element.getHeight() / viewBox.getHeight();        // scale-y
+		if( align != NONE && meetOrSlice == MEET )                    //
+			m33[0][0] = m33[1][1] = glm::min( m33[0][0], m33[1][1] ); //
+		else if( align != NONE && meetOrSlice == SLICE )              //
+			m33[0][0] = m33[1][1] = glm::max( m33[0][0], m33[1][1] ); //
+		m33[2][0] = element.x1 - ( viewBox.x1 * m33[0][0] );          // translate-x
+		m33[2][1] = element.y1 - ( viewBox.y1 * m33[1][1] );          // translate-y
 
-	if( align == X_MID_Y_MIN || align == X_MID_Y_MID || align == X_MID_Y_MAX )
-		m33[2][0] += ( element.getWidth() - viewBox.getWidth() * m33[0][0] ) * 0.5f;
-	else if( align == X_MAX_Y_MIN || align == X_MAX_Y_MID || align == X_MAX_Y_MAX )
-		m33[2][0] += element.getWidth() - viewBox.getWidth() * m33[0][0];
-	if( align == X_MIN_Y_MID || align == X_MID_Y_MID || align == X_MAX_Y_MID )
-		m33[2][1] += ( element.getHeight() - viewBox.getHeight() * m33[1][1] ) * 0.5f;
-	else if( align == X_MIN_Y_MAX || align == X_MID_Y_MAX || align == X_MAX_Y_MAX )
-		m33[2][1] += element.getHeight() - viewBox.getHeight() * m33[1][1];
+		if( align == X_MID_Y_MIN || align == X_MID_Y_MID || align == X_MID_Y_MAX )
+			m33[2][0] += ( element.getWidth() - viewBox.getWidth() * m33[0][0] ) * 0.5f;
+		else if( align == X_MAX_Y_MIN || align == X_MAX_Y_MID || align == X_MAX_Y_MAX )
+			m33[2][0] += element.getWidth() - viewBox.getWidth() * m33[0][0];
+		if( align == X_MIN_Y_MID || align == X_MID_Y_MID || align == X_MAX_Y_MID )
+			m33[2][1] += ( element.getHeight() - viewBox.getHeight() * m33[1][1] ) * 0.5f;
+		else if( align == X_MIN_Y_MAX || align == X_MID_Y_MAX || align == X_MAX_Y_MAX )
+			m33[2][1] += element.getHeight() - viewBox.getHeight() * m33[1][1];
+	}
+
+	// Normalize.
+	if( normalized && element.getWidth() > 0 && element.getHeight() > 0 ) {
+		m33[0][0] = float( viewBox.getWidth() ) * m33[0][0] / element.getWidth();
+		m33[1][1] = float( viewBox.getHeight() ) * m33[1][1] / element.getHeight();
+		m33[2][0] /= element.getWidth();
+		m33[2][1] /= element.getHeight();
+	}
 
 	return m33;
 }
@@ -2589,19 +2606,9 @@ Image::Image( Node *parent, const XmlTree &xml )
 
 	// Calculate texture transform matrix.
 	if( xml.hasAttribute( "preserveAspectRatio" ) )
-		mTextureMatrix = PreserveAspectRatio( xml.getAttributeValue<string>( "preserveAspectRatio" ) ).calcTransform( mBounds, mImage->getBounds() );
+		mTextureMatrix = PreserveAspectRatio( xml.getAttributeValue<string>( "preserveAspectRatio" ) ).calcTransform( mBounds, mImage->getBounds(), true );
 	else
-		mTextureMatrix = PreserveAspectRatio().calcTransform( mBounds, mImage->getBounds() );
-
-	// Normalize.
-	mTextureMatrix[0][0] = float( mImage->getWidth() ) * mTextureMatrix[0][0] / mBounds.getWidth();
-	mTextureMatrix[1][1] = float( mImage->getHeight() ) * mTextureMatrix[1][1] / mBounds.getHeight();
-	mTextureMatrix[2][0] = mTextureMatrix[2][0] / mBounds.getWidth();
-	mTextureMatrix[2][1] = mTextureMatrix[2][1] / mBounds.getHeight();
-
-	// Undo transformations of the path used to render the image.
-	mTransform = glm::identity<mat3>();
-	mSpecifiesTransform = false;
+		mTextureMatrix = PreserveAspectRatio().calcTransform( mBounds, mImage->getBounds(), true );
 }
 
 std::shared_ptr<Surface8u> Image::parseDataImage( const string &data )
@@ -2964,6 +2971,8 @@ const Node *Defs::findNode( const std::string &id, bool recurse ) const
 ClipPath::ClipPath( Node *parent, const XmlTree &xml )
 	: Group( parent, xml )
 {
+	//if( xml.hasAttribute( "clipPathUnits" ) )
+	//	__debugbreak(); // TODO: should be supported.
 }
 
 ////////////////////////////////////////////////////////////////////////////////////

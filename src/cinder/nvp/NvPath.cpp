@@ -951,7 +951,7 @@ Shader::Type Svg::prepareLinearGradient( const svg::Paint &paint, float opacity 
 	auto gradient = std::dynamic_pointer_cast<LinearGradient>( mGradients.at( paint.getId() ) );
 	if( !gradient ) {
 		gradient = LinearGradient::create( paint.getId().c_str() );
-		gradient->units( paint.mUseObjectBoundingBox ? GradientUnits::OBJECT_BOUNDING_BOX : GradientUnits::USER_SPACE_ON_USE ); //
+		gradient->units( paint.mUseObjectBoundingBox ? CoordinateSpace::OBJECT_BOUNDING_BOX : CoordinateSpace::USER_SPACE_ON_USE ); //
 		gradient->transform( paint.getTransform() );
 		gradient->from( paint.getCoords0() );
 		gradient->to( paint.getCoords1() );
@@ -977,7 +977,7 @@ Shader::Type Svg::prepareRadialGradient( const svg::Paint &paint, float opacity 
 	auto gradient = std::dynamic_pointer_cast<RadialGradient>( mGradients.at( paint.getId() ) );
 	if( !gradient ) {
 		gradient = RadialGradient::create( paint.getId().c_str() );
-		gradient->units( paint.useObjectBoundingBox() ? GradientUnits::OBJECT_BOUNDING_BOX : GradientUnits::USER_SPACE_ON_USE ); //
+		gradient->units( paint.useObjectBoundingBox() ? CoordinateSpace::OBJECT_BOUNDING_BOX : CoordinateSpace::USER_SPACE_ON_USE ); //
 		gradient->transform( paint.getTransform() );
 		gradient->center( paint.getCoords0() );
 		gradient->radius( paint.getRadius0() );
@@ -1010,6 +1010,31 @@ Shader::Type Svg::preparePaint( const svg::Paint &paint, float opacity )
 		return prepareRadialGradient( paint, opacity );
 
 	return Shader::Type::SOLID_COLOR;
+}
+
+bool Svg::findPath( size_t uuid, size_t &index ) const
+{
+	if( mPathsLookup.count( uuid ) ) {
+		index = mPathsLookup.at( uuid );
+		return true;
+	}
+
+	return false;
+}
+
+size_t Svg::insertOrReplacePath( size_t uuid, Path &&path )
+{
+	size_t index = 0;
+	if( findPath( uuid, index ) ) {
+		mPaths.at( index ) = std::move( path );
+	}
+	else {
+		index = mPaths.size();
+		mPathsLookup[uuid] = index;
+		mPaths.push_back( std::move( path ) );
+	}
+
+	return index;
 }
 
 void Svg::draw()
@@ -1049,7 +1074,7 @@ void Svg::draw()
 
 			ScopedShader scpShader( Shader::Type::IMAGE );
 			scpShader.setColor( ColorA::white() );
-			scpShader.setCoords( GL_PATH_OBJECT_BOUNDING_BOX_NV, call.fill.getTransform() );
+			scpShader.setCoords( GLenum( /*call.fill.mUseObjectBoundingBox ?*/ CoordinateSpace::OBJECT_BOUNDING_BOX /*: CoordinateSpace::USER_SPACE_ON_USE*/ ), call.fill.getTransform() );
 			scpShader.uniform( "image", 2 );
 
 			gl::ScopedTextureBind scpImage( call.image, 2 );
@@ -1172,7 +1197,7 @@ void Svg::draw()
 	ctx->popBoolState( GL_STENCIL_TEST );
 }
 
-Svg::Renderer::Renderer( Svg *svg )
+Renderer::Renderer( Svg *svg )
 	: mSvg{ svg }
 {
 	mMatrixStack.emplace_back();
@@ -1188,293 +1213,275 @@ Svg::Renderer::Renderer( Svg *svg )
 	mMiterLimitStack.push_back( 4.0f );
 	mDashArrayStack.emplace_back();
 	mDashOffsetStack.push_back( 0.0f );
-	// mClipPathStack.clear();
+	mClipPathStack.clear();
 }
 
-void Svg::Renderer::start()
+void Renderer::start()
 {
-	mSvg->mPaths.clear();
-	mSvg->mDrawCalls.clear();
-	mSvg->mInstances.clear();
-	mSvg->mTransforms.clear();
+	mSvg->clear();
 }
 
-void Svg::Renderer::pushGroup( const svg::Group &group, float opacity )
+void Renderer::pushGroup( const svg::Group &group, float opacity )
 {
 	mGroupOpacityStack.push_back( opacity );
 }
 
-void Svg::Renderer::popGroup()
+void Renderer::popGroup()
 {
 	mGroupOpacityStack.pop_back();
 }
 
-void Svg::Renderer::pushClipPath( const svg::ClipPath &clippath )
+void Renderer::pushClipPath( const svg::ClipPath &clippath )
 {
-	// Obtain shape from clip-path.
-	const auto &shape = clippath.getShape();
-	if( shape.empty() )
-		return;
-
 	if( mClipPathStack.size() > 5 )
 		CI_LOG_W( "Maximum number of nested clip-paths reached! Results are undefined." );
 
 	// Generate draw call to set the clip-path.
-	Path path( shape );
+	size_t index = 0;
+	if( !mSvg->findPath( clippath.getUuid(), index ) ) {
+		// Obtain shape from clip-path.
+		const auto shape = clippath.getShape();
+		if( shape.empty() )
+			return;
 
-	DrawCall dc;
-	dc.count = 1;
-	dc.offset = GLsizei( mSvg->mInstances.size() );
-	dc.clipMask = 0x80 >> mClipPathStack.size(); // Use path as clip-path.
+		Path path( shape );
+		index = mSvg->insertOrReplacePath( clippath.getUuid(), std::move( path ) );
+	}
 
-	// dc.fill = svg::Paint( ColorA8u::black() ); // For debugging.
+	mSvg->startClipPath( mSvg->getPathAt( index ).getId(), toMat3x2( mMatrixStack.back() ), 0x80 >> mClipPathStack.size() );
 
-	mSvg->mInstances.push_back( path.getId() );
-	mSvg->mTransforms.push_back( toMat3x2( mMatrixStack.back() ) );
-	mSvg->mPaths.push_back( std::move( path ) );
-
-	mSvg->mDrawCalls.push_back( std::move( dc ) );
-
-	//
 	mClipPathStack.push_back( &clippath );
 }
 
-void Svg::Renderer::popClipPath()
+void Renderer::popClipPath()
 {
 	assert( !mClipPathStack.empty() );
 
-	//
-	const auto &shape = mClipPathStack.back()->getShape();
-	mClipPathStack.pop_back();
-	if( shape.empty() )
-		return;
-
 	// Generate draw call to reset the clip-path.
-	Path path( shape );
+	size_t index = 0;
+	if( !mSvg->findPath( mClipPathStack.back()->getUuid(), index ) ) {
+		__debugbreak(); // Path should already be cached!
+	}
 
-	DrawCall dc;
-	dc.count = 1;
-	dc.offset = GLsizei( mSvg->mInstances.size() );
-	dc.clipMask = 0x80 >> mClipPathStack.size(); // Use path as clip-path.
-
-	mSvg->mInstances.push_back( path.getId() );
-	mSvg->mTransforms.push_back( toMat3x2( mMatrixStack.back() ) );
-	mSvg->mPaths.push_back( std::move( path ) );
-
-	mSvg->mDrawCalls.push_back( std::move( dc ) );
+	mClipPathStack.pop_back();
+	mSvg->finishClipPath( mSvg->getPathAt( index ).getId(), toMat3x2( mMatrixStack.back() ), 0x80 >> mClipPathStack.size() );
 }
 
-void Svg::Renderer::drawPath( const svg::Path &path )
+void Renderer::drawPath( const svg::Path &path )
 {
-	render( path.getShape2d() );
+	size_t index = 0;
+	if( !mSvg->findPath( path.getUuid(), index ) ) {
+		Path p( path.getShape2d() );
+		index = mSvg->insertOrReplacePath( path.getUuid(), std::move( p ) );
+	}
+
+	render( mSvg->getPathAt( index ) );
 }
 
-void Svg::Renderer::drawPolyline( const svg::Polyline &polyline )
+void Renderer::drawPolyline( const svg::Polyline &polyline )
 {
-	render( polyline.getShape() );
+	size_t index = 0;
+	if( !mSvg->findPath( polyline.getUuid(), index ) ) {
+		Path p( polyline.getShape() );
+		index = mSvg->insertOrReplacePath( polyline.getUuid(), std::move( p ) );
+	}
+
+	render( mSvg->getPathAt( index ) );
 }
 
-void Svg::Renderer::drawPolygon( const svg::Polygon &polygon )
+void Renderer::drawPolygon( const svg::Polygon &polygon )
 {
-	render( polygon.getShape() );
+	size_t index = 0;
+	if( !mSvg->findPath( polygon.getUuid(), index ) ) {
+		Path p( polygon.getShape() );
+		index = mSvg->insertOrReplacePath( polygon.getUuid(), std::move( p ) );
+	}
+
+	render( mSvg->getPathAt( index ) );
 }
 
-void Svg::Renderer::drawLine( const svg::Line &line )
+void Renderer::drawLine( const svg::Line &line )
 {
-	render( line.getShape() );
+	size_t index = 0;
+	if( !mSvg->findPath( line.getUuid(), index ) ) {
+		Path p( line.getShape() );
+		index = mSvg->insertOrReplacePath( line.getUuid(), std::move( p ) );
+	}
+
+	render( mSvg->getPathAt( index ) );
 }
 
-void Svg::Renderer::drawRect( const svg::Rect &rect )
+void Renderer::drawRect( const svg::Rect &rect )
 {
-	render( rect.getShape() );
+	size_t index = 0;
+	if( !mSvg->findPath( rect.getUuid(), index ) ) {
+		Path p( rect.getShape() );
+		index = mSvg->insertOrReplacePath( rect.getUuid(), std::move( p ) );
+	}
+
+	render( mSvg->getPathAt( index ) );
 }
 
-void Svg::Renderer::drawCircle( const svg::Circle &circle )
+void Renderer::drawCircle( const svg::Circle &circle )
 {
-	render( circle.getShape() );
+	size_t index = 0;
+	if( !mSvg->findPath( circle.getUuid(), index ) ) {
+		Path p( circle.getShape() );
+		index = mSvg->insertOrReplacePath( circle.getUuid(), std::move( p ) );
+	}
+
+	render( mSvg->getPathAt( index ) );
 }
 
-void Svg::Renderer::drawEllipse( const svg::Ellipse &ellipse )
+void Renderer::drawEllipse( const svg::Ellipse &ellipse )
 {
-	render( ellipse.getShape() );
+	size_t index = 0;
+	if( !mSvg->findPath( ellipse.getUuid(), index ) ) {
+		Path p( ellipse.getShape() );
+		index = mSvg->insertOrReplacePath( ellipse.getUuid(), std::move( p ) );
+	}
+
+	render( mSvg->getPathAt( index ) );
 }
 
-void Svg::Renderer::drawImage( const svg::Image &image )
+void Renderer::drawImage( const svg::Image &image )
 {
 	if( !shouldRender() )
 		return;
 
-	bool isClipped = !mClipPathStack.empty();
-
-	DrawCall dc;
-	dc.count = 1;
-	dc.offset = GLsizei( mSvg->mInstances.size() );
-	dc.fill = mFillStack.back();
-	dc.fillOpacity = mFillOpacityStack.back() * mGroupOpacityStack.back();
-	dc.fillRule = mFillRuleStack.back() == svg::FILL_RULE_NONZERO ? 0xFF : 0x01;
-	dc.stroke = mStrokeStack.back();
-	dc.strokeOpacity = mStrokeOpacityStack.back() * mGroupOpacityStack.back();
-	dc.image = gl::Texture2d::create( *image.getSurface(), gl::Texture2d::Format().loadTopDown( false ) ); // TODO: cache textures.
-
-	dc.fill.mTransform *= image.getTextureMatrix();
-	dc.fill.mSpecifiesTransform = true;
-
-	if( isClipped ) {
-		assert( !mSvg->mDrawCalls.empty() );
-
-		// Use the same cover mask as the previous draw call.
-		dc.coverMask = mSvg->mDrawCalls.back().coverMask;
-
-		// If previous draw call did not have a cover mask, construct it from its clip mask.
-		if( !dc.coverMask ) {
-			GLuint mask = mSvg->mDrawCalls.back().clipMask;
-			while( mask & 0xFF ) {
-				dc.coverMask |= mask;
-				mask <<= 1;
-			}
-		}
+	size_t index = 0;
+	if( !mSvg->findPath( image.getUuid(), index ) ) {
+		Path p( Path2d::rectangle( image.getRect() ) );
+		index = mSvg->insertOrReplacePath( image.getUuid(), std::move( p ) );
 	}
 
-	Path path( Path2d::rectangle( image.getRect() ) );
+	mSvg->addDrawCall( mSvg->getPathAt( index ).getId(), toMat3x2( mMatrixStack.back() ), mFillStack.back(), mStrokeStack.back(), mFillOpacityStack.back() * mGroupOpacityStack.back(), mStrokeOpacityStack.back() * mGroupOpacityStack.back(),
+		mFillRuleStack.back(), image );
 
-	mSvg->mInstances.push_back( path.getId() );
-	mSvg->mTransforms.push_back( toMat3x2( mMatrixStack.back() ) );
-	mSvg->mPaths.push_back( std::move( path ) );
-
-	mSvg->mDrawCalls.push_back( std::move( dc ) );
+	//mPreviousWasImage = true;
 }
 
-void Svg::Renderer::pushMatrix( const mat3 &m )
+void Renderer::pushMatrix( const mat3 &m )
 {
 	mMatrixStack.push_back( mMatrixStack.back() * m );
 }
 
-void Svg::Renderer::popMatrix()
+void Renderer::popMatrix()
 {
 	mMatrixStack.pop_back();
 }
 
-// void Svg::Renderer::pushStyle( const svg::Style &style )
-//{
-//	mStyleStack.push_back( mStyleStack.back() + style );
-//}
-//
-// void Svg::Renderer::popStyle()
-//{
-//	mStyleStack.pop_back();
-//}
-
-void Svg::Renderer::pushFill( const svg::Paint &paint )
+void Renderer::pushFill( const svg::Paint &paint )
 {
 	mFillStack.push_back( paint );
 }
 
-void Svg::Renderer::popFill()
+void Renderer::popFill()
 {
 	mFillStack.pop_back();
 }
 
-void Svg::Renderer::pushStroke( const svg::Paint &paint )
+void Renderer::pushStroke( const svg::Paint &paint )
 {
 	mStrokeStack.push_back( paint );
 }
 
-void Svg::Renderer::popStroke()
+void Renderer::popStroke()
 {
 	mStrokeStack.pop_back();
 }
 
-void Svg::Renderer::pushFillOpacity( float opacity )
+void Renderer::pushFillOpacity( float opacity )
 {
 	mFillOpacityStack.push_back( opacity );
 }
 
-void Svg::Renderer::popFillOpacity()
+void Renderer::popFillOpacity()
 {
 	mFillOpacityStack.pop_back();
 }
 
-void Svg::Renderer::pushStrokeOpacity( float opacity )
+void Renderer::pushStrokeOpacity( float opacity )
 {
 	mStrokeOpacityStack.push_back( opacity );
 }
 
-void Svg::Renderer::popStrokeOpacity()
+void Renderer::popStrokeOpacity()
 {
 	mStrokeOpacityStack.pop_back();
 }
 
-void Svg::Renderer::pushStrokeWidth( float x )
+void Renderer::pushStrokeWidth( float x )
 {
 	mStrokeWidthStack.push_back( x );
 }
 
-void Svg::Renderer::popStrokeWidth()
+void Renderer::popStrokeWidth()
 {
 	mStrokeWidthStack.pop_back();
 }
 
-void Svg::Renderer::pushFillRule( svg::FillRule fillRule )
+void Renderer::pushFillRule( svg::FillRule fillRule )
 {
 	mFillRuleStack.push_back( fillRule );
 }
 
-void Svg::Renderer::popFillRule()
+void Renderer::popFillRule()
 {
 	mFillRuleStack.pop_back();
 }
 
-void Svg::Renderer::pushLineCap( svg::LineCap lineCap )
+void Renderer::pushLineCap( svg::LineCap lineCap )
 {
 	mLineCapStack.push_back( lineCap );
 }
 
-void Svg::Renderer::popLineCap()
+void Renderer::popLineCap()
 {
 	mLineCapStack.pop_back();
 }
 
-void Svg::Renderer::pushLineJoin( svg::LineJoin lineJoin )
+void Renderer::pushLineJoin( svg::LineJoin lineJoin )
 {
 	mLineJoinStack.push_back( lineJoin );
 }
 
-void Svg::Renderer::popLineJoin()
+void Renderer::popLineJoin()
 {
 	mLineJoinStack.pop_back();
 }
 
-void Svg::Renderer::pushMiterLimit( float miterLimit )
+void Renderer::pushMiterLimit( float miterLimit )
 {
 	mMiterLimitStack.push_back( miterLimit );
 }
 
-void Svg::Renderer::popMiterLimit()
+void Renderer::popMiterLimit()
 {
 	mMiterLimitStack.pop_back();
 }
 
-void Svg::Renderer::pushDashArray( const std::vector<float> &dashArray )
+void Renderer::pushDashArray( const std::vector<float> &dashArray )
 {
 	mDashArrayStack.push_back( dashArray );
 }
 
-void Svg::Renderer::popDashArray()
+void Renderer::popDashArray()
 {
 	mDashArrayStack.pop_back();
 }
 
-void Svg::Renderer::pushDashOffset( float dashOffset )
+void Renderer::pushDashOffset( float dashOffset )
 {
 	mDashOffsetStack.push_back( dashOffset );
 }
 
-void Svg::Renderer::popDashOffset()
+void Renderer::popDashOffset()
 {
 	mDashOffsetStack.pop_back();
 }
 
-svg::Style Svg::Renderer::getCurrentStyle() const
+svg::Style Renderer::getCurrentStyle() const
 {
 	svg::Style result;
 	result.setDashArray( mDashArrayStack.back() );
@@ -1492,18 +1499,12 @@ svg::Style Svg::Renderer::getCurrentStyle() const
 	return result;
 }
 
-void Svg::Renderer::render( const Shape2d &shape ) const
+void Renderer::render( const Path &path ) const
 {
 	if( !shouldRender() )
 		return;
-	if( shape.empty() )
-		return;
 
-	bool isClipped = !mClipPathStack.empty();
-
-	// Create path.
-	Path path( shape );
-
+	// Set path parameters.
 	path.setMiterLimit( mMiterLimitStack.back() );
 	path.setDashPattern( mDashArrayStack.back() );
 	path.setDashOffset( mDashOffsetStack.back() );
@@ -1512,66 +1513,38 @@ void Svg::Renderer::render( const Shape2d &shape ) const
 	path.setJoinStyle( toJoinStyle( mLineJoinStack.back() ) );
 	path.setStrokeWidth( mStrokeWidthStack.back() );
 
-	DrawCall dc;
-	dc.count = 1;
-	dc.offset = GLsizei( mSvg->mInstances.size() );
-	dc.fill = mFillStack.back();
-	dc.fillOpacity = mFillOpacityStack.back() * mGroupOpacityStack.back();
-	dc.fillRule = mFillRuleStack.back() == svg::FILL_RULE_NONZERO ? 0xFF : 0x01;
-	dc.stroke = mStrokeStack.back();
-	dc.strokeOpacity = mStrokeOpacityStack.back() * mGroupOpacityStack.back();
+	//// Determine current style.
+	//auto style = getCurrentStyle();
 
-	if( isClipped ) {
-		assert( !mSvg->mDrawCalls.empty() );
+	//// Perform path merging.
+	//if( !mSvg->empty() /*&& mSvg->mDrawCalls.back().coverMask == dc.coverMask*/ ) {
+	//	if( mPreviousStyle == style && !mPreviousWasImage ) {
+	//		bool usesTransparency = style.getFillOpacity() < 1 || style.getFill().isTransparent();
+	//		bool usesGradient = style.getFill().isLinearGradient() || style.getFill().isRadialGradient();
+	//		bool usesEvenOdd = style.getFillRule() == svg::FILL_RULE_EVENODD;
+	//		bool usesStrokes = !style.getStroke().isNone();
 
-		// Use the same cover mask as the previous draw call.
-		dc.coverMask = mSvg->mDrawCalls.back().coverMask;
+	//		if( usesTransparency || usesGradient || usesEvenOdd || usesStrokes ) {
+	//			// Paths can not be merged if they use transparency, gradients, even-odd rendering or strokes.
+	//		}
+	//		else {
+	//			// Generate draw call.
+	//			mSvg->appendDrawCall( path.getId(), toMat3x2( mMatrixStack.back() ) );
 
-		// If previous draw call did not have a cover mask, construct it from its clip mask.
-		if( !dc.coverMask ) {
-			GLuint mask = mSvg->mDrawCalls.back().clipMask;
-			while( mask & 0xFF ) {
-				dc.coverMask |= mask;
-				mask <<= 1;
-			}
-		}
-	}
+	//			return;
+	//		}
+	//	}
+	//}
 
-	// Determine current style.
-	auto style = getCurrentStyle();
+	// Generate draw call.
+	mSvg->addDrawCall( path.getId(), toMat3x2( mMatrixStack.back() ), //
+		mFillStack.back(), mStrokeStack.back(),                       //
+		mFillOpacityStack.back() * mGroupOpacityStack.back(), mStrokeOpacityStack.back() * mGroupOpacityStack.back(), mFillRuleStack.back() );
 
-	// Perform path merging.
-	if( !mSvg->mDrawCalls.empty() && mSvg->mDrawCalls.back().coverMask == dc.coverMask ) {
-		if( mSvg->mPreviousStyle == style && !mSvg->mDrawCalls.back().image ) {
-			bool usesTransparency = style.getFillOpacity() < 1 || style.getFill().isTransparent();
-			bool usesGradient = style.getFill().isLinearGradient() || style.getFill().isRadialGradient();
-			bool usesEvenOdd = style.getFillRule() == svg::FILL_RULE_EVENODD;
-			bool usesStrokes = !style.getStroke().isNone();
-
-			if( usesTransparency || usesGradient || usesEvenOdd || usesStrokes ) {
-				// Paths can not be merged if they use transparency, gradients, even-odd rendering or strokes.
-			}
-			else {
-				mSvg->mInstances.push_back( path.getId() );
-				mSvg->mTransforms.push_back( toMat3x2( mMatrixStack.back() ) );
-				mSvg->mPaths.push_back( std::move( path ) );
-
-				mSvg->mDrawCalls.back().count++;
-				return;
-			}
-		}
-	}
-
-	// Keep track of current style, so we can compare with the next draw call.
-	mSvg->mPreviousStyle = style;
-
-	mSvg->mInstances.push_back( path.getId() );
-	mSvg->mTransforms.push_back( toMat3x2( mMatrixStack.back() ) );
-	mSvg->mPaths.push_back( std::move( path ) );
-
-	mSvg->mDrawCalls.push_back( std::move( dc ) );
+	//// Keep track of current style, so we can compare with the next draw call.
+	//mPreviousStyle = style;
+	//mPreviousWasImage = false;
 }
-
 
 Shader::Shader( Type type )
 	: mType( type )
@@ -2083,22 +2056,22 @@ void renderText( const text::Typesetter &typesetter, const vec2 &offset )
 	}
 }
 
-GradientUnits toGradientUnits( std::string style )
+CoordinateSpace toGradientUnits( std::string style )
 {
 	style = trim( style );
 	if( style == "userSpaceOnUse" )
-		return GradientUnits::USER_SPACE_ON_USE;
-	return GradientUnits::DEFAULT;
+		return CoordinateSpace::USER_SPACE_ON_USE;
+	return CoordinateSpace::DEFAULT;
 }
 
-GradientSpreadMethod toSpreadMethod( std::string style )
+SpreadMethod toSpreadMethod( std::string style )
 {
 	style = trim( toLower( style ) );
 	if( style == "reflect" )
-		return GradientSpreadMethod::REFLECT;
+		return SpreadMethod::REFLECT;
 	if( style == "repeat" )
-		return GradientSpreadMethod::REPEAT;
-	return GradientSpreadMethod::DEFAULT;
+		return SpreadMethod::REPEAT;
+	return SpreadMethod::DEFAULT;
 }
 
 } // namespace nvp
