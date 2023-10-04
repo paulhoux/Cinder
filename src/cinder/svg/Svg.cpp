@@ -2386,7 +2386,7 @@ void Group::appendMergedShape2d( Shape2d *appendTo ) const
 		if( group )
 			group->appendMergedShape2d( appendTo );
 		else
-			appendTo->append( child->getShape() );
+			appendTo->append( child->getShape().transformed( child->getTransform() ) );
 	}
 }
 
@@ -2971,7 +2971,7 @@ const Node *Defs::findNode( const std::string &id, bool recurse ) const
 ClipPath::ClipPath( Node *parent, const XmlTree &xml )
 	: Group( parent, xml )
 {
-	//if( xml.hasAttribute( "clipPathUnits" ) )
+	// if( xml.hasAttribute( "clipPathUnits" ) )
 	//	__debugbreak(); // TODO: should be supported.
 }
 

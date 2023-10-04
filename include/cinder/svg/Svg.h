@@ -55,6 +55,7 @@ using CoordinateSpace = enum { USER_SPACE_ON_USE, OBJECT_BOUNDING_BOX };
 class Circle;
 class ClipPath;
 class Defs;
+class Doc;
 class Ellipse;
 class ExcChildNotFound;
 class Group;
@@ -396,7 +397,7 @@ class CI_API Node {
 	//! Returns the unique id for this node.
 	size_t getUuid() const { return mUuid; }
 	//! Returns the svg::Doc this Node is an element of
-	class Doc *getDoc() const;
+	Doc *getDoc() const;
 	//! Returns the immediate parent of this node
 	const Node *getParent() const { return mParent; }
 	//! Returns the tag of this Node when present (e.g. 'svg').
