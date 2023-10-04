@@ -725,8 +725,6 @@ class Renderer : public svg::Renderer {
 	std::vector<std::vector<float>>    mDashArrayStack;
 	std::vector<float>                 mDashOffsetStack;
 	std::vector<const svg::ClipPath *> mClipPathStack;
-	//mutable svg::Style                 mPreviousStyle;
-	//mutable bool                       mPreviousWasImage = false;
 };
 
 class CI_API Svg {
@@ -751,8 +749,6 @@ class CI_API Svg {
 		mPathsLookup.clear();
 		mPaths.clear();
 		mDrawCalls.clear();
-		mInstances.clear();
-		mTransforms.clear();
 	}
 
 	void draw();
@@ -765,41 +761,50 @@ class CI_API Svg {
 	const Path &getPathAt( size_t index ) const { return mPaths.at( index ); }
 
 	//! Adds a clip-mask to the draw calls.
-	void startClipPath( GLuint pathId, glm::mat3x2 transform, GLuint clipMask )
+	void startClipPath( GLuint clipLayer, GLuint pathId, glm::mat3x2 transform )
 	{
+		assert( clipLayer > 0 );
+		assert( clipLayer < 7 );
+
 		DrawCall dc;
-		dc.count = 1;
-		dc.offset = GLsizei( mInstances.size() );
-		dc.clipMask = clipMask;
+		dc.path = pathId;
+		dc.transform = std::move( transform );
+		dc.clipMask = 0x80 >> ( clipLayer - 1 );
+		dc.coverMask = 0xFF >> clipLayer;
+		dc.stencilOp = GL_REPLACE;
+		dc.stencilFunc = GL_NOTEQUAL;
 
-		GLuint mask = clipMask;
-		while( mask & 0xFF ) {
-			dc.coverMask |= mask;
-			mask <<= 1;
-		}
-
-		mInstances.push_back( pathId );
-		mTransforms.push_back( std::move( transform ) );
 		mDrawCalls.push_back( std::move( dc ) );
 	}
 	//! Adds a clip-mask to the draw calls.
-	void finishClipPath( GLuint pathId, glm::mat3x2 transform, GLuint clipMask )
+	void finishClipPath( GLuint clipLayer, GLuint pathId, glm::mat3x2 transform )
 	{
-		DrawCall dc;
-		dc.count = 1;
-		dc.offset = GLsizei( mInstances.size() );
-		dc.clipMask = clipMask;
+		assert( clipLayer > 0 );
+		assert( clipLayer < 7 );
 
-		mInstances.push_back( pathId );
-		mTransforms.push_back( std::move( transform ) );
+		DrawCall dc;
+		dc.path = pathId;
+		dc.transform = std::move( transform );
+		dc.clipMask = 0x80 >> ( clipLayer - 1 );
+		dc.coverMask = 0xFF >> clipLayer;
+		dc.stencilOp = GL_ZERO;
+		dc.stencilFunc = GL_ALWAYS;
+
 		mDrawCalls.push_back( std::move( dc ) );
 	}
 	//! Adds a path to the draw calls.
-	void addDrawCall( GLuint pathId, glm::mat3x2 transform, svg::Paint fill, svg::Paint stroke, float fillOpacity = 1, float strokeOpacity = 1, svg::FillRule fillRule = svg::FILL_RULE_NONZERO, const svg::Image &image = {} )
+	void addDrawCall(
+		GLuint clipLayer, GLuint pathId, glm::mat3x2 transform, svg::Paint fill, svg::Paint stroke, float fillOpacity = 1, float strokeOpacity = 1, svg::FillRule fillRule = svg::FILL_RULE_NONZERO, const svg::Image &image = {} )
 	{
+		assert( clipLayer < 7 );
+
 		DrawCall dc;
-		dc.count = 1;
-		dc.offset = GLsizei( mInstances.size() );
+		dc.path = pathId;
+		dc.transform = std::move( transform );
+		dc.clipMask = clipLayer > 0 ? 0x80 >> clipLayer : 0x00;
+		dc.coverMask = clipLayer > 0 ? 0xFF >> ( clipLayer + 1 ) : 0xFF;
+		dc.stencilOp = GL_REPLACE;
+		dc.stencilFunc = GL_NOTEQUAL;
 		dc.fill = std::move( fill );
 		dc.fillOpacity = fillOpacity;
 		dc.fillRule = fillRule == svg::FILL_RULE_NONZERO ? 0xFF : 0x01;
@@ -810,26 +815,10 @@ class CI_API Svg {
 			dc.image = gl::Texture2d::create( *image.getSurface(), gl::Texture2d::Format().loadTopDown( true ) ); // TODO: cache textures.
 			dc.fill.mTransform *= image.getTextureMatrix();
 			dc.fill.mSpecifiesTransform = true;
+			// TODO: affect stroke as well?
 		}
 
-		// Use the same cover mask as the previous draw call.
-		if( !mDrawCalls.empty() ) {
-			dc.coverMask = mDrawCalls.back().coverMask;
-		}
-
-		//
-		mInstances.push_back( pathId );
-		mTransforms.push_back( std::move( transform ) );
 		mDrawCalls.push_back( std::move( dc ) );
-	}
-	//! Appends an instanced path to the draw calls.
-	void appendDrawCall( GLuint pathId, glm::mat3x2 transform )
-	{
-		assert( !mDrawCalls.empty() );
-
-		mInstances.push_back( pathId );
-		mTransforms.push_back( std::move( transform ) );
-		mDrawCalls.back().count++;
 	}
 
   private:
@@ -841,16 +830,18 @@ class CI_API Svg {
 	nvp::Shader::Type preparePaint( const svg::Paint &paint, float opacity );
 
 	struct DrawCall {
-		GLsizei          offset{ 0 };        // Offset into instance buffers.
-		GLsizei          count{ 1 };         // Number of paths to draw.
-		svg::Paint       fill;               //
-		svg::Paint       stroke;             //
-		gl::Texture2dRef image;              //
-		float            fillOpacity{ 1 };   //
-		float            strokeOpacity{ 1 }; //
-		GLuint           fillRule{ 0xFF };   // Used for non-zero (0xFF) or even-odd (0x01) rendering.
-		GLuint           clipMask{ 0x00 };   // If non-zero, path will be used as a clip-path.
-		GLuint           coverMask{ 0x00 };  // If non-zero, path will be clipped.
+		GLuint           path{ 0 };                // Path id.
+		glm::mat3x2      transform;                // Path transform matrix.
+		svg::Paint       fill;                     //
+		svg::Paint       stroke;                   //
+		gl::Texture2dRef image;                    // Can be null.
+		float            fillOpacity{ 1 };         //
+		float            strokeOpacity{ 1 };       //
+		GLuint           fillRule{ 0xFF };         // Used for non-zero (0xFF) or even-odd (0x01) rendering.
+		GLuint           clipMask{ 0x00 };         // If non-zero, path will be used as a clip-path.
+		GLuint           coverMask{ 0x00 };        // If non-zero, path will be clipped.
+		GLuint           stencilOp{ GL_ZERO };     // Operation used by the clipping stage.
+		GLuint           stencilFunc{ GL_ALWAYS }; // Operation used by the clipping stage.
 	};
 
 	svg::DocRef                        mDoc;
@@ -858,8 +849,6 @@ class CI_API Svg {
 	Gradients                          mGradients;
 	std::unordered_map<size_t, size_t> mPathsLookup;
 	std::vector<Path>                  mPaths;
-	std::vector<GLuint>                mInstances;
-	std::vector<glm::mat3x2>           mTransforms;
 	std::vector<DrawCall>              mDrawCalls;
 };
 

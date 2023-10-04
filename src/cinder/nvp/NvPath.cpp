@@ -1055,23 +1055,37 @@ void Svg::draw()
 	const auto &tex = mGradients.getTexture();
 	ctx->pushTextureBinding( tex->getTarget(), tex->getId(), 0 );
 
+	gl::pushModelView();
 	for( const auto &call : mDrawCalls ) {
-		gl::pushModelView();
 		gl::matrixLoadfEXT( GL_MODELVIEW, value_ptr( gl::getModelView() ) );
+		gl::matrixMult3x2fNV( GL_MODELVIEW, value_ptr( call.transform ) );
 
-		if( call.count == 1 )
-			gl::matrixMult3x2fNV( GL_MODELVIEW, value_ptr( mTransforms.at( call.offset ) ) );
+		/// <summary>
+		/// Clip paths are handled as follows:
+		///	  1. The path or group of paths are rendered to the stencil buffer using either non-zero or even-odd fill rule.
+		///	  2. The lowest bits of the stencil are now set for all pixels that need to be covered.
+		///	  3. We then cover the pixels without writing to the color buffer, replacing the stencil value with the highest bit (0x80) of the test is passed.
+		///	  4. Repeat this for each nested clip path, but use the next highest bit (0x40, 0x20, etc.) instead.
+		///	  5. When rendering the actual clipped content, render normally but only draw pixels if all clip bits are set.
+		///	  6. We then reset the lowest clip bit by doing a cover with the appropriate stencil functions set. 
+		///	  7. At the end of each clip path, reset the corresponding clip bit.
+		/// </summary>
 
-		if( call.clipMask ) {
-			// Render shape to stencil buffer only to use it as a clip-path.
-			// We assume that clip-paths use even-odd rendering and only need a single bit.
-			// ctx->pushBoolState( GL_STENCIL_TEST, GL_FALSE );
-			gl::stencilFillPathNV( mInstances.at( call.offset ), GL_INVERT, call.clipMask );
-			// ctx->popBoolState( GL_STENCIL_TEST );
+		if( call.clipMask && call.fill.isNone() && call.stroke.isNone() ) { // (steps 1-4 and 7).
+			// Render shape to stencil buffer to use it as a clip-path.
+			gl::ScopedColorMask   scpColorMask( GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE ); // Don't write to color buffer.
+			gl::ScopedStencilMask scpStencilMask( call.coverMask | call.clipMask );       // Don't write to previous clip bits.
+
+			gl::stencilOp( GL_KEEP, GL_KEEP, call.stencilOp );                           // stencilOp = GL_REPLACE to set clip, GL_ZERO to erase clip.
+			gl::stencilFunc( call.stencilFunc, GLint( call.clipMask ), call.coverMask ); // stencilFunc = GL_NOTEQUAL to set clip, GL_ALWAYS to erase clip.
+
+			if( call.stencilOp == GL_REPLACE )
+				gl::stencilFillPathNV( call.path, GL_COUNT_UP_NV, call.coverMask /* & call.fillRule */ ); // On set: write path to LSB portion (step 1).
+
+			gl::coverFillPathNV( call.path, GL_BOUNDING_BOX_NV ); // On set: convert LSB portion to clip bit (step 3), on reset: clear stencil buffer bits (step 7).
 		}
-		else if( call.image ) {
-			assert( call.count == 1 );
 
+		if( call.image ) {
 			ScopedShader scpShader( Shader::Type::IMAGE );
 			scpShader.setColor( ColorA::white() );
 			scpShader.setCoords( GLenum( /*call.fill.mUseObjectBoundingBox ?*/ CoordinateSpace::OBJECT_BOUNDING_BOX /*: CoordinateSpace::USER_SPACE_ON_USE*/ ), call.fill.getTransform() );
@@ -1079,28 +1093,28 @@ void Svg::draw()
 
 			gl::ScopedTextureBind scpImage( call.image, 2 );
 
-			if( call.coverMask ) {
-				// Render shape to the stencil buffer, while being careful not to affect existing clip-paths.
-				// ctx->pushBoolState( GL_STENCIL_TEST, GL_FALSE );
-				gl::stencilFillPathNV( mInstances.at( call.offset ), GL_COUNT_UP_NV, ~call.coverMask & 0xFF );
-				// ctx->popBoolState( GL_STENCIL_TEST );
+			if( call.clipMask ) {
+				gl::ScopedStencilMask scpStencilMask( call.coverMask | call.clipMask ); // Don't write to previous clip bits.
 
-				// Cover shape but only draw pixels touched by the shape and by all clip-paths.
-				gl::stencilFunc( GL_LESS, GLint( call.coverMask ), call.coverMask | call.fillRule );
+				GLuint mask = call.coverMask << 1 | 0x01;
+				gl::stencilFunc( GL_LESS, GLint( ~mask & 0xFF ), 0xFF ); // (step 5).
 				gl::stencilOp( GL_KEEP, GL_KEEP, GL_KEEP );
 
-				gl::coverFillPathNV( mInstances.at( call.offset ), GL_BOUNDING_BOX_NV );
+				gl::stencilThenCoverFillPathNV( call.path, GL_COUNT_UP_NV, call.fillRule & call.coverMask, GL_BOUNDING_BOX_NV ); // (step 5).
 
-				// Erase the shape from the stencil buffer again, while being careful not to affect existing clip-paths.
-				// ctx->pushBoolState( GL_STENCIL_TEST, GL_FALSE );
-				gl::stencilFillPathNV( mInstances.at( call.offset ), GL_COUNT_DOWN_NV, ~call.coverMask & 0xFF );
-				// ctx->popBoolState( GL_STENCIL_TEST );
+				// Remove shape from stencil buffer (step 6).
+				gl::ScopedColorMask scpColorMask( GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE ); // Don't write to color buffer.
+
+				gl::stencilOp( GL_KEEP, GL_KEEP, GL_ZERO );
+				gl::stencilFunc( GL_ALWAYS, GLint( call.clipMask ), call.coverMask );
+
+				gl::coverFillPathNV( call.path, GL_BOUNDING_BOX_NV );
 			}
 			else {
 				gl::stencilFunc( GL_NOTEQUAL, 0, call.fillRule );
 				gl::stencilOp( GL_KEEP, GL_KEEP, GL_ZERO );
 
-				gl::stencilThenCoverFillPathNV( mInstances.at( call.offset ), GL_COUNT_UP_NV, call.fillRule, GL_BOUNDING_BOX_NV );
+				gl::stencilThenCoverFillPathNV( call.path, GL_COUNT_UP_NV, call.fillRule, GL_BOUNDING_BOX_NV );
 			}
 		}
 		else {
@@ -1113,34 +1127,28 @@ void Svg::draw()
 				ScopedShader scpShader( type );
 				scpShader.setColor( solidColor );
 
-				if( call.coverMask ) {
-					// Render shape against clip-path to the stencil buffer.
-					// ctx->pushBoolState( GL_STENCIL_TEST, GL_FALSE );
-					gl::stencilFillPathNV( mInstances.at( call.offset ), GL_COUNT_UP_NV, ~call.coverMask & 0xFF );
-					// ctx->popBoolState( GL_STENCIL_TEST );
+				if( call.clipMask ) {
+					gl::ScopedStencilMask scpStencilMask( call.coverMask | call.clipMask ); // Don't write to previous clip bits.
 
-					// Cover shape if pixel is touched by all clip-paths.
-					gl::stencilFunc( GL_LESS, GLint( call.coverMask ), call.coverMask | call.fillRule );
+					GLuint mask = call.coverMask << 1 | 0x01;
+					gl::stencilFunc( GL_LESS, GLint( ~mask & 0xFF ), 0xFF ); // (step 5).
 					gl::stencilOp( GL_KEEP, GL_KEEP, GL_KEEP );
 
-					gl::coverFillPathNV( mInstances.at( call.offset ), GL_BOUNDING_BOX_NV );
+					gl::stencilThenCoverFillPathNV( call.path, GL_COUNT_UP_NV, call.fillRule & call.coverMask, GL_BOUNDING_BOX_NV ); // (step 5).
 
-					// Erase the shape from the stencil buffer again.
-					// ctx->pushBoolState( GL_STENCIL_TEST, GL_FALSE );
-					gl::stencilFillPathNV( mInstances.at( call.offset ), GL_COUNT_DOWN_NV, ~call.coverMask & 0xFF );
-					// ctx->popBoolState( GL_STENCIL_TEST );
+					// Remove shape from stencil buffer (step 6).
+					gl::ScopedColorMask scpColorMask( GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE ); // Don't write to color buffer.
+
+					gl::stencilOp( GL_KEEP, GL_KEEP, GL_ZERO );
+					gl::stencilFunc( GL_ALWAYS, GLint( call.clipMask ), call.coverMask );
+
+					gl::coverFillPathNV( call.path, GL_BOUNDING_BOX_NV );
 				}
 				else {
 					gl::stencilFunc( GL_NOTEQUAL, 0, call.fillRule );
 					gl::stencilOp( GL_KEEP, GL_KEEP, GL_ZERO );
 
-					if( call.count == 1 ) {
-						gl::stencilThenCoverFillPathNV( mInstances.at( call.offset ), GL_COUNT_UP_NV, call.fillRule, GL_BOUNDING_BOX_NV );
-					}
-					else {
-						gl::stencilThenCoverFillPathInstancedNV(
-							call.count, GL_UNSIGNED_INT, &mInstances.at( call.offset ), 0, GL_COUNT_UP_NV, call.fillRule, GL_BOUNDING_BOX_NV, GL_AFFINE_2D_NV, reinterpret_cast<const GLfloat *>( &mTransforms.at( call.offset ) ) );
-					}
+					gl::stencilThenCoverFillPathNV( call.path, GL_COUNT_UP_NV, call.fillRule, GL_BOUNDING_BOX_NV );
 				}
 			}
 
@@ -1153,39 +1161,33 @@ void Svg::draw()
 				ScopedShader scpShader( type );
 				scpShader.setColor( solidColor );
 
-				if( call.coverMask ) {
-					// Render shape against clip-path to the stencil buffer.
-					// ctx->pushBoolState( GL_STENCIL_TEST, GL_FALSE );
-					gl::stencilStrokePathNV( mInstances.at( call.offset ), GL_COUNT_UP_NV, ~call.coverMask & 0xFF );
-					// ctx->popBoolState( GL_STENCIL_TEST );
+				if( call.clipMask ) {
+					gl::ScopedStencilMask scpStencilMask( call.coverMask | call.clipMask ); // Don't write to previous clip bits.
 
-					// Cover shape if pixel is touched by all clip-paths.
-					gl::stencilFunc( GL_LESS, GLint( call.coverMask ), 0xFF );
+					GLuint mask = call.coverMask << 1 | 0x01;
+					gl::stencilFunc( GL_LESS, GLint( ~mask & 0xFF ), 0xFF ); // (step 5).
 					gl::stencilOp( GL_KEEP, GL_KEEP, GL_KEEP );
 
-					gl::coverStrokePathNV( mInstances.at( call.offset ), GL_BOUNDING_BOX_NV );
+					gl::stencilThenCoverStrokePathNV( call.path, GL_COUNT_UP_NV, call.coverMask, GL_BOUNDING_BOX_NV ); // (step 5).
 
-					// Erase the shape from the stencil buffer again.
-					// ctx->pushBoolState( GL_STENCIL_TEST, GL_FALSE );
-					gl::stencilStrokePathNV( mInstances.at( call.offset ), GL_COUNT_DOWN_NV, ~call.coverMask & 0xFF );
-					// ctx->popBoolState( GL_STENCIL_TEST );
+					// Remove shape from stencil buffer (step 6).
+					gl::ScopedColorMask scpColorMask( GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE ); // Don't write to color buffer.
+
+					gl::stencilOp( GL_KEEP, GL_KEEP, GL_ZERO );
+					gl::stencilFunc( GL_ALWAYS, GLint( call.clipMask ), call.coverMask );
+
+					gl::coverStrokePathNV( call.path, GL_BOUNDING_BOX_NV );
 				}
 				else {
 					gl::stencilFunc( GL_NOTEQUAL, 0, 0xFF );
 					gl::stencilOp( GL_KEEP, GL_KEEP, GL_ZERO );
 
-					if( call.count == 1 ) {
-						gl::stencilThenCoverStrokePathNV( mInstances.at( call.offset ), GL_COUNT_UP_NV, 0xFF, GL_BOUNDING_BOX_NV );
-					}
-					else {
-						gl::stencilThenCoverStrokePathInstancedNV(
-							call.count, GL_UNSIGNED_INT, &mInstances.at( call.offset ), 0, GL_COUNT_UP_NV, call.fillRule, GL_BOUNDING_BOX_NV, GL_AFFINE_2D_NV, reinterpret_cast<const GLfloat *>( &mTransforms.at( call.offset ) ) );
-					}
+					gl::stencilThenCoverStrokePathNV( call.path, GL_COUNT_UP_NV, 0xFF, GL_BOUNDING_BOX_NV );
 				}
 			}
 		}
-		gl::popModelView();
 	}
+	gl::popModelView();
 
 	ctx->popTextureBinding( tex->getTarget(), 0 );
 
@@ -1248,9 +1250,9 @@ void Renderer::pushClipPath( const svg::ClipPath &clippath )
 		index = mSvg->insertOrReplacePath( clippath.getUuid(), std::move( path ) );
 	}
 
-	mSvg->startClipPath( mSvg->getPathAt( index ).getId(), toMat3x2( mMatrixStack.back() ), 0x80 >> mClipPathStack.size() );
-
 	mClipPathStack.push_back( &clippath );
+
+	mSvg->startClipPath( mClipPathStack.size(), mSvg->getPathAt( index ).getId(), toMat3x2( mMatrixStack.back() ) );
 }
 
 void Renderer::popClipPath()
@@ -1263,8 +1265,9 @@ void Renderer::popClipPath()
 		__debugbreak(); // Path should already be cached!
 	}
 
+	mSvg->finishClipPath( mClipPathStack.size(), mSvg->getPathAt( index ).getId(), toMat3x2( mMatrixStack.back() ) );
+
 	mClipPathStack.pop_back();
-	mSvg->finishClipPath( mSvg->getPathAt( index ).getId(), toMat3x2( mMatrixStack.back() ), 0x80 >> mClipPathStack.size() );
 }
 
 void Renderer::drawPath( const svg::Path &path )
@@ -1355,10 +1358,15 @@ void Renderer::drawImage( const svg::Image &image )
 		index = mSvg->insertOrReplacePath( image.getUuid(), std::move( p ) );
 	}
 
-	mSvg->addDrawCall( mSvg->getPathAt( index ).getId(), toMat3x2( mMatrixStack.back() ), mFillStack.back(), mStrokeStack.back(), mFillOpacityStack.back() * mGroupOpacityStack.back(), mStrokeOpacityStack.back() * mGroupOpacityStack.back(),
-		mFillRuleStack.back(), image );
-
-	//mPreviousWasImage = true;
+	mSvg->addDrawCall( mClipPathStack.size(),                   //
+		mSvg->getPathAt( index ).getId(),                       //
+		toMat3x2( mMatrixStack.back() ),                        //
+		mFillStack.back(),                                      //
+		mStrokeStack.back(),                                    //
+		mFillOpacityStack.back() * mGroupOpacityStack.back(),   //
+		mStrokeOpacityStack.back() * mGroupOpacityStack.back(), //
+		mFillRuleStack.back(),                                  //
+		image );
 }
 
 void Renderer::pushMatrix( const mat3 &m )
@@ -1513,37 +1521,10 @@ void Renderer::render( const Path &path ) const
 	path.setJoinStyle( toJoinStyle( mLineJoinStack.back() ) );
 	path.setStrokeWidth( mStrokeWidthStack.back() );
 
-	//// Determine current style.
-	//auto style = getCurrentStyle();
-
-	//// Perform path merging.
-	//if( !mSvg->empty() /*&& mSvg->mDrawCalls.back().coverMask == dc.coverMask*/ ) {
-	//	if( mPreviousStyle == style && !mPreviousWasImage ) {
-	//		bool usesTransparency = style.getFillOpacity() < 1 || style.getFill().isTransparent();
-	//		bool usesGradient = style.getFill().isLinearGradient() || style.getFill().isRadialGradient();
-	//		bool usesEvenOdd = style.getFillRule() == svg::FILL_RULE_EVENODD;
-	//		bool usesStrokes = !style.getStroke().isNone();
-
-	//		if( usesTransparency || usesGradient || usesEvenOdd || usesStrokes ) {
-	//			// Paths can not be merged if they use transparency, gradients, even-odd rendering or strokes.
-	//		}
-	//		else {
-	//			// Generate draw call.
-	//			mSvg->appendDrawCall( path.getId(), toMat3x2( mMatrixStack.back() ) );
-
-	//			return;
-	//		}
-	//	}
-	//}
-
 	// Generate draw call.
-	mSvg->addDrawCall( path.getId(), toMat3x2( mMatrixStack.back() ), //
-		mFillStack.back(), mStrokeStack.back(),                       //
+	mSvg->addDrawCall( mClipPathStack.size(), path.getId(), toMat3x2( mMatrixStack.back() ), //
+		mFillStack.back(), mStrokeStack.back(),                                              //
 		mFillOpacityStack.back() * mGroupOpacityStack.back(), mStrokeOpacityStack.back() * mGroupOpacityStack.back(), mFillRuleStack.back() );
-
-	//// Keep track of current style, so we can compare with the next draw call.
-	//mPreviousStyle = style;
-	//mPreviousWasImage = false;
 }
 
 Shader::Shader( Type type )
