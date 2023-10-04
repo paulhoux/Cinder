@@ -379,6 +379,38 @@ class ScopedColorMask {
 	GLboolean mMask[4] = { GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE };
 };
 
+//!
+class ScopedStencilMask {
+  public:
+	ScopedStencilMask( GLuint mask )
+	{
+		glGetIntegerv( GL_STENCIL_WRITEMASK , &mFrontMask);
+		glGetIntegerv( GL_STENCIL_BACK_WRITEMASK, &mBackMask );
+		glStencilMask( mask );
+	}
+	ScopedStencilMask( GLuint front, GLuint back )
+	{
+		glGetIntegerv( GL_STENCIL_WRITEMASK , &mFrontMask);
+		glGetIntegerv( GL_STENCIL_BACK_WRITEMASK, &mBackMask );
+		glStencilMaskSeparate( GL_FRONT, front );
+		glStencilMaskSeparate( GL_BACK, back );
+	}
+	~ScopedStencilMask()
+	{
+		glStencilMaskSeparate( GL_FRONT, mFrontMask );
+		glStencilMaskSeparate( GL_BACK, mBackMask );
+	}
+
+	ScopedStencilMask( const ScopedStencilMask & ) = delete;
+	ScopedStencilMask( ScopedStencilMask && ) = delete;
+	ScopedStencilMask &operator=( const ScopedStencilMask & ) = delete;
+	ScopedStencilMask &operator=( ScopedStencilMask && ) = delete;
+
+  private:
+	GLint mFrontMask = 0xFF;
+	GLint mBackMask = 0xFF;
+};
+
 #if defined( CINDER_GL_HAS_KHR_DEBUG )
 
 //! Scopes debug group message
