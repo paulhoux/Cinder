@@ -41,11 +41,12 @@ class CI_API SvgRendererGl : public svg::Renderer {
 		gl::pushModelMatrix();
 	}
 	
-	~SvgRendererGl() {
+	~SvgRendererGl() override
+	{
 		gl::popModelMatrix();
 	}
   
-	void	pushGroup( const svg::Group &group, float opacity ) {}
+	void	pushGroup( const svg::Group &group, float opacity ) override {}
 	
 	void	drawPath( const svg::Path &path ) override {
 		if( ! mStacks.fill.back().isNone() ) {
@@ -123,9 +124,11 @@ class CI_API SvgRendererGl : public svg::Renderer {
 			gl::color( getCurStrokeColor() );
 			gl::drawStrokedEllipse( ellipse.getCenter(), ellipse.getRadiusX(), ellipse.getRadiusY() );
 		}
-	}	
-    
-	void	drawImage( const Surface8u &surface, const Rectf &drawRect ) {
+	}
+
+	void drawImage( const svg::Image &image ) override { drawImage( *image.getSurface(), image.getRect() ); }
+	void drawImage( const Surface8u &surface, const Rectf &drawRect ) const
+	{
 		gl::color( Color::white() );
 		gl::draw( gl::Texture::create( surface ), drawRect );
 	}
@@ -153,8 +156,18 @@ class CI_API SvgRendererGl : public svg::Renderer {
 	void	pushStrokeOpacity( float opacity ) override { mStacks.strokeOpacity.push_back( opacity ); }
 	void	popStrokeOpacity() override { mStacks.strokeOpacity.pop_back(); }
 
-	ColorA	getCurFillColor() { ColorA result( mStacks.fill.back().getColor() ); result.a = mStacks.fillOpacity.back(); return result; }
-	ColorA	getCurStrokeColor() { ColorA result( mStacks.stroke.back().getColor() ); result.a = mStacks.strokeOpacity.back(); return result; }
+	ColorA getCurFillColor() const
+	{
+		ColorA result( mStacks.fill.back().getColor() );
+		result.a = mStacks.fillOpacity.back();
+		return result;
+	}
+	ColorA getCurStrokeColor() const
+	{
+		ColorA result( mStacks.stroke.back().getColor() );
+		result.a = mStacks.strokeOpacity.back();
+		return result;
+	}
 
 
 	void	pushStrokeWidth( float width ) override { mStacks.strokeWidth.push_back( width ); glLineWidth( width ); }
@@ -162,7 +175,7 @@ class CI_API SvgRendererGl : public svg::Renderer {
 	void	pushFillRule( svg::FillRule rule ) override { mStacks.fillRule.push_back( rule ); }
 	void	popFillRule() override { mStacks.fillRule.pop_back(); }	
 
-
+private:
 	Stacks mStacks;
 };
 
