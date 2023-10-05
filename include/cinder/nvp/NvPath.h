@@ -653,10 +653,27 @@ class CI_API ScopedShader : public Noncopyable {
 	}
 };
 
-//!
-class Renderer : public svg::Renderer {
+class CI_API Svg : private svg::Renderer {
   public:
-	Renderer( Svg *svg );
+	Svg() = default;
+
+	explicit Svg( const DataSourceRef &src );
+	explicit Svg( const svg::DocRef &svg );
+
+	//!
+	float getWidth() const { return mBounds.getWidth(); }
+	//!
+	float getHeight() const { return mBounds.getHeight(); }
+	//!
+	vec2 getSize() const { return mBounds.getSize(); }
+	//!
+	const Rectf &getBounds() const { return mBounds; }
+
+	//!
+	void draw();
+
+  private:
+	// svg::Renderer callbacks.
 
 	void start() override;
 	void finish() override {}
@@ -675,8 +692,6 @@ class Renderer : public svg::Renderer {
 	void drawTextSpan( const svg::TextSpan & ) override {}
 	void pushMatrix( const mat3 & ) override;
 	void popMatrix() override;
-	// void pushStyle( const svg::Style & ) override;
-	// void popStyle() override;
 	void pushFill( const svg::Paint & ) override;
 	void popFill() override;
 	void pushStroke( const svg::Paint & ) override;
@@ -704,63 +719,17 @@ class Renderer : public svg::Renderer {
 	void pushTextRotation( float ) override {}
 	void popTextRotation() override {}
 
-  private:
 	//!
-	svg::Style getCurrentStyle() const;
+	bool shouldRender() const { return !( mStacks.fill.back().isNone() && mStacks.stroke.back().isNone() ); }
 	//!
-	bool shouldRender() const { return !( mFillStack.back().isNone() && mStrokeStack.back().isNone() ); }
-	//!
-	void render( const Path &path ) const;
-
-	Svg                               *mSvg = nullptr;
-	std::vector<mat3>                  mMatrixStack;
-	std::vector<svg::Paint>            mFillStack, mStrokeStack;
-	std::vector<float>                 mFillOpacityStack, mStrokeOpacityStack;
-	std::vector<float>                 mGroupOpacityStack;
-	std::vector<float>                 mStrokeWidthStack;
-	std::vector<svg::FillRule>         mFillRuleStack;
-	std::vector<svg::LineCap>          mLineCapStack;
-	std::vector<svg::LineJoin>         mLineJoinStack;
-	std::vector<float>                 mMiterLimitStack;
-	std::vector<std::vector<float>>    mDashArrayStack;
-	std::vector<float>                 mDashOffsetStack;
-	std::vector<const svg::ClipPath *> mClipPathStack;
-};
-
-class CI_API Svg {
-  public:
-	Svg() = default;
-
-	explicit Svg( const DataSourceRef &src );
-	explicit Svg( const svg::DocRef &svg );
-
-	float getWidth() const { return mDoc ? mDoc->getWidth() : 0.0f; }
-	float getHeight() const { return mDoc ? mDoc->getHeight() : 0.0f; }
-	vec2  getSize() const { return mDoc ? mDoc->getSize() : vec2{}; }
-	Rectf getBounds() const { return mDoc ? mDoc->getBounds() : Rectf{}; }
-
-	//! Returns whether any paths are defined.
-	bool empty() const { return mDrawCalls.empty(); }
-	//! Returns the number of paths.
-	size_t size() const { return mDrawCalls.size(); }
-	//!
-	void clear()
-	{
-		mPathsLookup.clear();
-		mPaths.clear();
-		mDrawCalls.clear();
-	}
-
-	void draw();
-
-	//!
+	void render( const Path &path );
+	//! Returns whether the path with the specified \a uuid exists and sets \a index if it does.
 	bool findPath( size_t uuid, size_t &index ) const;
-	//!
+	//! Caches the \a path using the specified \a uuid.
 	size_t insertOrReplacePath( size_t uuid, Path &&path );
-	//
+	//! Returns the path at \a index. Index must be valid!
 	const Path &getPathAt( size_t index ) const { return mPaths.at( index ); }
-
-	//! Adds a clip-mask to the draw calls.
+	//! Activates a clip-mask.
 	void startClipPath( GLuint clipLayer, GLuint pathId, glm::mat3x2 transform )
 	{
 		assert( clipLayer > 0 );
@@ -776,7 +745,7 @@ class CI_API Svg {
 
 		mDrawCalls.push_back( std::move( dc ) );
 	}
-	//! Adds a clip-mask to the draw calls.
+	//! Deactivates a clip-mask.
 	void finishClipPath( GLuint clipLayer, GLuint pathId, glm::mat3x2 transform )
 	{
 		assert( clipLayer > 0 );
@@ -820,14 +789,13 @@ class CI_API Svg {
 
 		mDrawCalls.push_back( std::move( dc ) );
 	}
-	//!
-	Shader::Type prepareLinearGradient( const svg::Paint &paint, float opacity, bool prepareShader = true );
-	//!
-	Shader::Type prepareRadialGradient( const svg::Paint &paint, float opacity, bool prepareShader = true );
-	//!
-	Shader::Type preparePaint( const svg::Paint &paint, float opacity, bool prepareShader = true );
+	//!  Creates or activates a linear gradient. Optionally prepares the correct shader as well.
+	Shader::Type prepareLinearGradient( const svg::Paint &paint, float opacity = 1, bool prepareShader = false );
+	//!  Creates or activates a radial gradient. Optionally prepares the correct shader as well.
+	Shader::Type prepareRadialGradient( const svg::Paint &paint, float opacity = 1, bool prepareShader = false );
+	//! Creates or activates a gradient. Optionally prepares the correct shader as well.
+	Shader::Type preparePaint( const svg::Paint &paint, float opacity = 1, bool prepareShader = false );
 
-  private:
 	struct DrawCall {
 		GLuint           path{ 0 };                // Path id.
 		glm::mat3x2      transform;                // Path transform matrix.
@@ -843,9 +811,9 @@ class CI_API Svg {
 		GLuint           stencilFunc{ GL_ALWAYS }; // Operation used by the clipping stage.
 	};
 
-	svg::DocRef                        mDoc;
-	Renderer                           mRenderer{ this };
+	Rectf                              mBounds;
 	Gradients                          mGradients;
+	Stacks                             mStacks;
 	std::unordered_map<size_t, size_t> mPathsLookup;
 	std::vector<Path>                  mPaths;
 	std::vector<DrawCall>              mDrawCalls;

@@ -961,9 +961,9 @@ Svg::Svg( const DataSourceRef &src )
 }
 
 Svg::Svg( const svg::DocRef &svg )
-	: mDoc( svg )
+	: mBounds( svg->getBounds() )
 {
-	mDoc->render( mRenderer );
+	svg->render( *this );
 }
 
 Shader::Type Svg::prepareLinearGradient( const svg::Paint &paint, float opacity, bool prepareShader )
@@ -1146,7 +1146,7 @@ void Svg::draw()
 				ColorA solidColor = call.fill.getColor();
 				solidColor.a *= call.fillOpacity;
 
-				const auto type = preparePaint( call.fill, call.fillOpacity );
+				const auto type = preparePaint( call.fill, call.fillOpacity, true );
 
 				ScopedShader scpShader( type );
 				scpShader.setColor( solidColor );
@@ -1180,7 +1180,7 @@ void Svg::draw()
 				ColorA solidColor = call.stroke.getColor();
 				solidColor.a *= call.strokeOpacity;
 
-				const auto type = preparePaint( call.stroke, call.strokeOpacity );
+				const auto type = preparePaint( call.stroke, call.strokeOpacity, true );
 
 				ScopedShader scpShader( type );
 				scpShader.setColor( solidColor );
@@ -1223,334 +1223,297 @@ void Svg::draw()
 	ctx->popBoolState( GL_STENCIL_TEST );
 }
 
-Renderer::Renderer( Svg *svg )
-	: mSvg{ svg }
+void Svg::start()
 {
-	mMatrixStack.emplace_back();
-	mFillStack.emplace_back( Color::black() );
-	mStrokeStack.emplace_back();
-	mFillOpacityStack.push_back( 1.0f );
-	mStrokeOpacityStack.push_back( 1.0f );
-	mGroupOpacityStack.push_back( 1.0f );
-	mStrokeWidthStack.push_back( 1.0f );
-	mFillRuleStack.push_back( svg::FILL_RULE_NONZERO );
-	mLineCapStack.push_back( svg::LineCap::LINE_CAP_BUTT );
-	mLineJoinStack.push_back( svg::LineJoin::LINE_JOIN_MITER );
-	mMiterLimitStack.push_back( 4.0f );
-	mDashArrayStack.emplace_back();
-	mDashOffsetStack.push_back( 0.0f );
-	mClipPathStack.clear();
+	mStacks.defaults();
 }
 
-void Renderer::start()
+void Svg::pushGroup( const svg::Group &group, float opacity )
 {
-	mSvg->clear();
+	mStacks.groupOpacity.push_back( opacity );
 }
 
-void Renderer::pushGroup( const svg::Group &group, float opacity )
+void Svg::popGroup()
 {
-	mGroupOpacityStack.push_back( opacity );
+	mStacks.groupOpacity.pop_back();
 }
 
-void Renderer::popGroup()
+void Svg::pushClipPath( const svg::ClipPath &clippath )
 {
-	mGroupOpacityStack.pop_back();
-}
-
-void Renderer::pushClipPath( const svg::ClipPath &clippath )
-{
-	if( mClipPathStack.size() > 5 )
+	if( mStacks.clipPath.size() > 5 )
 		CI_LOG_W( "Maximum number of nested clip-paths reached! Results are undefined." );
 
 	// Generate draw call to set the clip-path.
 	size_t index = 0;
-	if( !mSvg->findPath( clippath.getUuid(), index ) ) {
+	if( !findPath( clippath.getUuid(), index ) ) {
 		// Obtain shape from clip-path.
 		const auto shape = clippath.getShape();
 		if( shape.empty() )
 			return;
 
 		Path path( shape );
-		index = mSvg->insertOrReplacePath( clippath.getUuid(), std::move( path ) );
+		index = insertOrReplacePath( clippath.getUuid(), std::move( path ) );
 	}
 
-	mClipPathStack.push_back( &clippath );
+	mStacks.clipPath.push_back( &clippath );
 
-	mSvg->startClipPath( mClipPathStack.size(), mSvg->getPathAt( index ).getId(), toMat3x2( mMatrixStack.back() ) );
+	startClipPath( GLuint( mStacks.clipPath.size() ), getPathAt( index ).getId(), toMat3x2( mStacks.matrix.back() ) );
 }
 
-void Renderer::popClipPath()
+void Svg::popClipPath()
 {
 	assert( !mClipPathStack.empty() );
 
 	// Generate draw call to reset the clip-path.
 	size_t index = 0;
-	if( !mSvg->findPath( mClipPathStack.back()->getUuid(), index ) ) {
+	if( !findPath( mStacks.clipPath.back()->getUuid(), index ) ) {
 		__debugbreak(); // Path should already be cached!
 	}
 
-	mSvg->finishClipPath( mClipPathStack.size(), mSvg->getPathAt( index ).getId(), toMat3x2( mMatrixStack.back() ) );
+	finishClipPath( GLuint( mStacks.clipPath.size() ), getPathAt( index ).getId(), toMat3x2( mStacks.matrix.back() ) );
 
-	mClipPathStack.pop_back();
+	mStacks.clipPath.pop_back();
 }
 
-void Renderer::drawPath( const svg::Path &path )
+void Svg::drawPath( const svg::Path &path )
 {
 	size_t index = 0;
-	if( !mSvg->findPath( path.getUuid(), index ) ) {
+	if( !findPath( path.getUuid(), index ) ) {
 		Path p( path.getShape2d() );
-		index = mSvg->insertOrReplacePath( path.getUuid(), std::move( p ) );
+		index = insertOrReplacePath( path.getUuid(), std::move( p ) );
 	}
 
-	render( mSvg->getPathAt( index ) );
+	render( getPathAt( index ) );
 }
 
-void Renderer::drawPolyline( const svg::Polyline &polyline )
+void Svg::drawPolyline( const svg::Polyline &polyline )
 {
 	size_t index = 0;
-	if( !mSvg->findPath( polyline.getUuid(), index ) ) {
+	if( !findPath( polyline.getUuid(), index ) ) {
 		Path p( polyline.getShape() );
-		index = mSvg->insertOrReplacePath( polyline.getUuid(), std::move( p ) );
+		index = insertOrReplacePath( polyline.getUuid(), std::move( p ) );
 	}
 
-	render( mSvg->getPathAt( index ) );
+	render( getPathAt( index ) );
 }
 
-void Renderer::drawPolygon( const svg::Polygon &polygon )
+void Svg::drawPolygon( const svg::Polygon &polygon )
 {
 	size_t index = 0;
-	if( !mSvg->findPath( polygon.getUuid(), index ) ) {
+	if( !findPath( polygon.getUuid(), index ) ) {
 		Path p( polygon.getShape() );
-		index = mSvg->insertOrReplacePath( polygon.getUuid(), std::move( p ) );
+		index = insertOrReplacePath( polygon.getUuid(), std::move( p ) );
 	}
 
-	render( mSvg->getPathAt( index ) );
+	render( getPathAt( index ) );
 }
 
-void Renderer::drawLine( const svg::Line &line )
+void Svg::drawLine( const svg::Line &line )
 {
 	size_t index = 0;
-	if( !mSvg->findPath( line.getUuid(), index ) ) {
+	if( !findPath( line.getUuid(), index ) ) {
 		Path p( line.getShape() );
-		index = mSvg->insertOrReplacePath( line.getUuid(), std::move( p ) );
+		index = insertOrReplacePath( line.getUuid(), std::move( p ) );
 	}
 
-	render( mSvg->getPathAt( index ) );
+	render( getPathAt( index ) );
 }
 
-void Renderer::drawRect( const svg::Rect &rect )
+void Svg::drawRect( const svg::Rect &rect )
 {
 	size_t index = 0;
-	if( !mSvg->findPath( rect.getUuid(), index ) ) {
+	if( !findPath( rect.getUuid(), index ) ) {
 		Path p( rect.getShape() );
-		index = mSvg->insertOrReplacePath( rect.getUuid(), std::move( p ) );
+		index = insertOrReplacePath( rect.getUuid(), std::move( p ) );
 	}
 
-	render( mSvg->getPathAt( index ) );
+	render( getPathAt( index ) );
 }
 
-void Renderer::drawCircle( const svg::Circle &circle )
+void Svg::drawCircle( const svg::Circle &circle )
 {
 	size_t index = 0;
-	if( !mSvg->findPath( circle.getUuid(), index ) ) {
+	if( !findPath( circle.getUuid(), index ) ) {
 		Path p( circle.getShape() );
-		index = mSvg->insertOrReplacePath( circle.getUuid(), std::move( p ) );
+		index = insertOrReplacePath( circle.getUuid(), std::move( p ) );
 	}
 
-	render( mSvg->getPathAt( index ) );
+	render( getPathAt( index ) );
 }
 
-void Renderer::drawEllipse( const svg::Ellipse &ellipse )
+void Svg::drawEllipse( const svg::Ellipse &ellipse )
 {
 	size_t index = 0;
-	if( !mSvg->findPath( ellipse.getUuid(), index ) ) {
+	if( !findPath( ellipse.getUuid(), index ) ) {
 		Path p( ellipse.getShape() );
-		index = mSvg->insertOrReplacePath( ellipse.getUuid(), std::move( p ) );
+		index = insertOrReplacePath( ellipse.getUuid(), std::move( p ) );
 	}
 
-	render( mSvg->getPathAt( index ) );
+	render( getPathAt( index ) );
 }
 
-void Renderer::drawImage( const svg::Image &image )
+void Svg::drawImage( const svg::Image &image )
 {
 	if( !shouldRender() )
 		return;
 
 	size_t index = 0;
-	if( !mSvg->findPath( image.getUuid(), index ) ) {
+	if( !findPath( image.getUuid(), index ) ) {
 		Path p( Path2d::rectangle( image.getRect() ) );
-		index = mSvg->insertOrReplacePath( image.getUuid(), std::move( p ) );
+		index = insertOrReplacePath( image.getUuid(), std::move( p ) );
 	}
 
-	mSvg->addDrawCall( mClipPathStack.size(),                   //
-		mSvg->getPathAt( index ).getId(),                       //
-		toMat3x2( mMatrixStack.back() ),                        //
-		mFillStack.back(),                                      //
-		mStrokeStack.back(),                                    //
-		mFillOpacityStack.back() * mGroupOpacityStack.back(),   //
-		mStrokeOpacityStack.back() * mGroupOpacityStack.back(), //
-		mFillRuleStack.back(),                                  //
+	addDrawCall( GLuint( mStacks.clipPath.size() ),                 //
+		getPathAt( index ).getId(),                                 //
+		toMat3x2( mStacks.matrix.back() ),                          //
+		mStacks.fill.back(),                                        //
+		mStacks.stroke.back(),                                      //
+		mStacks.fillOpacity.back() * mStacks.groupOpacity.back(),   //
+		mStacks.strokeOpacity.back() * mStacks.groupOpacity.back(), //
+		mStacks.fillRule.back(),                                    //
 		image );
 }
 
-void Renderer::pushMatrix( const mat3 &m )
+void Svg::pushMatrix( const mat3 &m )
 {
-	mMatrixStack.push_back( mMatrixStack.back() * m );
+	mStacks.matrix.push_back( mStacks.matrix.back() * m );
 }
 
-void Renderer::popMatrix()
+void Svg::popMatrix()
 {
-	mMatrixStack.pop_back();
+	mStacks.matrix.pop_back();
 }
 
-void Renderer::pushFill( const svg::Paint &paint )
+void Svg::pushFill( const svg::Paint &paint )
 {
-	mFillStack.push_back( paint );
-	mSvg->preparePaint( paint, 1, false );
+	mStacks.fill.push_back( paint );
+	preparePaint( paint );
 }
 
-void Renderer::popFill()
+void Svg::popFill()
 {
-	mFillStack.pop_back();
+	mStacks.fill.pop_back();
 }
 
-void Renderer::pushStroke( const svg::Paint &paint )
+void Svg::pushStroke( const svg::Paint &paint )
 {
-	mStrokeStack.push_back( paint );
-	mSvg->preparePaint( paint, 1, false );
+	mStacks.stroke.push_back( paint );
+	preparePaint( paint );
 }
 
-void Renderer::popStroke()
+void Svg::popStroke()
 {
-	mStrokeStack.pop_back();
+	mStacks.stroke.pop_back();
 }
 
-void Renderer::pushFillOpacity( float opacity )
+void Svg::pushFillOpacity( float opacity )
 {
-	mFillOpacityStack.push_back( opacity );
+	mStacks.fillOpacity.push_back( opacity );
 }
 
-void Renderer::popFillOpacity()
+void Svg::popFillOpacity()
 {
-	mFillOpacityStack.pop_back();
+	mStacks.fillOpacity.pop_back();
 }
 
-void Renderer::pushStrokeOpacity( float opacity )
+void Svg::pushStrokeOpacity( float opacity )
 {
-	mStrokeOpacityStack.push_back( opacity );
+	mStacks.strokeOpacity.push_back( opacity );
 }
 
-void Renderer::popStrokeOpacity()
+void Svg::popStrokeOpacity()
 {
-	mStrokeOpacityStack.pop_back();
+	mStacks.strokeOpacity.pop_back();
 }
 
-void Renderer::pushStrokeWidth( float x )
+void Svg::pushStrokeWidth( float x )
 {
-	mStrokeWidthStack.push_back( x );
+	mStacks.strokeWidth.push_back( x );
 }
 
-void Renderer::popStrokeWidth()
+void Svg::popStrokeWidth()
 {
-	mStrokeWidthStack.pop_back();
+	mStacks.strokeWidth.pop_back();
 }
 
-void Renderer::pushFillRule( svg::FillRule fillRule )
+void Svg::pushFillRule( svg::FillRule fillRule )
 {
-	mFillRuleStack.push_back( fillRule );
+	mStacks.fillRule.push_back( fillRule );
 }
 
-void Renderer::popFillRule()
+void Svg::popFillRule()
 {
-	mFillRuleStack.pop_back();
+	mStacks.fillRule.pop_back();
 }
 
-void Renderer::pushLineCap( svg::LineCap lineCap )
+void Svg::pushLineCap( svg::LineCap lineCap )
 {
-	mLineCapStack.push_back( lineCap );
+	mStacks.lineCap.push_back( lineCap );
 }
 
-void Renderer::popLineCap()
+void Svg::popLineCap()
 {
-	mLineCapStack.pop_back();
+	mStacks.lineCap.pop_back();
 }
 
-void Renderer::pushLineJoin( svg::LineJoin lineJoin )
+void Svg::pushLineJoin( svg::LineJoin lineJoin )
 {
-	mLineJoinStack.push_back( lineJoin );
+	mStacks.lineJoin.push_back( lineJoin );
 }
 
-void Renderer::popLineJoin()
+void Svg::popLineJoin()
 {
-	mLineJoinStack.pop_back();
+	mStacks.lineJoin.pop_back();
 }
 
-void Renderer::pushMiterLimit( float miterLimit )
+void Svg::pushMiterLimit( float miterLimit )
 {
-	mMiterLimitStack.push_back( miterLimit );
+	mStacks.miterLimit.push_back( miterLimit );
 }
 
-void Renderer::popMiterLimit()
+void Svg::popMiterLimit()
 {
-	mMiterLimitStack.pop_back();
+	mStacks.miterLimit.pop_back();
 }
 
-void Renderer::pushDashArray( const std::vector<float> &dashArray )
+void Svg::pushDashArray( const std::vector<float> &dashArray )
 {
-	mDashArrayStack.push_back( dashArray );
+	mStacks.dashArray.push_back( dashArray );
 }
 
-void Renderer::popDashArray()
+void Svg::popDashArray()
 {
-	mDashArrayStack.pop_back();
+	mStacks.dashArray.pop_back();
 }
 
-void Renderer::pushDashOffset( float dashOffset )
+void Svg::pushDashOffset( float dashOffset )
 {
-	mDashOffsetStack.push_back( dashOffset );
+	mStacks.dashOffset.push_back( dashOffset );
 }
 
-void Renderer::popDashOffset()
+void Svg::popDashOffset()
 {
-	mDashOffsetStack.pop_back();
+	mStacks.dashOffset.pop_back();
 }
 
-svg::Style Renderer::getCurrentStyle() const
-{
-	svg::Style result;
-	result.setDashArray( mDashArrayStack.back() );
-	result.setDashOffset( mDashOffsetStack.back() );
-	result.setFill( mFillStack.back() );
-	result.setFillOpacity( mFillOpacityStack.back() );
-	result.setFillRule( mFillRuleStack.back() );
-	result.setLineCap( mLineCapStack.back() );
-	result.setLineJoin( mLineJoinStack.back() );
-	result.setMiterLimit( mMiterLimitStack.back() );
-	result.setOpacity( mGroupOpacityStack.back() );
-	result.setStroke( mStrokeStack.back() );
-	result.setStrokeOpacity( mStrokeOpacityStack.back() );
-	result.setStrokeWidth( mStrokeWidthStack.back() );
-	return result;
-}
-
-void Renderer::render( const Path &path ) const
+void Svg::render( const Path &path )
 {
 	if( !shouldRender() )
 		return;
 
 	// Set path parameters.
-	path.setMiterLimit( mMiterLimitStack.back() );
-	path.setDashPattern( mDashArrayStack.back() );
-	path.setDashOffset( mDashOffsetStack.back() );
-	path.setEndCaps( toCapsStyle( mLineCapStack.back() ) );
-	path.setDashCaps( toCapsStyle( mLineCapStack.back() ), toCapsStyle( mLineCapStack.back() ) );
-	path.setJoinStyle( toJoinStyle( mLineJoinStack.back() ) );
-	path.setStrokeWidth( mStrokeWidthStack.back() );
+	path.setMiterLimit( mStacks.miterLimit.back() );
+	path.setDashPattern( mStacks.dashArray.back() );
+	path.setDashOffset( mStacks.dashOffset.back() );
+	path.setEndCaps( toCapsStyle( mStacks.lineCap.back() ) );
+	path.setDashCaps( toCapsStyle( mStacks.lineCap.back() ), toCapsStyle( mStacks.lineCap.back() ) );
+	path.setJoinStyle( toJoinStyle( mStacks.lineJoin.back() ) );
+	path.setStrokeWidth( mStacks.strokeWidth.back() );
 
 	// Generate draw call.
-	mSvg->addDrawCall( mClipPathStack.size(), path.getId(), toMat3x2( mMatrixStack.back() ), //
-		mFillStack.back(), mStrokeStack.back(),                                              //
-		mFillOpacityStack.back() * mGroupOpacityStack.back(), mStrokeOpacityStack.back() * mGroupOpacityStack.back(), mFillRuleStack.back() );
+	addDrawCall( GLuint( mStacks.clipPath.size() ), path.getId(), toMat3x2( mStacks.matrix.back() ), //
+		mStacks.fill.back(), mStacks.stroke.back(),                                                  //
+		mStacks.fillOpacity.back() * mStacks.groupOpacity.back(), mStacks.strokeOpacity.back() * mStacks.groupOpacity.back(), mStacks.fillRule.back() );
 }
 
 Shader::Shader( Type type )

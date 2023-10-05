@@ -62,6 +62,7 @@ class Group;
 class Image;
 class Line;
 class Node;
+class Paint;
 class Path;
 class Polygon;
 class Polyline;
@@ -70,77 +71,6 @@ class Rect;
 class Style;
 class Styles;
 class TextSpan;
-
-using RenderVisitor = std::function<bool ( const Node &, svg::Style * )>;
-
-//! Base class from which Renderers are derived.
-class CI_API Renderer {
-  public:
-	virtual ~Renderer() = default;
-
-	void setVisitor( const std::function<bool( const Node &, svg::Style * )> &visitor );
-
-	virtual void start() {}
-	virtual void finish() {}
-
-	virtual void pushGroup( const Group & /*group*/, float /*opacity*/ ) {}
-	virtual void popGroup() {}
-	virtual void pushClipPath( const ClipPath & /* clippath */ ) {}
-	virtual void popClipPath() {}
-	virtual void drawPath( const svg::Path & /*path*/ ) {}
-	virtual void drawPolyline( const svg::Polyline & /*polyline*/ ) {}
-	virtual void drawPolygon( const svg::Polygon & /*polygon*/ ) {}
-	virtual void drawLine( const svg::Line & /*line*/ ) {}
-	virtual void drawRect( const svg::Rect & /*rect*/ ) {}
-	virtual void drawCircle( const svg::Circle & /*circle*/ ) {}
-	virtual void drawEllipse( const svg::Ellipse & /*ellipse*/ ) {}
-	virtual void drawImage( const svg::Image & /*image*/ ) {}
-	virtual void drawTextSpan( const svg::TextSpan & /*span*/ ) {}
-
-	virtual void pushMatrix( const mat3 & /*m*/ ) {}
-	virtual void popMatrix() {}
-	virtual void pushStyle( const svg::Style & /*style*/ ) {}
-	virtual void popStyle() {}
-	virtual void pushFill( const class Paint & /*paint*/ ) {}
-	virtual void popFill() {}
-	virtual void pushStroke( const class Paint & /*paint*/ ) {}
-	virtual void popStroke() {}
-	virtual void pushFillOpacity( float /*opacity*/ ) {}
-	virtual void popFillOpacity() {}
-	virtual void pushStrokeOpacity( float /*opacity*/ ) {}
-	virtual void popStrokeOpacity() {}
-	virtual void pushStrokeWidth( float /*width*/ ) {}
-	virtual void popStrokeWidth() {}
-	virtual void pushFillRule( FillRule /*rule*/ ) {}
-	virtual void popFillRule() {}
-	virtual void pushLineCap( LineCap /*lineCap*/ ) {}
-	virtual void popLineCap() {}
-	virtual void pushLineJoin( LineJoin /*lineJoin*/ ) {}
-	virtual void popLineJoin() {}
-	virtual void pushMiterLimit( float /*miterLimit*/ ) {}
-	virtual void popMiterLimit() {}
-	virtual void pushDashArray( const std::vector<float> & /*dashArray*/ ) {}
-	virtual void popDashArray() {}
-	virtual void pushDashOffset( float /*dashOffset*/ ) {}
-	virtual void popDashOffset() {}
-	virtual void pushTextPen( const vec2 & /*penPos*/ ) {}
-	virtual void popTextPen() {}
-	virtual void pushTextRotation( float /*rotation*/ ) {}
-	virtual void popTextRotation() {}
-
-	bool		visit( const Node &node, svg::Style *style ) const {
-		if( mVisitor )
-			return ( *mVisitor )( node, style );
-		else
-			return true;
-	}
-
-  protected:
-	// this is a shared_ptr to work around a bug in Clang 4.0
-	std::shared_ptr<std::function<bool( const Node &, svg::Style * )>> mVisitor;
-
-	friend class svg::Node;
-};
 
 //! SVG Value/Unit pair
 class CI_API Value {
@@ -212,6 +142,132 @@ class CI_API Paint {
 	bool    mNeedsResolve;
 
 	std::string mId;
+};
+
+using RenderVisitor = std::function<bool ( const Node &, svg::Style * )>;
+
+//! Base class from which Renderers are derived.
+class CI_API Renderer {
+  public:
+	virtual ~Renderer() = default;
+
+	void setVisitor( const std::function<bool( const Node &, svg::Style * )> &visitor );
+
+	virtual void start() {}
+	virtual void finish() {}
+
+	virtual void pushGroup( const Group & /*group*/, float /*opacity*/ ) {}
+	virtual void popGroup() {}
+	virtual void pushClipPath( const ClipPath & /* clippath */ ) {}
+	virtual void popClipPath() {}
+	virtual void drawPath( const svg::Path & /*path*/ ) {}
+	virtual void drawPolyline( const svg::Polyline & /*polyline*/ ) {}
+	virtual void drawPolygon( const svg::Polygon & /*polygon*/ ) {}
+	virtual void drawLine( const svg::Line & /*line*/ ) {}
+	virtual void drawRect( const svg::Rect & /*rect*/ ) {}
+	virtual void drawCircle( const svg::Circle & /*circle*/ ) {}
+	virtual void drawEllipse( const svg::Ellipse & /*ellipse*/ ) {}
+	virtual void drawImage( const svg::Image & /*image*/ ) {}
+	virtual void drawTextSpan( const svg::TextSpan & /*span*/ ) {}
+
+	virtual void pushMatrix( const mat3 & /*m*/ ) {}
+	virtual void popMatrix() {}
+	virtual void pushStyle( const svg::Style & /*style*/ ) {}
+	virtual void popStyle() {}
+	virtual void pushFill( const Paint & /*paint*/ ) {}
+	virtual void popFill() {}
+	virtual void pushStroke( const Paint & /*paint*/ ) {}
+	virtual void popStroke() {}
+	virtual void pushFillOpacity( float /*opacity*/ ) {}
+	virtual void popFillOpacity() {}
+	virtual void pushStrokeOpacity( float /*opacity*/ ) {}
+	virtual void popStrokeOpacity() {}
+	virtual void pushStrokeWidth( float /*width*/ ) {}
+	virtual void popStrokeWidth() {}
+	virtual void pushFillRule( FillRule /*rule*/ ) {}
+	virtual void popFillRule() {}
+	virtual void pushLineCap( LineCap /*lineCap*/ ) {}
+	virtual void popLineCap() {}
+	virtual void pushLineJoin( LineJoin /*lineJoin*/ ) {}
+	virtual void popLineJoin() {}
+	virtual void pushMiterLimit( float /*miterLimit*/ ) {}
+	virtual void popMiterLimit() {}
+	virtual void pushDashArray( const std::vector<float> & /*dashArray*/ ) {}
+	virtual void popDashArray() {}
+	virtual void pushDashOffset( float /*dashOffset*/ ) {}
+	virtual void popDashOffset() {}
+	virtual void pushTextPen( const vec2 & /*penPos*/ ) {}
+	virtual void popTextPen() {}
+	virtual void pushTextRotation( float /*rotation*/ ) {}
+	virtual void popTextRotation() {}
+
+	bool visit( const Node &node, svg::Style *style ) const
+	{
+		if( mVisitor )
+			return ( *mVisitor )( node, style );
+		else
+			return true;
+	}
+
+	struct Stacks {
+		std::vector<mat3>               matrix;
+		std::vector<Paint>              fill;
+		std::vector<Paint>              stroke;
+		std::vector<float>              fillOpacity;
+		std::vector<float>              strokeOpacity;
+		std::vector<float>              groupOpacity;
+		std::vector<float>              strokeWidth;
+		std::vector<FillRule>           fillRule;
+		std::vector<LineCap>            lineCap;
+		std::vector<LineJoin>           lineJoin;
+		std::vector<float>              miterLimit;
+		std::vector<std::vector<float>> dashArray;
+		std::vector<float>              dashOffset;
+		std::vector<const ClipPath *>   clipPath;
+
+		void clear()
+		{
+			matrix.clear();
+			fill.clear();
+			stroke.clear();
+			fillOpacity.clear();
+			strokeOpacity.clear();
+			groupOpacity.clear();
+			strokeWidth.clear();
+			fillRule.clear();
+			lineCap.clear();
+			lineJoin.clear();
+			miterLimit.clear();
+			dashArray.clear();
+			dashOffset.clear();
+			clipPath.clear();
+		}
+
+		void defaults()
+		{
+			clear();
+
+			matrix.emplace_back();
+			fill.emplace_back( Color::black() );
+			stroke.emplace_back();
+			fillOpacity.push_back( 1.0f );
+			strokeOpacity.push_back( 1.0f );
+			groupOpacity.push_back( 1.0f );
+			strokeWidth.push_back( 1.0f );
+			fillRule.push_back( FILL_RULE_NONZERO );
+			lineCap.push_back( LINE_CAP_BUTT );
+			lineJoin.push_back( LINE_JOIN_MITER );
+			miterLimit.push_back( 4.0f );
+			dashArray.emplace_back();
+			dashOffset.push_back( 0.0f );
+		}
+	};
+
+  protected:
+	// this is a shared_ptr to work around a bug in Clang 4.0
+	std::shared_ptr<std::function<bool( const Node &, svg::Style * )>> mVisitor;
+
+	friend class svg::Node;
 };
 
 //! SVG Style for a node. Corresponds to SVG Styling: http://www.w3.org/TR/SVG/styling.html
