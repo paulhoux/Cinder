@@ -1088,10 +1088,10 @@ void Svg::draw()
 		/// Clip paths are handled as follows:
 		///	  1. The path or group of paths are rendered to the stencil buffer using either non-zero or even-odd fill rule.
 		///	  2. The lowest bits of the stencil are now set for all pixels that need to be covered.
-		///	  3. We then cover the pixels without writing to the color buffer, replacing the stencil value with the highest bit (0x80) of the test is passed.
+		///	  3. We then cover the pixels without writing to the color buffer, replacing the stencil value with the highest bit (0x80) if the test is passed.
 		///	  4. Repeat this for each nested clip path, but use the next highest bit (0x40, 0x20, etc.) instead.
 		///	  5. When rendering the actual clipped content, render normally but only draw pixels if all clip bits are set.
-		///	  6. We then reset the lowest clip bit by doing a cover with the appropriate stencil functions set.
+		///	  6. We then reset the lowest clip bits by doing a cover with the appropriate stencil functions set.
 		///	  7. At the end of each clip path, reset the corresponding clip bit.
 		/// </summary>
 
@@ -1108,8 +1108,7 @@ void Svg::draw()
 
 			gl::coverFillPathNV( call.path, GL_BOUNDING_BOX_NV ); // On set: convert LSB portion to clip bit (step 3), on reset: clear stencil buffer bits (step 7).
 		}
-
-		if( call.image ) {
+		else if( call.image ) {
 			ScopedShader scpShader( Shader::Type::IMAGE );
 			scpShader.setColor( ColorA::white() );
 			scpShader.setCoords( GLenum( /*call.fill.mUseObjectBoundingBox ?*/ CoordinateSpace::OBJECT_BOUNDING_BOX /*: CoordinateSpace::USER_SPACE_ON_USE*/ ), call.fill.getTransform() );
@@ -1262,7 +1261,7 @@ void Svg::pushClipPath( const svg::ClipPath &clippath )
 
 void Svg::popClipPath()
 {
-	assert( !mClipPathStack.empty() );
+	assert( !mStacks.clipPath.empty() );
 
 	// Generate draw call to reset the clip-path.
 	size_t index = 0;
