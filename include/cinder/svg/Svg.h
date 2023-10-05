@@ -993,6 +993,7 @@ class CI_API Defs : public Group {
 	void renderSelf( Renderer &renderer ) const override
 	{ /* never render */
 	}
+	Rectf calcBoundingBox() const override { return Rectf( 0, 0, 0, 0 ); }
 
 	XmlTree mXml;
 };

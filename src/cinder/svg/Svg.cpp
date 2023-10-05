@@ -2430,7 +2430,7 @@ Rectf Group::calcBoundingBox() const
 	bool  empty = true;
 	Rectf result( 0, 0, 0, 0 );
 	for( auto child : mChildren ) {
-		Rectf childBounds = child->getBoundingBoxAbsolute();
+		Rectf childBounds = child->getBoundingBox().transformed( child->getTransform() );
 		// only use child area if it exists (text nodes return [0,0,0,0])
 		if( ( childBounds.getWidth() > 0 ) || ( childBounds.getHeight() > 0 ) ) {
 			if( empty ) {
@@ -3086,6 +3086,8 @@ void Doc::loadDoc( const DataSourceRef &source, const fs::path &filePath )
 
 	const XmlTree &xml( mXmlTree->getChild( "svg" ) );
 
+	Group::parse( xml );
+
 	if( xml.hasAttribute( "viewBox" ) ) {
 		auto        vbox = xml.getAttributeValue<string>( "viewBox" );
 		const char *vbCPtr = vbox.c_str();
@@ -3095,7 +3097,7 @@ void Doc::loadDoc( const DataSourceRef &source, const fs::path &filePath )
 		mViewBox.y2 = mViewBox.y1 + parseFloat( &vbCPtr );
 	}
 	else {
-		mViewBox = Rectf( 0, 0, 0, 0 );
+		mViewBox = getBoundingBox().transformed( getTransform() ).scaledCentered( 1.1f );
 	}
 	if( xml.hasAttribute( "x" ) ) {
 		Value val = Value::parse( xml.getAttributeValue<string>( "x" ) );
@@ -3137,12 +3139,6 @@ void Doc::loadDoc( const DataSourceRef &source, const fs::path &filePath )
 		else
 			setTransform( PreserveAspectRatio().calcTransform( mBounds, mViewBox ) );
 	}
-
-	//// we can't parse the group w/o having parsed the viewBox, dimensions, etc, so we have to do this manually:
-	// if( xml.hasChild( "switch" ) )		// when saved with "preserve Illustrator editing capabilities", svg data is inside a "switch"
-	//	Group::parse( xml.getChild( "switch" ) );
-	// else
-	Group::parse( xml );
 }
 
 shared_ptr<Surface8u> Doc::loadImage( const fs::path &relativePath )
