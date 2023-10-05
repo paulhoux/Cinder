@@ -710,13 +710,24 @@ void Style::startRender( Renderer &renderer, const Node *node ) const
 		renderer.pushDashOffset( mDashOffset );
 	if( mSpecifiesClipPath ) {
 		const ClipPath *clip = node->getClipPath( *this ); // Assumes the clip-path is available.
-		renderer.pushClipPath( *clip );
+		if( clip->useObjectBoundingBox() ) {
+			// Calculate object space transform matrix.
+			const auto bounds = node->getBoundingBox();
+			const auto transform = glm::scale( glm::translate( mat3(), bounds.getUpperLeft() ), bounds.getSize() );
+
+			// Apply matrix prior to rendering the clip path and restore afterwards.
+			renderer.pushMatrix( transform );
+			renderer.pushClipPath( *clip );
+			renderer.popMatrix();
+		}
+		else
+			renderer.pushClipPath( *clip );
 	}
 }
 
 void Style::finishRender( Renderer &renderer, const Node *node ) const
 {
-	if( mSpecifiesClipPath )
+	if( mSpecifiesClipPath ) 
 		renderer.popClipPath();
 	if( mSpecifiesDashOffset )
 		renderer.popDashOffset();
@@ -2971,8 +2982,9 @@ const Node *Defs::findNode( const std::string &id, bool recurse ) const
 ClipPath::ClipPath( Node *parent, const XmlTree &xml )
 	: Group( parent, xml )
 {
-	// if( xml.hasAttribute( "clipPathUnits" ) )
-	//	__debugbreak(); // TODO: should be supported.
+	if( xml.hasAttribute( "clipPathUnits" ) ) {
+		mUseObjectBoundingBox = xml.getAttributeValue<string>( "clipPathUnits" ) != string( "userSpaceOnUse" );
+	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////////

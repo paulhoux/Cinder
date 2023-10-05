@@ -1062,11 +1062,15 @@ class CI_API ClipPath : public Group {
 	{
 	}
 	ClipPath( Node *parent, const XmlTree &xml );
+	
+	bool useObjectBoundingBox() const { return mUseObjectBoundingBox; }
 
 protected:
 	void renderSelf( Renderer &renderer ) const override
 	{ /* never render */
 	}
+
+	bool mUseObjectBoundingBox = false;
 };
 
 //!
