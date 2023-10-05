@@ -305,7 +305,7 @@ class SvgRendererNvp : public svg::Renderer {
 		auto gradient = std::dynamic_pointer_cast<nvp::LinearGradient>( mGradientsCache.at( paint.getId() ) );
 		if( !gradient ) {
 			gradient = nvp::LinearGradient::create( paint.getId().c_str() );
-			gradient->units( paint.mUseObjectBoundingBox ? nvp::GradientUnits::OBJECT_BOUNDING_BOX : nvp::GradientUnits::USER_SPACE_ON_USE ); //
+			gradient->units( paint.mUseObjectBoundingBox ? nvp::CoordinateSpace::OBJECT_BOUNDING_BOX : nvp::CoordinateSpace::USER_SPACE_ON_USE ); //
 			gradient->transform( paint.getTransform() );
 			gradient->from( paint.getCoords0() );
 			gradient->to( paint.getCoords1() );
@@ -330,7 +330,7 @@ class SvgRendererNvp : public svg::Renderer {
 		auto gradient = std::dynamic_pointer_cast<nvp::RadialGradient>( mGradientsCache.at( paint.getId() ) );
 		if( !gradient ) {
 			gradient = nvp::RadialGradient::create( paint.getId().c_str() );
-			gradient->units( paint.useObjectBoundingBox() ? nvp::GradientUnits::OBJECT_BOUNDING_BOX : nvp::GradientUnits::USER_SPACE_ON_USE ); //
+			gradient->units( paint.useObjectBoundingBox() ? nvp::CoordinateSpace::OBJECT_BOUNDING_BOX : nvp::CoordinateSpace::USER_SPACE_ON_USE ); //
 			gradient->transform( paint.getTransform() );
 			gradient->center( paint.getCoords0() );
 			gradient->radius( paint.getRadius0() );
@@ -398,6 +398,7 @@ class NvPathSvgApp : public App {
 	ci::fs::path   mFilePath;
 	size_t         mNumDrawCalls = 0;
 	bool           mUseSvg = true;
+	bool           mCaptureScreenshot = false;
 };
 
 void NvPathSvgApp::setup()
@@ -425,12 +426,88 @@ void NvPathSvgApp::update()
 
 void NvPathSvgApp::draw()
 {
-	gl::clear( Color::white() );
-
 	{
 		nvp::ScopedCanvas     scpCanvas( mCanvas );
 		gl::ScopedModelMatrix scpModel( mCanvasUi.getModelMatrix() );
 
+		//
+		if( false ) {
+			nvp::Path c1( Path2d::circle( vec2( 100, 100 ), 50 ) );
+			c1.fill( ColorA( 1, 1, 0, 0.5f ) );
+
+			nvp::Path c2( Path2d::circle( vec2( 150, 100 ), 50 ) );
+			c2.fill( ColorA( 0, 1, 1, 0.5f ) );
+
+			nvp::Path c3( Path2d::circle( vec2( 125, 100 + 50 * 0.5f * sqrtf( 3.0f ) ), 50 ) );
+			c3.fill( ColorA( 1, 0, 1, 0.5f ) );
+
+			auto bounds = c1.getBounds();
+			bounds.include( c2.getBounds() );
+			bounds.include( c3.getBounds() );
+
+			nvp::Path b( Path2d::rectangle( bounds ) );
+			b.stroke( Color::black() );
+
+			//
+			nvp::ScopedShader scpShader( Color( 0.25f, 0.75f, 0.5f ) );
+
+			gl::matrixLoadfEXT( GL_MODELVIEW, value_ptr( gl::getModelView() ) );
+
+			gl::ScopedState scpStencil( GL_STENCIL_TEST, GL_TRUE );
+
+			std::vector<GLuint> clipPaths = { c1.getId(), c2.getId(), c3.getId() }; // Maximum of 6.
+
+			GLubyte clipMask = 0x80;  // 1st: 0x80, 2nd: 0x40, 3rd: 0x20, etc.
+			GLubyte coverMask = 0xFF; // 1: 0x7F, 2: 0x3F, 3: 0x1F, etc.
+
+			for( GLuint id : clipPaths ) {
+				coverMask >>= 1;
+
+				gl::colorMask( GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE );
+				gl::stencilOp( GL_KEEP, GL_KEEP, GL_REPLACE );
+				gl::stencilMask( coverMask | clipMask );
+				gl::stencilFunc( GL_NOTEQUAL, clipMask, coverMask );
+				gl::stencilFillPathNV( id, GL_COUNT_UP_NV, coverMask ); // Write to 0x1F portion.
+				gl::coverFillPathNV( id, GL_BOUNDING_BOX_NV );          // Convert 0x1F portion to 0x80.
+
+				clipMask >>= 1;
+			}
+
+			gl::colorMask( GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE );
+			gl::stencilOp( GL_KEEP, GL_KEEP, GL_KEEP );
+			gl::stencilMask( 0xFF );
+			gl::stencilFunc( GL_EQUAL, ~coverMask & 0xFF, 0xFF );
+			gl::coverFillPathNV( b.getId(), GL_BOUNDING_BOX_NV );
+
+			// Undo last clip.
+			clipMask <<= 1;
+			coverMask |= coverMask << 1;
+
+			gl::colorMask( GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE );
+			gl::stencilOp( GL_KEEP, GL_KEEP, GL_ZERO );
+			gl::stencilMask( coverMask | clipMask );
+			gl::stencilFunc( GL_ALWAYS, 0xFF, 0xFF );
+			gl::coverFillPathNV( c3.getId(), GL_BOUNDING_BOX_NV );
+
+			clipMask <<= 1;
+			coverMask |= coverMask << 1;
+
+			gl::colorMask( GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE );
+			gl::stencilOp( GL_KEEP, GL_KEEP, GL_ZERO );
+			gl::stencilMask( coverMask | clipMask );
+			gl::stencilFunc( GL_ALWAYS, 0xFF, 0xFF );
+			gl::coverFillPathNV( c2.getId(), GL_BOUNDING_BOX_NV );
+
+			// Test.
+			gl::colorMask( GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE );
+			gl::stencilOp( GL_KEEP, GL_KEEP, GL_KEEP );
+			gl::stencilMask( 0xFF );
+			gl::stencilFunc( GL_EQUAL, ~coverMask & 0xFF, 0xFF );
+			scpShader.setColor( ColorA( 0.5f, 0.75f, 0.25f, 1 ) );
+			gl::coverFillPathNV( b.getId(), GL_BOUNDING_BOX_NV );
+		}
+
+		//
 		if( mDoc && !mUseSvg ) {
 			gl::ScopedModelMatrix sm;
 
@@ -468,11 +545,34 @@ void NvPathSvgApp::draw()
 		}
 	}
 
+	gl::FboRef fbo;
+	if( mCaptureScreenshot ) {
+		fbo = gl::Fbo::create( getWindowWidth(), getWindowHeight(), gl::Fbo::Format().disableDepth().stencilBuffer( false ) );
+		fbo->bindFramebuffer();
+	}
+
+	gl::clear( Color::white() );
+
 	// Use premultiplied alpha!
 	gl::ScopedBlendPremult scpBlend;
 	gl::ScopedColor        scpColor( 1, 1, 1 );
 
 	mCanvas.draw();
+
+	if( mCaptureScreenshot ) {
+		fbo->unbindFramebuffer();
+
+		auto surface = fbo->readPixels8u( fbo->getBounds(), GL_COLOR_ATTACHMENT0 );
+		auto now = std::chrono::system_clock::to_time_t( std::chrono::system_clock::now() );
+
+		std::string filename( 64, '\0' );
+		std::strftime( filename.data(), filename.size(), "%Y-%m-%d %H.%M.%S.png", std::localtime( &now ) );
+
+		ci::fs::path folder = app::getAppPath();
+		writeImage( cinder::writeFile( folder / filename ), surface, ImageTarget::Options(), "png" );
+
+		mCaptureScreenshot = false;
+	}
 }
 
 void NvPathSvgApp::resize()
@@ -509,6 +609,9 @@ void NvPathSvgApp::keyDown( KeyEvent event )
 		break;
 	case KeyEvent::KEY_SPACE:
 		mUseSvg = !mUseSvg;
+		break;
+	case KeyEvent::KEY_KP_PLUS:
+		mCaptureScreenshot = !mCaptureScreenshot;
 		break;
 	default:
 		App::keyDown( event );
