@@ -901,15 +901,35 @@ void Gradients::set( const GradientRef &gradient )
 
 gl::Texture2dRef Gradients::getTexture() const
 {
-	if( !mTexture )
-		mTexture = create( 128, 1 );
-
-	if( !mDirty.empty() ) {
+	if( !mTexture || !mDirty.empty() ) {
 		// Resize texture if more space is needed.
-		if( const auto size = int( mGradients.size() ); mTexture->getHeight() < size ) {
-			const auto source = Surface8u( mTexture->createSource() );
-			const auto texture = create( mTexture->getWidth(), int( isPowerOf2( size ) ? size : nextPowerOf2( size ) ) );
-			texture->update( source );
+		if( const auto size = glm::max( 128, int( mGradients.size() ) ); !mTexture || mTexture->getHeight() < size ) {
+			const auto texture = create( 128, int( isPowerOf2( size ) ? size : nextPowerOf2( size ) ) );
+
+			if( mTexture ) {
+				if( glad_glCopyImageSubData ) {
+					glCopyImageSubData(                                       //
+						mTexture->getId(), mTexture->getTarget(), 0, 0, 0, 0, // Src
+						texture->getId(), texture->getTarget(), 0, 0, 0, 0,   // Dst
+						mTexture->getWidth(), mTexture->getHeight(), 0 );     // Size
+				}
+				else {
+					GLint previous[2];
+					glGetIntegerv( GL_READ_FRAMEBUFFER_BINDING, &previous[0] );
+					glGetIntegerv( GL_DRAW_FRAMEBUFFER_BINDING, &previous[1] );
+
+					GLuint fbo[2];
+					glGenFramebuffers( 2, fbo );
+					glNamedFramebufferTexture2DEXT( fbo[0], GL_COLOR_ATTACHMENT0, mTexture->getTarget(), mTexture->getId(), 0 );
+					glNamedFramebufferTexture2DEXT( fbo[1], GL_COLOR_ATTACHMENT0, texture->getTarget(), texture->getId(), 0 );
+					glBindFramebuffer( GL_READ_FRAMEBUFFER, fbo[0] );
+					glBindFramebuffer( GL_DRAW_FRAMEBUFFER, fbo[1] );
+					glBlitFramebufferEXT( 0, 0, mTexture->getWidth(), mTexture->getHeight(), 0, 0, mTexture->getWidth(), mTexture->getHeight(), GL_COLOR_BUFFER_BIT, GL_LINEAR );
+					glBindFramebuffer( GL_READ_FRAMEBUFFER, previous[0] );
+					glBindFramebuffer( GL_DRAW_FRAMEBUFFER, previous[1] );
+					glDeleteFramebuffers( 2, fbo );
+				}
+			}
 
 			mTexture = texture;
 		}
@@ -946,7 +966,7 @@ Svg::Svg( const svg::DocRef &svg )
 	mDoc->render( mRenderer );
 }
 
-Shader::Type Svg::prepareLinearGradient( const svg::Paint &paint, float opacity )
+Shader::Type Svg::prepareLinearGradient( const svg::Paint &paint, float opacity, bool prepareShader )
 {
 	auto gradient = std::dynamic_pointer_cast<LinearGradient>( mGradients.at( paint.getId() ) );
 	if( !gradient ) {
@@ -961,18 +981,20 @@ Shader::Type Svg::prepareLinearGradient( const svg::Paint &paint, float opacity 
 		mGradients.set( gradient );
 	}
 
-	ScopedShader scpShader( Shader::Type::LINEAR_GRADIENT );
-	scpShader.setCoords( GLenum( gradient->getUnits() ), mat3{ gradient->getTransform() } );
-	scpShader.uniform( "index", mGradients.index( paint.getId() ) );
-	scpShader.uniform( "gradTab", 0 );
-	scpShader.uniform( "gradStart", vec2( gradient->getX1(), gradient->getY1() ) );
-	scpShader.uniform( "gradEnd", vec2( gradient->getX2(), gradient->getY2() ) );
-	scpShader.uniform( "opacity", opacity );
+	if( prepareShader ) {
+		ScopedShader scpShader( Shader::Type::LINEAR_GRADIENT );
+		scpShader.setCoords( GLenum( gradient->getUnits() ), mat3{ gradient->getTransform() } );
+		scpShader.uniform( "index", mGradients.index( paint.getId() ) );
+		scpShader.uniform( "gradTab", 0 );
+		scpShader.uniform( "gradStart", vec2( gradient->getX1(), gradient->getY1() ) );
+		scpShader.uniform( "gradEnd", vec2( gradient->getX2(), gradient->getY2() ) );
+		scpShader.uniform( "opacity", opacity );
+	}
 
 	return Shader::Type::LINEAR_GRADIENT;
 }
 
-Shader::Type Svg::prepareRadialGradient( const svg::Paint &paint, float opacity )
+Shader::Type Svg::prepareRadialGradient( const svg::Paint &paint, float opacity, bool prepareShader )
 {
 	auto gradient = std::dynamic_pointer_cast<RadialGradient>( mGradients.at( paint.getId() ) );
 	if( !gradient ) {
@@ -988,26 +1010,28 @@ Shader::Type Svg::prepareRadialGradient( const svg::Paint &paint, float opacity 
 		mGradients.set( gradient );
 	}
 
-	ScopedShader scpShader( Shader::Type::RADIAL_GRADIENT );
-	scpShader.setCoords( GLenum( gradient->getUnits() ), mat3{ gradient->getTransform() } );
-	scpShader.uniform( "index", mGradients.index( paint.getId() ) );
-	scpShader.uniform( "gradTab", 0 );
-	scpShader.uniform( "focalToCenter", vec2( gradient->getCx() - gradient->getFx(), gradient->getCy() - gradient->getFy() ) );
-	scpShader.uniform( "centerRadius", gradient->getR() );
-	scpShader.uniform( "focalRadius", gradient->getFr() );
-	scpShader.uniform( "translationPoint", vec2( gradient->getFx(), gradient->getFy() ) );
-	scpShader.uniform( "opacity", opacity );
+	if( prepareShader ) {
+		ScopedShader scpShader( Shader::Type::RADIAL_GRADIENT );
+		scpShader.setCoords( GLenum( gradient->getUnits() ), mat3{ gradient->getTransform() } );
+		scpShader.uniform( "index", mGradients.index( paint.getId() ) );
+		scpShader.uniform( "gradTab", 0 );
+		scpShader.uniform( "focalToCenter", vec2( gradient->getCx() - gradient->getFx(), gradient->getCy() - gradient->getFy() ) );
+		scpShader.uniform( "centerRadius", gradient->getR() );
+		scpShader.uniform( "focalRadius", gradient->getFr() );
+		scpShader.uniform( "translationPoint", vec2( gradient->getFx(), gradient->getFy() ) );
+		scpShader.uniform( "opacity", opacity );
+	}
 
 	return Shader::Type::RADIAL_GRADIENT;
 }
 
-Shader::Type Svg::preparePaint( const svg::Paint &paint, float opacity )
+Shader::Type Svg::preparePaint( const svg::Paint &paint, float opacity, bool prepareShader )
 {
 	if( paint.isLinearGradient() )
-		return prepareLinearGradient( paint, opacity );
+		return prepareLinearGradient( paint, opacity, prepareShader );
 
 	if( paint.isRadialGradient() )
-		return prepareRadialGradient( paint, opacity );
+		return prepareRadialGradient( paint, opacity, prepareShader );
 
 	return Shader::Type::SOLID_COLOR;
 }
@@ -1067,7 +1091,7 @@ void Svg::draw()
 		///	  3. We then cover the pixels without writing to the color buffer, replacing the stencil value with the highest bit (0x80) of the test is passed.
 		///	  4. Repeat this for each nested clip path, but use the next highest bit (0x40, 0x20, etc.) instead.
 		///	  5. When rendering the actual clipped content, render normally but only draw pixels if all clip bits are set.
-		///	  6. We then reset the lowest clip bit by doing a cover with the appropriate stencil functions set. 
+		///	  6. We then reset the lowest clip bit by doing a cover with the appropriate stencil functions set.
 		///	  7. At the end of each clip path, reset the corresponding clip bit.
 		/// </summary>
 
@@ -1080,7 +1104,7 @@ void Svg::draw()
 			gl::stencilFunc( call.stencilFunc, GLint( call.clipMask ), call.coverMask ); // stencilFunc = GL_NOTEQUAL to set clip, GL_ALWAYS to erase clip.
 
 			if( call.stencilOp == GL_REPLACE )
-				gl::stencilFillPathNV( call.path, GL_COUNT_UP_NV, call.coverMask /* & call.fillRule */ ); // On set: write path to LSB portion (step 1).
+				gl::stencilFillPathNV( call.path, GL_COUNT_UP_NV, call.coverMask & call.fillRule ); // On set: write path to LSB portion (step 1).
 
 			gl::coverFillPathNV( call.path, GL_BOUNDING_BOX_NV ); // On set: convert LSB portion to clip bit (step 3), on reset: clear stencil buffer bits (step 7).
 		}
@@ -1382,6 +1406,7 @@ void Renderer::popMatrix()
 void Renderer::pushFill( const svg::Paint &paint )
 {
 	mFillStack.push_back( paint );
+	mSvg->preparePaint( paint, 1, false );
 }
 
 void Renderer::popFill()
@@ -1392,6 +1417,7 @@ void Renderer::popFill()
 void Renderer::pushStroke( const svg::Paint &paint )
 {
 	mStrokeStack.push_back( paint );
+	mSvg->preparePaint( paint, 1, false );
 }
 
 void Renderer::popStroke()

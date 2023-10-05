@@ -820,15 +820,14 @@ class CI_API Svg {
 
 		mDrawCalls.push_back( std::move( dc ) );
 	}
+	//!
+	Shader::Type prepareLinearGradient( const svg::Paint &paint, float opacity, bool prepareShader = true );
+	//!
+	Shader::Type prepareRadialGradient( const svg::Paint &paint, float opacity, bool prepareShader = true );
+	//!
+	Shader::Type preparePaint( const svg::Paint &paint, float opacity, bool prepareShader = true );
 
   private:
-	//!
-	nvp::Shader::Type prepareLinearGradient( const svg::Paint &paint, float opacity );
-	//!
-	nvp::Shader::Type prepareRadialGradient( const svg::Paint &paint, float opacity );
-	//!
-	nvp::Shader::Type preparePaint( const svg::Paint &paint, float opacity );
-
 	struct DrawCall {
 		GLuint           path{ 0 };                // Path id.
 		glm::mat3x2      transform;                // Path transform matrix.
