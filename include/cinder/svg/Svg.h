@@ -333,7 +333,7 @@ class CI_API Style {
 	void            unspecifyColor() { mSpecifiesColor = false; }
 	const ColorA8u &getColor() const { return mColor; }
 	void            setColor( const ColorA8u &color ) { mSpecifiesColor = true; mColor = color; }
-	static const ColorA8u &getColorDefault() { return ColorA8u::black(); /* Depends on the user agent. */}
+	static const ColorA8u &getColorDefault();
 
 	bool				specifiesFill() const { return mSpecifiesFill; }
 	void				unspecifyFill() { mSpecifiesFill = false; }

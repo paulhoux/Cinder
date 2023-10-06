@@ -261,8 +261,13 @@ class Gradients {
 	//! Sets or updates the gradient.
 	void set( const svg::Paint &paint );
 
-	//! Returns the texture containing all gradients. Can be empty!
-	gl::Texture2dRef getTexture() const { return mTexture; }
+	//!
+	void setSpreadMethod( svg::SpreadMethod method ) const;
+
+	//!
+	void bind( gl::Context *ctx, uint8_t textureUnit = 0 );
+	//!
+	void unbind( gl::Context *ctx );
 
   private:
 	//!
@@ -270,9 +275,11 @@ class Gradients {
 	//!
 	void store( size_t index, const svg::Paint &paint ) const;
 
+	gl::Context                            *mCtx = nullptr;
 	size_t                                  mIndex{ 0 };
 	std::unordered_map<std::string, size_t> mLookUp{};
 	mutable gl::Texture2dRef                mTexture{};
+	uint8_t                                 mTextureUnit{ 0 };
 };
 
 //! Shader for solid colors or gradients to be applied to paths.
@@ -387,7 +394,7 @@ class CI_API Svg : private svg::Renderer {
 	// svg::Renderer callbacks.
 
 	void start() override;
-	void finish() override {}
+	void finish() override;
 	void pushGroup( const svg::Group &group, float opacity ) override;
 	void popGroup() override;
 	void pushClipPath( const svg::ClipPath &clippath ) override;
@@ -434,71 +441,77 @@ class CI_API Svg : private svg::Renderer {
 	bool shouldRender() const { return !( mStacks.fill.back().isNone() && mStacks.stroke.back().isNone() ); }
 	//! Generates a draw call for visible paths.
 	void render( const Path &path );
+	//!
+	void fill( GLuint pathId, const svg::Paint &paint, float opacity );
+	//!
+	void stroke( GLuint pathId, const svg::Paint &paint, float opacity );
+
 	//! Returns whether the path with the specified \a uuid exists and sets \a index if it does.
 	bool findPath( size_t uuid, size_t &index ) const;
 	//! Caches the \a path using the specified \a uuid.
 	size_t insertOrReplacePath( size_t uuid, Path &&path );
 	//! Returns the path at \a index. Index must be valid!
 	const Path &getPathAt( size_t index ) const { return mPaths.at( index ); }
-	//! Activates a clip-mask.
-	void startClipPath( GLuint clipLayer, GLuint pathId, glm::mat3x2 transform )
-	{
-		assert( clipLayer > 0 );
-		assert( clipLayer < 7 );
 
-		DrawCall dc;
-		dc.path = pathId;
-		dc.transform = std::move( transform );
-		dc.clipMask = 0x80 >> ( clipLayer - 1 );
-		dc.coverMask = 0xFF >> clipLayer;
-		dc.stencilOp = GL_REPLACE;
-		dc.stencilFunc = GL_NOTEQUAL;
+	////! Activates a clip-mask.
+	// void startClipPath( GLuint clipLayer, GLuint pathId, glm::mat3x2 transform )
+	//{
+	//	assert( clipLayer > 0 );
+	//	assert( clipLayer < 7 );
 
-		mDrawCalls.push_back( std::move( dc ) );
-	}
-	//! Deactivates a clip-mask.
-	void finishClipPath( GLuint clipLayer, GLuint pathId, glm::mat3x2 transform )
-	{
-		assert( clipLayer > 0 );
-		assert( clipLayer < 7 );
+	//	DrawCall dc;
+	//	dc.path = pathId;
+	//	dc.transform = std::move( transform );
+	//	dc.clipMask = 0x80 >> ( clipLayer - 1 );
+	//	dc.coverMask = 0xFF >> clipLayer;
+	//	dc.stencilOp = GL_REPLACE;
+	//	dc.stencilFunc = GL_NOTEQUAL;
 
-		DrawCall dc;
-		dc.path = pathId;
-		dc.transform = std::move( transform );
-		dc.clipMask = 0x80 >> ( clipLayer - 1 );
-		dc.coverMask = 0xFF >> clipLayer;
-		dc.stencilOp = GL_ZERO;
-		dc.stencilFunc = GL_ALWAYS;
+	//	mDrawCalls.push_back( std::move( dc ) );
+	//}
+	////! Deactivates a clip-mask.
+	// void finishClipPath( GLuint clipLayer, GLuint pathId, glm::mat3x2 transform )
+	//{
+	//	assert( clipLayer > 0 );
+	//	assert( clipLayer < 7 );
 
-		mDrawCalls.push_back( std::move( dc ) );
-	}
-	//! Adds a path to the draw calls.
-	void addDrawCall(
-		GLuint clipLayer, GLuint pathId, glm::mat3x2 transform, svg::Paint fill, svg::Paint stroke, float fillOpacity = 1, float strokeOpacity = 1, svg::FillRule fillRule = svg::FILL_RULE_NONZERO, const svg::Image &image = {} )
-	{
-		assert( clipLayer < 7 );
+	//	DrawCall dc;
+	//	dc.path = pathId;
+	//	dc.transform = std::move( transform );
+	//	dc.clipMask = 0x80 >> ( clipLayer - 1 );
+	//	dc.coverMask = 0xFF >> clipLayer;
+	//	dc.stencilOp = GL_ZERO;
+	//	dc.stencilFunc = GL_ALWAYS;
 
-		DrawCall dc;
-		dc.path = pathId;
-		dc.transform = std::move( transform );
-		dc.clipMask = clipLayer > 0 ? 0x80 >> clipLayer : 0x00;
-		dc.coverMask = clipLayer > 0 ? 0xFF >> ( clipLayer + 1 ) : 0xFF;
-		dc.stencilOp = GL_REPLACE;
-		dc.stencilFunc = GL_NOTEQUAL;
-		dc.fill = std::move( fill );
-		dc.fillOpacity = fillOpacity;
-		dc.fillRule = fillRule == svg::FILL_RULE_NONZERO ? 0xFF : 0x01;
-		dc.stroke = std::move( stroke );
-		dc.strokeOpacity = strokeOpacity;
+	//	mDrawCalls.push_back( std::move( dc ) );
+	//}
+	////! Adds a path to the draw calls.
+	// void addDrawCall(
+	//	GLuint clipLayer, GLuint pathId, glm::mat3x2 transform, svg::Paint fill, svg::Paint stroke, float fillOpacity = 1, float strokeOpacity = 1, svg::FillRule fillRule = svg::FILL_RULE_NONZERO, const svg::Image &image = {} )
+	//{
+	//	assert( clipLayer < 7 );
 
-		if( image ) {
-			dc.image = gl::Texture2d::create( *image.getSurface(), gl::Texture2d::Format().loadTopDown( true ) ); // TODO: cache textures.
-			dc.fill.multiplyTransform( image.getTextureMatrix() );
-			// TODO: affect stroke as well?
-		}
+	//	DrawCall dc;
+	//	dc.path = pathId;
+	//	dc.transform = std::move( transform );
+	//	dc.clipMask = clipLayer > 0 ? 0x80 >> clipLayer : 0x00;
+	//	dc.coverMask = clipLayer > 0 ? 0xFF >> ( clipLayer + 1 ) : 0xFF;
+	//	dc.stencilOp = GL_REPLACE;
+	//	dc.stencilFunc = GL_NOTEQUAL;
+	//	dc.fill = std::move( fill );
+	//	dc.fillOpacity = fillOpacity;
+	//	dc.fillRule = fillRule == svg::FILL_RULE_NONZERO ? 0xFF : 0x01;
+	//	dc.stroke = std::move( stroke );
+	//	dc.strokeOpacity = strokeOpacity;
 
-		mDrawCalls.push_back( std::move( dc ) );
-	}
+	//	if( image ) {
+	//		dc.image = gl::Texture2d::create( *image.getSurface(), gl::Texture2d::Format().loadTopDown( true ) ); // TODO: cache textures.
+	//		dc.fill.multiplyTransform( image.getTextureMatrix() );
+	//		// TODO: affect stroke as well?
+	//	}
+
+	//	mDrawCalls.push_back( std::move( dc ) );
+	//}
 	//!  Creates or activates a linear gradient. Optionally prepares the correct shader as well.
 	Shader::Type prepareLinearGradient( const svg::Paint &paint, float opacity = 1, bool prepareShader = false );
 	//!  Creates or activates a radial gradient. Optionally prepares the correct shader as well.
@@ -506,28 +519,14 @@ class CI_API Svg : private svg::Renderer {
 	//! Creates or activates a gradient. Optionally prepares the correct shader as well.
 	Shader::Type preparePaint( const svg::Paint &paint, float opacity = 1, bool prepareShader = false );
 
-	struct DrawCall {
-		GLuint           path{ 0 };                // Path id.
-		glm::mat3x2      transform;                // Path transform matrix.
-		svg::Paint       fill;                     //
-		svg::Paint       stroke;                   //
-		gl::Texture2dRef image;                    // Can be null.
-		text::AttrString text;                     // Can be empty.
-		float            fillOpacity{ 1 };         //
-		float            strokeOpacity{ 1 };       //
-		GLuint           fillRule{ 0xFF };         // Used for non-zero (0xFF) or even-odd (0x01) rendering.
-		GLuint           clipMask{ 0x00 };         // If non-zero, path will be used as a clip-path.
-		GLuint           coverMask{ 0x00 };        // If non-zero, path will be clipped.
-		GLuint           stencilOp{ GL_ZERO };     // Operation used by the clipping stage.
-		GLuint           stencilFunc{ GL_ALWAYS }; // Operation used by the clipping stage.
-	};
-
-	Rectf                              mBounds;
-	Gradients                          mGradients;
-	Stacks                             mStacks;
-	std::unordered_map<size_t, size_t> mPathsLookup;
-	std::vector<Path>                  mPaths;
-	std::vector<DrawCall>              mDrawCalls;
+	svg::DocRef                                  mDoc;
+	gl::Context                                 *mCtx = nullptr;
+	Rectf                                        mBounds;
+	Gradients                                    mGradients;
+	Stacks                                       mStacks;
+	std::unordered_map<size_t, size_t>           mPathsLookup;
+	std::vector<Path>                            mPaths;
+	std::unordered_map<size_t, gl::Texture2dRef> mTextures;
 };
 
 //! Stores font faces and shaders so they can be easily reused by other parts of your code.

@@ -446,6 +446,12 @@ void Style::clear()
 	mDisplayNone = false;
 }
 
+const ColorA8u & Style::getColorDefault()
+{
+	static ColorA8u sBlack( 0, 0, 0, 255 ); // Default color depends on user agent.
+	return sBlack;
+}
+
 const Paint &Style::getFillDefault()
 {
 	return sPaintBlack;
