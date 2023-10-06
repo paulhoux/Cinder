@@ -25,30 +25,37 @@
 #pragma once
 
 #include "cinder/Cinder.h"
-#include "cinder/Xml.h"
-#include "cinder/Vector.h"
-#include "cinder/Matrix.h"
 #include "cinder/Color.h"
-#include "cinder/Shape2d.h"
-#include "cinder/PolyLine.h"
 #include "cinder/Exception.h"
-#include "cinder/Surface.h"
-#include "cinder/text/Font.h"
+#include "cinder/Matrix.h"
 #include "cinder/Noncopyable.h"
+#include "cinder/PolyLine.h"
+#include "cinder/Shape2d.h"
+#include "cinder/Surface.h"
+#include "cinder/Vector.h"
+#include "cinder/Xml.h"
+#include "cinder/text/AttrString.h"
+#include "cinder/text/Font.h"
 
 #include <functional>
 #include <map>
 
 namespace cinder { namespace svg {
 
+//!
 using FillRule = enum { FILL_RULE_NONZERO, FILL_RULE_EVENODD };
+//!
 using LineCap = enum { LINE_CAP_BUTT, LINE_CAP_ROUND, LINE_CAP_SQUARE };
+//!
 using LineJoin = enum { LINE_JOIN_MITER, LINE_JOIN_ROUND, LINE_JOIN_BEVEL };
+//!
 using FontWeight = enum { WEIGHT_100, WEIGHT_200, WEIGHT_300, WEIGHT_400, WEIGHT_NORMAL = WEIGHT_400, WEIGHT_500, WEIGHT_600, WEIGHT_700, WEIGHT_BOLD = WEIGHT_700, WEIGHT_800, WEIGHT_900 };
-
-using Align = enum { NONE, X_MIN_Y_MIN, X_MID_Y_MIN, X_MAX_Y_MIN, X_MIN_Y_MID, X_MID_Y_MID, X_MAX_Y_MID, X_MIN_Y_MAX, X_MID_Y_MAX, X_MAX_Y_MAX };
+//!
+using SpreadMethod = enum { SPREAD_METHOD_PAD, SPREAD_METHOD_REFLECT, SPREAD_METHOD_REPEAT };
+//!
+using Align = enum { ALIGN_NONE, ALIGN_X_MIN_Y_MIN, ALIGN_X_MID_Y_MIN, ALIGN_X_MAX_Y_MIN, ALIGN_X_MIN_Y_MID, ALIGN_X_MID_Y_MID, ALIGN_X_MAX_Y_MID, ALIGN_X_MIN_Y_MAX, ALIGN_X_MID_Y_MAX, ALIGN_X_MAX_Y_MAX };
+//!
 using MeetOrSlice = enum { MEET, SLICE };
-
 //! Defines the coordinate system used by gradients and images.
 using CoordinateSpace = enum { USER_SPACE_ON_USE, OBJECT_BOUNDING_BOX };
 
@@ -58,6 +65,7 @@ class Defs;
 class Doc;
 class Ellipse;
 class ExcChildNotFound;
+class Gradient;
 class Group;
 class Image;
 class Line;
@@ -96,52 +104,86 @@ class CI_API Value {
 //! SVG Paint specification for fill or stroke, including solids and gradients
 class CI_API Paint {
   public:
-	enum { NONE, COLOR, LINEAR_GRADIENT, RADIAL_GRADIENT };
+	enum Type : uint8_t { NONE, COLOR, LINEAR_GRADIENT, RADIAL_GRADIENT };
 
 	Paint();
-	Paint( uint8_t type );
+	Paint( Type type );
 	Paint( const ColorA8u &color );
-	Paint( const std::string &url ); // Marks Paint as "needs resolve".
+	Paint( std::string url ); // Marks Paint as "needs resolve".
+
+	Paint( const Paint & ) = default;
+	Paint( Paint && ) = default;
+	Paint &operator=( const Paint & ) = default;
+	Paint &operator=( Paint && ) = default;
+
+	~Paint() = default;
 
 	static Paint parse( const char *value, bool *specified, const Node *parentNode );
 
-	bool            isNone() const { return mType == NONE; }
-	bool            isLinearGradient() const { return mType == LINEAR_GRADIENT; }
-	bool            isRadialGradient() const { return mType == RADIAL_GRADIENT; }
-	bool            isTransparent() const;
+	bool isNone() const { return mType == NONE; }
+	bool isLinearGradient() const { return mType == LINEAR_GRADIENT; }
+	bool isRadialGradient() const { return mType == RADIAL_GRADIENT; }
+	bool isTransparent() const;
+	bool needsResolve() const { return mNeedsResolve; }
+
 	const ColorA8u &getColor( size_t idx = 0 ) const { return mStops[idx].second; }
 	float           getOffset( size_t idx ) const { return mStops[idx].first; }
-	size_t          getNumColors() const { return mStops.size(); }
+	
+	bool   empty() const { return mStops.empty(); }
+	size_t getNumColors() const { return mStops.size(); }
 
 	// only apply to gradients
-	vec2    getCoords0() const { return mCoords0; } // (x1,y1) on linear, (cx,cy) on radial
-	vec2    getCoords1() const { return mCoords1; } // (x2,y2) on linear, (fx,fy) on radial
-	float   getRadius0() const { return mRadius0; } // (r) on radial
-	float   getRadius1() const { return mRadius1; } // (fr) on radial
-	bool    useObjectBoundingBox() const { return mUseObjectBoundingBox; }
-	bool    specifiesTransform() const { return mSpecifiesTransform; }
-	mat3    getTransform() const { return mTransform; }
-	bool    specifiesSpreadMethod() const { return mSpecifiesSpreadMethod; }
-	uint8_t getSpreadMethod() const { return mSpreadMethod; }
+	vec2         getCoords0() const { return mCoords0; } // (x1,y1) on linear, (cx,cy) on radial
+	vec2         getCoords1() const { return mCoords1; } // (x2,y2) on linear, (fx,fy) on radial
+	float        getRadius0() const { return mRadius0; } // (r) on radial
+	float        getRadius1() const { return mRadius1; } // (fr) on radial
+	bool         useObjectBoundingBox() const { return mUseObjectBoundingBox; }
+	bool         specifiesTransform() const { return mSpecifiesTransform; }
+	mat3         getTransform() const { return mTransform; }
+	void         multiplyTransform( const mat3 &m ) { mTransform *= m; mSpecifiesTransform = true; }
+	bool         specifiesSpreadMethod() const { return mSpecifiesSpreadMethod; }
+	SpreadMethod getSpreadMethod() const { return mSpreadMethod; }
 
 	const std::string &getId() const { return mId; }
 
 	bool operator==( const Paint &rhs ) const { return mType == rhs.mType && mStops == rhs.mStops; }
 	bool operator!=( const Paint &rhs ) const { return !( *this == rhs ); }
+	
+	//! Returns the (interpolated) color at position \a t.
+	ColorA8u at( float t, bool preMultiply = false ) const;
 
-	uint8_t                                 mType;
+	//! Returns the nearest stop lower than position \a t.
+	const std::pair<float, ColorA8u> &floor( float t ) const;
+	//! Returns the nearest stop higher than position \a t.
+	const std::pair<float, ColorA8u> &ceil( float t ) const;
+	
+	auto begin() const { return mStops.begin(); }
+	auto end() const { return mStops.end(); }
+
+	auto rbegin() const { return mStops.rbegin(); }
+	auto rend() const { return mStops.rend(); }
+
+	//! Returns raw 8-bit RGBA data. You can use this to construct a Surface.
+	std::unique_ptr<uint8_t[]> data( int32_t width, int32_t height, bool preMultiply = false, float from = 0.0f, float to = 1.0f ) const;
+
+protected:
+	Type                                    mType{ NONE };
 	std::vector<std::pair<float, ColorA8u>> mStops;
 
-	vec2    mCoords0, mCoords1;
-	float   mRadius0, mRadius1;
-	bool    mUseObjectBoundingBox;
-	mat3    mTransform;
-	bool    mSpecifiesTransform;
-	uint8_t mSpreadMethod;
-	bool    mSpecifiesSpreadMethod;
-	bool    mNeedsResolve;
+	vec2         mCoords0{}, mCoords1{};
+	float        mRadius0{ 0 }, mRadius1{ 0 };
+	bool         mUseObjectBoundingBox{ false };
+	mat3         mTransform{};
+	bool         mSpecifiesTransform{ false };
+	SpreadMethod mSpreadMethod{ SPREAD_METHOD_PAD };
+	bool         mSpecifiesSpreadMethod{ false };
+	bool         mNeedsResolve{ false };
 
 	std::string mId;
+
+	friend class Gradient;
+	friend class LinearGradient;
+	friend class RadialGradient;
 };
 
 using RenderVisitor = std::function<bool ( const Node &, svg::Style * )>;
@@ -223,6 +265,8 @@ class CI_API Renderer {
 		std::vector<float>              miterLimit;
 		std::vector<std::vector<float>> dashArray;
 		std::vector<float>              dashOffset;
+		std::vector<vec2>               textPen;
+		std::vector<float>              textRotation;
 		std::vector<const ClipPath *>   clipPath;
 
 		void clear()
@@ -240,6 +284,8 @@ class CI_API Renderer {
 			miterLimit.clear();
 			dashArray.clear();
 			dashOffset.clear();
+			textPen.clear();
+			textRotation.clear();
 			clipPath.clear();
 		}
 
@@ -260,6 +306,8 @@ class CI_API Renderer {
 			miterLimit.push_back( 4.0f );
 			dashArray.emplace_back();
 			dashOffset.push_back( 0.0f );
+			textPen.emplace_back( 0.0f, 0.0f );
+			textRotation.push_back( 0.0f );
 		}
 	};
 
@@ -280,6 +328,12 @@ class CI_API Style {
 	static Style makeGlobalDefaults();
 	//! Marks all styles as unspecified
 	void clear();
+
+	bool            specifiesColor() const { return mSpecifiesColor; }
+	void            unspecifyColor() { mSpecifiesColor = false; }
+	const ColorA8u &getColor() const { return mColor; }
+	void            setColor( const ColorA8u &color ) { mSpecifiesColor = true; mColor = color; }
+	static const ColorA8u &getColorDefault() { return ColorA8u::black(); /* Depends on the user agent. */}
 
 	bool				specifiesFill() const { return mSpecifiesFill; }
 	void				unspecifyFill() { mSpecifiesFill = false; }
@@ -359,6 +413,19 @@ class CI_API Style {
 	const std::string &getClipPath() const { return mClipPath; }
 	void               setClipPath( const std::string &clipPath ) { mSpecifiesClipPath = true; mClipPath = clipPath; }
 
+	// stops
+	bool            specifiesStopColor() const { return mSpecifiesStopColor; }
+	void            unspecifyStopColor() { mSpecifiesStopColor = false; }
+	const ColorA8u &getStopColor() const { return mStopColor; }
+	void            setStopColor( const ColorA8u &stopColor ) { mSpecifiesStopColor = true; mStopColor = stopColor; }
+	static ColorA8u	getStopColorDefault() { return {0,0,0,255}; }
+
+	bool  specifiesStopOpacity() const { return mSpecifiesStopOpacity; }
+	void  unspecifyStopOpacity() { mSpecifiesStopOpacity = false; }
+	float getStopOpacity() const { return mStopOpacity; }
+	void  setStopOpacity( float stopOpacity ) { mSpecifiesStopOpacity = true; mStopOpacity = stopOpacity; }
+	static float getStopOpacityDefault() { return 1; }
+
 	// fonts
 	bool                            specifiesFontFamilies() const { return mSpecifiesFontFamilies; }
 	void                            unspecifyFontFamilies() { mSpecifiesFontFamilies = false; }
@@ -412,6 +479,8 @@ class CI_API Style {
 	bool  mSpecifiesFillOpacity, mSpecifiesStrokeOpacity;
 	float mFillOpacity, mStrokeOpacity;
 
+	bool               mSpecifiesColor;
+	ColorA8u           mColor;
 	bool               mSpecifiesFill, mSpecifiesStroke;
 	mutable Paint      mFill, mStroke; // Paint might need to be resolved from a 'const' method.
 	bool               mSpecifiesStrokeWidth;
@@ -430,6 +499,10 @@ class CI_API Style {
 	float              mDashOffset;
 	bool               mSpecifiesClipPath;
 	std::string        mClipPath;
+	bool               mSpecifiesStopColor;
+	ColorA8u           mStopColor;
+	bool               mSpecifiesStopOpacity;
+	float              mStopOpacity;
 
 	// fonts
 	bool                     mSpecifiesFontFamilies, mSpecifiesFontSize, mSpecifiesFontWeight;
@@ -516,6 +589,8 @@ class CI_API Node {
 	//! Returns a Shape2d representing the node in absolute coordinates. Not supported for Text.
 	Shape2d getShapeAbsolute() const { return getShape().transformed( getTransformAbsolute() ); }
 
+	//! Returns node's color, or the first among its ancestors when it has none
+	const ColorA8u &getColor() const;
 	//! Returns node's fill, or the first among its ancestors when it has none
 	const Paint &getFill() const;
 	//! Returns node's stroke, or the first among its ancestors when it has none
@@ -538,6 +613,10 @@ class CI_API Node {
 	const std::vector<float> &getDashArray() const;
 	//! Returns node's dash offset, or the first among its ancestors when it has none
 	float getDashOffset() const;
+	//! Returns node's stop color, or the first among its ancestors when it has none
+	ColorA8u getStopColor() const;
+	//! Returns node's stop opacity, or the first among its ancestors when it has none
+	float getStopOpacity() const;
 	//! Returns node's stroke width, or the first among its ancestors when it has none
 	float getStrokeWidth() const;
 	//! Returns node's font families, or the first among its ancestors when it has none
@@ -594,37 +673,40 @@ class CI_API Node {
 //! Base class for SVG Gradients. See SVG Gradients: http://www.w3.org/TR/SVG/pservers.html#Gradients
 class CI_API Gradient : public Node {
   public:
-	using SpreadMethod = enum { PAD, REFLECT, REPEAT };
-
 	Gradient( Node *parent, const XmlTree &xml );
 
 	class CI_API Stop {
 	  public:
+		Stop() = default;
 		Stop( const Node *parent, const XmlTree &xml );
 
-		float    mOffset; // normalized 0-1
-		ColorA8u mColor;
-		float    mOpacity;
-		bool     mSpecifiesColor, mSpecifiesOpacity;
+		bool operator<( const Stop &rhs ) const { return offset < rhs.offset; }
+
+		float    offset{ 0 }; // normalized 0-1
+		ColorA8u color{ 0, 0, 0, 255 };
+		float    opacity{ 1 };
+		bool     specifiesColor{ true };
+		bool     specifiesOpacity{ true };
 	};
 
 	bool useObjectBoundingBox() const { return mUseObjectBoundingBox; }
 
-	SpreadMethod getSpreadMethod() const { return mSpreadMethod; }
-
+	SpreadMethod        getSpreadMethod() const { return mSpreadMethod; }
 	static SpreadMethod parseSpreadMethod( const std::string &s );
 
+	//!
+	virtual Paint asPaint() const;
+	
   protected:
 	void renderSelf( Renderer & /*renderer*/ ) const override {}
 
-	void          parse( const Node *parent, const XmlTree &xml );
-	void          copyAttributesFrom( const Gradient &rhs );
-	virtual Paint asPaint() const;
+	void parse( const Node *parent, const XmlTree &xml );
+	void copyAttributesFrom( const Gradient &rhs );
 
 	std::vector<Stop> mStops;
-	bool              mUseObjectBoundingBox;
-	bool              mSpecifiesSpreadMethod;
-	SpreadMethod      mSpreadMethod;
+	bool              mUseObjectBoundingBox{ true };
+	bool              mSpecifiesSpreadMethod{ false };
+	SpreadMethod      mSpreadMethod{ SPREAD_METHOD_PAD };
 };
 
 //! SVG Linear gradient
@@ -858,7 +940,7 @@ public:
 
 	mat3 calcTransform( const Rectf &element, const Rectf &viewBox, bool normalized = false ) const;
 
-	Align       align{ X_MID_Y_MID };
+	Align       align{ ALIGN_X_MID_Y_MID };
 	MeetOrSlice meetOrSlice{ MEET };
 };
 
@@ -911,6 +993,7 @@ class CI_API TextSpan : public Node {
 		float              mTextLength;
 		float              mLengthAdjust;
 		std::vector<Value> mLetterSpacing;
+		text::Alignment    mAlignment;
 	};
 
 	TextSpan( Node *parent, const XmlTree &xml );
@@ -925,6 +1008,7 @@ class CI_API TextSpan : public Node {
 	void                                   setTextPen( const vec2 &textPen );
 	float                                  getRotation() const;
 	Value                                  getLetterSpacing() const;
+	text::Alignment                        getAlignment() const;
 
 	std::vector<TextSpanRef> &      getSpans() { return mSpans; }
 	const std::vector<TextSpanRef> &getSpans() const { return mSpans; }
@@ -949,10 +1033,11 @@ class CI_API Text : public Node {
   public:
 	Text( Node *parent, const XmlTree &xml );
 
-	vec2  getTextPen() const;
-	void  setTextPen( const vec2 &textPen ) { mAttributes.setTextPen( textPen ); }
-	float getRotation() const;
-	Value getLetterSpacing() const;
+	vec2            getTextPen() const;
+	void            setTextPen( const vec2 &textPen ) { mAttributes.setTextPen( textPen ); }
+	float           getRotation() const;
+	Value           getLetterSpacing() const;
+	text::Alignment getAlignment() const;
 
 	std::vector<TextSpanRef> &      getSpans() { return mSpans; }
 	const std::vector<TextSpanRef> &getSpans() const { return mSpans; }

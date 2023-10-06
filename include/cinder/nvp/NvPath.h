@@ -28,6 +28,7 @@ This code is intended for use with the Cinder C++ library: http://libcinder.org
 #include "cinder/gl/Context.h"
 #include "cinder/gl/Fbo.h"
 #include "cinder/svg/Svg.h"
+#include "cinder/text/AttrString.h"
 
 namespace cinder {
 
@@ -45,7 +46,6 @@ class Cache;
 class Canvas;
 class ClipRect;
 class Face;
-class Gradient;
 class Gradients;
 class Path;
 class Shader;
@@ -54,7 +54,6 @@ class Svg;
 using CanvasRef = std::shared_ptr<Canvas>;
 using PathRef = std::shared_ptr<Path>;
 using FaceRef = std::shared_ptr<Face>;
-using GradientRef = std::shared_ptr<Gradient>;
 using ShaderRef = std::shared_ptr<Shader>;
 
 //!
@@ -230,295 +229,6 @@ CI_API class Face {
 	GLsizei           mNumGlyphs{ 0 }; //
 };
 
-//!
-class Gradient {
-  public:
-	class Stop {
-		float    mOffset{ 0 }; // normalized 0-1
-		ColorA8u mColor;
-
-	  public:
-		Stop() = default;
-		Stop( float t, const ColorA8u &color, unsigned char opacity = 255 )
-			: mOffset{ clamp( t, 0.0f, 1.0f ) }
-			, mColor{ color }
-		{
-			mColor.a = mColor.a * opacity / 255;
-		}
-		Stop( float t, const Color8u &color, unsigned char opacity = 255 )
-			: mOffset{ clamp( t, 0.0f, 1.0f ) }
-			, mColor{ color, unsigned char( 255 * opacity ) }
-		{
-		}
-		Stop( float t, unsigned char r, unsigned char g, unsigned char b, unsigned char a = 255 )
-			: mOffset{ clamp( t, 0.0f, 1.0f ) }
-			, mColor{ r, g, b, a }
-		{
-		}
-		~Stop() = default;
-
-		Stop( const Stop & ) = default;
-		Stop( Stop && ) noexcept = default;
-		Stop &operator=( const Stop & ) = default;
-		Stop &operator=( Stop && ) noexcept = default;
-
-		float offset() const { return mOffset; }
-
-		const ColorA8u &color() const { return mColor; }
-
-		bool operator<( const Stop &other ) const { return offset() < other.offset(); }
-		bool operator==( const Stop &other ) const { return approxEqual( offset(), other.offset() ) && mColor == other.mColor; }
-		bool operator!=( const Stop &other ) const { return !( *this == other ); }
-	};
-
-  public:
-	Gradient() = default;
-	virtual ~Gradient() = default;
-
-	Gradient( const Gradient & ) = default;
-	Gradient( Gradient && ) = default;
-	Gradient &operator=( const Gradient & ) = default;
-	Gradient &operator=( Gradient && ) = default;
-
-	bool operator==( const Gradient &other ) const { return mStops == other.mStops; }
-	bool operator!=( const Gradient &other ) const { return !( *this == other ); }
-
-	//!
-	virtual const std::string &getId() const = 0;
-	//!
-	const mat3 &getTransform() const { return mTransform; }
-	//!
-	const auto &getUnits() const { return mUnits; }
-	//!
-	const auto &getSpread() const { return mSpread; }
-
-	//! Returns the (interpolated) color at position \a t. Does not pre-multiply the RGB values.
-	ColorA8u at( float t ) const;
-
-	//! Returns the nearest stop lower than position \a t.
-	const Stop &floor( float t ) const;
-
-	//! Returns the nearest stop higher than position \a t.
-	const Stop &ceil( float t ) const;
-
-	//! Inserts a \a color at position \a t.
-	Gradient &stop( float t, const ColorA8u &color );
-	//! Inserts a \a color at position \a t.
-	Gradient &stop( float t, unsigned char r, unsigned char g, unsigned char b, unsigned char a = 255 );
-	//! Inserts a \a color at position \a t.
-	Gradient &stop( float t, const ColorA &color ) { return stop( t, ColorA8u( color ) ); }
-	//! Inserts a \a color at position \a t.
-	Gradient &stop( float t, float r, float g, float b, float a = 1 );
-
-	//! Inserts a \a color at offset \a t. If an additional \a opacity is given, it will be multiplied with the color's alpha value.
-	void insert( float t, const ColorA8u &color, unsigned char opacity = 255 ) { insert( Stop{ t, color, opacity } ); }
-	//! Inserts a \a color at offset \a t.
-	void insert( float t, const Color8u &color, unsigned char opacity = 255 ) { insert( Stop{ t, color, opacity } ); }
-	//! Inserts a \a color at offset \a t. If an additional \a opacity is given, it will be multiplied with the color's alpha value.
-	void insert( float t, const ColorA &color, float opacity = 1 ) { insert( Stop{ t, ColorA8u( color ), static_cast<unsigned char>( 255 * opacity ) } ); }
-	//! Inserts a \a color at offset \a t.
-	void insert( float t, const Color &color, float opacity = 1 ) { insert( Stop{ t, Color8u( color ), static_cast<unsigned char>( 255 * opacity ) } ); }
-	//! Inserts a stop.
-	void insert( const Stop &stop );
-	//! Removes all stops.
-	void clear() { mStops.clear(); }
-	//! Adds all stops of the \a other gradient without discarding existing stops.
-	void add( const Gradient &other );
-	//! Replaces all stops with those of the \a other gradient.
-	void replace( const Gradient &other ) { mStops = other.mStops; }
-
-	bool   empty() const { return mStops.empty(); }
-	size_t size() const { return mStops.size(); }
-
-	auto begin() const { return mStops.begin(); }
-	auto end() const { return mStops.end(); }
-
-	auto rbegin() const { return mStops.rbegin(); }
-	auto rend() const { return mStops.rend(); }
-
-	//! Returns raw 8-bit RGBA data. You can use this to construct a Surface.
-	std::unique_ptr<uint8_t[]> data( int32_t width, int32_t height, float from = 0.0f, float to = 1.0f ) const;
-
-  protected:
-	mat3            mTransform;
-	CoordinateSpace mUnits{ CoordinateSpace::DEFAULT };
-	SpreadMethod    mSpread{ SpreadMethod::DEFAULT };
-
-  private:
-	std::vector<Stop> mStops;
-};
-
-using LinearGradientRef = std::shared_ptr<class LinearGradient>;
-
-class LinearGradient : public Gradient {
-  public:
-	static LinearGradientRef create( const char *id ) { return std::make_shared<LinearGradient>( id ); }
-
-	explicit LinearGradient( std::string id )
-		: mId{ std::move( id ) }
-	{
-	}
-	explicit LinearGradient( const char *id )
-		: mId{ id }
-	{
-	}
-	explicit LinearGradient( const GradientRef &other );
-
-	const std::string &getId() const override { return mId; }
-
-	const auto &getX1() const { return mX1; }
-	const auto &getY1() const { return mY1; }
-	const auto &getX2() const { return mX2; }
-	const auto &getY2() const { return mY2; }
-
-	LinearGradientRef clone() { return std::make_shared<LinearGradient>( *this ); }
-
-	LinearGradient &id( const std::string &id )
-	{
-		mId = id;
-		return *this;
-	}
-	LinearGradient &transform( const mat3 &transform )
-	{
-		mTransform = transform;
-		return *this;
-	}
-	LinearGradient &units( CoordinateSpace units )
-	{
-		mUnits = units;
-		return *this;
-	}
-	LinearGradient &spread( SpreadMethod spread )
-	{
-		mSpread = spread;
-		return *this;
-	}
-	LinearGradient &from( float x1, float y1 )
-	{
-		mX1 = x1;
-		mY1 = y1;
-		return *this;
-	}
-	LinearGradient &from( const vec2 &pt )
-	{
-		mX1 = pt.x;
-		mY1 = pt.y;
-		return *this;
-	}
-	LinearGradient &to( float x2, const float y2 )
-	{
-		mX2 = x2;
-		mY2 = y2;
-		return *this;
-	}
-	LinearGradient &to( const vec2 &pt )
-	{
-		mX2 = pt.x;
-		mY2 = pt.y;
-		return *this;
-	}
-
-	LinearGradient &operator<<( const LinearGradient &other );
-
-  private:
-	std::string mId;
-	float       mX1{ 0 };
-	float       mY1{ 0 };
-	float       mX2{ 1 };
-	float       mY2{ 0 };
-};
-
-using RadialGradientRef = std::shared_ptr<class RadialGradient>;
-
-class RadialGradient : public Gradient {
-  public:
-	static RadialGradientRef create( const char *id ) { return std::make_shared<RadialGradient>( id ); }
-
-	explicit RadialGradient( std::string id )
-		: mId{ std::move( id ) }
-	{
-	}
-	explicit RadialGradient( const char *id )
-		: mId{ id }
-	{
-	}
-	explicit RadialGradient( const GradientRef &other );
-
-	const std::string &getId() const override { return mId; }
-
-	const auto &getR() const { return mR; }
-	const auto &getCx() const { return mCx; }
-	const auto &getCy() const { return mCy; }
-	const auto &getFr() const { return mFr; }
-	const auto &getFx() const { return mFx; }
-	const auto &getFy() const { return mFy; }
-
-	RadialGradientRef clone() { return std::make_shared<RadialGradient>( *this ); }
-
-	RadialGradient &id( const std::string &id )
-	{
-		mId = id;
-		return *this;
-	}
-	RadialGradient &transform( const mat3 &transform )
-	{
-		mTransform = transform;
-		return *this;
-	}
-	RadialGradient &units( CoordinateSpace units )
-	{
-		mUnits = units;
-		return *this;
-	}
-	RadialGradient &spread( SpreadMethod spread )
-	{
-		mSpread = spread;
-		return *this;
-	}
-	RadialGradient &radius( float r )
-	{
-		mR = r;
-		return *this;
-	}
-	RadialGradient &center( float cx, float cy )
-	{
-		mCx = cx;
-		mCy = cy;
-		return *this;
-	}
-	RadialGradient &center( const vec2 &center )
-	{
-		mCx = center.x;
-		mCy = center.y;
-		return *this;
-	}
-	RadialGradient &focal( float fx, float fy, float fr = 0 )
-	{
-		mFx = fx;
-		mFy = fy;
-		mFr = fr;
-		return *this;
-	}
-	RadialGradient &focal( const vec2 &focal, float fr = 0 )
-	{
-		mFx = focal.x;
-		mFy = focal.y;
-		mFr = fr;
-		return *this;
-	}
-
-	RadialGradient &operator<<( const RadialGradient &other );
-
-  private:
-	std::string mId;
-	float       mR{ 0.5f };  // Defaults to 50%.
-	float       mCx{ 0.5f }; // Defaults to 50%.
-	float       mCy{ 0.5f }; // Defaults to 50%.
-	float       mFr{ 0 };    // Defaults to 0%.
-	float       mFx{ mCx };
-	float       mFy{ mCy };
-};
-
 //! Stores multiple gradients in a single texture for performance.
 class Gradients {
   public:
@@ -535,32 +245,33 @@ class Gradients {
 	//!
 	void clear()
 	{
-		mGradients.clear();
 		mLookUp.clear();
-		mDirty.clear();
 		mTexture.reset();
 	}
 	//!
 	size_t size() const { return mLookUp.size(); }
 
-	//! Returns a pointer to the gradient, if it exists. Returns nullptr otherwise.
-	const GradientRef &at( const std::string &id ) const;
+	//! Returns whether the gradient is known.
+	bool contains( const std::string &id ) const;
 	//! Returns the coordinate of the gradient in the texture.
 	float index( const std::string &id ) const;
 
 	//! Sets or updates the gradient.
-	void set( const GradientRef &gradient );
+	void set( const svg::Gradient &gradient );
+	//! Sets or updates the gradient.
+	void set( const svg::Paint &paint );
 
-	//! Returns the texture containing all gradients. If no texture was created or if any of the gradients have been updated,
-	//! the texture will be (re)created in this call.
-	gl::Texture2dRef getTexture() const;
+	//! Returns the texture containing all gradients. Can be empty!
+	gl::Texture2dRef getTexture() const { return mTexture; }
 
   private:
+	//!
 	gl::Texture2dRef create( int width, int height ) const;
+	//!
+	void store( size_t index, const svg::Paint &paint ) const;
 
-	std::vector<GradientRef>                mGradients{};
+	size_t                                  mIndex{ 0 };
 	std::unordered_map<std::string, size_t> mLookUp{};
-	mutable std::set<size_t>                mDirty{};
 	mutable gl::Texture2dRef                mTexture{};
 };
 
@@ -689,7 +400,7 @@ class CI_API Svg : private svg::Renderer {
 	void drawCircle( const svg::Circle & ) override;
 	void drawEllipse( const svg::Ellipse & ) override;
 	void drawImage( const svg::Image & ) override;
-	void drawTextSpan( const svg::TextSpan & ) override {}
+	void drawTextSpan( const svg::TextSpan & ) override;
 	void pushMatrix( const mat3 & ) override;
 	void popMatrix() override;
 	void pushFill( const svg::Paint & ) override;
@@ -714,14 +425,14 @@ class CI_API Svg : private svg::Renderer {
 	void popDashArray() override;
 	void pushDashOffset( float dashOffset ) override;
 	void popDashOffset() override;
-	void pushTextPen( const vec2 & ) override {}
-	void popTextPen() override {}
-	void pushTextRotation( float ) override {}
-	void popTextRotation() override {}
+	void pushTextPen( const vec2 & ) override;
+	void popTextPen() override;
+	void pushTextRotation( float ) override;
+	void popTextRotation() override;
 
-	//!
+	//! Returns whether the current style has fill or stroke enabled.
 	bool shouldRender() const { return !( mStacks.fill.back().isNone() && mStacks.stroke.back().isNone() ); }
-	//!
+	//! Generates a draw call for visible paths.
 	void render( const Path &path );
 	//! Returns whether the path with the specified \a uuid exists and sets \a index if it does.
 	bool findPath( size_t uuid, size_t &index ) const;
@@ -782,8 +493,7 @@ class CI_API Svg : private svg::Renderer {
 
 		if( image ) {
 			dc.image = gl::Texture2d::create( *image.getSurface(), gl::Texture2d::Format().loadTopDown( true ) ); // TODO: cache textures.
-			dc.fill.mTransform *= image.getTextureMatrix();
-			dc.fill.mSpecifiesTransform = true;
+			dc.fill.multiplyTransform( image.getTextureMatrix() );
 			// TODO: affect stroke as well?
 		}
 
@@ -802,6 +512,7 @@ class CI_API Svg : private svg::Renderer {
 		svg::Paint       fill;                     //
 		svg::Paint       stroke;                   //
 		gl::Texture2dRef image;                    // Can be null.
+		text::AttrString text;                     // Can be empty.
 		float            fillOpacity{ 1 };         //
 		float            strokeOpacity{ 1 };       //
 		GLuint           fillRule{ 0xFF };         // Used for non-zero (0xFF) or even-odd (0x01) rendering.

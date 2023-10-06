@@ -683,144 +683,6 @@ void Face::createPaths() const
 	mFace->getGlyphOutlines( 0, mNumGlyphs, functions, &glyph );
 }
 
-ColorA8u Gradient::at( float t ) const
-{
-	auto &lo = floor( t );
-	auto &hi = ceil( t );
-
-	if( lo == hi )
-		return lo.color();
-
-	float f = clamp( ( t - lo.offset() ) / ( hi.offset() - lo.offset() ), 0.0f, 1.0f );
-	return lo.color().lerp( static_cast<unsigned char>( f * 255 ), hi.color() );
-}
-
-const Gradient::Stop &Gradient::floor( float t ) const
-{
-	if( mStops.empty() ) {
-		static Stop kEmpty{ 0.0f, ColorA8u( 0, 0, 0, 0 ) };
-		return kEmpty;
-	}
-
-	for( auto itr = mStops.rbegin(); itr != mStops.rend(); ++itr ) {
-		if( itr->offset() <= t )
-			return *itr;
-	}
-
-	return mStops.front();
-}
-
-const Gradient::Stop &Gradient::ceil( float t ) const
-{
-	if( mStops.empty() ) {
-		static Stop kEmpty{ 0.0f, ColorA8u( 0, 0, 0, 0 ) };
-		return kEmpty;
-	}
-
-	for( auto itr = mStops.begin(); itr != mStops.end(); ++itr ) {
-		if( itr->offset() > t )
-			return *itr;
-	}
-
-	return mStops.back();
-}
-
-Gradient &Gradient::stop( float t, const ColorA8u &color )
-{
-	insert( t, color );
-	return *this;
-}
-
-Gradient &Gradient::stop( float t, unsigned char r, unsigned char g, unsigned char b, unsigned char a )
-{
-	insert( t, ColorA8u{ r, g, b, a } );
-	return *this;
-}
-
-Gradient &Gradient::stop( float t, float r, float g, float b, float a )
-{
-	insert( t, ColorA8u{ static_cast<unsigned char>( r * 255 ), static_cast<unsigned char>( g * 255 ), static_cast<unsigned char>( b * 255 ), static_cast<unsigned char>( a * 255 ) } );
-	return *this;
-}
-
-void Gradient::insert( const Stop &stop )
-{
-	// Keep sorted.
-	mStops.insert( std::upper_bound( mStops.begin(), mStops.end(), stop ), stop );
-}
-
-void Gradient::add( const Gradient &other )
-{
-	for( const auto &stop : other.mStops )
-		insert( stop );
-}
-
-std::unique_ptr<uint8_t[]> Gradient::data( int32_t width, int32_t height, float from, float to ) const
-{
-	auto result = std::make_unique<uint8_t[]>( size_t( width ) * size_t( height ) * sizeof( ColorA8u ) );
-
-	for( int y = 0; y < height; ++y ) {
-		for( int x = 0; x < width; ++x ) {
-			float t = mix( from, to, float( x ) / float( width - 1 ) );
-
-			const auto    c = at( t );
-			const int64_t i = ( int64_t( x ) + int64_t( y ) * int64_t( width ) ) * sizeof( ColorA8u );
-			result[size_t( i ) + 0] = uint8_t( c.r );
-			result[size_t( i ) + 1] = uint8_t( c.g );
-			result[size_t( i ) + 2] = uint8_t( c.b );
-			result[size_t( i ) + 3] = uint8_t( c.a );
-		}
-	}
-
-	return result;
-}
-
-LinearGradient::LinearGradient( const GradientRef &other )
-{
-	if( other ) {
-		if( const auto linear = std::dynamic_pointer_cast<LinearGradient>( other ) )
-			*this << *linear; // Copy all attributes.
-		else
-			replace( *other ); // Only copy stops.
-	}
-}
-
-LinearGradient &LinearGradient::operator<<( const LinearGradient &other )
-{
-	add( other );
-	mUnits = other.mUnits;
-	mSpread = other.mSpread;
-	mX1 = other.mX1;
-	mY1 = other.mY1;
-	mX2 = other.mX2;
-	mY2 = other.mY2;
-	return *this;
-}
-
-RadialGradient::RadialGradient( const GradientRef &other )
-{
-	if( other ) {
-		if( const auto radial = std::dynamic_pointer_cast<RadialGradient>( other ) )
-			*this << *radial; // Copy all attributes.
-		else
-			replace( *other ); // Only copy stops.
-	}
-}
-
-RadialGradient &RadialGradient::operator<<( const RadialGradient &other )
-{
-	add( other );
-	mUnits = other.mUnits;
-	mSpread = other.mSpread;
-	mR = other.mR;
-	mCx = other.mCx;
-	mCy = other.mCy;
-	mFr = other.mFr;
-	mFx = other.mFx;
-	mFy = other.mFy;
-	return *this;
-}
-
 bool ClipRect::push()
 {
 	if( mCtx == nullptr ) {
@@ -869,13 +731,9 @@ bool ClipRect::pop()
 	return false;
 }
 
-const GradientRef &Gradients::at( const std::string &id ) const
+bool Gradients::contains( const std::string &id ) const
 {
-	if( mLookUp.count( id ) )
-		return mGradients.at( mLookUp.at( id ) );
-
-	static const GradientRef kEmpty;
-	return kEmpty;
+	return mLookUp.count( id ) > 0;
 }
 
 float Gradients::index( const std::string &id ) const
@@ -886,65 +744,28 @@ float Gradients::index( const std::string &id ) const
 	return ( float( mLookUp.at( id ) ) + 0.5f ) / float( mTexture->getHeight() );
 }
 
-void Gradients::set( const GradientRef &gradient )
+void Gradients::set( const svg::Gradient &gradient )
 {
-	if( !mLookUp.count( gradient->getId() ) ) {
-		mLookUp.insert_or_assign( gradient->getId(), mGradients.size() );
-		mDirty.insert( mGradients.size() );
-		mGradients.emplace_back( gradient );
+	if( !mLookUp.count( gradient.getId() ) ) {
+		store( mIndex, gradient.asPaint() );
+
+		mLookUp.insert_or_assign( gradient.getId(), mIndex++ );
 	}
-	else if( auto index = mLookUp.at( gradient->getId() ); *mGradients.at( index ) != *gradient ) {
-		mDirty.insert( index );
-		mGradients.at( index ) = gradient;
+	else {
+		// store( mLookUp.at( gradient.getId() ), gradient.asPaint() );
 	}
 }
 
-gl::Texture2dRef Gradients::getTexture() const
+void Gradients::set( const svg::Paint &paint )
 {
-	if( !mTexture || !mDirty.empty() ) {
-		// Resize texture if more space is needed.
-		if( const auto size = glm::max( 128, int( mGradients.size() ) ); !mTexture || mTexture->getHeight() < size ) {
-			const auto texture = create( 128, int( isPowerOf2( size ) ? size : nextPowerOf2( size ) ) );
+	if( !mLookUp.count( paint.getId() ) ) {
+		store( mIndex, paint );
 
-			if( mTexture ) {
-				if( glad_glCopyImageSubData ) {
-					glCopyImageSubData(                                       //
-						mTexture->getId(), mTexture->getTarget(), 0, 0, 0, 0, // Src
-						texture->getId(), texture->getTarget(), 0, 0, 0, 0,   // Dst
-						mTexture->getWidth(), mTexture->getHeight(), 0 );     // Size
-				}
-				else {
-					GLint previous[2];
-					glGetIntegerv( GL_READ_FRAMEBUFFER_BINDING, &previous[0] );
-					glGetIntegerv( GL_DRAW_FRAMEBUFFER_BINDING, &previous[1] );
-
-					GLuint fbo[2];
-					glGenFramebuffers( 2, fbo );
-					glNamedFramebufferTexture2DEXT( fbo[0], GL_COLOR_ATTACHMENT0, mTexture->getTarget(), mTexture->getId(), 0 );
-					glNamedFramebufferTexture2DEXT( fbo[1], GL_COLOR_ATTACHMENT0, texture->getTarget(), texture->getId(), 0 );
-					glBindFramebuffer( GL_READ_FRAMEBUFFER, fbo[0] );
-					glBindFramebuffer( GL_DRAW_FRAMEBUFFER, fbo[1] );
-					glBlitFramebufferEXT( 0, 0, mTexture->getWidth(), mTexture->getHeight(), 0, 0, mTexture->getWidth(), mTexture->getHeight(), GL_COLOR_BUFFER_BIT, GL_LINEAR );
-					glBindFramebuffer( GL_READ_FRAMEBUFFER, previous[0] );
-					glBindFramebuffer( GL_DRAW_FRAMEBUFFER, previous[1] );
-					glDeleteFramebuffers( 2, fbo );
-				}
-			}
-
-			mTexture = texture;
-		}
-
-		// Update gradients.
-		for( const auto index : mDirty ) {
-			const auto data = mGradients.at( index )->data( 128, 1 );
-			mTexture->update( data.get(), GL_RGBA, GL_UNSIGNED_BYTE, 0, 128, 1, { 0, index } );
-		}
-
-		// Done.
-		mDirty.clear();
+		mLookUp.insert_or_assign( paint.getId(), mIndex++ );
 	}
-
-	return mTexture;
+	else {
+		// store( mLookUp.at( paint.getId() ), paint );
+	}
 }
 
 gl::Texture2dRef Gradients::create( int width, int height ) const
@@ -953,6 +774,44 @@ gl::Texture2dRef Gradients::create( int width, int height ) const
 
 	gl::Texture2dRef texture = gl::Texture2d::create( width, height, FORMAT );
 	return texture;
+}
+
+void Gradients::store( size_t index, const svg::Paint &paint ) const
+{
+	// Resize texture if more space is needed.
+	if( const auto size = glm::max( 128, int( index ) ); !mTexture || mTexture->getHeight() < size ) {
+		const auto texture = create( 128, int( isPowerOf2( size ) ? size : nextPowerOf2( size ) ) );
+
+		if( mTexture ) {
+			if( glad_glCopyImageSubData ) {
+				glCopyImageSubData(                                       //
+					mTexture->getId(), mTexture->getTarget(), 0, 0, 0, 0, // Src
+					texture->getId(), texture->getTarget(), 0, 0, 0, 0,   // Dst
+					mTexture->getWidth(), mTexture->getHeight(), 0 );     // Size
+			}
+			else {
+				GLint previous[2];
+				glGetIntegerv( GL_READ_FRAMEBUFFER_BINDING, &previous[0] );
+				glGetIntegerv( GL_DRAW_FRAMEBUFFER_BINDING, &previous[1] );
+
+				GLuint fbo[2];
+				glGenFramebuffers( 2, fbo );
+				glNamedFramebufferTexture2DEXT( fbo[0], GL_COLOR_ATTACHMENT0, mTexture->getTarget(), mTexture->getId(), 0 );
+				glNamedFramebufferTexture2DEXT( fbo[1], GL_COLOR_ATTACHMENT0, texture->getTarget(), texture->getId(), 0 );
+				glBindFramebuffer( GL_READ_FRAMEBUFFER, fbo[0] );
+				glBindFramebuffer( GL_DRAW_FRAMEBUFFER, fbo[1] );
+				glBlitFramebufferEXT( 0, 0, mTexture->getWidth(), mTexture->getHeight(), 0, 0, mTexture->getWidth(), mTexture->getHeight(), GL_COLOR_BUFFER_BIT, GL_LINEAR );
+				glBindFramebuffer( GL_READ_FRAMEBUFFER, previous[0] );
+				glBindFramebuffer( GL_DRAW_FRAMEBUFFER, previous[1] );
+				glDeleteFramebuffers( 2, fbo );
+			}
+		}
+
+		mTexture = texture;
+	}
+
+	const auto data = paint.data( 128, 1, false );
+	mTexture->update( data.get(), GL_RGBA, GL_UNSIGNED_BYTE, 0, 128, 1, { 0, index } );
 }
 
 Svg::Svg( const DataSourceRef &src )
@@ -968,26 +827,17 @@ Svg::Svg( const svg::DocRef &svg )
 
 Shader::Type Svg::prepareLinearGradient( const svg::Paint &paint, float opacity, bool prepareShader )
 {
-	auto gradient = std::dynamic_pointer_cast<LinearGradient>( mGradients.at( paint.getId() ) );
-	if( !gradient ) {
-		gradient = LinearGradient::create( paint.getId().c_str() );
-		gradient->units( paint.mUseObjectBoundingBox ? CoordinateSpace::OBJECT_BOUNDING_BOX : CoordinateSpace::USER_SPACE_ON_USE ); //
-		gradient->transform( paint.getTransform() );
-		gradient->from( paint.getCoords0() );
-		gradient->to( paint.getCoords1() );
-		for( size_t i = 0; i < paint.getNumColors(); ++i )
-			gradient->stop( paint.getOffset( i ), paint.getColor( i ) );
+	assert( paint.isLinearGradient() );
 
-		mGradients.set( gradient );
-	}
+	mGradients.set( paint );
 
 	if( prepareShader ) {
 		ScopedShader scpShader( Shader::Type::LINEAR_GRADIENT );
-		scpShader.setCoords( GLenum( gradient->getUnits() ), mat3{ gradient->getTransform() } );
+		scpShader.setCoords( paint.useObjectBoundingBox() ? GL_PATH_OBJECT_BOUNDING_BOX_NV : GL_OBJECT_LINEAR_NV, paint.getTransform() );
 		scpShader.uniform( "index", mGradients.index( paint.getId() ) );
 		scpShader.uniform( "gradTab", 0 );
-		scpShader.uniform( "gradStart", vec2( gradient->getX1(), gradient->getY1() ) );
-		scpShader.uniform( "gradEnd", vec2( gradient->getX2(), gradient->getY2() ) );
+		scpShader.uniform( "gradStart", paint.getCoords0() );
+		scpShader.uniform( "gradEnd", paint.getCoords1() );
 		scpShader.uniform( "opacity", opacity );
 	}
 
@@ -996,29 +846,19 @@ Shader::Type Svg::prepareLinearGradient( const svg::Paint &paint, float opacity,
 
 Shader::Type Svg::prepareRadialGradient( const svg::Paint &paint, float opacity, bool prepareShader )
 {
-	auto gradient = std::dynamic_pointer_cast<RadialGradient>( mGradients.at( paint.getId() ) );
-	if( !gradient ) {
-		gradient = RadialGradient::create( paint.getId().c_str() );
-		gradient->units( paint.useObjectBoundingBox() ? CoordinateSpace::OBJECT_BOUNDING_BOX : CoordinateSpace::USER_SPACE_ON_USE ); //
-		gradient->transform( paint.getTransform() );
-		gradient->center( paint.getCoords0() );
-		gradient->radius( paint.getRadius0() );
-		gradient->focal( paint.getCoords1(), paint.getRadius1() );
-		for( size_t i = 0; i < paint.getNumColors(); ++i )
-			gradient->stop( paint.getOffset( i ), paint.getColor( i ) );
+	assert( paint.isRadialGradient() );
 
-		mGradients.set( gradient );
-	}
+	mGradients.set( paint );
 
 	if( prepareShader ) {
 		ScopedShader scpShader( Shader::Type::RADIAL_GRADIENT );
-		scpShader.setCoords( GLenum( gradient->getUnits() ), mat3{ gradient->getTransform() } );
+		scpShader.setCoords( paint.useObjectBoundingBox() ? GL_PATH_OBJECT_BOUNDING_BOX_NV : GL_OBJECT_LINEAR_NV, paint.getTransform() );
 		scpShader.uniform( "index", mGradients.index( paint.getId() ) );
 		scpShader.uniform( "gradTab", 0 );
-		scpShader.uniform( "focalToCenter", vec2( gradient->getCx() - gradient->getFx(), gradient->getCy() - gradient->getFy() ) );
-		scpShader.uniform( "centerRadius", gradient->getR() );
-		scpShader.uniform( "focalRadius", gradient->getFr() );
-		scpShader.uniform( "translationPoint", vec2( gradient->getFx(), gradient->getFy() ) );
+		scpShader.uniform( "focalToCenter", paint.getCoords0() - paint.getCoords1() );
+		scpShader.uniform( "centerRadius", paint.getRadius0() );
+		scpShader.uniform( "focalRadius", paint.getRadius1() );
+		scpShader.uniform( "translationPoint", paint.getCoords1() );
 		scpShader.uniform( "opacity", opacity );
 	}
 
@@ -1063,6 +903,9 @@ size_t Svg::insertOrReplacePath( size_t uuid, Path &&path )
 
 void Svg::draw()
 {
+	if( mDrawCalls.empty() )
+		return;
+
 	auto ctx = gl::context();
 
 	// Enable stencil buffer testing.
@@ -1075,9 +918,10 @@ void Svg::draw()
 	// Enable sRGB correct rendering.
 	ctx->pushBoolState( GL_FRAMEBUFFER_SRGB, GL_TRUE );
 
-	// Bind gradient texture.
+	// Bind gradient texture if it exists.
 	const auto &tex = mGradients.getTexture();
-	ctx->pushTextureBinding( tex->getTarget(), tex->getId(), 0 );
+	if( tex )
+		ctx->pushTextureBinding( tex->getTarget(), tex->getId(), 0 );
 
 	gl::pushModelView();
 	for( const auto &call : mDrawCalls ) {
@@ -1142,77 +986,98 @@ void Svg::draw()
 		}
 		else {
 			if( !call.fill.isNone() ) {
-				ColorA solidColor = call.fill.getColor();
-				solidColor.a *= call.fillOpacity;
-
-				const auto type = preparePaint( call.fill, call.fillOpacity, true );
-
-				ScopedShader scpShader( type );
-				scpShader.setColor( solidColor );
-
-				if( call.clipMask ) {
-					gl::ScopedStencilMask scpStencilMask( call.coverMask | call.clipMask ); // Don't write to previous clip bits.
-
-					GLuint mask = call.coverMask << 1 | 0x01;
-					gl::stencilFunc( GL_LESS, GLint( ~mask & 0xFF ), 0xFF ); // (step 5).
-					gl::stencilOp( GL_KEEP, GL_KEEP, GL_KEEP );
-
-					gl::stencilThenCoverFillPathNV( call.path, GL_COUNT_UP_NV, call.fillRule & call.coverMask, GL_BOUNDING_BOX_NV ); // (step 5).
-
-					// Remove shape from stencil buffer (step 6).
-					gl::ScopedColorMask scpColorMask( GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE ); // Don't write to color buffer.
-
-					gl::stencilOp( GL_KEEP, GL_KEEP, GL_ZERO );
-					gl::stencilFunc( GL_ALWAYS, GLint( call.clipMask ), call.coverMask );
-
-					gl::coverFillPathNV( call.path, GL_BOUNDING_BOX_NV );
+				if( !call.text.empty() ) {
+					text::Frame layout( call.text );
+					renderText( layout );
 				}
 				else {
-					gl::stencilFunc( GL_NOTEQUAL, 0, call.fillRule );
-					gl::stencilOp( GL_KEEP, GL_KEEP, GL_ZERO );
+					ColorA solidColor = call.fill.getColor();
+					solidColor.a *= call.fillOpacity;
 
-					gl::stencilThenCoverFillPathNV( call.path, GL_COUNT_UP_NV, call.fillRule, GL_BOUNDING_BOX_NV );
+					const auto type = preparePaint( call.fill, call.fillOpacity, true );
+
+					if( tex )
+						tex->setWrapS( call.fill.getSpreadMethod() == svg::SpreadMethod::SPREAD_METHOD_REFLECT ? GL_MIRRORED_REPEAT : //							
+							call.fill.getSpreadMethod() == svg::SpreadMethod::SPREAD_METHOD_REPEAT ? GL_REPEAT : //																				   
+																				   GL_CLAMP_TO_EDGE );
+
+					ScopedShader scpShader( type );
+					scpShader.setColor( solidColor );
+					if( call.clipMask ) {
+						gl::ScopedStencilMask scpStencilMask( call.coverMask | call.clipMask ); // Don't write to previous clip bits.
+
+						GLuint mask = call.coverMask << 1 | 0x01;
+						gl::stencilFunc( GL_LESS, GLint( ~mask & 0xFF ), 0xFF ); // (step 5).
+						gl::stencilOp( GL_KEEP, GL_KEEP, GL_KEEP );
+
+						gl::stencilThenCoverFillPathNV( call.path, GL_COUNT_UP_NV, call.fillRule & call.coverMask, GL_BOUNDING_BOX_NV ); // (step 5).
+
+						// Remove shape from stencil buffer (step 6).
+						gl::ScopedColorMask scpColorMask( GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE ); // Don't write to color buffer.
+
+						gl::stencilOp( GL_KEEP, GL_KEEP, GL_ZERO );
+						gl::stencilFunc( GL_ALWAYS, GLint( call.clipMask ), call.coverMask );
+
+						gl::coverFillPathNV( call.path, GL_BOUNDING_BOX_NV );
+					}
+					else {
+						gl::stencilFunc( GL_NOTEQUAL, 0, call.fillRule );
+						gl::stencilOp( GL_KEEP, GL_KEEP, GL_ZERO );
+
+						gl::stencilThenCoverFillPathNV( call.path, GL_COUNT_UP_NV, call.fillRule, GL_BOUNDING_BOX_NV );
+					}
 				}
 			}
 
 			if( !call.stroke.isNone() ) {
-				ColorA solidColor = call.stroke.getColor();
-				solidColor.a *= call.strokeOpacity;
-
-				const auto type = preparePaint( call.stroke, call.strokeOpacity, true );
-
-				ScopedShader scpShader( type );
-				scpShader.setColor( solidColor );
-
-				if( call.clipMask ) {
-					gl::ScopedStencilMask scpStencilMask( call.coverMask | call.clipMask ); // Don't write to previous clip bits.
-
-					GLuint mask = call.coverMask << 1 | 0x01;
-					gl::stencilFunc( GL_LESS, GLint( ~mask & 0xFF ), 0xFF ); // (step 5).
-					gl::stencilOp( GL_KEEP, GL_KEEP, GL_KEEP );
-
-					gl::stencilThenCoverStrokePathNV( call.path, GL_COUNT_UP_NV, call.coverMask, GL_BOUNDING_BOX_NV ); // (step 5).
-
-					// Remove shape from stencil buffer (step 6).
-					gl::ScopedColorMask scpColorMask( GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE ); // Don't write to color buffer.
-
-					gl::stencilOp( GL_KEEP, GL_KEEP, GL_ZERO );
-					gl::stencilFunc( GL_ALWAYS, GLint( call.clipMask ), call.coverMask );
-
-					gl::coverStrokePathNV( call.path, GL_BOUNDING_BOX_NV );
+				if( !call.text.empty() ) {
+					text::Frame layout( call.text );
+					renderText( layout );
 				}
 				else {
-					gl::stencilFunc( GL_NOTEQUAL, 0, 0xFF );
-					gl::stencilOp( GL_KEEP, GL_KEEP, GL_ZERO );
+					ColorA solidColor = call.stroke.getColor();
+					solidColor.a *= call.strokeOpacity;
 
-					gl::stencilThenCoverStrokePathNV( call.path, GL_COUNT_UP_NV, 0xFF, GL_BOUNDING_BOX_NV );
+					const auto type = preparePaint( call.stroke, call.strokeOpacity, true );
+
+					if( tex )
+						tex->setWrapS( call.stroke.getSpreadMethod() == svg::SpreadMethod::SPREAD_METHOD_REFLECT ? GL_MIRRORED_REPEAT : //							
+							call.stroke.getSpreadMethod() == svg::SpreadMethod::SPREAD_METHOD_REPEAT ? GL_REPEAT : //																				   
+																				   GL_CLAMP_TO_EDGE );
+
+					ScopedShader scpShader( type );
+					scpShader.setColor( solidColor );
+					if( call.clipMask ) {
+						gl::ScopedStencilMask scpStencilMask( call.coverMask | call.clipMask ); // Don't write to previous clip bits.
+
+						GLuint mask = call.coverMask << 1 | 0x01;
+						gl::stencilFunc( GL_LESS, GLint( ~mask & 0xFF ), 0xFF ); // (step 5).
+						gl::stencilOp( GL_KEEP, GL_KEEP, GL_KEEP );
+
+						gl::stencilThenCoverStrokePathNV( call.path, GL_COUNT_UP_NV, call.coverMask, GL_BOUNDING_BOX_NV ); // (step 5).
+
+						// Remove shape from stencil buffer (step 6).
+						gl::ScopedColorMask scpColorMask( GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE ); // Don't write to color buffer.
+
+						gl::stencilOp( GL_KEEP, GL_KEEP, GL_ZERO );
+						gl::stencilFunc( GL_ALWAYS, GLint( call.clipMask ), call.coverMask );
+
+						gl::coverStrokePathNV( call.path, GL_BOUNDING_BOX_NV );
+					}
+					else {
+						gl::stencilFunc( GL_NOTEQUAL, 0, 0xFF );
+						gl::stencilOp( GL_KEEP, GL_KEEP, GL_ZERO );
+
+						gl::stencilThenCoverStrokePathNV( call.path, GL_COUNT_UP_NV, 0xFF, GL_BOUNDING_BOX_NV );
+					}
 				}
 			}
 		}
 	}
 	gl::popModelView();
 
-	ctx->popTextureBinding( tex->getTarget(), 0 );
+	if( tex )
+		ctx->popTextureBinding( tex->getTarget(), 0 );
 
 	ctx->popBoolState( GL_FRAMEBUFFER_SRGB );
 
@@ -1373,6 +1238,42 @@ void Svg::drawImage( const svg::Image &image )
 		image );
 }
 
+void Svg::drawTextSpan( const svg::TextSpan &textSpan )
+{
+	const auto font = textSpan.getFont();
+	if( font ) {
+		const auto color = mStacks.fill.back().getColor();
+
+		text::AttrString text;
+		text << font << color << textSpan.getString();
+
+		vec2 offset{ 0, -font->getAscender() };
+		measureString( text, &offset.x );
+
+		if( textSpan.getAlignment() == text::Alignment::LEFT || textSpan.getAlignment() == text::Alignment::JUSTIFIED )
+			offset.x *= 0;
+		else if( textSpan.getAlignment() == text::Alignment::CENTER )
+			offset.x *= -0.5f;
+		else
+			offset.x *= -1.0f;
+
+		DrawCall dc;
+		dc.transform = mStacks.matrix.back() * glm::translate( mat3(), mStacks.textPen.back() + offset );
+		// dc.clipMask = clipLayer > 0 ? 0x80 >> clipLayer : 0x00;
+		// dc.coverMask = clipLayer > 0 ? 0xFF >> ( clipLayer + 1 ) : 0xFF;
+		// dc.stencilOp = GL_REPLACE;
+		// dc.stencilFunc = GL_NOTEQUAL;
+		dc.fill = mStacks.fill.back();
+		dc.fillOpacity = mStacks.fillOpacity.back() * mStacks.groupOpacity.back();
+		dc.fillRule = mStacks.fillRule.back() == svg::FILL_RULE_NONZERO ? 0xFF : 0x01;
+		dc.stroke = mStacks.stroke.back();
+		dc.strokeOpacity = mStacks.strokeOpacity.back() * mStacks.groupOpacity.back();
+		dc.text = text;
+
+		mDrawCalls.push_back( std::move( dc ) );
+	}
+}
+
 void Svg::pushMatrix( const mat3 &m )
 {
 	mStacks.matrix.push_back( mStacks.matrix.back() * m );
@@ -1493,6 +1394,26 @@ void Svg::pushDashOffset( float dashOffset )
 void Svg::popDashOffset()
 {
 	mStacks.dashOffset.pop_back();
+}
+
+void Svg::pushTextPen( const vec2 &vec2 )
+{
+	mStacks.textPen.push_back( vec2 );
+}
+
+void Svg::popTextPen()
+{
+	mStacks.textPen.pop_back();
+}
+
+void Svg::pushTextRotation( float x )
+{
+	mStacks.textRotation.push_back( x );
+}
+
+void Svg::popTextRotation()
+{
+	mStacks.textRotation.pop_back();
 }
 
 void Svg::render( const Path &path )
@@ -1982,9 +1903,9 @@ void Canvas::resize( const ivec2 &size )
 
 void renderText( const text::Typesetter &typesetter, const vec2 &offset )
 {
-	gl::ScopedBlendPremult scpBlend;
-	gl::ScopedColor        scpColor;
-	gl::matrixLoadfEXT( GL_MODELVIEW, value_ptr( gl::getModelView() ) );
+	// gl::ScopedBlendPremult scpBlend;
+	// gl::ScopedColor        scpColor;
+	// gl::matrixLoadfEXT( GL_MODELVIEW, value_ptr( gl::getModelView() ) );
 
 	std::vector<glm::mat3x2> transforms;
 
@@ -2015,7 +1936,7 @@ void renderText( const text::Typesetter &typesetter, const vec2 &offset )
 		}
 
 		// Draw immediately.
-		gl::ScopedState scpStencil( GL_STENCIL_TEST, GL_TRUE );
+		// gl::ScopedState scpStencil( GL_STENCIL_TEST, GL_TRUE );
 		gl::stencilFunc( GL_NOTEQUAL, 0, 0xFF );
 		gl::stencilOp( GL_KEEP, GL_KEEP, GL_ZERO );
 

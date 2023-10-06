@@ -197,40 +197,26 @@ const Paint sPaintBlack = Paint( Color::black() );
 ////////////////////////////////////////////////////////////////////////////////////
 // Paint
 Paint::Paint()
-	: mType( NONE )
-	, mSpecifiesTransform( false )
-	, mSpecifiesSpreadMethod( false )
-	, mNeedsResolve( false )
+	: Paint( NONE )
 {
-	mStops.emplace_back( 0.0f, ColorA8u::black() );
 }
 
-Paint::Paint( uint8_t type )
+Paint::Paint( Type type )
 	: mType( type )
-	, mSpecifiesTransform( false )
-	, mSpecifiesSpreadMethod( false )
-	, mNeedsResolve( false )
 {
 	mStops.emplace_back( 0.0f, ColorA8u::black() );
 }
 
 Paint::Paint( const ColorA8u &color )
 	: mType( COLOR )
-	, mSpecifiesTransform( false )
-	, mSpecifiesSpreadMethod( false )
-	, mNeedsResolve( false )
 {
 	mStops.emplace_back( 0.0f, color );
 }
 
-Paint::Paint( const std::string &url )
-	: mType( NONE )
-	, mSpecifiesTransform( false )
-	, mSpecifiesSpreadMethod( false )
-	, mNeedsResolve( true )
-	, mId( url )
+Paint::Paint( std::string url )
+	: mNeedsResolve( true )
+	, mId( std::move( url ) )
 {
-	mStops.emplace_back( 0.0f, ColorA8u::black() );
 }
 
 Paint Paint::parse( const char *value, bool *specified, const Node *parentNode )
@@ -246,6 +232,12 @@ Paint Paint::parse( const char *value, bool *specified, const Node *parentNode )
 		*specified = false;
 		return {};
 	}
+
+	if( !strncmp( value, "currentColor", 12 ) ) {
+		*specified = true;
+		return { parentNode->getColor() };
+	}
+
 	if( value[0] == '#' ) { // hex color
 		uint32_t v = 0;
 		if( strlen( value ) > 4 ) {
@@ -317,6 +309,70 @@ bool Paint::isTransparent() const
 	return false;
 }
 
+ColorA8u Paint::at( float t, bool preMultiply ) const
+{
+	ColorA8u result;
+
+	const auto &lo = floor( t );
+	const auto &hi = ceil( t );
+		
+	// See: https://svgwg.org/svg2-draft/pservers.html#GradientStops
+	// "If two gradient stops have the same offset value, then the latter gradient stop controls the color value at the overlap point."
+	if( approxEqual( lo.first, hi.first ) ) {
+		result = hi.second;                                              // TODO: check specifiesColor?
+	}
+	else {
+		float f = clamp( ( t - lo.first ) / ( hi.first - lo.first ), 0.0f, 1.0f );
+		result = lo.second.lerp( uint8_t( f * 255.0f ), hi.second ); // TODO: check specifiesColor?
+	}
+
+	return preMultiply ? result.premultiplied() : result;
+}
+
+const std::pair<float, ColorA8u> & Paint::floor( float t ) const
+{
+	assert( !mStops.empty() );
+
+	for( auto itr = mStops.rbegin(); itr != mStops.rend(); ++itr ) {
+		if( itr->first <= t )
+			return *itr;
+	}
+
+	return mStops.front();
+}
+
+const  std::pair<float, ColorA8u> &Paint::ceil( float t ) const
+{
+	assert( !mStops.empty() );
+
+	for( auto itr = mStops.begin(); itr != mStops.end(); ++itr ) {
+		if( itr->first > t )
+			return *itr;
+	}
+
+	return mStops.back();
+}
+
+std::unique_ptr<uint8_t[]> Paint::data( int32_t width, int32_t height, bool preMultiply, float from, float to ) const
+{
+	auto result = std::make_unique<uint8_t[]>( size_t( width ) * size_t( height ) * sizeof( ColorA8u ) );
+
+	for( int x = 0; x < width; ++x ) {
+		float t = mix( from, to, float( x ) / float( width - 1 ) );
+
+		const auto c = at( t, preMultiply );
+		for( int y = 0; y < height; ++y ) {
+			const int64_t i = ( int64_t( x ) + int64_t( y ) * int64_t( width ) ) * sizeof( ColorA8u );
+			result[size_t( i ) + 0] = uint8_t( c.r );
+			result[size_t( i ) + 1] = uint8_t( c.g );
+			result[size_t( i ) + 2] = uint8_t( c.b );
+			result[size_t( i ) + 3] = uint8_t( c.a );
+		}
+	}
+
+	return result;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////
 // Style
 Style::Style()
@@ -342,6 +398,7 @@ Style Style::makeGlobalDefaults()
 {
 	Style result;
 
+	result.setColor( getColorDefault() );
 	result.setFill( getFillDefault() );
 	result.setStroke( getStrokeDefault() );
 	result.setFillOpacity( getFillOpacityDefault() );
@@ -354,6 +411,8 @@ Style Style::makeGlobalDefaults()
 	result.setMiterLimit( getMiterLimitDefault() );
 	result.setDashArray( getDashArrayDefault() );
 	result.setDashOffset( getDashOffsetDefault() );
+	result.setStopColor( getStopColorDefault() );
+	result.setStopOpacity( getStopOpacityDefault() );
 
 	result.setFontFamilies( getFontFamiliesDefault() );
 	result.setFontSize( getFontSizeDefault() );
@@ -367,6 +426,7 @@ Style Style::makeGlobalDefaults()
 
 void Style::clear()
 {
+	mSpecifiesColor = false;
 	mSpecifiesFill = mSpecifiesStroke = false;
 	mSpecifiesOpacity = mSpecifiesFillOpacity = mSpecifiesStrokeOpacity = false;
 	mOpacity = 1.0f;
@@ -378,6 +438,8 @@ void Style::clear()
 	mSpecifiesDashArray = false;
 	mSpecifiesDashOffset = false;
 	mSpecifiesClipPath = false;
+	mSpecifiesStopColor = false;
+	mSpecifiesStopOpacity = false;
 	mSpecifiesFontFamilies = mSpecifiesFontSize = mSpecifiesFontWeight = false;
 	mSpecifiesVisible = false;
 	mVisible = true;
@@ -398,7 +460,7 @@ const std::vector<std::string> &Style::getFontFamiliesDefault()
 	static shared_ptr<vector<string>> sDefault;
 	if( !sDefault ) {
 		sDefault = std::make_shared<vector<string>>();
-		sDefault->push_back( "Arial" );
+		sDefault->push_back( "Times New Roman" ); // Most browsers use Times New Roman as the default font.
 	}
 
 	return *sDefault;
@@ -429,7 +491,11 @@ void Style::parseStyleAttribute( const std::string &stylePropertyString, const N
 
 bool Style::parseProperty( const std::string &key, const std::string &value, const Node *parent )
 {
-	if( key == "fill" ) {
+	if( key == "color" ) {
+		mColor = Paint::parse( value.c_str(), &mSpecifiesColor, parent ).getColor();
+		return true;
+	}
+	else if( key == "fill" ) {
 		mFill = Paint::parse( value.c_str(), &mSpecifiesFill, parent );
 		return true;
 	}
@@ -544,6 +610,18 @@ bool Style::parseProperty( const std::string &key, const std::string &value, con
 		}
 		return true;
 	}
+	else if( key == "stop-color" ) {
+		if( value != "inherit" )
+			mStopColor = Paint::parse( value.c_str(), &mSpecifiesStopColor, nullptr ).getColor();
+		return true;
+	}
+	else if( key == "stop-opacity" ) {
+		if( value != "inherit" ) {
+			mStopOpacity = readValue( value, 0, 1 ).asUser();
+			mSpecifiesStopOpacity = true;
+		}
+		return true;
+	}
 	else if( key == "font-family" ) {
 		mSpecifiesFontFamilies = true;
 		setFontFamilies( readStringList( value, true ) );
@@ -599,11 +677,11 @@ bool Style::parseProperty( const std::string &key, const std::string &value, con
 
 void Style::resolve( const Node *node ) const
 {
-	if( mSpecifiesFill && mFill.mNeedsResolve ) {
-		mFill = node->findPaintInAncestors( mFill.mId );
+	if( mSpecifiesFill && mFill.needsResolve() ) {
+		mFill = node->findPaintInAncestors( mFill.getId() );
 	}
-	if( mSpecifiesStroke && mStroke.mNeedsResolve ) {
-		mStroke = node->findPaintInAncestors( mStroke.mId );
+	if( mSpecifiesStroke && mStroke.needsResolve() ) {
+		mStroke = node->findPaintInAncestors( mStroke.getId() );
 	}
 }
 
@@ -876,6 +954,17 @@ string Node::getDomPath() const
 	return result;
 }
 
+const ColorA8u &Node::getColor() const
+{
+	const auto &style = getStyle(); // Resolves style if needed.
+	if( style.specifiesColor() )
+		return style.getColor();
+	else if( mParent )
+		return mParent->getColor();
+	else
+		return Style::getColorDefault();
+}
+
 const Paint &Node::getFill() const
 {
 	const auto &style = getStyle(); // Resolves style if needed.
@@ -1008,6 +1097,28 @@ float Node::getDashOffset() const
 		return Style::getDashOffsetDefault();
 }
 
+ColorA8u Node::getStopColor() const
+{
+	const auto &style = getStyle(); // Resolves style if needed.
+	if( style.specifiesStopColor() )
+		return style.getStopColor();
+	else if( mParent )
+		return mParent->getStopColor();
+	else
+		return Style::getStopColorDefault();
+}
+
+float Node::getStopOpacity() const
+{
+	const auto &style = getStyle(); // Resolves style if needed.
+	if( style.specifiesStopOpacity() )
+		return style.getStopOpacity();
+	else if( mParent )
+		return mParent->getStopOpacity();
+	else
+		return Style::getStopOpacityDefault();
+}
+
 const vector<string> &Node::getFontFamilies() const
 {
 	const auto &style = getStyle(); // Resolves style if needed.
@@ -1054,6 +1165,12 @@ Paint Node::parsePaint( const char *value, bool *specified, const Node *parentNo
 		*specified = false;
 		return {};
 	}
+
+	if( !strncmp( value, "currentColor", 12 ) ) {
+		*specified = true;
+		return { parentNode->getColor() };
+	}
+
 	if( value[0] == '#' ) { // hex color
 		uint32_t v = 0;
 		if( strlen( value ) > 4 ) {
@@ -1178,7 +1295,7 @@ bool Node::parseTransformComponent( const char **c, mat3 *result )
 		vector<float> v = parseFloatList( c );
 		if( v.size() == 1 ) {
 			float a = toRadians( v[0] );
-			m = shearY2D( mat3(), tan( a ) );
+			m = shearY( mat3(), tan( a ) );
 		}
 		else
 			throw TransformParseExc();
@@ -1188,7 +1305,7 @@ bool Node::parseTransformComponent( const char **c, mat3 *result )
 		vector<float> v = parseFloatList( c );
 		if( v.size() == 1 ) {
 			float a = toRadians( v[0] );
-			m = shearX2D( mat3(), tan( a ) );
+			m = shearX( mat3(), tan( a ) );
 		}
 		else
 			throw TransformParseExc();
@@ -1229,6 +1346,8 @@ Style Node::calcInheritedStyle() const
 	result.setDashArray( getDashArray() );
 	result.setDashOffset( getDashOffset() );
 	result.setStrokeWidth( getStrokeWidth() );
+	result.setStopColor( getStopColor() );
+	result.setStopOpacity( getStopOpacity() );
 	result.setFontFamilies( getFontFamilies() );
 	result.setFontSize( getFontSize() );
 	return result;
@@ -1346,22 +1465,19 @@ mat3 Node::getTransformAbsolute() const
 // Gradient
 Gradient::Gradient( Node *parent, const XmlTree &xml )
 	: Node( parent, xml )
-	, mUseObjectBoundingBox( true )
-	, mSpecifiesSpreadMethod( false )
-	, mSpreadMethod( PAD )
 {
 	parse( parent, xml );
 }
 
-Gradient::SpreadMethod Gradient::parseSpreadMethod( const std::string &s )
+SpreadMethod Gradient::parseSpreadMethod( const std::string &s )
 {
 	auto m = trim( toLower( s ) );
 	if( m == "reflect" )
-		return REFLECT;
+		return SPREAD_METHOD_REFLECT;
 	if( m == "repeat" )
-		return REPEAT;
+		return SPREAD_METHOD_REPEAT;
 
-	return PAD;
+	return SPREAD_METHOD_PAD;
 }
 
 void Gradient::parse( const Node *parent, const XmlTree &xml )
@@ -1395,6 +1511,17 @@ void Gradient::parse( const Node *parent, const XmlTree &xml )
 		mSpecifiesSpreadMethod = true;
 		mSpreadMethod = parseSpreadMethod( xml.getAttributeValue<string>( "spreadMethod" ) );
 	}
+
+	// See: https://svgwg.org/svg2-draft/pservers.html#GradientStops
+	// "Each gradient offset value is required to be equal to or greater than the previous gradient stop's offset value.
+	//  If a given gradient stop's offset value is not equal to or greater than all previous offset values, then the offset
+	//  value is adjusted to be equal to the largest of all previous offset values."
+	if( !mStops.empty() ) {
+		float offset = mStops.front().offset;
+		for( auto &stop : mStops ) {
+			offset = stop.offset = glm::max( offset, stop.offset );
+		}
+	}
 }
 
 void Gradient::copyAttributesFrom( const Gradient &rhs )
@@ -1412,29 +1539,36 @@ void Gradient::copyAttributesFrom( const Gradient &rhs )
 }
 
 Gradient::Stop::Stop( const Node *parent, const XmlTree &xml )
-	: mOffset( 0 )
-	, mColor( 0, 0, 0 )
-	, mOpacity( 1 )
-	, mSpecifiesColor( false )
-	, mSpecifiesOpacity( false )
 {
 	if( xml.hasAttribute( "offset" ) )
-		mOffset = Value::parse( xml.getAttributeValue<string>( "offset" ) ).asUser( 1 ); // Percentages will be converted to decimals, where 100% = 1.0f
+		offset = Value::parse( xml.getAttributeValue<string>( "offset" ) ).asUser( 1 ); // Percentages will be converted to decimals, where 100% = 1.0f
 	if( xml.hasAttribute( "stop-color" ) )
-		mColor = parsePaint( xml.getAttributeValue<string>( "stop-color" ).c_str(), &mSpecifiesColor, parent ).getColor();
+		color = parsePaint( xml.getAttributeValue<string>( "stop-color" ).c_str(), &specifiesColor, parent ).getColor();
 	if( xml.hasAttribute( "stop-opacity" ) ) {
-		mSpecifiesOpacity = true;
-		mColor.a = uint8_t( Value::parse( xml.getAttributeValue<string>( "stop-opacity" ) ).asUser() * 255 );
+		const auto value = xml.getAttributeValue<string>( "stop-opacity" );
+		if( value == "inherit" ) {
+			specifiesOpacity = false;
+		}
+		else {
+			specifiesOpacity = true;
+			color.a = uint8_t( Value::parse( value ).asUser() * 255 );
+		}
 	}
+
 	if( xml.hasAttribute( "style" ) ) {
 		string stopColorString = findStyleValue( xml.getAttributeValue<string>( "style" ), "stop-color" );
 		if( !stopColorString.empty() )
-			mColor = parsePaint( stopColorString.c_str(), &mSpecifiesColor, parent ).getColor();
+			color = parsePaint( stopColorString.c_str(), &specifiesColor, parent ).getColor();
 		string stopOpacityString = findStyleValue( xml.getAttributeValue<string>( "style" ), "stop-opacity" );
 		if( !stopOpacityString.empty() ) {
-			mColor.a = uint8_t( Value::parse( stopOpacityString ).asUser() * 255 );
+			color.a = uint8_t( Value::parse( stopOpacityString ).asUser() * 255 );
 		}
 	}
+
+	// See: https://svgwg.org/svg2-draft/pservers.html#GradientStops
+	// "Gradient offset values less than 0 (or less than 0%) are rounded up to 0%.
+	//  Gradient offset values greater than 1 (or greater than 100%) are rounded down to 100%."
+	offset = clamp( offset, 0.0f, 1.0f );
 }
 
 Paint Gradient::asPaint() const
@@ -1445,12 +1579,24 @@ Paint Gradient::asPaint() const
 	if( getStyle().isDisplayNone() || !getStyle().isVisible() )
 		result.mType = Paint::NONE;
 	else {
-		if( !mStops.empty() ) {
-			result.mStops.clear();
-			for( const auto &stop : mStops )
-				result.mStops.emplace_back( stop.mOffset, stop.mColor );
+		result.mStops.clear();
+		for( const auto &stop : mStops ) {
+			if( stop.specifiesColor )
+				result.mStops.emplace_back( stop.offset, stop.color );
+			else
+				result.mStops.emplace_back( stop.offset, getStopColor() );
+
+			// See: https://svgwg.org/svg2-draft/pservers.html#GradientStops
+			// "The opacity value used for the gradient calculation is the product of the value of stop-opacity and the opacity of the value of stop-color."
+			auto &opacity = result.mStops.back().second.a;
+			if( stop.specifiesOpacity )
+				opacity = ( opacity * uint8_t( stop.opacity * 255.0f ) ) / 255;
+			else
+				opacity = ( opacity * uint8_t( getStopOpacity() * 255.0f ) ) / 255;
 		}
+
 		result.mUseObjectBoundingBox = mUseObjectBoundingBox;
+
 		if( mSpecifiesTransform ) {
 			result.mSpecifiesTransform = true;
 			result.mTransform = mTransform;
@@ -1511,11 +1657,17 @@ void LinearGradient::copyAttributesFrom( const LinearGradient &rhs )
 Paint LinearGradient::asPaint() const
 {
 	Paint result = Gradient::asPaint();
-	result.mType = Paint::LINEAR_GRADIENT;
-	result.mCoords0.x = mX1.asUser( 1 ); // Percentages will be converted to decimals, where 100% = 1.0f
-	result.mCoords0.y = mY1.asUser( 1 );
-	result.mCoords1.x = mX2.asUser( 1 );
-	result.mCoords1.y = mY2.asUser( 1 );
+	// See: https://svgwg.org/svg2-draft/pservers.html#GradientStops
+	// "If no stops are defined, then painting shall occur as if 'none' were specified as the paint style."
+	if( result.mStops.empty() )
+		result.mType = Paint::NONE;
+	else {
+		result.mType = Paint::LINEAR_GRADIENT;
+		result.mCoords0.x = mX1.asUser( 1 ); // Percentages will be converted to decimals, where 100% = 1.0f
+		result.mCoords0.y = mY1.asUser( 1 );
+		result.mCoords1.x = mX2.asUser( 1 );
+		result.mCoords1.y = mY2.asUser( 1 );
+	}
 	return result;
 }
 
@@ -1576,13 +1728,19 @@ void RadialGradient::copyAttributesFrom( const RadialGradient &rhs )
 Paint RadialGradient::asPaint() const
 {
 	Paint result = Gradient::asPaint();
-	result.mType = Paint::RADIAL_GRADIENT;
-	result.mCoords0.x = mCx.asUser( 1 ); // Percentages will be converted to decimals, where 100% = 1.0f
-	result.mCoords0.y = mCy.asUser( 1 );
-	result.mCoords1.x = mFx.asUser( 1 );
-	result.mCoords1.y = mFy.asUser( 1 );
-	result.mRadius0 = mR.asUser( 1 );
-	result.mRadius1 = mFr.asUser( 1 );
+	// See: https://svgwg.org/svg2-draft/pservers.html#GradientStops
+	// "If no stops are defined, then painting shall occur as if 'none' were specified as the paint style."
+	if( result.mStops.empty() )
+		result.mType = Paint::NONE;
+	else {
+		result.mType = Paint::RADIAL_GRADIENT;
+		result.mCoords0.x = mCx.asUser( 1 ); // Percentages will be converted to decimals, where 100% = 1.0f
+		result.mCoords0.y = mCy.asUser( 1 );
+		result.mCoords1.x = mFx.asUser( 1 );
+		result.mCoords1.y = mFy.asUser( 1 );
+		result.mRadius0 = mR.asUser( 1 );
+		result.mRadius1 = mFr.asUser( 1 );
+	}
 	return result;
 }
 
@@ -2482,6 +2640,15 @@ void Use::parse( const XmlTree &xml )
 	else if( xml.hasAttribute( "href" ) )
 		ref = xml.getAttributeValue<string>( "href" );
 
+	if( xml.hasAttribute( "x" ) ) {
+		mTransform[2][0] = Value::parse( xml.getAttributeValue<std::string>( "x" ) ).asUser();
+		mSpecifiesTransform = true;
+	}
+	if( xml.hasAttribute( "y" ) ) {
+		mTransform[2][1] = Value::parse( xml.getAttributeValue<std::string>( "y" ) ).asUser();
+		mSpecifiesTransform = true;
+	}
+
 	if( ref.size() > 1 ) {
 		if( ref[0] == '#' ) {
 			string elementId = ref.substr( 1, string::npos );
@@ -2511,25 +2678,25 @@ PreserveAspectRatio::PreserveAspectRatio( const std::string &value )
 		return; // Error!
 
 	if( keywords[0] == "none" )
-		align = NONE;
+		align = ALIGN_NONE;
 	else if( keywords[0] == "xminymin" )
-		align = X_MIN_Y_MIN;
+		align = ALIGN_X_MIN_Y_MIN;
 	else if( keywords[0] == "xmidymin" )
-		align = X_MID_Y_MIN;
+		align = ALIGN_X_MID_Y_MIN;
 	else if( keywords[0] == "xmaxymin" )
-		align = X_MAX_Y_MIN;
+		align = ALIGN_X_MAX_Y_MIN;
 	else if( keywords[0] == "xminymid" )
-		align = X_MIN_Y_MID;
+		align = ALIGN_X_MIN_Y_MID;
 	else if( keywords[0] == "xmidymid" )
-		align = X_MID_Y_MID;
+		align = ALIGN_X_MID_Y_MID;
 	else if( keywords[0] == "xmaxymid" )
-		align = X_MAX_Y_MID;
+		align = ALIGN_X_MAX_Y_MID;
 	else if( keywords[0] == "xminymax" )
-		align = X_MIN_Y_MIN;
+		align = ALIGN_X_MIN_Y_MIN;
 	else if( keywords[0] == "xmidymax" )
-		align = X_MID_Y_MAX;
+		align = ALIGN_X_MID_Y_MAX;
 	else if( keywords[0] == "xmaxymax" )
-		align = X_MAX_Y_MAX;
+		align = ALIGN_X_MAX_Y_MAX;
 
 	if( keywords.size() > 1 ) {
 		if( keywords[1] == "slice" )
@@ -2545,20 +2712,20 @@ mat3 PreserveAspectRatio::calcTransform( const Rectf &element, const Rectf &view
 	if( viewBox.getWidth() > 0 && viewBox.getHeight() > 0 ) {
 		m33[0][0] = element.getWidth() / viewBox.getWidth();          // scale-x
 		m33[1][1] = element.getHeight() / viewBox.getHeight();        // scale-y
-		if( align != NONE && meetOrSlice == MEET )                    //
+		if( align != ALIGN_NONE && meetOrSlice == MEET )                    //
 			m33[0][0] = m33[1][1] = glm::min( m33[0][0], m33[1][1] ); //
-		else if( align != NONE && meetOrSlice == SLICE )              //
+		else if( align != ALIGN_NONE && meetOrSlice == SLICE )              //
 			m33[0][0] = m33[1][1] = glm::max( m33[0][0], m33[1][1] ); //
 		m33[2][0] = element.x1 - ( viewBox.x1 * m33[0][0] );          // translate-x
 		m33[2][1] = element.y1 - ( viewBox.y1 * m33[1][1] );          // translate-y
 
-		if( align == X_MID_Y_MIN || align == X_MID_Y_MID || align == X_MID_Y_MAX )
+		if( align == ALIGN_X_MID_Y_MIN || align == ALIGN_X_MID_Y_MID || align == ALIGN_X_MID_Y_MAX )
 			m33[2][0] += ( element.getWidth() - viewBox.getWidth() * m33[0][0] ) * 0.5f;
-		else if( align == X_MAX_Y_MIN || align == X_MAX_Y_MID || align == X_MAX_Y_MAX )
+		else if( align == ALIGN_X_MAX_Y_MIN || align == ALIGN_X_MAX_Y_MID || align == ALIGN_X_MAX_Y_MAX )
 			m33[2][0] += element.getWidth() - viewBox.getWidth() * m33[0][0];
-		if( align == X_MIN_Y_MID || align == X_MID_Y_MID || align == X_MAX_Y_MID )
+		if( align == ALIGN_X_MIN_Y_MID || align == ALIGN_X_MID_Y_MID || align == ALIGN_X_MAX_Y_MID )
 			m33[2][1] += ( element.getHeight() - viewBox.getHeight() * m33[1][1] ) * 0.5f;
-		else if( align == X_MIN_Y_MAX || align == X_MID_Y_MAX || align == X_MAX_Y_MAX )
+		else if( align == ALIGN_X_MIN_Y_MAX || align == ALIGN_X_MID_Y_MAX || align == ALIGN_X_MAX_Y_MAX )
 			m33[2][1] += element.getHeight() - viewBox.getHeight() * m33[1][1];
 	}
 
@@ -2708,6 +2875,11 @@ Value Text::getLetterSpacing() const
 		return mAttributes.mLetterSpacing[0];
 }
 
+text::Alignment Text::getAlignment() const
+{
+	return mAttributes.mAlignment;
+}
+
 void Text::renderSelf( Renderer &renderer ) const
 {
 	renderer.pushTextPen( vec2() ); // this may be overridden by the attributes, but that's ok
@@ -2725,6 +2897,7 @@ TextSpan::TextSpan( Node *parent, const XmlTree &xml )
 	: Node( parent, xml )
 	, mIgnoreAttributes( false )
 	, mAttributes( xml )
+	, mFont( nullptr )
 {
 	for( XmlTree::ConstIter treeIt = xml.begin(); treeIt != xml.end(); ++treeIt ) {
 		if( treeIt->getTag().empty() ) { // data!
@@ -2739,6 +2912,7 @@ TextSpan::TextSpan( Node *parent, const XmlTree &xml )
 TextSpan::TextSpan( Node *parent, const std::string &str )
 	: Node( parent )
 	, mIgnoreAttributes( true )
+	, mFont( nullptr )
 {
 	// replace all multi-char whitespace with single space
 	/*size_t c = 0;
@@ -2822,6 +2996,7 @@ Shape2d TextSpan::getShape() const
 
 // TextSpan::Atributes
 TextSpan::Attributes::Attributes( const XmlTree &xml )
+	: mAlignment( text::Alignment::LEFT )
 {
 	if( xml.hasAttribute( "x" ) )
 		mX = readValueList( xml["x"], false );
@@ -2831,6 +3006,13 @@ TextSpan::Attributes::Attributes( const XmlTree &xml )
 		mRotate = readValueList( xml["rotate"], false );
 	if( xml.hasAttribute( "letter-spacing" ) )
 		mLetterSpacing = readValueList( xml["letter-spacing"], false );
+	if( xml.hasAttribute( "text-anchor" ) ) {
+		const auto anchor = xml.getAttributeValue<std::string>( "text-anchor" );
+		if( anchor == "middle" )
+			mAlignment = text::Alignment::CENTER;
+		else if( anchor == "end" )
+			mAlignment = text::Alignment::RIGHT;
+	}
 }
 
 text::Font *TextSpan::getFont() const
@@ -2913,6 +3095,22 @@ Value TextSpan::getLetterSpacing() const
 	}
 	else
 		return mAttributes.mLetterSpacing[0];
+}
+
+text::Alignment TextSpan::getAlignment() const
+{
+	if( mIgnoreAttributes ) {
+		if( !mParent )
+			return text::Alignment::LEFT;
+		else if( typeid( *mParent ) == typeid( TextSpan ) )
+			return reinterpret_cast<const TextSpan *>( mParent )->getAlignment();
+		else if( typeid( *mParent ) == typeid( Text ) )
+			return reinterpret_cast<const Text *>( mParent )->getAlignment();
+		else
+			return text::Alignment::LEFT;
+	}
+	else
+		return mAttributes.mAlignment;
 }
 
 void TextSpan::Attributes::startRender( Renderer &renderer ) const
