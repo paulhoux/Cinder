@@ -60,7 +60,7 @@ class CI_API Path2d {
 	
 	//! Closes the path, by drawing a straight line from the first to the last point. This is only legal as the last command.
 	void	close() { mSegments.push_back( CLOSE ); }
-	bool	isClosed() const { return ( mSegments.size() > 1 ) && mSegments.back() == CLOSE; }
+	bool	isClosed() const { return ! mSegments.empty() && mSegments.back() == CLOSE; }
 
 	//! Creates a circle with given \a center and \a radius and returns it as a Path2d.
 	static Path2d circle( const vec2 &center, float radius );

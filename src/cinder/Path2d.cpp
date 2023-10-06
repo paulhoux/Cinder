@@ -659,7 +659,7 @@ void Path2d::reverse()
 	if( isClosed() && mSegments.size() > 2 ) {
 		std::reverse( mSegments.begin(), mSegments.end() - 1 );
 	}
-	else if( mSegments.size() > 1 ) {
+	else if( ! isClosed() && mSegments.size() > 1 ) {
 		std::reverse( mSegments.begin(), mSegments.end() );
 	}
 }

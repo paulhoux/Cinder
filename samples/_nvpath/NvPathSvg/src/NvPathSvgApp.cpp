@@ -29,7 +29,7 @@ class NvPathSvgApp : public App {
   private:
 	Engine      mEngine = NVP;
 	CanvasUi    mCanvasUi;
-	nvp::Canvas mCanvas;
+	nvp::Canvas mCanvas{ 8, 16, true };
 	nvp::Svg    mSvg;
 	svg::DocRef mDoc;
 	fs::path    mFilePath;
@@ -110,6 +110,7 @@ void NvPathSvgApp::draw()
 		// Use pre-multiplied alpha!
 		gl::ScopedBlendPremult scpBlend;
 		gl::ScopedColor        scpColor( 1, 1, 1 );
+		//gl::ScopedState        scpSrgb( GL_FRAMEBUFFER_SRGB, GL_TRUE );
 
 		mCanvas.draw();
 	}

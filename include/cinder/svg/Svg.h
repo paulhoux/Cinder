@@ -58,6 +58,8 @@ using Align = enum { ALIGN_NONE, ALIGN_X_MIN_Y_MIN, ALIGN_X_MID_Y_MIN, ALIGN_X_M
 using MeetOrSlice = enum { MEET, SLICE };
 //! Defines the coordinate system used by gradients and images.
 using CoordinateSpace = enum { USER_SPACE_ON_USE, OBJECT_BOUNDING_BOX };
+//!
+using TextAnchor = enum { TEXT_ANCHOR_START, TEXT_ANCHOR_MIDDLE, TEXT_ANCHOR_END };
 
 class Circle;
 class ClipPath;
@@ -78,18 +80,24 @@ class PreserveAspectRatio;
 class Rect;
 class Style;
 class Styles;
+class Text;
 class TextSpan;
+class Use;
 
 //! SVG Value/Unit pair
 class CI_API Value {
   public:
 	enum Unit { USER, PX, PERCENT, PT, PC, MM, CM, INCH, EM, EX };
 
-	Value() : mUnit( USER ), mValue( 0 ) {}
-	Value( float value, Unit unit = USER ) : mUnit( unit ), mValue( value ) {}
+	Value() = default;
+	Value( float value, Unit unit = USER ) : mUnit( unit ), mValue( value ), mIsSet( true ) {}
 
 	float asUser( float percentOf = 100, float dpi = 72, float fontSize = 12, float fontXHeight = 7 ) const;
 
+	float value() const { return mValue; }
+	Unit  unit() const { return mUnit; }
+
+	bool isSet() const { return mIsSet; }
 	bool isUser() const { return mUnit == USER; }
 	bool isPercent() const { return mUnit == PERCENT; }
 	bool isPixels() const { return mUnit == PX; }
@@ -97,8 +105,10 @@ class CI_API Value {
 	static Value parse( const char **sInOut );
 	static Value parse( const std::string &s );
 
+  private:
 	Unit  mUnit;
 	float mValue;
+	bool  mIsSet{ false };
 };
 
 //! SVG Paint specification for fill or stroke, including solids and gradients
@@ -447,6 +457,12 @@ class CI_API Style {
 	void				setFontWeight( FontWeight weight ) { mSpecifiesFontWeight = true; mFontWeight = weight; }
 	static FontWeight	getFontWeightDefault() { return svg::WEIGHT_NORMAL; }
 
+	bool				specifiesTextAnchor() const { return mSpecifiesTextAnchor; }
+	void				unspecifyTextAnchor() { mSpecifiesTextAnchor = false; }
+	TextAnchor			getTextAnchor() const { return mTextAnchor; }
+	void				setTextAnchor( TextAnchor anchor ) { mSpecifiesTextAnchor = true; mTextAnchor = anchor; }
+	static TextAnchor	getTextAnchorDefault() { return TEXT_ANCHOR_START; }
+
 	bool			specifiesVisible() const { return mSpecifiesVisible; }
 	bool			isVisible() const { return mVisible; }
 	void			setVisible( bool visible ) { mSpecifiesVisible = true; mVisible = visible; }
@@ -505,10 +521,11 @@ class CI_API Style {
 	float              mStopOpacity;
 
 	// fonts
-	bool                     mSpecifiesFontFamilies, mSpecifiesFontSize, mSpecifiesFontWeight;
+	bool                     mSpecifiesFontFamilies, mSpecifiesFontSize, mSpecifiesFontWeight, mSpecifiesTextAnchor;
 	std::vector<std::string> mFontFamilies;
 	Value                    mFontSize;
 	FontWeight               mFontWeight;
+	TextAnchor               mTextAnchor;
 
 	// visibility
 	bool mSpecifiesVisible, mVisible, mDisplayNone;
@@ -623,6 +640,8 @@ class CI_API Node {
 	const std::vector<std::string> &getFontFamilies() const;
 	//! Returns node's font size, or the first among its ancestors when it has none
 	Value getFontSize() const;
+	//! Returns node's text anchor, or the first among its ancestors when it has none
+	TextAnchor getTextAnchor() const;
 	//! Returns whether this Node is visible, or the first among its ancestors when unspecified
 	bool isVisible() const;
 	//! Returns whether the Display property of this Node is set to 'None', preventing rendering of the node and its children
@@ -863,8 +882,8 @@ class CI_API Rect : public Node {
 	Rectf calcBoundingBox() const override { return mRect; }
 
 	Rectf mRect;
-	Value mRx; // No default value.
-	Value mRy; // No default value.
+	Value mRx{ 0 }; // Defaults to 'auto'.
+	Value mRy{ 0 }; // Defaults to 'auto'.
 };
 
 //! SVG Polygon Element: http://www.w3.org/TR/SVG/shapes.html#PolygonElement
@@ -987,13 +1006,12 @@ class CI_API TextSpan : public Node {
 
 		void setTextPen( const vec2 &textPen );
 
-		std::vector<Value> mX, mY;
+		Value              mX{ 0 }, mY{ 0 };
 		float              mDx, mDy;
 		std::vector<Value> mRotate;
 		float              mTextLength;
 		float              mLengthAdjust;
 		std::vector<Value> mLetterSpacing;
-		text::Alignment    mAlignment;
 	};
 
 	TextSpan( Node *parent, const XmlTree &xml );
@@ -1002,13 +1020,13 @@ class CI_API TextSpan : public Node {
 	const std::string &getString() const { return mString; }
 	void               setString( const std::string &s ) { mString = s; }
 	text::Font *       getFont() const;
+	text::Font *       getFont(const std::vector<std::string> &fontFamilies) const;
 	//! Returns a vector of glyph IDs and positions for the string, ignoring rotation. Cached and lazily calculated.
 	std::vector<std::pair<uint16_t, vec2>> getGlyphMeasures() const;
 	vec2                                   getTextPen() const;
 	void                                   setTextPen( const vec2 &textPen );
 	float                                  getRotation() const;
 	Value                                  getLetterSpacing() const;
-	text::Alignment                        getAlignment() const;
 
 	std::vector<TextSpanRef> &      getSpans() { return mSpans; }
 	const std::vector<TextSpanRef> &getSpans() const { return mSpans; }
@@ -1019,7 +1037,7 @@ class CI_API TextSpan : public Node {
 	bool                                                            mIgnoreAttributes; // TextSpans that are actually the contents of Text's attributes should be ignored
 	Attributes                                                      mAttributes;
 	std::string                                                     mString;
-	mutable text::Font *                                            mFont;
+	mutable text::Font                                             *mFont;
 	mutable std::shared_ptr<std::vector<std::pair<uint16_t, vec2>>> mGlyphMeasures;
 	mutable std::shared_ptr<Shape2d>                                mShape;
 
@@ -1045,8 +1063,7 @@ class CI_API Text : public Node {
   protected:
 	void renderSelf( Renderer &renderer ) const override;
 
-	TextSpan::Attributes mAttributes;
-
+	TextSpan::Attributes     mAttributes;
 	std::vector<TextSpanRef> mSpans;
 };
 

@@ -148,9 +148,9 @@ Value readValue( const std::string &s, float minV, float maxV )
 {
 	const char *temp = s.c_str();
 	Value       result = Value::parse( &temp );
-	if( result.mValue < minV )
+	if( result.value() < minV )
 		result = minV;
-	if( result.mValue > maxV )
+	if( result.value() > maxV )
 		result = maxV;
 	return result;
 }
@@ -417,6 +417,7 @@ Style Style::makeGlobalDefaults()
 	result.setFontFamilies( getFontFamiliesDefault() );
 	result.setFontSize( getFontSizeDefault() );
 	result.setFontWeight( getFontWeightDefault() );
+	result.setTextAnchor( getTextAnchorDefault() );
 
 	result.setVisible( true );
 	result.setDisplayNone( false );
@@ -440,7 +441,7 @@ void Style::clear()
 	mSpecifiesClipPath = false;
 	mSpecifiesStopColor = false;
 	mSpecifiesStopOpacity = false;
-	mSpecifiesFontFamilies = mSpecifiesFontSize = mSpecifiesFontWeight = false;
+	mSpecifiesFontFamilies = mSpecifiesFontSize = mSpecifiesFontWeight = mSpecifiesTextAnchor = false;
 	mSpecifiesVisible = false;
 	mVisible = true;
 	mDisplayNone = false;
@@ -593,8 +594,10 @@ bool Style::parseProperty( const std::string &key, const std::string &value, con
 	}
 	else if( key == "stroke-dashoffset" ) {
 		if( value != "inherit" ) {
-			mSpecifiesDashOffset = true;
-			mDashOffset = Value::parse( value ).asUser();
+			if( !( value == "none" || value.empty() ) ) {
+				mSpecifiesDashOffset = true;
+				mDashOffset = Value::parse( value ).asUser();
+			}
 		}
 		return true;
 	}
@@ -660,6 +663,17 @@ bool Style::parseProperty( const std::string &key, const std::string &value, con
 			mSpecifiesFontWeight = true;
 		}
 		return true;
+	}
+	else if( key == "text-anchor" ) {
+		mSpecifiesTextAnchor = true;
+		if( asciiCaseEqual( value, "start" ) )
+			mTextAnchor = TEXT_ANCHOR_START;
+		if( asciiCaseEqual( value, "middle" ) )
+			mTextAnchor = TEXT_ANCHOR_MIDDLE;
+		else if( asciiCaseEqual( value, "end" ) )
+			mTextAnchor = TEXT_ANCHOR_END;
+		else
+			mSpecifiesTextAnchor = false;
 	}
 	else if( key == "display" ) {
 		// we can't handle most of the possibilities yet; only 'none'
@@ -1145,6 +1159,17 @@ Value Node::getFontSize() const
 		return mParent->getFontSize();
 	else
 		return Style::getFontSizeDefault();
+}
+
+TextAnchor Node::getTextAnchor() const
+{
+	const auto &style = getStyle(); // Resolves style if needed.
+	if( style.specifiesTextAnchor() )
+		return style.getTextAnchor();
+	else if( mParent )
+		return mParent->getTextAnchor();
+	else
+		return Style::getTextAnchorDefault();
 }
 
 bool Node::isVisible() const
@@ -1762,7 +1787,8 @@ Circle::Circle( Node *parent, const XmlTree &xml )
 
 void Circle::renderSelf( Renderer &renderer ) const
 {
-	renderer.drawCircle( *this );
+	if( mRadius > 0 ) // Zero-radius circles should never be drawn.
+		renderer.drawCircle( *this );
 }
 
 Shape2d Circle::getShape() const
@@ -1785,7 +1811,8 @@ Ellipse::Ellipse( Node *parent, const XmlTree &xml )
 
 void Ellipse::renderSelf( Renderer &renderer ) const
 {
-	renderer.drawEllipse( *this );
+	if( mRadiusX > 0 && mRadiusY > 0 ) // Zero-radius ellipses should never be drawn.
+		renderer.drawEllipse( *this );
 }
 
 bool Ellipse::containsPoint( const vec2 &pt ) const
@@ -1802,11 +1829,11 @@ Shape2d Ellipse::getShape() const
 	constexpr float magic = 0.552284749830793398402f; // 4/3*(sqrt(2)-1)
 	const vec2      offset( mRadiusX * magic, mRadiusY * magic );
 
-	result.moveTo( vec2( mCenter.x - mRadiusX, mCenter.y ) );
-	result.curveTo( vec2( mCenter.x - mRadiusX, mCenter.y - offset.y ), vec2( mCenter.x - offset.x, mCenter.y - mRadiusY ), vec2( mCenter.x, mCenter.y - mRadiusY ) );
-	result.curveTo( vec2( mCenter.x + offset.x, mCenter.y - mRadiusY ), vec2( mCenter.x + mRadiusX, mCenter.y - offset.y ), vec2( mCenter.x + mRadiusX, mCenter.y ) );
+	result.moveTo( vec2( mCenter.x + mRadiusX, mCenter.y ) );
 	result.curveTo( vec2( mCenter.x + mRadiusX, mCenter.y + offset.y ), vec2( mCenter.x + offset.x, mCenter.y + mRadiusY ), vec2( mCenter.x, mCenter.y + mRadiusY ) );
 	result.curveTo( vec2( mCenter.x - offset.x, mCenter.y + mRadiusY ), vec2( mCenter.x - mRadiusX, mCenter.y + offset.y ), vec2( mCenter.x - mRadiusX, mCenter.y ) );
+	result.curveTo( vec2( mCenter.x - mRadiusX, mCenter.y - offset.y ), vec2( mCenter.x - offset.x, mCenter.y - mRadiusY ), vec2( mCenter.x, mCenter.y - mRadiusY ) );
+	result.curveTo( vec2( mCenter.x + offset.x, mCenter.y - mRadiusY ), vec2( mCenter.x + mRadiusX, mCenter.y - offset.y ), vec2( mCenter.x + mRadiusX, mCenter.y ) );
 	result.close();
 
 	return result;
@@ -2217,7 +2244,8 @@ Rect::Rect( Node *parent, const XmlTree &xml )
 
 void Rect::renderSelf( Renderer &renderer ) const
 {
-	renderer.drawRect( *this );
+	if( mRect.getWidth() > 0 && mRect.getHeight() > 0 ) // Zero-width or height rectangles should never be drawn.
+		renderer.drawRect( *this );
 }
 
 float Rect::getRx() const
@@ -2647,11 +2675,11 @@ void Use::parse( const XmlTree &xml )
 		ref = xml.getAttributeValue<string>( "href" );
 
 	if( xml.hasAttribute( "x" ) ) {
-		mTransform[2][0] = Value::parse( xml.getAttributeValue<std::string>( "x" ) ).asUser();
+		mTransform[2][0] += Value::parse( xml.getAttributeValue<std::string>( "x" ) ).asUser();
 		mSpecifiesTransform = true;
 	}
 	if( xml.hasAttribute( "y" ) ) {
-		mTransform[2][1] = Value::parse( xml.getAttributeValue<std::string>( "y" ) ).asUser();
+		mTransform[2][1] += Value::parse( xml.getAttributeValue<std::string>( "y" ) ).asUser();
 		mSpecifiesTransform = true;
 	}
 
@@ -2772,6 +2800,14 @@ Image::Image( Node *parent, const XmlTree &xml )
 	if( !mFilePath.empty() )
 		mImage = getDoc()->loadImage( mFilePath );
 
+	// Calculate texture transform matrix.
+	if( mImage ) {
+		if( xml.hasAttribute( "preserveAspectRatio" ) )
+			mTextureMatrix = PreserveAspectRatio( xml.getAttributeValue<string>( "preserveAspectRatio" ) ).calcTransform( mBounds, mImage->getBounds(), true );
+		else
+			mTextureMatrix = PreserveAspectRatio().calcTransform( mBounds, mImage->getBounds(), true );
+	}
+
 	if( xml.hasAttribute( "clip-path" ) ) {
 		auto value = xml.getAttributeValue<std::string>( "clip-path" );
 
@@ -2787,12 +2823,6 @@ Image::Image( Node *parent, const XmlTree &xml )
 			}
 		}
 	}
-
-	// Calculate texture transform matrix.
-	if( xml.hasAttribute( "preserveAspectRatio" ) )
-		mTextureMatrix = PreserveAspectRatio( xml.getAttributeValue<string>( "preserveAspectRatio" ) ).calcTransform( mBounds, mImage->getBounds(), true );
-	else
-		mTextureMatrix = PreserveAspectRatio().calcTransform( mBounds, mImage->getBounds(), true );
 }
 
 std::shared_ptr<Surface8u> Image::parseDataImage( const string &data )
@@ -2856,11 +2886,11 @@ Shape2d Text::getShape() const
 
 vec2 Text::getTextPen() const
 {
-	if( ( mAttributes.mX.size() != 1 ) || ( mAttributes.mY.size() != 1 ) ) {
+	if( ! mAttributes.mX.isSet() || ! mAttributes.mY.isSet() ) {
 		return {};
 	}
-	else
-		return { mAttributes.mX[0].asUser(), mAttributes.mY[0].asUser() };
+
+	return { mAttributes.mX.asUser(), mAttributes.mY.asUser() };
 }
 
 float Text::getRotation() const
@@ -2879,11 +2909,6 @@ Value Text::getLetterSpacing() const
 	}
 	else
 		return mAttributes.mLetterSpacing[0];
-}
-
-text::Alignment Text::getAlignment() const
-{
-	return mAttributes.mAlignment;
 }
 
 void Text::renderSelf( Renderer &renderer ) const
@@ -2935,21 +2960,21 @@ TextSpan::TextSpan( Node *parent, const std::string &str )
 
 void TextSpan::renderSelf( Renderer &renderer ) const
 {
-	Style style = getStyle(); // Resolves style if needed.
-	if( !renderer.visit( *this, &style ) )
-		return;
-	startRender( renderer, style );
-	if( !mIgnoreAttributes ) // TextSpans that are actually the contents of Text's attributes should be ignored
-		mAttributes.startRender( renderer );
+	//Style style = getStyle(); // Resolves style if needed.
+	//if( !renderer.visit( *this, &style ) )
+	//	return;
+	//startRender( renderer, style );
+	//if( !mIgnoreAttributes ) // TextSpans that are actually the contents of Text's attributes should be ignored
+	//	mAttributes.startRender( renderer );
 	if( !mString.empty() ) {
 		renderer.drawTextSpan( *this );
 	}
 	for( const auto &span : mSpans ) {
 		span->renderSelf( renderer );
 	}
-	if( !mIgnoreAttributes )
-		mAttributes.finishRender( renderer );
-	finishRender( renderer, style );
+	//if( !mIgnoreAttributes )
+	//	mAttributes.finishRender( renderer );
+	//finishRender( renderer, style );
 }
 
 std::vector<std::pair<uint16_t, vec2>> TextSpan::getGlyphMeasures() const
@@ -3002,38 +3027,39 @@ Shape2d TextSpan::getShape() const
 
 // TextSpan::Atributes
 TextSpan::Attributes::Attributes( const XmlTree &xml )
-	: mAlignment( text::Alignment::LEFT )
 {
 	if( xml.hasAttribute( "x" ) )
-		mX = readValueList( xml["x"], false );
+		mX = readValue( xml["x"] );
 	if( xml.hasAttribute( "y" ) )
-		mY = readValueList( xml["y"], false );
+		mY = readValue( xml["y"] );
 	if( xml.hasAttribute( "rotate" ) )
 		mRotate = readValueList( xml["rotate"], false );
 	if( xml.hasAttribute( "letter-spacing" ) )
 		mLetterSpacing = readValueList( xml["letter-spacing"], false );
-	if( xml.hasAttribute( "text-anchor" ) ) {
-		const auto anchor = xml.getAttributeValue<std::string>( "text-anchor" );
-		if( anchor == "middle" )
-			mAlignment = text::Alignment::CENTER;
-		else if( anchor == "end" )
-			mAlignment = text::Alignment::RIGHT;
-	}
 }
 
 text::Font *TextSpan::getFont() const
 {
+	return getFont( getFontFamilies() );
+}
+
+text::Font *TextSpan::getFont( const std::vector<std::string> &fontFamilies ) const
+{
 	if( !mFont ) {
-		const vector<string> &fontFamilies = getFontFamilies();
-		float                 fontSize = getFontSize().asUser();
+		float fontSize = getFontSize().asUser();
 		for( const auto &fontFamily : fontFamilies ) {
 			try {
 				mFont = font( text::loadSystemFace( fontFamily ), fontSize );
+				if( !mFont )
+					throw Exception("Failed to load font '" + fontFamily +"'");
+
 				break;
 			}
 			catch( Exception &exc ) {
-				CI_LOG_W( "failed to load font with name: " << fontFamily << ", size: " << fontSize << ". what: " << exc.what() << "\t - loading default font." );
-				mFont = font( text::systemDefaultFace(), fontSize );
+				CI_LOG_W( exc.what() << " - loading default font." );
+			
+				if( fontFamilies != Style::getFontFamiliesDefault() )
+					return getFont( Style::getFontFamiliesDefault() );
 			}
 		}
 	}
@@ -3043,7 +3069,7 @@ text::Font *TextSpan::getFont() const
 
 vec2 TextSpan::getTextPen() const
 {
-	if( mIgnoreAttributes || ( mAttributes.mX.size() != 1 ) || ( mAttributes.mY.size() != 1 ) ) {
+	if( mIgnoreAttributes || ( ! mAttributes.mX.isSet() ) || ( ! mAttributes.mY.isSet() ) ) {
 		if( !mParent )
 			return {};
 		else if( typeid( *mParent ) == typeid( TextSpan ) )
@@ -3054,7 +3080,7 @@ vec2 TextSpan::getTextPen() const
 			return {};
 	}
 	else
-		return { mAttributes.mX[0].asUser(), mAttributes.mY[0].asUser() };
+		return { mAttributes.mX.asUser(), mAttributes.mY.asUser() };
 }
 
 void TextSpan::setTextPen( const vec2 &textPen )
@@ -3103,26 +3129,10 @@ Value TextSpan::getLetterSpacing() const
 		return mAttributes.mLetterSpacing[0];
 }
 
-text::Alignment TextSpan::getAlignment() const
-{
-	if( mIgnoreAttributes ) {
-		if( !mParent )
-			return text::Alignment::LEFT;
-		else if( typeid( *mParent ) == typeid( TextSpan ) )
-			return reinterpret_cast<const TextSpan *>( mParent )->getAlignment();
-		else if( typeid( *mParent ) == typeid( Text ) )
-			return reinterpret_cast<const Text *>( mParent )->getAlignment();
-		else
-			return text::Alignment::LEFT;
-	}
-	else
-		return mAttributes.mAlignment;
-}
-
 void TextSpan::Attributes::startRender( Renderer &renderer ) const
 {
-	if( mX.size() == 1 && mY.size() == 1 )
-		renderer.pushTextPen( vec2( mX[0].asUser(), mY[0].asUser() ) );
+	if( mX.isSet() && mY.isSet() )
+		renderer.pushTextPen( vec2( mX.asUser(), mY.asUser() ) );
 	if( mRotate.size() == 1 )
 		renderer.pushTextRotation( mRotate[0].asUser() );
 	else
@@ -3131,21 +3141,15 @@ void TextSpan::Attributes::startRender( Renderer &renderer ) const
 
 void TextSpan::Attributes::finishRender( Renderer &renderer ) const
 {
-	if( mX.size() == 1 && mY.size() == 1 )
+	if( mX.isSet() && mY.isSet() )
 		renderer.popTextPen();
 	renderer.popTextRotation();
 }
 
 void TextSpan::Attributes::setTextPen( const vec2 &textPen )
 {
-	if( mX.empty() )
-		mX.emplace_back( textPen.x );
-	else
-		mX[0] = Value( textPen.x );
-	if( mY.empty() )
-		mY.emplace_back( textPen.y );
-	else
-		mY[0] = Value( textPen.y );
+	mX = Value( textPen.x );
+	mY = Value( textPen.y );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////
