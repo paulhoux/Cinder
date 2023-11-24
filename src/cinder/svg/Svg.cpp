@@ -315,11 +315,11 @@ ColorA8u Paint::at( float t, bool preMultiply ) const
 
 	const auto &lo = floor( t );
 	const auto &hi = ceil( t );
-		
+
 	// See: https://svgwg.org/svg2-draft/pservers.html#GradientStops
 	// "If two gradient stops have the same offset value, then the latter gradient stop controls the color value at the overlap point."
 	if( approxEqual( lo.first, hi.first ) ) {
-		result = hi.second;                                              // TODO: check specifiesColor?
+		result = hi.second; // TODO: check specifiesColor?
 	}
 	else {
 		float f = clamp( ( t - lo.first ) / ( hi.first - lo.first ), 0.0f, 1.0f );
@@ -329,7 +329,7 @@ ColorA8u Paint::at( float t, bool preMultiply ) const
 	return preMultiply ? result.premultiplied() : result;
 }
 
-const std::pair<float, ColorA8u> & Paint::floor( float t ) const
+const std::pair<float, ColorA8u> &Paint::floor( float t ) const
 {
 	assert( !mStops.empty() );
 
@@ -341,7 +341,7 @@ const std::pair<float, ColorA8u> & Paint::floor( float t ) const
 	return mStops.front();
 }
 
-const  std::pair<float, ColorA8u> &Paint::ceil( float t ) const
+const std::pair<float, ColorA8u> &Paint::ceil( float t ) const
 {
 	assert( !mStops.empty() );
 
@@ -383,6 +383,11 @@ Style::Style()
 Style::Style( const XmlTree &xml, const Node *parent )
 {
 	clear();
+
+	// Make sure to parse the 'color' property before 'fill' or 'stroke',
+	// so that 'fill="currentColor"' works. See: https://www.w3.org/TR/SVGTiny12/painting.html#ColorProperty
+	if( xml.hasAttribute( "color" ) )
+		parseProperty( "color", xml.getAttribute( "color" ).getValue(), parent );
 
 	for( const auto &attrib : xml.getAttributes() ) {
 		if( attrib.getName() == "class" )
@@ -447,7 +452,7 @@ void Style::clear()
 	mDisplayNone = false;
 }
 
-const ColorA8u & Style::getColorDefault()
+const ColorA8u &Style::getColorDefault()
 {
 	static ColorA8u sBlack( 0, 0, 0, 255 ); // Default color depends on user agent.
 	return sBlack;
@@ -674,6 +679,7 @@ bool Style::parseProperty( const std::string &key, const std::string &value, con
 			mTextAnchor = TEXT_ANCHOR_END;
 		else
 			mSpecifiesTextAnchor = false;
+		return true;
 	}
 	else if( key == "display" ) {
 		// we can't handle most of the possibilities yet; only 'none'
@@ -825,7 +831,7 @@ void Style::startRender( Renderer &renderer, const Node *node ) const
 
 void Style::finishRender( Renderer &renderer, const Node *node ) const
 {
-	if( mSpecifiesClipPath ) 
+	if( mSpecifiesClipPath )
 		renderer.popClipPath();
 	if( mSpecifiesDashOffset )
 		renderer.popDashOffset();
@@ -880,6 +886,21 @@ float Value::asUser( float percentOf, float dpi, float fontSize, float fontXHeig
 	return mValue;
 }
 
+float Value::asUser( const Doc *doc, const Style &style ) const
+{
+	return asUser( 100, doc->getDpi(), style.getFontSize().asUser() );
+}
+
+float Value::asUserWidth( const Doc *doc, const Style &style ) const
+{
+	return asUser( doc->getWidth(), doc->getDpi(), style.getFontSize().asUser() );
+}
+
+float Value::asUserHeight( const Doc *doc, const Style &style ) const
+{
+	return asUser( doc->getHeight(), doc->getDpi(), style.getFontSize().asUser() );
+}
+
 // Reads the suffix and converts it to user units based on dpi
 Value Value::parse( const char **sInOut )
 {
@@ -919,6 +940,10 @@ Value Value::parse( const char **sInOut )
 	else if( strncmp( *sInOut, "ex", 2 ) == 0 ) {
 		*sInOut += 2;
 		return { v, EX };
+	}
+	else if( strncmp( *sInOut, "auto", 4 ) == 0 ) {
+		*sInOut += 4;
+		return { 0, AUTO };
 	}
 	else
 		return { v, USER };
@@ -1530,7 +1555,7 @@ void Gradient::parse( const Node *parent, const XmlTree &xml )
 	}
 
 	for( XmlTree::ConstIter stopsIt = xml.begin( "stop" ); stopsIt != xml.end(); ++stopsIt ) {
-		mStops.emplace_back( parent, *stopsIt );
+		mStops.emplace_back( this, *stopsIt );
 	}
 	if( xml.hasAttribute( "gradientUnits" ) )
 		mUseObjectBoundingBox = xml.getAttributeValue<string>( "gradientUnits" ) != string( "userSpaceOnUse" );
@@ -1780,9 +1805,13 @@ Paint RadialGradient::asPaint() const
 Circle::Circle( Node *parent, const XmlTree &xml )
 	: Node( parent, xml )
 {
-	mCenter.x = xml.getAttributeValue( "cx", 0.0f );
-	mCenter.y = xml.getAttributeValue( "cy", 0.0f );
-	mRadius = xml.getAttributeValue( "r", 0.0f );
+	const auto doc = getDoc();
+	const auto style = calcInheritedStyle();
+	mCenter.x = Value::parse( xml.getAttributeValue<string>( "cx" ) ).asUserWidth( doc, style );
+	mCenter.y = Value::parse( xml.getAttributeValue<string>( "cy" ) ).asUserHeight( doc, style );
+
+	const auto m = getTransformAbsolute();
+	mRadius = Value::parse( xml.getAttributeValue<string>( "r" ) ).asUser( 100 * m[0][0] ); // Use absolute scale.
 }
 
 void Circle::renderSelf( Renderer &renderer ) const
@@ -1803,10 +1832,12 @@ Shape2d Circle::getShape() const
 Ellipse::Ellipse( Node *parent, const XmlTree &xml )
 	: Node( parent, xml )
 {
-	mCenter.x = xml.getAttributeValue( "cx", 0.0f );
-	mCenter.y = xml.getAttributeValue( "cy", 0.0f );
-	mRadiusX = xml.getAttributeValue( "rx", 0.0f );
-	mRadiusY = xml.getAttributeValue( "ry", 0.0f );
+	const auto doc = getDoc();
+	const auto style = calcInheritedStyle();
+	mCenter.x = Value::parse( xml.getAttributeValue<string>( "cx" ) ).asUserWidth( doc, style );
+	mCenter.y = Value::parse( xml.getAttributeValue<string>( "cy" ) ).asUserHeight( doc, style );
+	mRadiusX = Value::parse( xml.getAttributeValue<string>( "rx" ) ).asUserWidth( doc, style );
+	mRadiusY = Value::parse( xml.getAttributeValue<string>( "ry" ) ).asUserHeight( doc, style );
 }
 
 void Ellipse::renderSelf( Renderer &renderer ) const
@@ -2177,10 +2208,12 @@ void Path::renderSelf( Renderer &renderer ) const
 Line::Line( Node *parent, const XmlTree &xml )
 	: Node( parent, xml )
 {
-	mPoint1.x = xml.getAttributeValue<float>( "x1", 0 );
-	mPoint1.y = xml.getAttributeValue<float>( "y1", 0 );
-	mPoint2.x = xml.getAttributeValue<float>( "x2", 0 );
-	mPoint2.y = xml.getAttributeValue<float>( "y2", 0 );
+	const auto doc = getDoc();
+	const auto style = calcInheritedStyle();
+	mPoint1.x = Value::parse( xml.getAttributeValue<string>( "x1" ) ).asUserWidth( doc, style );
+	mPoint1.y = Value::parse( xml.getAttributeValue<string>( "y1" ) ).asUserHeight( doc, style );
+	mPoint2.x = Value::parse( xml.getAttributeValue<string>( "x2" ) ).asUserWidth( doc, style );
+	mPoint2.y = Value::parse( xml.getAttributeValue<string>( "y2" ) ).asUserHeight( doc, style );
 }
 
 void Line::renderSelf( Renderer &renderer ) const
@@ -2201,21 +2234,24 @@ Shape2d Line::getShape() const
 Rect::Rect( Node *parent, const XmlTree &xml )
 	: Node( parent, xml )
 {
+	const auto doc = getDoc();
+	const auto style = calcInheritedStyle();
+
 	if( xml.hasAttribute( "x" ) )
-		mRect.x1 = Value::parse( xml["x"] ).asUser();
+		mRect.x1 = Value::parse( xml["x"] ).asUserWidth( doc, style );
 	else
 		mRect.x1 = 0;
 	if( xml.hasAttribute( "y" ) )
-		mRect.y1 = Value::parse( xml["y"] ).asUser();
+		mRect.y1 = Value::parse( xml["y"] ).asUserHeight( doc, style );
 	else
 		mRect.y1 = 0;
 
 	float width = 0;
 	float height = 0;
 	if( xml.hasAttribute( "width" ) )
-		width = Value::parse( xml["width"] ).asUser();
+		width = Value::parse( xml["width"] ).asUserWidth( doc, style );
 	if( xml.hasAttribute( "height" ) )
-		height = Value::parse( xml["height"] ).asUser();
+		height = Value::parse( xml["height"] ).asUserHeight( doc, style );
 	mRect.x2 = mRect.x1 + width;
 	mRect.y2 = mRect.y1 + height;
 
@@ -2433,6 +2469,8 @@ Node *Group::create( Node *parent, const XmlTree &xml )
 	// Treat <switch> tags as normal groups and parse their contents.
 	if( xml.getTag() == "switch" )
 		return new Group( parent, xml );
+
+	CI_LOG_W( "The `" << xml.getTag() << "` tag is currently not supported or recognized." );
 
 	return nullptr;
 }
@@ -2746,9 +2784,9 @@ mat3 PreserveAspectRatio::calcTransform( const Rectf &element, const Rectf &view
 	if( viewBox.getWidth() > 0 && viewBox.getHeight() > 0 ) {
 		m33[0][0] = element.getWidth() / viewBox.getWidth();          // scale-x
 		m33[1][1] = element.getHeight() / viewBox.getHeight();        // scale-y
-		if( align != ALIGN_NONE && meetOrSlice == MEET )                    //
+		if( align != ALIGN_NONE && meetOrSlice == MEET )              //
 			m33[0][0] = m33[1][1] = glm::min( m33[0][0], m33[1][1] ); //
-		else if( align != ALIGN_NONE && meetOrSlice == SLICE )              //
+		else if( align != ALIGN_NONE && meetOrSlice == SLICE )        //
 			m33[0][0] = m33[1][1] = glm::max( m33[0][0], m33[1][1] ); //
 		m33[2][0] = element.x1 - ( viewBox.x1 * m33[0][0] );          // translate-x
 		m33[2][1] = element.y1 - ( viewBox.y1 * m33[1][1] );          // translate-y
@@ -2792,21 +2830,21 @@ Image::Image( Node *parent, const XmlTree &xml )
 	else if( xml.hasAttribute( "href" ) )
 		ref = xml.getAttributeValue<string>( "href" );
 
-	if( ref.find( "data:" ) == 0 )
-		mImage = parseDataImage( ref );
-	else
-		mFilePath = ref;
-
-	if( !mFilePath.empty() )
-		mImage = getDoc()->loadImage( mFilePath );
+	if( ref.find( "data:" ) == 0 ) {
+		parseDataImage( ref );
+	}
+	else if( !ref.empty() ) {
+		mImage = getDoc()->loadImage( ref );
+	}
 
 	// Calculate texture transform matrix.
-	if( mImage ) {
-		if( xml.hasAttribute( "preserveAspectRatio" ) )
-			mTextureMatrix = PreserveAspectRatio( xml.getAttributeValue<string>( "preserveAspectRatio" ) ).calcTransform( mBounds, mImage->getBounds(), true );
-		else
-			mTextureMatrix = PreserveAspectRatio().calcTransform( mBounds, mImage->getBounds(), true );
-	}
+	Rectf element( 0, 0, width, height );
+	Rectf viewBox = mImage ? Rectf( mImage->getBounds() ) : mSvg ? mSvg->getBounds() : Rectf{};
+	if( xml.hasAttribute( "preserveAspectRatio" ) )
+		mTextureMatrix = PreserveAspectRatio( xml.getAttributeValue<string>( "preserveAspectRatio" ) ).calcTransform( element, viewBox, true );
+	else
+		mTextureMatrix = PreserveAspectRatio().calcTransform( element, viewBox, true );
+
 
 	if( xml.hasAttribute( "clip-path" ) ) {
 		auto value = xml.getAttributeValue<std::string>( "clip-path" );
@@ -2825,36 +2863,53 @@ Image::Image( Node *parent, const XmlTree &xml )
 	}
 }
 
-std::shared_ptr<Surface8u> Image::parseDataImage( const string &data )
+bool Image::parseDataImage( const string &data )
 {
+	mImage.reset();
+	mSvg.reset();
+
 	size_t dataOffset = data.find( "data:" ) + 5;
 	size_t semi = data.find( ';' );
 	size_t comma = data.find( ',' );
 	if( semi == string::npos || comma == string::npos )
-		return {};
-	string mime = data.substr( dataOffset, semi - dataOffset );
-	string extension;
-	if( mime == "image/png" )
-		extension = "png";
-	else if( mime == "image/jpeg" )
-		extension = "jpeg";
+		return false;
+
 	size_t len = data.size() - comma - 1;
 	auto   buf = make_shared<Buffer>( fromBase64( &data[comma + 1], len ) );
-	try {
-		shared_ptr<Surface8u> result( new Surface8u( loadImage( DataSourceBuffer::create( buf ), ImageSource::Options(), extension ) ) );
-		return result;
+
+	string mime = data.substr( dataOffset, semi - dataOffset );
+	if( mime == "image/svg+xml" ) {
+		// See also: https://www.w3.org/TR/SVG2/embedded.html#ImageElement
+		mSvg = svg::Doc::createFromSvgz( DataSourceBuffer::create( buf ) );
+
+		// To prevent breaking changes, use a placeholder image.
+		unsigned char bytes[4] = { 255, 0, 0, 255 };
+		mImage = std::make_shared<Surface8u>( bytes, 1, 1, 4, SurfaceChannelOrder::RGBA );
+
+		return true;
 	}
-	catch( std::exception &exc ) {
-		CI_LOG_W( "failed to parse data image, what: " << exc.what() );
+	else {
+		string extension;
+		if( mime == "image/png" )
+			extension = "png";
+		else if( mime == "image/jpeg" )
+			extension = "jpeg";
+
+		try {
+			mImage = std::make_shared<Surface8u>( loadImage( DataSourceBuffer::create( buf ), ImageSource::Options(), extension ) );
+			return true;
+		}
+		catch( std::exception &exc ) {
+			CI_LOG_W( "failed to parse data image, what: " << exc.what() );
+		}
 	}
-	return {};
+	return false;
 }
 
 void Image::renderSelf( Renderer &renderer ) const
 {
-	if( mImage ) {
+	if( mImage || mSvg )
 		renderer.drawImage( *this );
-	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////////
@@ -2886,7 +2941,7 @@ Shape2d Text::getShape() const
 
 vec2 Text::getTextPen() const
 {
-	if( ! mAttributes.mX.isSet() || ! mAttributes.mY.isSet() ) {
+	if( !mAttributes.mX.isSet() || !mAttributes.mY.isSet() ) {
 		return {};
 	}
 
@@ -2960,11 +3015,11 @@ TextSpan::TextSpan( Node *parent, const std::string &str )
 
 void TextSpan::renderSelf( Renderer &renderer ) const
 {
-	//Style style = getStyle(); // Resolves style if needed.
-	//if( !renderer.visit( *this, &style ) )
+	// Style style = getStyle(); // Resolves style if needed.
+	// if( !renderer.visit( *this, &style ) )
 	//	return;
-	//startRender( renderer, style );
-	//if( !mIgnoreAttributes ) // TextSpans that are actually the contents of Text's attributes should be ignored
+	// startRender( renderer, style );
+	// if( !mIgnoreAttributes ) // TextSpans that are actually the contents of Text's attributes should be ignored
 	//	mAttributes.startRender( renderer );
 	if( !mString.empty() ) {
 		renderer.drawTextSpan( *this );
@@ -2972,9 +3027,9 @@ void TextSpan::renderSelf( Renderer &renderer ) const
 	for( const auto &span : mSpans ) {
 		span->renderSelf( renderer );
 	}
-	//if( !mIgnoreAttributes )
+	// if( !mIgnoreAttributes )
 	//	mAttributes.finishRender( renderer );
-	//finishRender( renderer, style );
+	// finishRender( renderer, style );
 }
 
 std::vector<std::pair<uint16_t, vec2>> TextSpan::getGlyphMeasures() const
@@ -3051,13 +3106,13 @@ text::Font *TextSpan::getFont( const std::vector<std::string> &fontFamilies ) co
 			try {
 				mFont = font( text::loadSystemFace( fontFamily ), fontSize );
 				if( !mFont )
-					throw Exception("Failed to load font '" + fontFamily +"'");
+					throw Exception( "Failed to load font '" + fontFamily + "'" );
 
 				break;
 			}
 			catch( Exception &exc ) {
 				CI_LOG_W( exc.what() << " - loading default font." );
-			
+
 				if( fontFamilies != Style::getFontFamiliesDefault() )
 					return getFont( Style::getFontFamiliesDefault() );
 			}
@@ -3069,7 +3124,7 @@ text::Font *TextSpan::getFont( const std::vector<std::string> &fontFamilies ) co
 
 vec2 TextSpan::getTextPen() const
 {
-	if( mIgnoreAttributes || ( ! mAttributes.mX.isSet() ) || ( ! mAttributes.mY.isSet() ) ) {
+	if( mIgnoreAttributes || ( !mAttributes.mX.isSet() ) || ( !mAttributes.mY.isSet() ) ) {
 		if( !mParent )
 			return {};
 		else if( typeid( *mParent ) == typeid( TextSpan ) )
@@ -3306,8 +3361,6 @@ void Doc::loadDoc( const DataSourceRef &source, const fs::path &filePath )
 
 	const XmlTree &xml( mXmlTree->getChild( "svg" ) );
 
-	Group::parse( xml );
-
 	if( xml.hasAttribute( "viewBox" ) ) {
 		auto        vbox = xml.getAttributeValue<string>( "viewBox" );
 		const char *vbCPtr = vbox.c_str();
@@ -3359,6 +3412,8 @@ void Doc::loadDoc( const DataSourceRef &source, const fs::path &filePath )
 		else
 			setTransform( PreserveAspectRatio().calcTransform( mBounds, mViewBox ) );
 	}
+
+	Group::parse( xml );
 }
 
 shared_ptr<Surface8u> Doc::loadImage( const fs::path &relativePath )

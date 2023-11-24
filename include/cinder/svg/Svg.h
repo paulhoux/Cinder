@@ -87,12 +87,15 @@ class Use;
 //! SVG Value/Unit pair
 class CI_API Value {
   public:
-	enum Unit { USER, PX, PERCENT, PT, PC, MM, CM, INCH, EM, EX };
+	enum Unit { USER, PX, PERCENT, PT, PC, MM, CM, INCH, EM, EX, AUTO };
 
 	Value() = default;
 	Value( float value, Unit unit = USER ) : mUnit( unit ), mValue( value ), mIsSet( true ) {}
 
 	float asUser( float percentOf = 100, float dpi = 72, float fontSize = 12, float fontXHeight = 7 ) const;
+	float asUser( const Doc *doc, const Style &style ) const;
+	float asUserWidth( const Doc *doc, const Style &style ) const;
+	float asUserHeight( const Doc *doc, const Style &style ) const;
 
 	float value() const { return mValue; }
 	Unit  unit() const { return mUnit; }
@@ -101,6 +104,7 @@ class CI_API Value {
 	bool isUser() const { return mUnit == USER; }
 	bool isPercent() const { return mUnit == PERCENT; }
 	bool isPixels() const { return mUnit == PX; }
+	bool isAuto() const { return mUnit == AUTO; }
 
 	static Value parse( const char **sInOut );
 	static Value parse( const std::string &s );
@@ -643,7 +647,7 @@ class CI_API Node {
 	//! Returns node's text anchor, or the first among its ancestors when it has none
 	TextAnchor getTextAnchor() const;
 	//! Returns whether this Node is visible, or the first among its ancestors when unspecified
-	bool isVisible() const;
+	virtual bool isVisible() const;
 	//! Returns whether the Display property of this Node is set to 'None', preventing rendering of the node and its children
 	bool isDisplayNone() const { return getStyle().isDisplayNone(); }
 	//! Returns whether this type of node directly renders anything. Everything but groups and gradients.
@@ -969,10 +973,12 @@ class CI_API Image : public Node {
 	Image() : Node(nullptr) {}
 	Image( Node *parent, const XmlTree &xml );
 
-	operator bool() const { return bool(mImage); }
+	operator bool() const { return bool( mImage ) || bool( mSvg ); }
 
-	const Rectf &              getRect() const { return mBounds; }
+	const Rectf &getRect() const { return mBounds; }
+
 	std::shared_ptr<Surface8u> getSurface() const { return mImage; }
+	std::shared_ptr<svg::Doc>  getSvg() const { return mSvg; }
 
 	bool containsPoint( const vec2 &pt ) const override { return mBounds.contains( pt ); }
 
@@ -983,10 +989,10 @@ class CI_API Image : public Node {
 	void  renderSelf( Renderer &renderer ) const override;
 	Rectf calcBoundingBox() const override { return mBounds; }
 
-	static std::shared_ptr<Surface8u> parseDataImage( const std::string &data );
+	bool parseDataImage( const std::string &data );
 
 	Rectf                      mBounds;
-	fs::path                   mFilePath;
+	std::shared_ptr<svg::Doc>  mSvg;
 	std::shared_ptr<Surface8u> mImage;
 	mat3                       mTextureMatrix;
 };
@@ -1146,6 +1152,8 @@ class CI_API Defs : public Group {
 	Defs( Node *parent, const XmlTree &xml );
 
 	const Node *findNode( const std::string &id, bool recurse ) const override;
+
+	bool isVisible() const override { return false; }
 
   protected:
 	void renderSelf( Renderer &renderer ) const override
