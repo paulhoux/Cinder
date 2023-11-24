@@ -467,6 +467,31 @@ const Paint &Style::getStrokeDefault()
 	return sPaintNone;
 }
 
+text::Font * Style::getFont() const
+{
+	return Style::getFont( mFontFamilies, mFontSize.asUser() );
+}
+
+text::Font *Style::getFont( const std::vector<std::string> &fontFamilies, float fontSize ) 
+{
+	for( const auto &fontFamily : fontFamilies ) {
+		try {
+			text::Font *result = font( text::loadSystemFace( fontFamily ), fontSize );
+			if( !result )
+				throw Exception( "Failed to load font '" + fontFamily + "'" );
+
+			return result;
+		}
+		catch( Exception &exc ) {
+			CI_LOG_W( exc.what() << " - loading default font." );
+
+			if( fontFamilies != getFontFamiliesDefault() )
+				return getFont( getFontFamiliesDefault(), fontSize );
+		}
+	}
+	return nullptr;
+}
+
 const std::vector<std::string> &Style::getFontFamiliesDefault()
 {
 	static shared_ptr<vector<string>> sDefault;
@@ -888,17 +913,17 @@ float Value::asUser( float percentOf, float dpi, float fontSize, float fontXHeig
 
 float Value::asUser( const Doc *doc, const Style &style ) const
 {
-	return asUser( 100, doc->getDpi(), style.getFontSize().asUser() );
+	return asUser( 100, doc->getDpi(), style.getFontSize().asUser(), style.getFontSize().asUser() * 7.0f / 12.0f );
 }
 
 float Value::asUserWidth( const Doc *doc, const Style &style ) const
 {
-	return asUser( doc->getWidth(), doc->getDpi(), style.getFontSize().asUser() );
+	return asUser( doc->getWidth(), doc->getDpi(), style.getFontSize().asUser(), style.getFontSize().asUser() * 7.0f / 12.0f );
 }
 
 float Value::asUserHeight( const Doc *doc, const Style &style ) const
 {
-	return asUser( doc->getHeight(), doc->getDpi(), style.getFontSize().asUser() );
+	return asUser( doc->getHeight(), doc->getDpi(), style.getFontSize().asUser(), style.getFontSize().asUser() * 7.0f / 12.0f );
 }
 
 // Reads the suffix and converts it to user units based on dpi
@@ -2439,6 +2464,8 @@ Node *Group::create( Node *parent, const XmlTree &xml )
 		return new Defs( parent, xml );
 	if( xml.getTag() == "g" )
 		return new Group( parent, xml );
+	if( xml.getTag() == "svg" )
+		return new Doc( parent, xml );
 	if( xml.getTag() == "path" )
 		return new Path( parent, xml );
 	if( xml.getTag() == "polygon" )
@@ -3100,24 +3127,8 @@ text::Font *TextSpan::getFont() const
 
 text::Font *TextSpan::getFont( const std::vector<std::string> &fontFamilies ) const
 {
-	if( !mFont ) {
-		float fontSize = getFontSize().asUser();
-		for( const auto &fontFamily : fontFamilies ) {
-			try {
-				mFont = font( text::loadSystemFace( fontFamily ), fontSize );
-				if( !mFont )
-					throw Exception( "Failed to load font '" + fontFamily + "'" );
-
-				break;
-			}
-			catch( Exception &exc ) {
-				CI_LOG_W( exc.what() << " - loading default font." );
-
-				if( fontFamilies != Style::getFontFamiliesDefault() )
-					return getFont( Style::getFontFamiliesDefault() );
-			}
-		}
-	}
+	if( !mFont )
+		mFont = Style::getFont( fontFamilies, getFontSize().asUser() );
 
 	return mFont;
 }
@@ -3314,6 +3325,13 @@ Doc::Doc()
 {
 }
 
+Doc::Doc( Node *parent, const XmlTree &xml )
+	: Group( parent )
+	, mBounds( 0, 0, 0, 0 )
+{
+	loadDoc( xml );
+}
+
 Doc::Doc( const fs::path &filePath )
 	: Group( nullptr )
 	, mBounds( 0, 0, 0, 0 )
@@ -3353,14 +3371,8 @@ DocRef Doc::createFromSvgz( const DataSourceRef &dataSource, const fs::path &fil
 	return std::make_shared<Doc>( DataSourceBuffer::create( decompressed, relativePath ) );
 }
 
-void Doc::loadDoc( const DataSourceRef &source, const fs::path &filePath )
+void Doc::loadDoc( const XmlTree &xml )
 {
-	if( !filePath.empty() )
-		mFilePath = filePath.parent_path();
-	mXmlTree = std::make_shared<XmlTree>( source, XmlTree::ParseOptions().ignoreDataChildren( false ) );
-
-	const XmlTree &xml( mXmlTree->getChild( "svg" ) );
-
 	if( xml.hasAttribute( "viewBox" ) ) {
 		auto        vbox = xml.getAttributeValue<string>( "viewBox" );
 		const char *vbCPtr = vbox.c_str();
@@ -3414,6 +3426,16 @@ void Doc::loadDoc( const DataSourceRef &source, const fs::path &filePath )
 	}
 
 	Group::parse( xml );
+}
+
+void Doc::loadDoc( const DataSourceRef &source, const fs::path &filePath )
+{
+	if( !filePath.empty() )
+		mFilePath = filePath.parent_path();
+		
+	auto xml = std::make_shared<XmlTree>( source, XmlTree::ParseOptions().ignoreDataChildren( false ) );
+
+	loadDoc( xml->getChild( "svg" ) ); 
 }
 
 shared_ptr<Surface8u> Doc::loadImage( const fs::path &relativePath )

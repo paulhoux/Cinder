@@ -441,6 +441,10 @@ class CI_API Style {
 	static float getStopOpacityDefault() { return 1; }
 
 	// fonts
+	text::Font *getFont() const;
+
+	static text::Font *getFont( const std::vector<std::string> &fontFamilies, float fontSize );
+
 	bool                            specifiesFontFamilies() const { return mSpecifiesFontFamilies; }
 	void                            unspecifyFontFamilies() { mSpecifiesFontFamilies = false; }
 	const std::vector<std::string>&			getFontFamilies() const { return mFontFamilies; }
@@ -1206,6 +1210,7 @@ using DocRef = std::shared_ptr<Doc>;
 class CI_API Doc : public Group {
   public:
 	Doc();
+	Doc( Node *parent, const XmlTree &xml );
 	Doc( const fs::path &filePath );
 	Doc( const DataSourceRef &dataSource, const fs::path &filePath = fs::path() );
 
@@ -1234,16 +1239,16 @@ class CI_API Doc : public Group {
 	std::shared_ptr<Surface8u> loadImage( const fs::path &relativePath );
 
   private:
+	void loadDoc( const XmlTree &xml );
 	void loadDoc( const DataSourceRef &source, const fs::path &filePath );
 
 	void renderSelf( Renderer &renderer ) const override;
 
-	std::shared_ptr<XmlTree>                       mXmlTree;
 	std::map<fs::path, std::shared_ptr<Surface8u>> mImageCache;
 
-	fs::path            mFilePath;
-	Rectf               mBounds;
-	Rectf               mViewBox;
+	fs::path mFilePath;
+	Rectf    mBounds;
+	Rectf    mViewBox;
 };
 
 //! SVG Exception base-class
