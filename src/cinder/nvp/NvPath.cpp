@@ -176,7 +176,17 @@ float Path::getLength() const
 	return length;
 }
 
-Rectf Path::getBounds() const
+Rectf Path::getFillBounds() const
+{
+	Rectf bounds;
+
+	if( mPathId > 0 )
+		gl::getPathParameterfvNV( mPathId, GL_PATH_FILL_BOUNDING_BOX_NV, reinterpret_cast<GLfloat *>( &bounds ) );
+
+	return bounds;
+}
+
+Rectf Path::getStrokeBounds() const
 {
 	Rectf bounds;
 
@@ -239,7 +249,7 @@ void Path::setEndCaps( CapsStyle caps ) const
 	setEndCaps( caps, caps );
 }
 
-void Path::setEndCaps(CapsStyle initialCap, CapsStyle terminalCap ) const
+void Path::setEndCaps( CapsStyle initialCap, CapsStyle terminalCap ) const
 {
 	if( mPathId > 0 ) {
 		gl::pathParameteriNV( mPathId, GL_PATH_INITIAL_END_CAP_NV, GLint( initialCap ) );
@@ -388,7 +398,7 @@ void Path::fill( const gl::TextureRef &texture, const Rectf &bounds, bool clearS
 	const auto textureBounds = Rectf( texture->getBounds() );
 	const auto fit = bounds.getCenteredFit( textureBounds, true ).scaled( 1.0f / textureBounds.getSize() );
 
-	const auto pathBounds = getBounds();
+	const auto pathBounds = getFillBounds();
 
 	auto normalized = Rectf( pathBounds.getUpperLeft() - bounds.getUpperLeft(), pathBounds.getLowerRight() - bounds.getUpperLeft() ).scaled( fit.getSize() / bounds.getSize() );
 	normalized.offset( fit.getUpperLeft() );
@@ -1269,6 +1279,7 @@ void Svg::drawImage( const svg::Image &image )
 	scpShader.setColor( ColorA::white() );
 	scpShader.setCoords( GL_PATH_OBJECT_BOUNDING_BOX_NV /* TODO support userSpaceOnUse */, image.getTextureMatrix() );
 	scpShader.uniform( "image", 2 );
+	scpShader.uniform( "opacity", image.getOpacity() );
 
 	if( !mStacks.clipPath.empty() ) {
 		// Render clipped image.
@@ -1531,10 +1542,26 @@ void Svg::render( const Path &path )
 	if( !shouldRender() )
 		return;
 
-	if( !mStacks.fill.back().isNone() )
-		fill( path.getId(), mStacks.fill.back(), mStacks.fillOpacity.back() * mStacks.groupOpacity.back() );
-	if( !mStacks.stroke.back().isNone() )
-		stroke( path.getId(), mStacks.stroke.back(), mStacks.strokeOpacity.back() * mStacks.groupOpacity.back() );
+	if( !mStacks.fill.back().isNone() ) {
+		// Vertical and horizontal lines don't have a bounding box, since they are one-dimensional,
+		// even though the stroke-width makes it look like they should have a bounding box with non-zero width and height.
+		if( mStacks.fill.back().fallback() && approxZero( path.getFillBounds().calcArea() ) ) {
+			if( !mStacks.fill.back().fallback()->isNone() )
+				fill( path.getId(), *mStacks.fill.back().fallback(), mStacks.fillOpacity.back() * mStacks.groupOpacity.back() );
+		}
+		else
+			fill( path.getId(), mStacks.fill.back(), mStacks.fillOpacity.back() * mStacks.groupOpacity.back() );
+	}
+	if( !mStacks.stroke.back().isNone() ) {
+		// Vertical and horizontal lines don't have a bounding box, since they are one-dimensional,
+		// even though the stroke-width makes it look like they should have a bounding box with non-zero width and height.
+		if( mStacks.stroke.back().fallback() && approxZero( path.getFillBounds().calcArea() ) ) {
+			if( !mStacks.stroke.back().fallback()->isNone() )
+				stroke( path.getId(), *mStacks.stroke.back().fallback(), mStacks.strokeOpacity.back() * mStacks.groupOpacity.back() );
+		}
+		else
+			stroke( path.getId(), mStacks.stroke.back(), mStacks.strokeOpacity.back() * mStacks.groupOpacity.back() );
+	}
 }
 
 void Svg::fill( GLuint pathId, const svg::Paint &paint, float opacity )
@@ -1748,7 +1775,7 @@ Shader::Shader( Type type )
 			  "    float gradTabIndex = dot(gradVec, uv - gradStart) / (gradVec.x * gradVec.x + gradVec.y * gradVec.y);"
 			  "    fragColor = texture(gradTab, vec2(gradTabIndex, index));"
 			  "    fragColor.a *= opacity;"
-			  "    fragColor.rgb = mix( color.rgb, fragColor.rgb, fragColor.a );"
+			  //"    fragColor.rgb = mix( color.rgb, fragColor.rgb, fragColor.a );"
 			  "    fragColor.rgb *= fragColor.a;"
 			  "}";
 
@@ -1785,7 +1812,7 @@ Shader::Shader( Type type )
 			  "            fragColor = texture(gradTab, vec2(w, index));"
 			  "    }"
 			  "    fragColor.a *= opacity;"
-			  "    fragColor.rgb = mix( color.rgb, fragColor.rgb, fragColor.a );"
+			  //"    fragColor.rgb = mix( color.rgb, fragColor.rgb, fragColor.a );"
 			  "    fragColor.rgb *= fragColor.a;"
 			  "}";
 
@@ -1815,7 +1842,7 @@ Shader::Shader( Type type )
 			  "        t = (atan(-coord.y, coord.x) + angle) * INVERSE_2PI;"
 			  "    fragColor = texture(gradTab, vec2(t - floor(t), index));"
 			  "    fragColor.a *= opacity;"
-			  "    fragColor.rgb = mix( color.rgb, fragColor.rgb, fragColor.a );"
+			  //"    fragColor.rgb = mix( color.rgb, fragColor.rgb, fragColor.a );"
 			  "    fragColor.rgb *= fragColor.a;"
 			  "}";
 
@@ -1838,7 +1865,7 @@ Shader::Shader( Type type )
 			  "        fragColor.a = 0;"
 			  "    }"
 			  "    fragColor.a *= opacity;"
-			  "    fragColor.rgb = mix( color.rgb, fragColor.rgb, fragColor.a );"
+			  //"    fragColor.rgb = mix( color.rgb, fragColor.rgb, fragColor.a );"
 			  "    fragColor.rgb *= fragColor.a;"
 			  "}";
 

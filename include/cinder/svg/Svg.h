@@ -140,7 +140,8 @@ class CI_API Paint {
 	bool isTransparent() const;
 	bool needsResolve() const { return mNeedsResolve; }
 
-	const ColorA8u &getColor( size_t idx = 0 ) const { return mStops[idx].second; }
+	const ColorA8u &getColor() const;
+	const ColorA8u &getColor( size_t idx ) const { return mStops[idx].second; }
 	float           getOffset( size_t idx ) const { return mStops[idx].first; }
 	
 	bool   empty() const { return mStops.empty(); }
@@ -159,6 +160,8 @@ class CI_API Paint {
 	SpreadMethod getSpreadMethod() const { return mSpreadMethod; }
 
 	const std::string &getId() const { return mId; }
+
+	const std::shared_ptr<Paint> &fallback() const { return mFallback; }
 
 	bool operator==( const Paint &rhs ) const { return mType == rhs.mType && mStops == rhs.mStops; }
 	bool operator!=( const Paint &rhs ) const { return !( *this == rhs ); }
@@ -194,6 +197,8 @@ protected:
 	bool         mNeedsResolve{ false };
 
 	std::string mId;
+
+	std::shared_ptr<Paint> mFallback;
 
 	friend class Gradient;
 	friend class LinearGradient;
@@ -554,7 +559,7 @@ class CI_API Node {
 	//! Returns the unique id for this node.
 	size_t getUuid() const { return mUuid; }
 	//! Returns the svg::Doc this Node is an element of
-	Doc *getDoc() const;
+	const Doc *getDoc() const;
 	//! Returns the immediate parent of this node
 	const Node *getParent() const { return mParent; }
 	//! Returns the tag of this Node when present (e.g. 'svg').
@@ -810,7 +815,7 @@ class CI_API Circle : public Node {
 	void  renderSelf( Renderer &renderer ) const override;
 	Rectf calcBoundingBox() const override { return Rectf( mCenter.x - mRadius, mCenter.y - mRadius, mCenter.x + mRadius, mCenter.y + mRadius ); }
 
-	vec2  mCenter;
+	vec2  mCenter{0};
 	float mRadius;
 };
 
@@ -843,7 +848,7 @@ class CI_API Ellipse : public Node {
 	void  renderSelf( Renderer &renderer ) const override;
 	Rectf calcBoundingBox() const override { return Rectf( mCenter.x - mRadiusX, mCenter.y - mRadiusY, mCenter.x + mRadiusX, mCenter.y + mRadiusY ); }
 
-	vec2  mCenter;
+	vec2  mCenter{0};
 	float mRadiusX, mRadiusY;
 };
 
@@ -883,7 +888,7 @@ class CI_API Line : public Node {
 	void  renderSelf( Renderer &renderer ) const override;
 	Rectf calcBoundingBox() const override { return Rectf( std::min( mPoint1.x, mPoint2.x ), std::min( mPoint1.y, mPoint2.y ), std::max( mPoint1.x, mPoint2.x ), std::max( mPoint1.y, mPoint2.y ) ); }
 
-	vec2 mPoint1, mPoint2;
+	vec2 mPoint1{0}, mPoint2{0};
 };
 
 //! SVG Rect element: http://www.w3.org/TR/SVG/shapes.html#RectElement
@@ -1185,9 +1190,7 @@ class CI_API Defs : public Group {
 	Defs( Node *parent, const XmlTree &xml );
 
 	const Node *findNode( const std::string &id, bool recurse ) const override;
-
-	bool isVisible() const override { return false; }
-
+	
   protected:
 	void renderSelf( Renderer &renderer ) const override
 	{ /* never render */
@@ -1246,10 +1249,12 @@ class CI_API Doc : public Group {
 	Doc( Node *parent, const XmlTree &xml );
 	Doc( const fs::path &filePath );
 	Doc( const DataSourceRef &dataSource, const fs::path &filePath = fs::path() );
+	Doc( Node *parent, const DataSourceRef &dataSource, const fs::path &filePath = fs::path() );
 	
 	static DocRef create( Node *parent, const XmlTree &xml );
 	static DocRef create( const fs::path &filePath );
 	static DocRef create( const DataSourceRef &dataSource, const fs::path &filePath = fs::path() );
+	static DocRef create( Node *parent, const DataSourceRef &dataSource, const fs::path &filePath = fs::path() );
 	static DocRef createFromSvgz( const DataSourceRef &dataSource, const fs::path &filePath = fs::path() );
 
 	//! Returns the file path of the document. Can be relative or empty.
@@ -1273,7 +1278,7 @@ class CI_API Doc : public Group {
 	Node *nodeUnderPoint( const vec2 &pt ) const;
 
 	//! Utility function to load an image relative to the document. Caches results.
-	std::shared_ptr<Surface8u> loadImage( const fs::path &relativePath );
+	std::shared_ptr<Surface8u> loadImage( const fs::path &relativePath ) const;
 
   private:
 	void loadDoc( const XmlTree &xml );
@@ -1281,7 +1286,7 @@ class CI_API Doc : public Group {
 
 	void renderSelf( Renderer &renderer ) const override;
 
-	std::map<fs::path, std::shared_ptr<Surface8u>> mImageCache;
+	mutable std::map<fs::path, std::shared_ptr<Surface8u>> mImageCache;
 
 	fs::path mFilePath;
 	Rectf    mBounds;

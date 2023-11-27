@@ -99,8 +99,10 @@ CI_API class Path {
 
 	//! Returns the total length of the path.
 	[[nodiscard]] virtual float getLength() const;
+	//! Returns the path's bounding box, calculated from the actual shape.
+	[[nodiscard]] virtual Rectf getFillBounds() const;
 	//! Returns the path's bounding box, calculated from the actual shape and adjusted for stroke width.
-	[[nodiscard]] virtual Rectf getBounds() const;
+	[[nodiscard]] virtual Rectf getStrokeBounds() const;
 
 	//! Obtains the path's commands and coords.
 	void getPath( std::vector<GLubyte> &commands, std::vector<GLfloat> &coords ) const;
@@ -164,7 +166,7 @@ CI_API class Path {
 	//! Fills the path with a solid \a color.
 	virtual void fill( const ColorA &color, bool clearStencil = true ) const;
 	//! Fills the path with a \a texture, automatically centered within the path's bounding box.
-	virtual void fill( const gl::TextureRef &texture, bool clearStencil = true ) const { fill( texture, getBounds(), clearStencil ); }
+	virtual void fill( const gl::TextureRef &texture, bool clearStencil = true ) const { fill( texture, getFillBounds(), clearStencil ); }
 	//! Fills the path with a \a texture, automatically centered within the specified \a bounding box.
 	virtual void fill( const gl::TextureRef &texture, const Rectf &bounds, bool clearStencil = true ) const;
 	//! Fills the path with a \a texture.

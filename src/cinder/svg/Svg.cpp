@@ -288,8 +288,14 @@ Paint Paint::parse( const char *value, bool *specified, const Node *parentNode )
 			return {};
 		strncpy( id, hash + 1, closeParen - hash - 1 );
 		id[closeParen - hash - 1] = 0;
+
+		Paint result = parentNode->findPaintInAncestors( id );
+		if( ( closeParen + 1 ) ) // Parse fallback color.
+			result.mFallback = std::make_shared<Paint>( parse( closeParen + 1, specified, parentNode ) );
+
 		*specified = true;
-		return parentNode->findPaintInAncestors( id );
+
+		return result;
 	}
 	else { // try to find color amongst named colors
 		Color8u result = svgNameToRgb( value, specified );
@@ -307,6 +313,23 @@ bool Paint::isTransparent() const
 			return true;
 
 	return false;
+}
+
+const ColorA8u &Paint::getColor() const
+{
+	static ColorA8u sBlack{ 0, 0, 0, 255 };
+	static ColorA8u sTransparent{ 0, 0, 0, 0 };
+
+	switch( mType ) {
+	case NONE:
+		return sTransparent;
+	case COLOR:
+		return getColor( 0 );
+	default:
+		if( mFallback )
+			return mFallback->getColor();
+		return sBlack;
+	}
 }
 
 ColorA8u Paint::at( float t, bool preMultiply ) const
@@ -716,11 +739,13 @@ bool Style::parseProperty( const std::string &key, const std::string &value, con
 		return true;
 	}
 	else if( key == "visibility" ) {
-		mSpecifiesVisible = true;
-		if( value == "hidden" || value == "collapse" )
-			mVisible = false;
-		else
-			mVisible = true;
+		if( value != "inherit" ) {
+			mSpecifiesVisible = true;
+			if( value == "hidden" || value == "collapse" )
+				mVisible = false;
+			else
+				mVisible = true;
+		}
 		return true;
 	}
 	else
@@ -1002,16 +1027,18 @@ Node::Node( Node *parent, const XmlTree &xml )
 		mTransform = mat3();
 }
 
-Doc *Node::getDoc() const
+const Doc *Node::getDoc() const
 {
-	const Node *parent = this;
-	while( parent && parent->mParent )
-		parent = parent->mParent;
+	const Node *parent = mParent;
+	while( parent ) {
+		const Doc *doc = dynamic_cast<const Doc *>( parent );
+		if( doc )
+			return doc;
 
-	if( typeid( Doc ) == typeid( *parent ) )
-		return const_cast<Doc *>( reinterpret_cast<const Doc *>( parent ) );
-	else
-		return nullptr;
+		parent = parent->mParent;
+	}
+
+	return nullptr;
 }
 
 string Node::getDomPath() const
@@ -1840,8 +1867,10 @@ Circle::Circle( Node *parent, const XmlTree &xml )
 {
 	const auto doc = getDoc();
 	const auto style = calcInheritedStyle();
-	mCenter.x = Value::parse( xml.getAttributeValue<string>( "cx" ) ).asUserWidth( doc, style );
-	mCenter.y = Value::parse( xml.getAttributeValue<string>( "cy" ) ).asUserHeight( doc, style );
+	if( xml.hasAttribute( "cx" ) )
+		mCenter.x = Value::parse( xml.getAttributeValue<string>( "cx" ) ).asUserWidth( doc, style );
+	if( xml.hasAttribute( "cy" ) )
+		mCenter.y = Value::parse( xml.getAttributeValue<string>( "cy" ) ).asUserHeight( doc, style );
 
 	const auto m = getTransformAbsolute();
 	mRadius = Value::parse( xml.getAttributeValue<string>( "r" ) ).asUser( 100 * m[0][0] ); // Use absolute scale.
@@ -1867,8 +1896,10 @@ Ellipse::Ellipse( Node *parent, const XmlTree &xml )
 {
 	const auto doc = getDoc();
 	const auto style = calcInheritedStyle();
-	mCenter.x = Value::parse( xml.getAttributeValue<string>( "cx" ) ).asUserWidth( doc, style );
-	mCenter.y = Value::parse( xml.getAttributeValue<string>( "cy" ) ).asUserHeight( doc, style );
+	if( xml.hasAttribute( "cx" ) )
+		mCenter.x = Value::parse( xml.getAttributeValue<string>( "cx" ) ).asUserWidth( doc, style );
+	if( xml.hasAttribute( "cy" ) )
+		mCenter.y = Value::parse( xml.getAttributeValue<string>( "cy" ) ).asUserHeight( doc, style );
 	mRadiusX = Value::parse( xml.getAttributeValue<string>( "rx" ) ).asUserWidth( doc, style );
 	mRadiusY = Value::parse( xml.getAttributeValue<string>( "ry" ) ).asUserHeight( doc, style );
 }
@@ -2040,168 +2071,172 @@ Shape2d parsePath( const std::string &p )
 	vec2        lastPoint2;
 
 	Shape2d result;
-	bool    done = false;
-	bool    firstCmd = true;
-	char    prevCmd = '\0';
-	while( !done ) {
-		char cmd = readNextCommand( &s );
-		switch( cmd ) {
-		case 'm':
-		case 'M':
-			v0.x = parseFloat( &s );
-			v0.y = parseFloat( &s );
-			if( ( !firstCmd ) && ( cmd == 'm' ) )
-				v0 += lastPoint;
-			result.moveTo( v0 );
-			lastPoint2 = lastPoint;
-			lastPoint = v0;
-			while( nextItemIsFloat( s ) ) {
+	try {
+		bool done = false;
+		bool firstCmd = true;
+		char prevCmd = '\0';
+		while( !done ) {
+			char cmd = readNextCommand( &s );
+			switch( cmd ) {
+			case 'm':
+			case 'M':
 				v0.x = parseFloat( &s );
 				v0.y = parseFloat( &s );
-				if( cmd == 'm' )
+				if( ( !firstCmd ) && ( cmd == 'm' ) )
 					v0 += lastPoint;
-				result.lineTo( v0 );
+				result.moveTo( v0 );
 				lastPoint2 = lastPoint;
 				lastPoint = v0;
+				while( nextItemIsFloat( s ) ) {
+					v0.x = parseFloat( &s );
+					v0.y = parseFloat( &s );
+					if( cmd == 'm' )
+						v0 += lastPoint;
+					result.lineTo( v0 );
+					lastPoint2 = lastPoint;
+					lastPoint = v0;
+				}
+				break;
+			case 'l':
+			case 'L':
+				do {
+					v0.x = parseFloat( &s );
+					v0.y = parseFloat( &s );
+					if( cmd == 'l' )
+						v0 += lastPoint;
+					result.lineTo( v0 );
+					lastPoint2 = lastPoint;
+					lastPoint = v0;
+				} while( nextItemIsFloat( s ) );
+				break;
+			case 'H':
+			case 'h':
+				do {
+					float x = parseFloat( &s );
+					v0 = vec2( ( cmd == 'h' ) ? ( lastPoint.x + x ) : x, lastPoint.y );
+					result.lineTo( v0 );
+					lastPoint2 = lastPoint;
+					lastPoint = v0;
+				} while( nextItemIsFloat( s ) );
+				break;
+			case 'V':
+			case 'v':
+				do {
+					float y = parseFloat( &s );
+					v0 = vec2( lastPoint.x, ( cmd == 'v' ) ? ( lastPoint.y + y ) : ( y ) );
+					result.lineTo( v0 );
+					lastPoint2 = lastPoint;
+					lastPoint = v0;
+				} while( nextItemIsFloat( s ) );
+				break;
+			case 'C':
+			case 'c':
+				do {
+					v0.x = parseFloat( &s );
+					v0.y = parseFloat( &s );
+					v1.x = parseFloat( &s );
+					v1.y = parseFloat( &s );
+					v2.x = parseFloat( &s );
+					v2.y = parseFloat( &s );
+					if( cmd == 'c' ) { // relative
+						v0 += lastPoint;
+						v1 += lastPoint;
+						v2 += lastPoint;
+					}
+					result.curveTo( v0, v1, v2 );
+					lastPoint2 = v1;
+					lastPoint = v2;
+				} while( nextItemIsFloat( s ) );
+				break;
+			case 'S':
+			case 's':
+				do {
+					if( prevCmd == 's' || prevCmd == 'S' || prevCmd == 'c' || prevCmd == 'C' )
+						v0 = lastPoint * 2.0f - lastPoint2;
+					else
+						v0 = lastPoint;
+					prevCmd = cmd; // set this now in case we loop
+					v1.x = parseFloat( &s );
+					v1.y = parseFloat( &s );
+					v2.x = parseFloat( &s );
+					v2.y = parseFloat( &s );
+					if( cmd == 's' ) { // relative
+						v1 += lastPoint;
+						v2 += lastPoint;
+					}
+					result.curveTo( v0, v1, v2 );
+					lastPoint2 = v1;
+					lastPoint = v2;
+				} while( nextItemIsFloat( s ) );
+				break;
+			case 'Q':
+			case 'q':
+				do {
+					v0.x = parseFloat( &s );
+					v0.y = parseFloat( &s );
+					v1.x = parseFloat( &s );
+					v1.y = parseFloat( &s );
+					if( cmd == 'q' ) { // relative
+						v0 += lastPoint;
+						v1 += lastPoint;
+					}
+					result.quadTo( v0, v1 );
+					lastPoint2 = v0;
+					lastPoint = v1;
+				} while( nextItemIsFloat( s ) );
+				break;
+			case 'T':
+			case 't':
+				do {
+					if( prevCmd == 't' || prevCmd == 'T' || prevCmd == 'q' || prevCmd == 'Q' )
+						v0 = lastPoint * 2.0f - lastPoint2;
+					else
+						v0 = lastPoint;
+					prevCmd = cmd; // set this now in case we loop
+					v1.x = parseFloat( &s );
+					v1.y = parseFloat( &s );
+					if( cmd == 't' ) { // relative
+						v1 += lastPoint;
+					}
+					result.quadTo( v0, v1 );
+					lastPoint2 = v0;
+					lastPoint = v1;
+				} while( nextItemIsFloat( s ) );
+				break;
+			case 'a':
+			case 'A': {
+				do {
+					float ra = parseFloat( &s );
+					float rb = parseFloat( &s );
+					float xAxisRotation = parseFloat( &s ) * float( M_PI ) / 180.0f;
+					bool  largeArc = readFlag( &s );
+					bool  sweepFlag = readFlag( &s );
+					v0.x = parseFloat( &s );
+					v0.y = parseFloat( &s );
+					if( cmd == 'a' ) { // relative
+						v0 += lastPoint;
+					}
+					ellipticalArc( result, lastPoint.x, lastPoint.y, v0.x, v0.y, ra, rb, xAxisRotation, largeArc, sweepFlag );
+					lastPoint2 = lastPoint;
+					lastPoint = v0;
+				} while( nextItemIsFloat( s ) );
+			} break;
+			case 'z':
+			case 'Z':
+				result.close();
+				lastPoint2 = lastPoint;
+				lastPoint = ( result.empty() || result.getContours().back().empty() ) ? vec2() : result.getContours().back().getPoint( 0 );
+				break;
+			case '\0':
+			default: // technically noise at the end of the string is acceptable according to the spec; see W3C_SVG_11/paths-data-18.svg
+				done = true;
+				break;
 			}
-			break;
-		case 'l':
-		case 'L':
-			do {
-				v0.x = parseFloat( &s );
-				v0.y = parseFloat( &s );
-				if( cmd == 'l' )
-					v0 += lastPoint;
-				result.lineTo( v0 );
-				lastPoint2 = lastPoint;
-				lastPoint = v0;
-			} while( nextItemIsFloat( s ) );
-			break;
-		case 'H':
-		case 'h':
-			do {
-				float x = parseFloat( &s );
-				v0 = vec2( ( cmd == 'h' ) ? ( lastPoint.x + x ) : x, lastPoint.y );
-				result.lineTo( v0 );
-				lastPoint2 = lastPoint;
-				lastPoint = v0;
-			} while( nextItemIsFloat( s ) );
-			break;
-		case 'V':
-		case 'v':
-			do {
-				float y = parseFloat( &s );
-				v0 = vec2( lastPoint.x, ( cmd == 'v' ) ? ( lastPoint.y + y ) : ( y ) );
-				result.lineTo( v0 );
-				lastPoint2 = lastPoint;
-				lastPoint = v0;
-			} while( nextItemIsFloat( s ) );
-			break;
-		case 'C':
-		case 'c':
-			do {
-				v0.x = parseFloat( &s );
-				v0.y = parseFloat( &s );
-				v1.x = parseFloat( &s );
-				v1.y = parseFloat( &s );
-				v2.x = parseFloat( &s );
-				v2.y = parseFloat( &s );
-				if( cmd == 'c' ) { // relative
-					v0 += lastPoint;
-					v1 += lastPoint;
-					v2 += lastPoint;
-				}
-				result.curveTo( v0, v1, v2 );
-				lastPoint2 = v1;
-				lastPoint = v2;
-			} while( nextItemIsFloat( s ) );
-			break;
-		case 'S':
-		case 's':
-			do {
-				if( prevCmd == 's' || prevCmd == 'S' || prevCmd == 'c' || prevCmd == 'C' )
-					v0 = lastPoint * 2.0f - lastPoint2;
-				else
-					v0 = lastPoint;
-				prevCmd = cmd; // set this now in case we loop
-				v1.x = parseFloat( &s );
-				v1.y = parseFloat( &s );
-				v2.x = parseFloat( &s );
-				v2.y = parseFloat( &s );
-				if( cmd == 's' ) { // relative
-					v1 += lastPoint;
-					v2 += lastPoint;
-				}
-				result.curveTo( v0, v1, v2 );
-				lastPoint2 = v1;
-				lastPoint = v2;
-			} while( nextItemIsFloat( s ) );
-			break;
-		case 'Q':
-		case 'q':
-			do {
-				v0.x = parseFloat( &s );
-				v0.y = parseFloat( &s );
-				v1.x = parseFloat( &s );
-				v1.y = parseFloat( &s );
-				if( cmd == 'q' ) { // relative
-					v0 += lastPoint;
-					v1 += lastPoint;
-				}
-				result.quadTo( v0, v1 );
-				lastPoint2 = v0;
-				lastPoint = v1;
-			} while( nextItemIsFloat( s ) );
-			break;
-		case 'T':
-		case 't':
-			do {
-				if( prevCmd == 't' || prevCmd == 'T' || prevCmd == 'q' || prevCmd == 'Q' )
-					v0 = lastPoint * 2.0f - lastPoint2;
-				else
-					v0 = lastPoint;
-				prevCmd = cmd; // set this now in case we loop
-				v1.x = parseFloat( &s );
-				v1.y = parseFloat( &s );
-				if( cmd == 't' ) { // relative
-					v1 += lastPoint;
-				}
-				result.quadTo( v0, v1 );
-				lastPoint2 = v0;
-				lastPoint = v1;
-			} while( nextItemIsFloat( s ) );
-			break;
-		case 'a':
-		case 'A': {
-			do {
-				float ra = parseFloat( &s );
-				float rb = parseFloat( &s );
-				float xAxisRotation = parseFloat( &s ) * float( M_PI ) / 180.0f;
-				bool  largeArc = readFlag( &s );
-				bool  sweepFlag = readFlag( &s );
-				v0.x = parseFloat( &s );
-				v0.y = parseFloat( &s );
-				if( cmd == 'a' ) { // relative
-					v0 += lastPoint;
-				}
-				ellipticalArc( result, lastPoint.x, lastPoint.y, v0.x, v0.y, ra, rb, xAxisRotation, largeArc, sweepFlag );
-				lastPoint2 = lastPoint;
-				lastPoint = v0;
-			} while( nextItemIsFloat( s ) );
-		} break;
-		case 'z':
-		case 'Z':
-			result.close();
-			lastPoint2 = lastPoint;
-			lastPoint = ( result.empty() || result.getContours().back().empty() ) ? vec2() : result.getContours().back().getPoint( 0 );
-			break;
-		case '\0':
-		default: // technically noise at the end of the string is acceptable according to the spec; see W3C_SVG_11/paths-data-18.svg
-			done = true;
-			break;
+			firstCmd = false;
+			prevCmd = cmd;
 		}
-		firstCmd = false;
-		prevCmd = cmd;
+	}
+	catch( ... ) {
 	}
 
 	// For consistency, make sure paths are defined in CCW order for filled sections, CW for holes.
@@ -2243,10 +2278,16 @@ Line::Line( Node *parent, const XmlTree &xml )
 {
 	const auto doc = getDoc();
 	const auto style = calcInheritedStyle();
-	mPoint1.x = Value::parse( xml.getAttributeValue<string>( "x1" ) ).asUserWidth( doc, style );
-	mPoint1.y = Value::parse( xml.getAttributeValue<string>( "y1" ) ).asUserHeight( doc, style );
-	mPoint2.x = Value::parse( xml.getAttributeValue<string>( "x2" ) ).asUserWidth( doc, style );
-	mPoint2.y = Value::parse( xml.getAttributeValue<string>( "y2" ) ).asUserHeight( doc, style );
+
+	// If the attribute is not specified, the effect is as if a value of "0" were specified.
+	if( xml.hasAttribute( "x1" ) )
+		mPoint1.x = Value::parse( xml.getAttributeValue<string>( "x1" ) ).asUserWidth( doc, style );
+	if( xml.hasAttribute( "y1" ) )
+		mPoint1.y = Value::parse( xml.getAttributeValue<string>( "y1" ) ).asUserHeight( doc, style );
+	if( xml.hasAttribute( "x2" ) )
+		mPoint2.x = Value::parse( xml.getAttributeValue<string>( "x2" ) ).asUserWidth( doc, style );
+	if( xml.hasAttribute( "y2" ) )
+		mPoint2.y = Value::parse( xml.getAttributeValue<string>( "y2" ) ).asUserHeight( doc, style );
 }
 
 void Line::renderSelf( Renderer &renderer ) const
@@ -2441,6 +2482,9 @@ Group::~Group()
 
 void Group::parse( const XmlTree &xml )
 {
+	if( !approxEqual( getOpacity(), 1.0f ) )
+		CI_LOG_W( "Group '" << getId() << "' opacity of " << getOpacity() << " is currently not supported." );
+
 	for( XmlTree::ConstIter treeIt = xml.begin(); treeIt != xml.end(); ++treeIt ) {
 		Node *node = create( this, *treeIt );
 		if( node )
@@ -2502,8 +2546,10 @@ Node *Group::create( Node *parent, const XmlTree &xml )
 		return new Text( parent, xml );
 
 	// Treat <switch> tags as normal groups and parse their contents.
-	if( xml.getTag() == "switch" )
+	if( xml.getTag() == "switch" ) {
+		CI_LOG_W( "The `switch` tag is currently not supported and will be treated as a normal group." );
 		return new Group( parent, xml );
+	}
 
 	CI_LOG_W( "The `" << xml.getTag() << "` tag is currently not supported or recognized." );
 
@@ -2852,12 +2898,17 @@ mat3 PreserveAspectRatio::calcTransform( const Rectf &element, const Rectf &view
 Image::Image( Node *parent, const XmlTree &xml )
 	: Node( parent, xml )
 {
-	mBounds.x1 = xml.getAttributeValue<float>( "x", 0 );
-	mBounds.y1 = xml.getAttributeValue<float>( "y", 0 );
-	auto width = xml.getAttributeValue<float>( "width", 0 );
-	auto height = xml.getAttributeValue<float>( "height", 0 );
-	mBounds.x2 = mBounds.x1 + width;
-	mBounds.y2 = mBounds.y1 + height;
+	const auto doc = getDoc();
+	const auto style = calcInheritedStyle();
+
+	if( xml.hasAttribute( "x" ) )
+		mBounds.x1 = Value::parse( xml.getAttributeValue<string>( "x" ) ).asUserWidth( doc, style );
+	if( xml.hasAttribute( "y" ) )
+		mBounds.y1 = Value::parse( xml.getAttributeValue<string>( "y" ) ).asUserHeight( doc, style );
+	if( xml.hasAttribute( "width" ) )
+		mBounds.x2 = mBounds.x1 + Value::parse( xml.getAttributeValue<string>( "width" ) ).asUserWidth( doc, style );
+	if( xml.hasAttribute( "height" ) )
+		mBounds.y2 = mBounds.y1 + Value::parse( xml.getAttributeValue<string>( "height" ) ).asUserHeight( doc, style );
 
 	std::string ref;
 	if( xml.hasAttribute( "xlink:href" ) )
@@ -2871,15 +2922,15 @@ Image::Image( Node *parent, const XmlTree &xml )
 	else if( !ref.empty() ) {
 		auto ext = fs::path( ref ).extension().string();
 		if( ext == ".svg" ) {
-			const auto path = getDoc()->getFilePath() / ref;
-			mSvg = svg::Doc::create( loadFile( path ), path );
+			const auto path = doc->getFilePath() / ref;
+			mSvg = svg::Doc::create( this, loadFile( path ), path );
 		}
 		else
-			mImage = getDoc()->loadImage( ref );
+			mImage = doc->loadImage( ref );
 	}
 
 	// Calculate texture transform matrix.
-	Rectf element( 0, 0, width, height );
+	Rectf element( 0, 0, mBounds.getWidth(), mBounds.getHeight() );
 	Rectf viewBox = mImage ? Rectf( mImage->getBounds() ) : mSvg ? mSvg->getBounds() : Rectf{};
 	if( xml.hasAttribute( "preserveAspectRatio" ) )
 		mTextureMatrix = PreserveAspectRatio( xml.getAttributeValue<string>( "preserveAspectRatio" ) ).calcTransform( element, viewBox, true );
@@ -3361,7 +3412,12 @@ Doc::Doc( const fs::path &filePath )
 }
 
 Doc::Doc( const DataSourceRef &dataSource, const fs::path &filePath )
-	: Group( nullptr )
+	: Doc( nullptr, dataSource, filePath )
+{
+}
+
+Doc::Doc( Node *parent, const DataSourceRef &dataSource, const fs::path &filePath )
+	: Group( parent )
 	, mBounds( 0, 0, 0, 0 )
 {
 	fs::path relativePath = filePath;
@@ -3383,6 +3439,11 @@ DocRef Doc::create( const fs::path &filePath )
 DocRef Doc::create( const DataSourceRef &dataSource, const fs::path &filePath )
 {
 	return std::make_shared<Doc>( dataSource, filePath );
+}
+
+DocRef Doc::create( Node *parent, const DataSourceRef &dataSource, const fs::path &filePath )
+{
+	return std::make_shared<Doc>( parent, dataSource, filePath );
 }
 
 DocRef Doc::createFromSvgz( const DataSourceRef &dataSource, const fs::path &filePath )
@@ -3408,7 +3469,11 @@ void Doc::loadDoc( const XmlTree &xml )
 		mViewBox.y2 = mViewBox.y1 + parseFloat( &vbCPtr );
 	}
 	else {
-		mViewBox = getBoundingBox().transformed( getTransform() ).scaledCentered( 1.1f );
+		const Doc* doc = getDoc();
+		if( doc )
+			mViewBox = doc->mViewBox;
+		else
+			mViewBox = getBoundingBox().transformed( getTransform() ).scaledCentered( 1.1f );
 	}
 	if( xml.hasAttribute( "x" ) ) {
 		Value val = Value::parse( xml.getAttributeValue<string>( "x" ) );
@@ -3465,7 +3530,7 @@ void Doc::loadDoc( const DataSourceRef &source, const fs::path &filePath )
 	loadDoc( xml->getChild( "svg" ) );
 }
 
-shared_ptr<Surface8u> Doc::loadImage( const fs::path &relativePath )
+shared_ptr<Surface8u> Doc::loadImage( const fs::path &relativePath ) const
 {
 	if( mImageCache.find( relativePath ) == mImageCache.end() ) {
 		try {
