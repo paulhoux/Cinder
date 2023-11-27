@@ -424,8 +424,8 @@ class CI_API Style {
 	// clip path
 	bool               specifiesClipPath() const { return mSpecifiesClipPath; }
 	void               unspecifyClipPath() { mSpecifiesClipPath = false; }
-	const std::string &getClipPath() const { return mClipPath; }
-	void               setClipPath( const std::string &clipPath ) { mSpecifiesClipPath = true; mClipPath = clipPath; }
+	const std::string &getClipPath() const { return mClipPathId; }
+	void               setClipPath( const std::string &clipPath ) { mSpecifiesClipPath = true; mClipPathId = clipPath; }
 
 	// stops
 	bool            specifiesStopColor() const { return mSpecifiesStopColor; }
@@ -522,11 +522,14 @@ class CI_API Style {
 	bool               mSpecifiesDashOffset;
 	float              mDashOffset;
 	bool               mSpecifiesClipPath;
-	std::string        mClipPath;
+	std::string        mClipPathId;
 	bool               mSpecifiesStopColor;
 	ColorA8u           mStopColor;
 	bool               mSpecifiesStopOpacity;
 	float              mStopOpacity;
+
+	// cached clip-path
+	mutable const ClipPath *mClipPath = nullptr;
 
 	// fonts
 	bool                     mSpecifiesFontFamilies, mSpecifiesFontSize, mSpecifiesFontWeight, mSpecifiesTextAnchor;
@@ -653,7 +656,7 @@ class CI_API Node {
 	//! Returns whether this Node is visible, or the first among its ancestors when unspecified
 	virtual bool isVisible() const;
 	//! Returns whether the Display property of this Node is set to 'None', preventing rendering of the node and its children
-	bool isDisplayNone() const { return getStyle().isDisplayNone(); }
+	virtual bool isDisplayNone() const { return getStyle().isDisplayNone(); }
 	//! Returns whether this type of node directly renders anything. Everything but groups and gradients.
 	virtual bool isDrawable() const { return true; }
 
@@ -678,7 +681,7 @@ class CI_API Node {
 	static bool  parseTransformComponent( const char **c, mat3 *result );
 
 	static std::string findStyleValue( const std::string &styleString, const std::string &key );
-	void               parseStyle( const std::string &value );
+	void               parseStyle( const XmlTree &xml );
 
 	size_t        mUuid;
 	Node         *mParent;
@@ -791,6 +794,14 @@ class CI_API Circle : public Node {
 	float getRadius() const { return mRadius; }
 	void  setRadius( float radius ) { mRadius = radius; }
 
+	bool isVisible() const override
+	{
+		// A value of zero disables rendering of the element.
+		if( mRadius <= 0 )
+			return false;
+		return Node::isVisible();
+	}
+
 	bool containsPoint( const vec2 &pt ) const override { return distance2( pt, mCenter ) < mRadius * mRadius; }
 
 	Shape2d getShape() const override;
@@ -815,6 +826,14 @@ class CI_API Ellipse : public Node {
 	void  setRadiusX( float radiusX ) { mRadiusX = radiusX; }
 	float getRadiusY() const { return mRadiusY; }
 	void  setRadiusY( float radiusY ) { mRadiusY = radiusY; }
+
+	bool isVisible() const override
+	{
+		// A value of zero disables rendering of the element.
+		if( mRadiusX <= 0 || mRadiusY <= 0 )
+			return false;
+		return Node::isVisible();
+	}
 
 	bool containsPoint( const vec2 &pt ) const override;
 
@@ -881,6 +900,14 @@ class CI_API Rect : public Node {
 	float        getRx() const;
 	float        getRy() const;
 
+	bool isVisible() const override
+	{
+		// A value of zero disables rendering of the element.
+		if( mRect.getWidth() <= 0 || mRect.getHeight() <= 0 )
+			return false;
+		return Node::isVisible();
+	}
+
 	bool containsPoint( const vec2 &pt ) const override { return mRect.contains( pt ); }
 
 	Shape2d getShape() const override;
@@ -941,11 +968,13 @@ class CI_API Use : public Node {
 
 	bool isDrawable() const override { return false; }
 
-	Shape2d	getShape() const override { if( mReferenced ) return mReferenced->getShape(); else return Shape2d(); }
+	bool isDisplayNone() const override { return Node::isDisplayNone() || (mReferenced ? mReferenced->isDisplayNone() : false); }
+
+	Shape2d	getShape() const override { if( mReferenced ) return mReferenced->getShape(); return Shape2d(); }
 
   protected:
 	void  renderSelf( Renderer &renderer ) const override;
-	Rectf calcBoundingBox() const override { if( mReferenced ) return mReferenced->getBoundingBox(); else return Rectf(0,0,0,0); }
+	Rectf calcBoundingBox() const override { if( mReferenced ) return mReferenced->getBoundingBox(); return Rectf(0,0,0,0); }
 
 	void parse( const XmlTree &xml );
 
@@ -1179,12 +1208,16 @@ class CI_API ClipPath : public Group {
 	
 	bool useObjectBoundingBox() const { return mUseObjectBoundingBox; }
 
+	//! Returns whether all children are set to 'display="none"'.
+	bool isDisplayNone() const override { return mIsDisplayNone; }
+
 protected:
 	void renderSelf( Renderer &renderer ) const override
 	{ /* never render */
 	}
 
 	bool mUseObjectBoundingBox = false;
+	bool mIsDisplayNone = true;
 };
 
 //!
@@ -1213,10 +1246,14 @@ class CI_API Doc : public Group {
 	Doc( Node *parent, const XmlTree &xml );
 	Doc( const fs::path &filePath );
 	Doc( const DataSourceRef &dataSource, const fs::path &filePath = fs::path() );
-
+	
+	static DocRef create( Node *parent, const XmlTree &xml );
 	static DocRef create( const fs::path &filePath );
 	static DocRef create( const DataSourceRef &dataSource, const fs::path &filePath = fs::path() );
 	static DocRef createFromSvgz( const DataSourceRef &dataSource, const fs::path &filePath = fs::path() );
+
+	//! Returns the file path of the document. Can be relative or empty.
+	const fs::path &getFilePath() const { return mFilePath; }
 
 	//! Returns the width of the document in pixels
 	float getWidth() const { return mBounds.getWidth(); }

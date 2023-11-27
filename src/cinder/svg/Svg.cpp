@@ -450,6 +450,7 @@ void Style::clear()
 	mSpecifiesVisible = false;
 	mVisible = true;
 	mDisplayNone = false;
+	mClipPath = nullptr;
 }
 
 const ColorA8u &Style::getColorDefault()
@@ -467,12 +468,12 @@ const Paint &Style::getStrokeDefault()
 	return sPaintNone;
 }
 
-text::Font * Style::getFont() const
+text::Font *Style::getFont() const
 {
 	return Style::getFont( mFontFamilies, mFontSize.asUser() );
 }
 
-text::Font *Style::getFont( const std::vector<std::string> &fontFamilies, float fontSize ) 
+text::Font *Style::getFont( const std::vector<std::string> &fontFamilies, float fontSize )
 {
 	for( const auto &fontFamily : fontFamilies ) {
 		try {
@@ -642,7 +643,7 @@ bool Style::parseProperty( const std::string &key, const std::string &value, con
 				strncpy( id, hash + 1, closeParen - hash - 1 );
 				id[closeParen - hash - 1] = 0;
 				mSpecifiesClipPath = true;
-				mClipPath = id;
+				mClipPathId = id;
 				return true;
 			}
 			return false;
@@ -762,7 +763,7 @@ bool Style::operator==( const Style &other ) const
 		return false;
 	if( mSpecifiesDashOffset && !approxEqual( mDashOffset, other.mDashOffset ) )
 		return false;
-	if( mSpecifiesClipPath && mClipPath != other.mClipPath )
+	if( mSpecifiesClipPath && mClipPathId != other.mClipPathId )
 		return false;
 	return true;
 }
@@ -794,7 +795,8 @@ void Style::operator+=( const Style &other )
 	if( other.mSpecifiesDashOffset )
 		setDashOffset( other.mDashOffset );
 	if( other.mSpecifiesClipPath )
-		setClipPath( other.mClipPath );
+		setClipPath( other.mClipPathId );
+	mClipPath = other.mClipPath;
 }
 
 Style Style::operator+( const Style &other ) const
@@ -838,19 +840,20 @@ void Style::startRender( Renderer &renderer, const Node *node ) const
 	if( mSpecifiesDashOffset )
 		renderer.pushDashOffset( mDashOffset );
 	if( mSpecifiesClipPath ) {
-		const ClipPath *clip = node->getClipPath( *this ); // Assumes the clip-path is available.
-		if( clip->useObjectBoundingBox() ) {
+		if( !mClipPath )
+			mClipPath = node->getClipPath( *this ); 
+		if( mClipPath->useObjectBoundingBox() ) {
 			// Calculate object space transform matrix.
 			const auto bounds = node->getBoundingBox();
 			const auto transform = glm::scale( glm::translate( mat3(), bounds.getUpperLeft() ), bounds.getSize() );
 
 			// Apply matrix prior to rendering the clip path and restore afterwards.
 			renderer.pushMatrix( transform );
-			renderer.pushClipPath( *clip );
+			renderer.pushClipPath( *mClipPath );
 			renderer.popMatrix();
 		}
 		else
-			renderer.pushClipPath( *clip );
+			renderer.pushClipPath( *mClipPath );
 	}
 }
 
@@ -1410,6 +1413,11 @@ std::string Node::findStyleValue( const std::string &styleString, const std::str
 			return valuePair[1];
 	}
 	return {};
+}
+
+void Node::parseStyle( const XmlTree &xml )
+{
+	mStyle = Style( xml, this );
 }
 
 Style Node::calcInheritedStyle() const
@@ -2861,7 +2869,13 @@ Image::Image( Node *parent, const XmlTree &xml )
 		parseDataImage( ref );
 	}
 	else if( !ref.empty() ) {
-		mImage = getDoc()->loadImage( ref );
+		auto ext = fs::path( ref ).extension().string();
+		if( ext == ".svg" ) {
+			const auto path = getDoc()->getFilePath() / ref;
+			mSvg = svg::Doc::create( loadFile( path ), path );
+		}
+		else
+			mImage = getDoc()->loadImage( ref );
 	}
 
 	// Calculate texture transform matrix.
@@ -3259,6 +3273,13 @@ ClipPath::ClipPath( Node *parent, const XmlTree &xml )
 	if( xml.hasAttribute( "clipPathUnits" ) ) {
 		mUseObjectBoundingBox = xml.getAttributeValue<string>( "clipPathUnits" ) != string( "userSpaceOnUse" );
 	}
+
+	for( const auto &child : mChildren ) {
+		if( !child->isDisplayNone() && child->isVisible() ) {
+			mIsDisplayNone = false;
+			break;
+		}
+	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////////
@@ -3326,7 +3347,7 @@ Doc::Doc()
 }
 
 Doc::Doc( Node *parent, const XmlTree &xml )
-	: Group( parent )
+	: Group( parent, xml )
 	, mBounds( 0, 0, 0, 0 )
 {
 	loadDoc( xml );
@@ -3347,6 +3368,11 @@ Doc::Doc( const DataSourceRef &dataSource, const fs::path &filePath )
 	if( filePath.empty() )
 		relativePath = fs::path( dataSource->getFilePathHint() );
 	loadDoc( dataSource, relativePath );
+}
+
+DocRef Doc::create( Node *parent, const XmlTree &xml )
+{
+	return std::make_shared<Doc>( parent, xml );
 }
 
 DocRef Doc::create( const fs::path &filePath )
@@ -3425,6 +3451,7 @@ void Doc::loadDoc( const XmlTree &xml )
 			setTransform( PreserveAspectRatio().calcTransform( mBounds, mViewBox ) );
 	}
 
+	Node::parseStyle( xml );
 	Group::parse( xml );
 }
 
@@ -3432,10 +3459,10 @@ void Doc::loadDoc( const DataSourceRef &source, const fs::path &filePath )
 {
 	if( !filePath.empty() )
 		mFilePath = filePath.parent_path();
-		
+
 	auto xml = std::make_shared<XmlTree>( source, XmlTree::ParseOptions().ignoreDataChildren( false ) );
 
-	loadDoc( xml->getChild( "svg" ) ); 
+	loadDoc( xml->getChild( "svg" ) );
 }
 
 shared_ptr<Surface8u> Doc::loadImage( const fs::path &relativePath )

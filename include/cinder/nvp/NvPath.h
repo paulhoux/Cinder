@@ -122,6 +122,8 @@ CI_API class Path {
 	void setDashCaps( CapsStyle initialCap, CapsStyle terminalCap ) const;
 	//! Sets the path's end caps for strokes.
 	void setEndCaps( CapsStyle caps ) const;
+	//! Sets the path's end caps for strokes.
+	void setEndCaps( CapsStyle initialCap, CapsStyle terminalCap ) const;
 	//! Sets the join style for strokes.
 	void setJoinStyle( JoinStyle joins ) const;
 	//! Sets the stroke width.
