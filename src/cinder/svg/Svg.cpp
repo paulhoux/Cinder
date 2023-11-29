@@ -866,7 +866,7 @@ void Style::startRender( Renderer &renderer, const Node *node ) const
 		renderer.pushDashOffset( mDashOffset );
 	if( mSpecifiesClipPath ) {
 		if( !mClipPath )
-			mClipPath = node->getClipPath( *this ); 
+			mClipPath = node->getClipPath( *this );
 		if( mClipPath->useObjectBoundingBox() ) {
 			// Calculate object space transform matrix.
 			const auto bounds = node->getBoundingBox();
@@ -2787,20 +2787,25 @@ Use::Use( Node *parent, const XmlTree &xml )
 
 void Use::parse( const XmlTree &xml )
 {
+	const auto doc = getDoc();
+	const auto style = calcInheritedStyle();
+
 	std::string ref;
 	if( xml.hasAttribute( "xlink:href" ) )
 		ref = xml.getAttributeValue<string>( "xlink:href" );
 	else if( xml.hasAttribute( "href" ) )
 		ref = xml.getAttributeValue<string>( "href" );
 
+	vec2 translate{ 0 };
 	if( xml.hasAttribute( "x" ) ) {
-		mTransform[2][0] += Value::parse( xml.getAttributeValue<std::string>( "x" ) ).asUser();
+		translate.x = Value::parse( xml.getAttributeValue<std::string>( "x" ) ).asUserWidth( doc, style );
 		mSpecifiesTransform = true;
 	}
 	if( xml.hasAttribute( "y" ) ) {
-		mTransform[2][1] += Value::parse( xml.getAttributeValue<std::string>( "y" ) ).asUser();
+		translate.y = Value::parse( xml.getAttributeValue<std::string>( "y" ) ).asUserHeight( doc, style );
 		mSpecifiesTransform = true;
 	}
+	mTransform = glm::translate( mTransform, translate );
 
 	if( ref.size() > 1 ) {
 		if( ref[0] == '#' ) {
@@ -2897,6 +2902,7 @@ mat3 PreserveAspectRatio::calcTransform( const Rectf &element, const Rectf &view
 // Image
 Image::Image( Node *parent, const XmlTree &xml )
 	: Node( parent, xml )
+	, mBounds( 0, 0, 0, 0 )
 {
 	const auto doc = getDoc();
 	const auto style = calcInheritedStyle();
@@ -3469,7 +3475,7 @@ void Doc::loadDoc( const XmlTree &xml )
 		mViewBox.y2 = mViewBox.y1 + parseFloat( &vbCPtr );
 	}
 	else {
-		const Doc* doc = getDoc();
+		const Doc *doc = getDoc();
 		if( doc )
 			mViewBox = doc->mViewBox;
 		else
