@@ -141,7 +141,7 @@ void NvPathTextApp::draw()
 		gl::ScopedModelMatrix scpModel( mCanvasUi.getModelMatrix() );
 
 		// Render text using path rendering.
-		gl::translate( 0.5f * getWindowWidth(), 0 );
+		gl::translate( getWindowWidth() / 2, 0 );
 		text::Frame title( mTitleRight, mColumnSize.x, -1, text::TypesetOptions().topLineOffset( 10 ) );
 		nvp::renderText( title );
 

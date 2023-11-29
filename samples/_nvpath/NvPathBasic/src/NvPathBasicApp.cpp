@@ -83,7 +83,8 @@ void NvPathBasicApp::draw()
 
 				nvp::Path primitive( Path2d::circle( { 128, 128 }, 96 ) );
 				primitive.fill( Color::black() );
-				primitive.stroke( Color( 0.2f, 0.4f, 1.0f ), 5 );
+				primitive.setStrokeWidth( 5 );
+				primitive.stroke( Color( 0.2f, 0.4f, 1.0f ) );
 			},
 			[&]() {
 				// Ellipse.
@@ -91,14 +92,16 @@ void NvPathBasicApp::draw()
 
 				nvp::Path primitive( Path2d::ellipse( { 128, 128 }, 96, 64 ) );
 				primitive.fill( Color::black() );
-				primitive.stroke( Color( 0.2f, 0.4f, 1.0f ), 5 );
+				primitive.setStrokeWidth( 5 );
+				primitive.stroke( Color( 0.2f, 0.4f, 1.0f ) );
 			},
 			[&]() {
 				// Line.
 				nvp::ScopedClipRect scpClipRect( 0, 0, 256, 256 );
 
 				nvp::Path primitive( Path2d::line( { 64, 64 }, { 192, 192 } ) );
-				primitive.stroke( Color( 0.2f, 0.4f, 1.0f ), 5 );
+				primitive.setStrokeWidth( 5 );
+				primitive.stroke( Color( 0.2f, 0.4f, 1.0f ) );
 			},
 			[&]() {
 				// Rectangle.
@@ -106,7 +109,8 @@ void NvPathBasicApp::draw()
 
 				nvp::Path primitive( Path2d::rectangle( { 32, 32, 192, 192 } ) );
 				primitive.fill( Color::black() );
-				primitive.stroke( Color( 0.2f, 0.4f, 1.0f ), 5 );
+				primitive.setStrokeWidth( 5 );
+				primitive.stroke( Color( 0.2f, 0.4f, 1.0f ) );
 			},
 			[&]() {
 				// Rounded rectangle.
@@ -114,7 +118,8 @@ void NvPathBasicApp::draw()
 
 				nvp::Path primitive( Path2d::roundedRectangle( 32, 32, 192, 192, 16 ) );
 				primitive.fill( Color::black() );
-				primitive.stroke( Color( 0.2f, 0.4f, 1.0f ), 5 );
+				primitive.setStrokeWidth( 5 );
+				primitive.stroke( Color( 0.2f, 0.4f, 1.0f ) );
 			},
 			[&]() {
 				// Star.
@@ -122,7 +127,8 @@ void NvPathBasicApp::draw()
 
 				nvp::Path primitive( Path2d::star( { 128, 128 }, 5, 96, 40 ) );
 				primitive.fill( Color::black() );
-				primitive.stroke( Color( 0.2f, 0.4f, 1.0f ), 5 );
+				primitive.setStrokeWidth( 5 );
+				primitive.stroke( Color( 0.2f, 0.4f, 1.0f ) );
 			},
 			[&]() {
 				// Arrow.
@@ -130,14 +136,16 @@ void NvPathBasicApp::draw()
 
 				nvp::Path primitive( Path2d::arrow( { 32, 128 }, { 224, 128 }, 16 ) );
 				primitive.fill( Color::black() );
-				primitive.stroke( Color( 0.2f, 0.4f, 1.0f ), 5 );
+				primitive.setStrokeWidth( 5 );
+				primitive.stroke( Color( 0.2f, 0.4f, 1.0f ) );
 			},
 			[&]() {
 				// Spiral.
 				nvp::ScopedClipRect scpClipRect( 0, 0, 256, 256 );
 
 				nvp::Path primitive( Path2d::spiral( { 128, 128 }, 0, 96, 16 ) );
-				primitive.stroke( Color( 0.2f, 0.4f, 1.0f ), 5 );
+				primitive.setStrokeWidth( 5 );
+				primitive.stroke( Color( 0.2f, 0.4f, 1.0f ) );
 			},
 			[&]() {
 				// Dash caps.
@@ -147,7 +155,8 @@ void NvPathBasicApp::draw()
 				primitive.setDashOffset( -10 * getElapsedSeconds() );
 				primitive.setDashPattern( { 30.0f, 15.0f } );
 				primitive.setDashCaps( nvp::CapsStyle::ROUND, nvp::CapsStyle::TRIANGULAR );
-				primitive.stroke( Color( 0.2f, 0.4f, 1.0f ), 10 );
+				primitive.setStrokeWidth( 10 );
+				primitive.stroke( Color( 0.2f, 0.4f, 1.0f ) );
 			},
 			[&]() {
 				// Stencil demo.
@@ -158,7 +167,7 @@ void NvPathBasicApp::draw()
 				primitive.stencilFill();
 
 				// Calculate the size and position of the texture from the circle's bounds.
-				auto bounds = primitive.getBounds();
+				auto bounds = primitive.getFillBounds();
 				auto width = mTexture->getAspectRatio() * bounds.getHeight();
 				bounds.inflate( { width - bounds.getWidth(), 0 } );
 
@@ -176,13 +185,14 @@ void NvPathBasicApp::draw()
 
 				// Render the glyph.
 				nvp::Path primitive( glyph );
-				vec2      offset = vec2( 128 ) - primitive.getBounds().getCenter();
+				vec2      offset = vec2( 128 ) - primitive.getFillBounds().getCenter();
 
 				gl::ScopedModelMatrix scpModelMatrix;
 				gl::translate( offset );
 
 				primitive.fill( Color::black() );
-				primitive.stroke( Color( 0.2f, 0.4f, 1.0f ), 5 );
+				primitive.setStrokeWidth( 5 );
+				primitive.stroke( Color( 0.2f, 0.4f, 1.0f ) );
 			},
 			[&]() {
 				// Text

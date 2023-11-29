@@ -2214,14 +2214,12 @@ void Canvas::resize( const ivec2 &size )
 
 void renderText( const text::Typesetter &typesetter, const vec2 &offset )
 {
-	// gl::ScopedBlendPremult scpBlend;
-	// gl::ScopedColor        scpColor;
-	// gl::matrixLoadfEXT( GL_MODELVIEW, value_ptr( gl::getModelView() ) );
+	gl::matrixLoadfEXT( GL_MODELVIEW, value_ptr( gl::getModelView() ) );
 
 	std::vector<glm::mat3x2> transforms;
 
 	text::Typesetter::Iterator iter = typesetter.getIterator();
-	const text::Run           *runPtr;
+	const text::Run *          runPtr;
 	vec2                       lineDrawOffset;
 	while( typesetter.nextRun( iter, &runPtr, &lineDrawOffset ) ) {
 		if( runPtr->isPlaceholder() )
@@ -2247,7 +2245,7 @@ void renderText( const text::Typesetter &typesetter, const vec2 &offset )
 		}
 
 		// Draw immediately.
-		// gl::ScopedState scpStencil( GL_STENCIL_TEST, GL_TRUE );
+		gl::ScopedState scpStencil( GL_STENCIL_TEST, GL_TRUE );
 		gl::stencilFunc( GL_NOTEQUAL, 0, 0xFF );
 		gl::stencilOp( GL_KEEP, GL_KEEP, GL_ZERO );
 
