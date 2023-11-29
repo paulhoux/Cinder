@@ -27,13 +27,14 @@ class NvPathSvgApp : public App {
 	void loadNextSvgFile();
 
   private:
-	Engine      mEngine = NVP;
-	CanvasUi    mCanvasUi;
-	nvp::Canvas mCanvas{ 8, 16, true };
-	nvp::Svg    mSvg;
-	svg::DocRef mDoc;
-	fs::path    mFilePath;
-	bool        mCaptureScreenshot = false;
+	Engine        mEngine = NVP;
+	CanvasUi      mCanvasUi;
+	SvgRendererGl mSvgGl;
+	nvp::Svg      mSvg;
+	nvp::Canvas   mCanvas{ 8, 16, true };
+	svg::DocRef   mDoc;
+	fs::path      mFilePath;
+	bool          mCaptureScreenshot = false;
 };
 
 void NvPathSvgApp::setup()
@@ -61,6 +62,8 @@ void NvPathSvgApp::update()
 
 void NvPathSvgApp::draw()
 {
+	gl::ScopedColor scpColor( 1, 1, 1 );
+
 	gl::FboRef fbo;
 	if( mCaptureScreenshot ) {
 		fbo = gl::Fbo::create( getWindowWidth(), getWindowHeight(), gl::Fbo::Format().disableDepth().stencilBuffer( false ) );
@@ -69,50 +72,37 @@ void NvPathSvgApp::draw()
 
 	gl::clear( Color::white() );
 
-	if( mDoc && mEngine == GL ) {
-		gl::ScopedModelMatrix scpModel( mCanvasUi.getModelMatrix() );
-
+	if( mDoc && mDoc->getWidth() > 0 && mDoc->getHeight() > 0 ) {
 		// Scale SVG to window.
-		if( mDoc->getWidth() > 0 && mDoc->getHeight() > 0 ) {
-			auto bounds = Area::proportionalFit( Area( mDoc->getBounds() ), getWindowBounds(), true, true );
-			auto scale = vec2( bounds.getSize() ) / vec2( mDoc->getSize() );
-			auto offset = bounds.getUL();
+		auto bounds = Area::proportionalFit( Area( mDoc->getBounds() ), getWindowBounds(), true, true );
+		auto scale = vec2( bounds.getSize() ) / vec2( mDoc->getSize() );
+		auto offset = bounds.getUL();
 
-			gl::translate( offset );
-			gl::scale( scale );
+		mat4 transform;
+		transform = glm::translate( transform, vec3( offset, 0 ) );
+		transform = glm::scale( transform, vec3( scale, 1 ) );
+
+		if( mEngine == GL ) {
+			try {
+				gl::ScopedModelMatrix scpModel( mCanvasUi.getModelMatrix() * transform );
+				mDoc->render( mSvgGl );
+			}
+			catch( ... ) {
+			}
 		}
+		else if( mEngine == NVP ) {
+			try {
+				// Convenient canvas with stencil buffer to draw on.
+				nvp::ScopedCanvas scpCanvas( mCanvas );
 
-		try {
-			mDoc->render( SvgRendererGl() );
-		}
-		catch( ... ) {
-		}
-	}
-	else if( mEngine == NVP ) {
-		{
-			nvp::ScopedCanvas scpCanvas( mCanvas );
-
-			gl::ScopedModelMatrix scpModel( mCanvasUi.getModelMatrix() );
-
-			// Scale SVG to canvas.
-			if( mSvg.getWidth() > 0 && mSvg.getHeight() > 0 ) {
-				auto bounds = Area::proportionalFit( Area( mSvg.getBounds() ), mCanvas.getBounds(), true, true );
-				auto scale = vec2( bounds.getSize() ) / vec2( mSvg.getSize() );
-				auto offset = bounds.getUL();
-
-				gl::translate( offset );
-				gl::scale( scale );
+				gl::ScopedModelMatrix scpModel( mCanvasUi.getModelMatrix() * transform );
+				mDoc->render( mSvg );
+			}
+			catch( ... ) {
 			}
 
-			mSvg.draw();
+			mCanvas.draw();
 		}
-
-		// Use pre-multiplied alpha!
-		gl::ScopedBlendPremult scpBlend;
-		gl::ScopedColor        scpColor( 1, 1, 1 );
-		//gl::ScopedState        scpSrgb( GL_FRAMEBUFFER_SRGB, GL_TRUE );
-
-		mCanvas.draw();
 	}
 
 	if( mCaptureScreenshot ) {
@@ -204,10 +194,8 @@ bool NvPathSvgApp::loadSvgFile( const fs::path &file )
 	mFilePath = file;
 
 	mCanvasUi.reset();
-
-	t.start();
-	mSvg = nvp::Svg( mDoc );
-	CI_LOG_I( "Preparing SVG for path rendering took " << t.getSeconds() << "s." );
+	mSvgGl.clear();
+	mSvg.clear();
 
 	return true;
 }
