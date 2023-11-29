@@ -35,16 +35,18 @@ namespace cinder {
 
 class CI_API SvgRendererGl : public svg::Renderer {
   public:
-	SvgRendererGl() : svg::Renderer() { 
+	SvgRendererGl() = default;
+
+	~SvgRendererGl() override = default;
+
+	void start() override
+	{
 		mStacks.defaults();
 		glLineWidth( 1.0f );
 		gl::pushModelMatrix();
 	}
-	
-	~SvgRendererGl() override
-	{
-		gl::popModelMatrix();
-	}
+
+	void finish() override { gl::popModelMatrix(); }
   
 	void	pushGroup( const svg::Group &group, float opacity ) override {}
 	

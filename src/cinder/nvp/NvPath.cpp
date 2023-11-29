@@ -1045,6 +1045,13 @@ void Svg::finish()
 	mCtx = nullptr;
 }
 
+void Svg::clear()
+{
+	mGradients.clear();
+	mTextures.clear();
+	mPaths.clear();
+}
+
 void Svg::pushGroup( const svg::Group &group, float opacity )
 {
 	mStacks.groupOpacity.push_back( opacity );
@@ -2154,6 +2161,8 @@ void Canvas::unbind() const
 void Canvas::draw() const
 {
 	if( mFbo && !mIsBound ) {
+		// Use pre-multiplied alpha!
+		gl::ScopedBlendPremult scpBlend;
 		gl::draw( mFbo->getColorTexture() );
 	}
 }

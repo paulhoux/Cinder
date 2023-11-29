@@ -213,9 +213,12 @@ class CI_API Renderer {
 	virtual ~Renderer() = default;
 
 	void setVisitor( const std::function<bool( const Node &, svg::Style * )> &visitor );
-
+	
 	virtual void start() {}
 	virtual void finish() {}
+
+	//! Clears rendering cache.
+	virtual void clear() {}
 
 	virtual void pushGroup( const Group & /*group*/, float /*opacity*/ ) {}
 	virtual void popGroup() {}

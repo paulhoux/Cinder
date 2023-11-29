@@ -251,6 +251,7 @@ class Gradients {
 	//!
 	void clear()
 	{
+		mIndex = 0;
 		mLookUp.clear();
 		mTexture.reset();
 	}
@@ -377,7 +378,7 @@ class CI_API ScopedShader : public Noncopyable {
 	}
 };
 
-class CI_API Svg : private svg::Renderer {
+class CI_API Svg : public svg::Renderer {
   public:
 	Svg() = default;
 
@@ -395,6 +396,8 @@ class CI_API Svg : private svg::Renderer {
 
 	//!
 	void draw();
+
+	void clear() override;
 
   private:
 	// svg::Renderer callbacks.
