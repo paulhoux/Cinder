@@ -185,7 +185,7 @@ void Path2d::smoothQuadTo( const vec2 &p2 )
 
 	vec2 p1 = getCurrentPoint();
 
-	if( mSegments.back() == QUADTO ) {
+	if( !mSegments.empty() && mSegments.back() == QUADTO ) {
 		const vec2 &c = getPointBefore( mPoints.size() - 1 );
 		p1.x = 2 * p1.x - c.x;
 		p1.y = 2 * p1.y - c.y;
@@ -214,7 +214,7 @@ void Path2d::smoothCurveTo( const vec2 &p2, const vec2 &p3 )
 
 	vec2 p1 = getCurrentPoint();
 
-	if( mSegments.back() == CUBICTO ) {
+	if( !mSegments.empty() && mSegments.back() == CUBICTO ) {
 		const vec2 &c = getPointBefore( mPoints.size() - 1 );
 		p1.x = 2 * p1.x - c.x;
 		p1.y = 2 * p1.y - c.y;
