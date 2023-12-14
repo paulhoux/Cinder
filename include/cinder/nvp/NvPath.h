@@ -73,6 +73,151 @@ CapsStyle toCapsStyle( ci::svg::LineCap lineCap );
 //!
 JoinStyle toJoinStyle( ci::svg::LineJoin lineJoin );
 
+//! Shader for solid colors or gradients to be applied to paths.
+class CI_API Shader {
+  public:
+	enum class Type { SOLID_COLOR, LINEAR_GRADIENT, RADIAL_GRADIENT, CONICAL_GRADIENT, IMAGE, UNDEFINED };
+
+	static ShaderRef create( Type type ) { return std::make_shared<Shader>( type ); }
+
+	Shader() = default;
+	explicit Shader( Type type );
+	virtual ~Shader();
+
+	Shader( const Shader & ) = delete;
+	Shader( Shader && ) = default;
+	Shader &operator=( const Shader & ) = delete;
+	Shader &operator=( Shader && ) = default;
+
+	void        bind() const;
+	static void unbind();
+
+	void uniform( const std::string &name, GLint value ) const;
+	void uniform( const std::string &name, GLfloat value ) const;
+	void uniform( const std::string &name, const vec2 &value ) const;
+	void uniform( const std::string &name, const vec3 &value ) const;
+	void uniform( const std::string &name, const vec4 &value ) const;
+	void uniform( const std::string &name, const mat3 &value ) const;
+	void uniform( const std::string &name, const glm::mat3x2 &value ) const;
+	void uniform( const std::string &name, const mat4 &value ) const;
+
+	void setColor( const ci::ColorA &color ) const;
+
+  protected:
+	GLuint mProgram{ 0 };
+	GLuint mPipeline{ 0 };
+	Type   mType{ Type::UNDEFINED };
+
+	friend class ScopedShader;
+};
+
+class CI_API ScopedShader : public Noncopyable {
+	gl::Context *mCtx = nullptr;
+	ShaderRef    mShader;
+
+  public:
+	//!
+	explicit ScopedShader( Shader::Type type );
+	//! Activates the solid color shader and sets the current color.
+	explicit ScopedShader( const ColorA &color );
+
+	~ScopedShader();
+
+	ScopedShader( const ScopedShader & ) = delete;
+	ScopedShader( ScopedShader && ) = delete;
+	ScopedShader &operator=( const ScopedShader & ) = delete;
+	ScopedShader &operator=( ScopedShader && ) = delete;
+
+	template <typename T>
+	void uniform( const std::string &name, const T &value )
+	{
+		if( mShader )
+			mShader->uniform( name, value );
+	}
+
+	void setColor( const ColorA &color ) const
+	{
+		if( mShader )
+			mShader->setColor( color );
+	}
+
+	//! Only works for linear gradient, radial gradient and image shaders! TODO
+	void setCoords( GLenum genMode = GL_PATH_OBJECT_BOUNDING_BOX_NV, const mat3 &transform = {} ) const
+	{
+		// Sanity check.
+		static_assert( sizeof( mat3::value_type ) == sizeof( GLfloat ) );
+
+		if( mShader && ( mShader->mType == Shader::Type::LINEAR_GRADIENT || mShader->mType == Shader::Type::RADIAL_GRADIENT || mShader->mType == Shader::Type::IMAGE ) ) {
+			const auto t = transpose( inverse( transform ) );
+			gl::programPathFragmentInputGenNV( mShader->mProgram, 1, genMode, 2, value_ptr( t ) );
+		}
+	}
+
+	//! Only works for linear gradient, radial gradient and image shaders! TODO
+	void setCoords( GLenum genMode, const std::vector<float> &data ) const
+	{
+		assert( data.size() == 6 );
+
+		if( mShader && ( mShader->mType == Shader::Type::LINEAR_GRADIENT || mShader->mType == Shader::Type::RADIAL_GRADIENT || mShader->mType == Shader::Type::IMAGE ) ) {
+			gl::programPathFragmentInputGenNV( mShader->mProgram, 1, genMode, 2, data.data() );
+		}
+	}
+};
+
+//! Stores multiple gradients in a single texture for performance.
+class Gradients {
+  public:
+	Gradients() = default;
+	~Gradients() = default;
+
+	Gradients( const Gradients & ) = delete;
+	Gradients( Gradients && ) = default;
+	Gradients &operator=( const Gradients & ) = delete;
+	Gradients &operator=( Gradients && ) = default;
+
+	//!
+	bool empty() const { return mLookUp.empty(); }
+	//!
+	void clear()
+	{
+		mIndex = 0;
+		mLookUp.clear();
+		mTexture.reset();
+	}
+	//!
+	size_t size() const { return mLookUp.size(); }
+
+	//! Returns whether the gradient is known.
+	bool contains( const std::string &id ) const;
+	//! Returns the coordinate of the gradient in the texture.
+	float index( const std::string &id ) const;
+
+	//! Sets or updates the gradient.
+	void set( const svg::Gradient &gradient );
+	//! Sets or updates the gradient.
+	void set( const svg::Paint &paint );
+
+	//!
+	void setSpreadMethod( svg::SpreadMethod method ) const;
+
+	//!
+	void bind( gl::Context *ctx, uint8_t textureUnit = 0 );
+	//!
+	void unbind( gl::Context *ctx );
+
+  private:
+	//!
+	gl::Texture2dRef create( int width, int height ) const;
+	//!
+	void store( size_t index, const svg::Paint &paint ) const;
+
+	gl::Context                            *mCtx = nullptr;
+	size_t                                  mIndex{ 0 };
+	std::unordered_map<std::string, size_t> mLookUp{};
+	mutable gl::Texture2dRef                mTexture{};
+	uint8_t                                 mTextureUnit{ 0 };
+};
+
 //! Path represents a vector shape stored efficiently on the GPU.
 CI_API class Path {
   public:
@@ -157,6 +302,8 @@ CI_API class Path {
 
 	//! Strokes the path with a solid \a color.
 	virtual void stroke( const ColorA &color, bool clearStencil = true ) const;
+	//! Strokes the path with the specified \a paint and \a opacity.
+	virtual void stroke( const svg::Paint &paint, float opacity = 1, bool clearStencil = true ) const;
 
 	//! Strokes the path instances with a solid \a color and the specified \a caps and \a join styles.
 	virtual void strokeInstanced( const std::vector<GLuint> &paths, const std::vector<glm::mat3x2> &transforms, const ColorA &color, bool clearStencil = true );
@@ -165,6 +312,8 @@ CI_API class Path {
 
 	//! Fills the path with a solid \a color.
 	virtual void fill( const ColorA &color, bool clearStencil = true ) const;
+	//! Fills the path with the specified \a paint and \a opacity.
+	virtual void fill( const svg::Paint &paint, float opacity = 1, bool clearStencil = true ) const;
 	//! Fills the path with a \a texture, automatically centered within the path's bounding box.
 	virtual void fill( const gl::TextureRef &texture, bool clearStencil = true ) const { fill( texture, getFillBounds(), clearStencil ); }
 	//! Fills the path with a \a texture, automatically centered within the specified \a bounding box.
@@ -192,10 +341,22 @@ CI_API class Path {
 	//! Reverses the order of the points and segments, effectively changing the winding. NOT THOROUGHLY TESTED, USE WITH CARE!
 	void reverse() const;
 
+	//!
+	static void bindGradients( gl::Context *ctx, uint8_t textureUnit = 0 ) { sGradients.bind( ctx, textureUnit ); }
+	//!
+	static void unbindGradients( gl::Context *ctx ) { sGradients.unbind( ctx ); }
+
   protected:
+	static Shader::Type preparePaint( const svg::Paint &paint, float opacity = 1, bool prepareShader = false );
+	static Shader::Type prepareLinearGradient( const svg::Paint &paint, float opacity = 1, bool prepareShader = false );
+	static Shader::Type prepareRadialGradient( const svg::Paint &paint, float opacity = 1, bool prepareShader = false );
+
 	static GLubyte toPathCommand( Path2d::SegmentType type );
 
 	GLuint mPathId{ 0 };
+
+	//! Stores gradients into a single texture per thread.
+	inline static thread_local Gradients sGradients{};
 };
 
 //! Represents a font face stored efficiently on the GPU as a list of glyph paths.
@@ -235,149 +396,6 @@ CI_API class Face {
 	GLsizei           mNumGlyphs{ 0 }; //
 };
 
-//! Stores multiple gradients in a single texture for performance.
-class Gradients {
-  public:
-	Gradients() = default;
-	~Gradients() = default;
-
-	Gradients( const Gradients & ) = delete;
-	Gradients( Gradients && ) = default;
-	Gradients &operator=( const Gradients & ) = delete;
-	Gradients &operator=( Gradients && ) = default;
-
-	//!
-	bool empty() const { return mLookUp.empty(); }
-	//!
-	void clear()
-	{
-		mIndex = 0;
-		mLookUp.clear();
-		mTexture.reset();
-	}
-	//!
-	size_t size() const { return mLookUp.size(); }
-
-	//! Returns whether the gradient is known.
-	bool contains( const std::string &id ) const;
-	//! Returns the coordinate of the gradient in the texture.
-	float index( const std::string &id ) const;
-
-	//! Sets or updates the gradient.
-	void set( const svg::Gradient &gradient );
-	//! Sets or updates the gradient.
-	void set( const svg::Paint &paint );
-
-	//!
-	void setSpreadMethod( svg::SpreadMethod method ) const;
-
-	//!
-	void bind( gl::Context *ctx, uint8_t textureUnit = 0 );
-	//!
-	void unbind( gl::Context *ctx );
-
-  private:
-	//!
-	gl::Texture2dRef create( int width, int height ) const;
-	//!
-	void store( size_t index, const svg::Paint &paint ) const;
-
-	gl::Context                            *mCtx = nullptr;
-	size_t                                  mIndex{ 0 };
-	std::unordered_map<std::string, size_t> mLookUp{};
-	mutable gl::Texture2dRef                mTexture{};
-	uint8_t                                 mTextureUnit{ 0 };
-};
-
-//! Shader for solid colors or gradients to be applied to paths.
-class CI_API Shader {
-  public:
-	enum class Type { SOLID_COLOR, LINEAR_GRADIENT, RADIAL_GRADIENT, CONICAL_GRADIENT, IMAGE, UNDEFINED };
-
-	static ShaderRef create( Type type ) { return std::make_shared<Shader>( type ); }
-
-	Shader() = default;
-	explicit Shader( Type type );
-	virtual ~Shader();
-
-	Shader( const Shader & ) = delete;
-	Shader( Shader && ) = default;
-	Shader &operator=( const Shader & ) = delete;
-	Shader &operator=( Shader && ) = default;
-
-	void        bind() const;
-	static void unbind();
-
-	void uniform( const std::string &name, GLint value ) const;
-	void uniform( const std::string &name, GLfloat value ) const;
-	void uniform( const std::string &name, const vec2 &value ) const;
-	void uniform( const std::string &name, const vec3 &value ) const;
-	void uniform( const std::string &name, const vec4 &value ) const;
-	void uniform( const std::string &name, const mat3 &value ) const;
-	void uniform( const std::string &name, const glm::mat3x2 &value ) const;
-	void uniform( const std::string &name, const mat4 &value ) const;
-
-  protected:
-	GLuint mProgram{ 0 };
-	GLuint mPipeline{ 0 };
-	Type   mType{ Type::UNDEFINED };
-
-	friend class ScopedShader;
-};
-
-class CI_API ScopedShader : public Noncopyable {
-	gl::Context *mCtx = nullptr;
-	ShaderRef    mShader;
-
-  public:
-	//!
-	explicit ScopedShader( Shader::Type type );
-	//! Activates the solid color shader and sets the current color.
-	explicit ScopedShader( const ColorA &color );
-
-	~ScopedShader();
-
-	ScopedShader( const ScopedShader & ) = delete;
-	ScopedShader( ScopedShader && ) = delete;
-	ScopedShader &operator=( const ScopedShader & ) = delete;
-	ScopedShader &operator=( ScopedShader && ) = delete;
-
-	template <typename T>
-	void uniform( const std::string &name, const T &value )
-	{
-		if( mShader )
-			mShader->uniform( name, value );
-	}
-
-	void setColor( const ColorA &color ) const
-	{
-		if( mShader )
-			gl::programPathFragmentInputGenNV( mShader->mProgram, 0, GL_CONSTANT_NV, 4, color.premultiplied().ptr() );
-	}
-
-	//! Only works for linear gradient, radial gradient and image shaders! TODO
-	void setCoords( GLenum genMode = GL_PATH_OBJECT_BOUNDING_BOX_NV, const mat3 &transform = {} ) const
-	{
-		// Sanity check.
-		static_assert( sizeof( mat3::value_type ) == sizeof( GLfloat ) );
-
-		if( mShader && ( mShader->mType == Shader::Type::LINEAR_GRADIENT || mShader->mType == Shader::Type::RADIAL_GRADIENT || mShader->mType == Shader::Type::IMAGE ) ) {
-			const auto t = transpose( inverse( transform ) );
-			gl::programPathFragmentInputGenNV( mShader->mProgram, 1, genMode, 2, value_ptr( t ) );
-		}
-	}
-
-	//! Only works for linear gradient, radial gradient and image shaders! TODO
-	void setCoords( GLenum genMode, const std::vector<float> &data ) const
-	{
-		assert( data.size() == 6 );
-
-		if( mShader && ( mShader->mType == Shader::Type::LINEAR_GRADIENT || mShader->mType == Shader::Type::RADIAL_GRADIENT || mShader->mType == Shader::Type::IMAGE ) ) {
-			gl::programPathFragmentInputGenNV( mShader->mProgram, 1, genMode, 2, data.data() );
-		}
-	}
-};
-
 class CI_API Svg : public svg::Renderer {
   public:
 	Svg() = default;
@@ -394,10 +412,11 @@ class CI_API Svg : public svg::Renderer {
 	//!
 	const Rectf &getBounds() const { return mBounds; }
 
-	//!
-	void draw();
-
 	void clear() override;
+
+	bool isDrawable() const { return !mCommands.empty(); }
+
+	void draw();
 
   private:
 	// svg::Renderer callbacks.
@@ -466,6 +485,11 @@ class CI_API Svg : public svg::Renderer {
 	//! Caches a path using the specified \a uuid and \a shape. Returns a pointer to the new path.
 	const Path *insertPath( size_t uuid, const Shape2d &shape, bool isClipPath = false );
 
+	//!
+	bool findPaint( const svg::Paint &paint, size_t &index ) const;
+	//!
+	size_t insertPaint( const svg::Paint &paint );
+
 	//!  Creates or activates a linear gradient. Optionally prepares the correct shader as well.
 	Shader::Type prepareLinearGradient( const svg::Paint &paint, float opacity = 1, bool prepareShader = false );
 	//!  Creates or activates a radial gradient. Optionally prepares the correct shader as well.
@@ -473,13 +497,24 @@ class CI_API Svg : public svg::Renderer {
 	//! Creates or activates a gradient. Optionally prepares the correct shader as well.
 	Shader::Type preparePaint( const svg::Paint &paint, float opacity = 1, bool prepareShader = false );
 
+	enum Cmd : uint32_t { PUSH_CLIP, POP_CLIP, PREPARE_PAINT, FILL_PATH, STROKE_PATH };
+
+	void addCommand( Cmd cmd, GLuint pathId, const glm::mat3x2 &transform );
+	void addPushClipCommand( GLuint pathId, const glm::mat3x2 &transform, GLuint clipMask, GLuint fillRule );
+	void addPopClipCommand( GLuint pathId, const glm::mat3x2 &transform, GLuint clipMask );
+	void addPreparePaintCommand( const svg::Paint &paint, float opacity );
+	void addFillCommand( GLuint pathId, const glm::mat3x2 &transform, GLuint clipMask, GLuint fillRule );
+	void addStrokeCommand( GLuint pathId, const glm::mat3x2 &transform, GLuint clipMask );
+
 	svg::DocRef                                  mDoc;
 	gl::Context                                 *mCtx = nullptr;
+	Stacks                                       mStacks;
 	Rectf                                        mBounds;
 	Gradients                                    mGradients;
-	Stacks                                       mStacks;
-	std::unordered_map<size_t, gl::Texture2dRef> mTextures;
-	std::unordered_map<size_t, Path>             mPaths;
+	std::unordered_map<GLuint, gl::Texture2dRef> mTextures;
+	std::unordered_map<GLuint, Path>             mPaths;
+	std::vector<svg::Paint>                      mPaints;
+	std::vector<uint32_t>                        mCommands;
 };
 
 //! Stores font faces and shaders so they can be easily reused by other parts of your code.

@@ -120,8 +120,24 @@ class CI_API Paint {
   public:
 	enum Type : uint8_t { NONE, COLOR, LINEAR_GRADIENT, RADIAL_GRADIENT };
 
+	struct Stop {
+		Stop() = default;
+		Stop( float offset, const ColorA8u &color )
+			: color( color )
+			, offset( offset )
+		{
+		}
+
+		ColorA8u color;
+		float    offset;
+
+		bool operator==( const Stop &other ) const { return approxEqual( offset, other.offset ) && color == other.color; }
+		bool operator!=( const Stop &other ) const { return !( *this == other ); }
+		bool operator<( const Stop &other ) const { return offset < other.offset; }
+	};
+
 	Paint();
-	Paint( Type type );
+	Paint( Type type, std::string id = {} );
 	Paint( const ColorA8u &color );
 	Paint( std::string url ); // Marks Paint as "needs resolve".
 
@@ -141,9 +157,9 @@ class CI_API Paint {
 	bool needsResolve() const { return mNeedsResolve; }
 
 	const ColorA8u &getColor() const;
-	const ColorA8u &getColor( size_t idx ) const { return mStops[idx].second; }
-	float           getOffset( size_t idx ) const { return mStops[idx].first; }
-	
+	const ColorA8u &getColor( size_t idx ) const { return mStops[idx].color; }
+	float           getOffset( size_t idx ) const { return mStops[idx].offset; }
+
 	bool   empty() const { return mStops.empty(); }
 	size_t getNumColors() const { return mStops.size(); }
 
@@ -165,15 +181,30 @@ class CI_API Paint {
 
 	bool operator==( const Paint &rhs ) const { return mType == rhs.mType && mStops == rhs.mStops; }
 	bool operator!=( const Paint &rhs ) const { return !( *this == rhs ); }
-	
+
+	//! Sets a stop color.
+	void set( float offset, const ColorA8u &color );
+	//! Sets (x1,y1) on linear, (cx,cy) on radial.
+	void setCoords0( float a, float b )
+	{
+		mCoords0.x = a;
+		mCoords0.y = b;
+	}
+	//! Sets (x2,y2) on linear, (fx,fy) on radial.
+	void setCoords1( float a, float b )
+	{
+		mCoords1.x = a;
+		mCoords1.y = b;
+	}
+
 	//! Returns the (interpolated) color at position \a t.
 	ColorA8u at( float t, bool preMultiply = false ) const;
 
 	//! Returns the nearest stop lower than position \a t.
-	const std::pair<float, ColorA8u> &floor( float t ) const;
+	const Stop &floor( float t ) const;
 	//! Returns the nearest stop higher than position \a t.
-	const std::pair<float, ColorA8u> &ceil( float t ) const;
-	
+	const Stop &ceil( float t ) const;
+
 	auto begin() const { return mStops.begin(); }
 	auto end() const { return mStops.end(); }
 
@@ -183,13 +214,13 @@ class CI_API Paint {
 	//! Returns raw 8-bit RGBA data. You can use this to construct a Surface.
 	std::unique_ptr<uint8_t[]> data( int32_t width, int32_t height, bool preMultiply = false, float from = 0.0f, float to = 1.0f ) const;
 
-protected:
-	Type                                    mType{ NONE };
-	std::vector<std::pair<float, ColorA8u>> mStops;
+  protected:
+	Type              mType{ NONE };
+	std::vector<Stop> mStops;
 
 	vec2         mCoords0{}, mCoords1{};
 	float        mRadius0{ 0 }, mRadius1{ 0 };
-	bool         mUseObjectBoundingBox{ false };
+	bool         mUseObjectBoundingBox{ true }; // Used to default to false. Please check.
 	mat3         mTransform{};
 	bool         mSpecifiesTransform{ false };
 	SpreadMethod mSpreadMethod{ SPREAD_METHOD_PAD };
@@ -584,7 +615,7 @@ class CI_API Node {
 
 	//! Returns the ClipPath for this node. Returns NULL on failure.
 	virtual const ClipPath *getClipPath() const;
-		//! Returns the ClipPath for the specified \a style. Returns NULL on failure.
+	//! Returns the ClipPath for the specified \a style. Returns NULL on failure.
 	virtual const ClipPath *getClipPath( const Style &style ) const;
 
 	//! Returns whether the point \a pt is inside of the Node's shape.
@@ -1253,7 +1284,7 @@ class CI_API Doc : public Group {
 	Doc( const fs::path &filePath );
 	Doc( const DataSourceRef &dataSource, const fs::path &filePath = fs::path() );
 	Doc( Node *parent, const DataSourceRef &dataSource, const fs::path &filePath = fs::path() );
-	
+
 	static DocRef create( Node *parent, const XmlTree &xml );
 	static DocRef create( const fs::path &filePath );
 	static DocRef create( const DataSourceRef &dataSource, const fs::path &filePath = fs::path() );

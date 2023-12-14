@@ -201,8 +201,9 @@ Paint::Paint()
 {
 }
 
-Paint::Paint( Type type )
+Paint::Paint( Type type, std::string id )
 	: mType( type )
+	, mId( std::move( id ) )
 {
 	mStops.emplace_back( 0.0f, ColorA8u::black() );
 }
@@ -308,7 +309,7 @@ Paint Paint::parse( const char *value, bool *specified, const Node *parentNode )
 
 bool Paint::isTransparent() const
 {
-	for( const auto &[offset, color] : mStops )
+	for( const auto &[color, offset] : mStops )
 		if( color.a < 1 )
 			return true;
 
@@ -332,6 +333,22 @@ const ColorA8u &Paint::getColor() const
 	}
 }
 
+void Paint::set( float offset, const ColorA8u &color )
+{
+	const auto t = glm::clamp( offset, 0.0f, 1.0f );
+	for( auto &stop : mStops ) {
+		if( approxEqual( t, stop.offset ) ) {
+			stop.color = color;
+			return;
+		}
+		if( t < stop.offset )
+			break;
+	}
+
+	mStops.emplace_back( offset, color );
+	std::sort( mStops.begin(), mStops.end() );
+}
+
 ColorA8u Paint::at( float t, bool preMultiply ) const
 {
 	ColorA8u result;
@@ -341,35 +358,35 @@ ColorA8u Paint::at( float t, bool preMultiply ) const
 
 	// See: https://svgwg.org/svg2-draft/pservers.html#GradientStops
 	// "If two gradient stops have the same offset value, then the latter gradient stop controls the color value at the overlap point."
-	if( approxEqual( lo.first, hi.first ) ) {
-		result = hi.second; // TODO: check specifiesColor?
+	if( approxEqual( lo.offset, hi.offset ) ) {
+		result = hi.color; // TODO: check specifiesColor?
 	}
 	else {
-		float f = clamp( ( t - lo.first ) / ( hi.first - lo.first ), 0.0f, 1.0f );
-		result = lo.second.lerp( uint8_t( f * 255.0f ), hi.second ); // TODO: check specifiesColor?
+		float f = clamp( ( t - lo.offset ) / ( hi.offset - lo.offset ), 0.0f, 1.0f );
+		result = lo.color.lerp( uint8_t( f * 255.0f ), hi.color ); // TODO: check specifiesColor?
 	}
 
 	return preMultiply ? result.premultiplied() : result;
 }
 
-const std::pair<float, ColorA8u> &Paint::floor( float t ) const
+const Paint::Stop &Paint::floor( float t ) const
 {
 	assert( !mStops.empty() );
 
 	for( auto itr = mStops.rbegin(); itr != mStops.rend(); ++itr ) {
-		if( itr->first <= t )
+		if( itr->offset <= t )
 			return *itr;
 	}
 
 	return mStops.front();
 }
 
-const std::pair<float, ColorA8u> &Paint::ceil( float t ) const
+const Paint::Stop &Paint::ceil( float t ) const
 {
 	assert( !mStops.empty() );
 
 	for( auto itr = mStops.begin(); itr != mStops.end(); ++itr ) {
-		if( itr->first > t )
+		if( itr->offset > t )
 			return *itr;
 	}
 
@@ -1704,7 +1721,7 @@ Paint Gradient::asPaint() const
 
 			// See: https://svgwg.org/svg2-draft/pservers.html#GradientStops
 			// "The opacity value used for the gradient calculation is the product of the value of stop-opacity and the opacity of the value of stop-color."
-			auto &opacity = result.mStops.back().second.a;
+			auto &opacity = result.mStops.back().color.a;
 			if( stop.specifiesOpacity )
 				opacity = ( opacity * uint8_t( stop.opacity * 255.0f ) ) / 255;
 			else
