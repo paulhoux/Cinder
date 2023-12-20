@@ -1896,7 +1896,7 @@ class SvgRendererCairo : public svg::Renderer {
 			return true;
 		}
 		else if( paintStack.back().isRadialGradient() ) {
-			cairo::GradientRadial grad( paintStack.back().getCoords1(), 0, paintStack.back().getCoords0(), paintStack.back().getRadius() );
+			cairo::GradientRadial grad( paintStack.back().getCoords1(), paintStack.back().getRadius1(), paintStack.back().getCoords0(), paintStack.back().getRadius0() );
 			prepareGradientSource( node, paintStack.back(), grad, opacityStack.back() );
 			return true;
 		}
@@ -2121,7 +2121,7 @@ class SvgRendererCairo : public svg::Renderer {
 	void	pushStrokeWidth( float width ) { mStrokeWidthStack.push_back( width ); mCtx.setLineWidth( width ); }
 	void	popStrokeWidth() { mStrokeWidthStack.pop_back(); mCtx.setLineWidth( mStrokeWidthStack.back() ); }
 	void	pushFillRule( svg::FillRule rule ) {
-			mFillRuleStack.push_back( rule == svg::FILL_RULE_EVENODD ? cairo::FILL_RULE_EVEN_ODD : cairo::FILL_RULE_WINDING );
+			mFillRuleStack.push_back( rule == svg::FILL_RULE_EVEN_ODD ? cairo::FILL_RULE_EVEN_ODD : cairo::FILL_RULE_WINDING );
 			mCtx.setFillRule( mFillRuleStack.back() );
 	}
 	void	popFillRule() { mFillRuleStack.pop_back(); mCtx.setFillRule( mFillRuleStack.back() ); }	
