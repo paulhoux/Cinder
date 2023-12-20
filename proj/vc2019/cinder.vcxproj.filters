@@ -250,6 +250,12 @@
     <Filter Include="Header Files\gl\nv">
       <UniqueIdentifier>{7ff32b0d-8190-49b2-ab18-187db6196a2b}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Header Files\css">
+      <UniqueIdentifier>{e5d41c3e-340d-4b4f-ab60-f56adcfdb333}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\css">
+      <UniqueIdentifier>{823fbc2d-cf2f-4a3d-b7c8-c7f1e9e61703}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\src\cinder\Area.cpp">
@@ -1082,6 +1088,12 @@
     </ClCompile>
     <ClCompile Include="..\..\src\cinder\MediaTime.cpp">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\cinder\css\CSSParser.cpp">
+      <Filter>Source Files\css</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\cinder\css\CSSProperties.cpp">
+      <Filter>Source Files\css</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -2278,6 +2290,12 @@
     </ClInclude>
     <ClInclude Include="..\..\include\cinder\CanvasUi.h">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\cinder\css\CSSParser.h">
+      <Filter>Header Files\css</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\cinder\css\CSSProperties.h">
+      <Filter>Header Files\css</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
