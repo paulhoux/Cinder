@@ -256,6 +256,12 @@
     <Filter Include="Source Files\css">
       <UniqueIdentifier>{823fbc2d-cf2f-4a3d-b7c8-c7f1e9e61703}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\nvp">
+      <UniqueIdentifier>{28887124-540b-445d-8b59-23a6ea8db51a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\nvp">
+      <UniqueIdentifier>{f41c0b60-8606-4155-be22-750a609cc5f3}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\src\cinder\Area.cpp">
@@ -1094,6 +1100,9 @@
     </ClCompile>
     <ClCompile Include="..\..\src\cinder\css\CSSProperties.cpp">
       <Filter>Source Files\css</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\cinder\nvp\NvPath.cpp">
+      <Filter>Source Files\nvp</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -2296,6 +2305,9 @@
     </ClInclude>
     <ClInclude Include="..\..\include\cinder\css\CSSProperties.h">
       <Filter>Header Files\css</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\cinder\nvp\NvPath.h">
+      <Filter>Header Files\nvp</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
