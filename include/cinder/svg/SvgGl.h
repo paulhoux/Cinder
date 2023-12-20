@@ -28,107 +28,109 @@
 #include "cinder/gl/Texture.h"
 #include "cinder/svg/Svg.h"
 #include "cinder/Triangulate.h"
+#include "cinder/gl/draw.h"
+#include "cinder/gl/wrapper.h"
 
 namespace cinder {
 
 class CI_API SvgRendererGl : public svg::Renderer {
   public:
-	SvgRendererGl() : svg::Renderer() { 
-		mFillStack.push_back( svg::Paint( Color::black() ) );
-		mStrokeStack.push_back( svg::Paint() );
-		mFillOpacityStack.push_back( 1.0f );
-		mStrokeOpacityStack.push_back( 1.0f );
-		mStrokeWidthStack.push_back( 1.0f );
+	SvgRendererGl() = default;
+
+	~SvgRendererGl() override = default;
+
+	void start() override
+	{
+		mStacks.defaults();
 		glLineWidth( 1.0f );
 		gl::pushModelMatrix();
-		mFillRuleStack.push_back( svg::FILL_RULE_NONZERO );
 	}
-	
-	~SvgRendererGl() {
-		gl::popModelMatrix();
-	}
+
+	void finish() override { gl::popModelMatrix(); }
   
-	void	pushGroup( const svg::Group &group, float opacity ) {}
+	void	pushGroup( const svg::Group &group, float opacity ) override {}
 	
 	void	drawPath( const svg::Path &path ) override {
-		if( ! mFillStack.back().isNone() ) {
+		if( ! mStacks.fill.back().isNone() ) {
 			gl::color( getCurFillColor() );
-			Triangulator::Winding winding = ( mFillRuleStack.back() == svg::FILL_RULE_NONZERO ) ? Triangulator::WINDING_NONZERO : Triangulator::WINDING_ODD;
+			Triangulator::Winding winding = ( mStacks.fillRule.back() == svg::FILL_RULE_NONZERO ) ? Triangulator::WINDING_NONZERO : Triangulator::WINDING_ODD;
 			gl::draw( Triangulator( path.getShape2d() ).calcMesh( winding ) );
 		}
-		if( ! mStrokeStack.back().isNone() ) {
+		if( ! mStacks.stroke.back().isNone() ) {
 			gl::color( getCurStrokeColor() );
 			gl::draw( path.getShape2d() );
 		}
 	}
 
 	void	drawPolygon( const svg::Polygon &polygon ) override {
-		if( ! mFillStack.back().isNone() ) {
+		if( ! mStacks.fill.back().isNone() ) {
 			gl::color( getCurFillColor() );
-			Triangulator::Winding winding = ( mFillRuleStack.back() == svg::FILL_RULE_NONZERO ) ? Triangulator::WINDING_NONZERO : Triangulator::WINDING_ODD;
+			Triangulator::Winding winding = ( mStacks.fillRule.back() == svg::FILL_RULE_NONZERO ) ? Triangulator::WINDING_NONZERO : Triangulator::WINDING_ODD;
 			gl::draw( Triangulator( polygon.getPolyLine() ).calcMesh( winding ) );
 
 		}
-		if( ! mStrokeStack.back().isNone() ) {
+		if( ! mStacks.stroke.back().isNone() ) {
 			gl::color( getCurStrokeColor() );
 			gl::draw( polygon.getPolyLine() );
 		}
 	}
 
 	void	drawPolyline( const svg::Polyline &polyline ) override {
-		if( ! mFillStack.back().isNone() ) {
+		if( ! mStacks.fill.back().isNone() ) {
 			gl::color( getCurFillColor() );
-			Triangulator::Winding winding = ( mFillRuleStack.back() == svg::FILL_RULE_NONZERO ) ? Triangulator::WINDING_NONZERO : Triangulator::WINDING_ODD;
+			Triangulator::Winding winding = ( mStacks.fillRule.back() == svg::FILL_RULE_NONZERO ) ? Triangulator::WINDING_NONZERO : Triangulator::WINDING_ODD;
 			gl::draw( Triangulator( polyline.getPolyLine() ).calcMesh( winding ) );
 
 		}
-		if( ! mStrokeStack.back().isNone() ) {
+		if( ! mStacks.stroke.back().isNone() ) {
 			gl::color( getCurStrokeColor() );
 			gl::draw( polyline.getPolyLine() );
 		}
 	}
 
 	void	drawLine( const svg::Line &line ) override {
-		if( ! mStrokeStack.back().isNone() ) {
+		if( ! mStacks.stroke.back().isNone() ) {
 			gl::color( getCurStrokeColor() );
 			gl::drawLine( line.getPoint1(), line.getPoint2() );
 		}
 	}
 
 	void	drawRect( const svg::Rect &rect ) override {
-		if( ! mFillStack.back().isNone() ) {
+		if( ! mStacks.fill.back().isNone() ) {
 			gl::color( getCurFillColor() );
 			gl::drawSolidRect( rect.getRect() );
 		}
-		if( ! mStrokeStack.back().isNone() ) {
+		if( ! mStacks.stroke.back().isNone() ) {
 			gl::color( getCurStrokeColor() );
 			gl::drawStrokedRect( rect.getRect() );
 		}
 	}
 
 	void	drawCircle( const svg::Circle &circle ) override {
-		if( ! mFillStack.back().isNone() ) {
+		if( ! mStacks.fill.back().isNone() ) {
 			gl::color( getCurFillColor() );
 			gl::drawSolidCircle( circle.getCenter(), circle.getRadius() );
 		}
-		if( ! mStrokeStack.back().isNone() ) {
+		if( ! mStacks.stroke.back().isNone() ) {
 			gl::color( getCurStrokeColor() );
 			gl::drawStrokedCircle( circle.getCenter(), circle.getRadius() );
 		}
 	}
 
 	void	drawEllipse( const svg::Ellipse &ellipse ) override {
-		if( ! mFillStack.back().isNone() ) {
+		if( ! mStacks.fill.back().isNone() ) {
 			gl::color( getCurFillColor() );
 			gl::drawSolidEllipse( ellipse.getCenter(), ellipse.getRadiusX(), ellipse.getRadiusY() );
 		}
-		if( ! mStrokeStack.back().isNone() ) {
+		if( ! mStacks.stroke.back().isNone() ) {
 			gl::color( getCurStrokeColor() );
 			gl::drawStrokedEllipse( ellipse.getCenter(), ellipse.getRadiusX(), ellipse.getRadiusY() );
 		}
-	}	
-    
-	void	drawImage( const Surface8u &surface, const Rectf &drawRect ) {
+	}
+
+	void drawImage( const svg::Image &image ) override { drawImage( *image.getSurface(), image.getRect() ); }
+	void drawImage( const Surface8u &surface, const Rectf &drawRect ) const
+	{
 		gl::color( Color::white() );
 		gl::draw( gl::Texture::create( surface ), drawRect );
 	}
@@ -147,29 +149,36 @@ class CI_API SvgRendererGl : public svg::Renderer {
 		gl::popModelMatrix();
 	}
 	
-	void	pushFill( const svg::Paint &paint ) override { mFillStack.push_back( paint ); }
-	void	popFill() override { mFillStack.pop_back(); }
-	void	pushStroke( const svg::Paint &paint ) override { mStrokeStack.push_back( paint ); }
-	void	popStroke() override { mStrokeStack.pop_back(); }
-	void	pushFillOpacity( float opacity ) override { mFillOpacityStack.push_back( opacity ); }
-	void	popFillOpacity() override { mFillOpacityStack.pop_back(); }
-	void	pushStrokeOpacity( float opacity ) override { mStrokeOpacityStack.push_back( opacity ); }
-	void	popStrokeOpacity() override { mStrokeOpacityStack.pop_back(); }
+	void	pushFill( const svg::Paint &paint ) override { mStacks.fill.push_back( paint ); }
+	void	popFill() override { mStacks.fill.pop_back(); }
+	void	pushStroke( const svg::Paint &paint ) override { mStacks.stroke.push_back( paint ); }
+	void	popStroke() override { mStacks.stroke.pop_back(); }
+	void	pushFillOpacity( float opacity ) override { mStacks.fillOpacity.push_back( opacity ); }
+	void	popFillOpacity() override { mStacks.fillOpacity.pop_back(); }
+	void	pushStrokeOpacity( float opacity ) override { mStacks.strokeOpacity.push_back( opacity ); }
+	void	popStrokeOpacity() override { mStacks.strokeOpacity.pop_back(); }
 
-	ColorA	getCurFillColor() { ColorA result( mFillStack.back().getColor() ); result.a = mFillOpacityStack.back(); return result; }
-	ColorA	getCurStrokeColor() { ColorA result( mStrokeStack.back().getColor() ); result.a = mStrokeOpacityStack.back(); return result; }
+	ColorA getCurFillColor() const
+	{
+		ColorA result( mStacks.fill.back().getColor() );
+		result.a = mStacks.fillOpacity.back();
+		return result;
+	}
+	ColorA getCurStrokeColor() const
+	{
+		ColorA result( mStacks.stroke.back().getColor() );
+		result.a = mStacks.strokeOpacity.back();
+		return result;
+	}
 
 
-	void	pushStrokeWidth( float width ) override { mStrokeWidthStack.push_back( width ); glLineWidth( width ); }
-	void	popStrokeWidth() override { mStrokeWidthStack.pop_back(); glLineWidth( mStrokeWidthStack.back() ); }
-	void	pushFillRule( svg::FillRule rule ) override { mFillRuleStack.push_back( rule ); }
-	void	popFillRule() override { mFillRuleStack.pop_back(); }	
+	void	pushStrokeWidth( float width ) override { mStacks.strokeWidth.push_back( width ); glLineWidth( width ); }
+	void	popStrokeWidth() override { mStacks.strokeWidth.pop_back(); glLineWidth( mStacks.strokeWidth.back() ); }
+	void	pushFillRule( svg::FillRule rule ) override { mStacks.fillRule.push_back( rule ); }
+	void	popFillRule() override { mStacks.fillRule.pop_back(); }	
 
-
-	std::vector<svg::Paint>		mFillStack, mStrokeStack;
-	std::vector<float>			mFillOpacityStack, mStrokeOpacityStack;
-	std::vector<float>			mStrokeWidthStack;
-	std::vector<svg::FillRule>	mFillRuleStack;
+private:
+	Stacks mStacks;
 };
 
 namespace gl {
