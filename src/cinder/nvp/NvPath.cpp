@@ -692,7 +692,7 @@ void Path::setPath( const std::vector<GLubyte> &commands, const std::vector<GLfl
 Face::Face( const Font &font )
 	: mFont( font )
 {
-	mNumGlyphs = mFont.getNumGlyphs();
+	mNumGlyphs = (GLsizei)mFont.getNumGlyphs();
 	mBaseId = gl::genPathsNV( mNumGlyphs );
 
 	createPaths();
@@ -1061,7 +1061,7 @@ void Svg::addPreparePaintCommand( const svg::Paint &paint, float opacity )
 {
 	mCommands.push_back( PREPARE_PAINT );
 
-	size_t paintId = insertPaint( paint );
+	uint32_t paintId = uint32_t( insertPaint( paint ) );
 	mCommands.push_back( paintId );
 
 	size_t index = mCommands.size();
@@ -1084,8 +1084,8 @@ void Svg::addStrokeCommand( GLuint pathId, const glm::mat3x2 &transform, GLuint 
 
 const Path *Svg::findPath( size_t uuid ) const
 {
-	if( mPaths.count( uuid ) )
-		return &mPaths.at( uuid );
+	if( mPaths.count( GLuint( uuid ) ) )
+		return &mPaths.at( GLuint( uuid ) );
 
 	return nullptr;
 }
@@ -1093,11 +1093,11 @@ const Path *Svg::findPath( size_t uuid ) const
 const Path *Svg::insertPath( size_t uuid, const Path2d &path, bool isClipPath )
 {
 	if( !findPath( uuid ) ) {
-		mPaths.insert_or_assign( uuid, Path( path ) );
+		mPaths.insert_or_assign( GLuint( uuid ), Path( path ) );
 
 		// Set path parameters.
 		if( !isClipPath ) {
-			auto &path = mPaths.at( uuid );
+			auto &path = mPaths.at( GLuint( uuid ) );
 			path.setMiterLimit( mStacks.miterLimit.back() );
 			path.setDashPattern( mStacks.dashArray.back() );
 			path.setDashOffset( mStacks.dashOffset.back() );
@@ -1108,17 +1108,17 @@ const Path *Svg::insertPath( size_t uuid, const Path2d &path, bool isClipPath )
 		}
 	}
 
-	return &mPaths.at( uuid );
+	return &mPaths.at( GLuint( uuid ) );
 }
 
 const Path *Svg::insertPath( size_t uuid, const Shape2d &shape, bool isClipPath )
 {
 	if( !findPath( uuid ) ) {
-		mPaths.insert_or_assign( uuid, Path( shape ) );
+		mPaths.insert_or_assign( GLuint( uuid ), Path( shape ) );
 
 		// Set path parameters.
 		if( !isClipPath ) {
-			auto &path = mPaths.at( uuid );
+			auto &path = mPaths.at( GLuint( uuid ) );
 			path.setMiterLimit( mStacks.miterLimit.back() );
 			path.setDashPattern( mStacks.dashArray.back() );
 			path.setDashOffset( mStacks.dashOffset.back() );
@@ -1129,7 +1129,7 @@ const Path *Svg::insertPath( size_t uuid, const Shape2d &shape, bool isClipPath 
 		}
 	}
 
-	return &mPaths.at( uuid );
+	return &mPaths.at( GLuint( uuid ) );
 }
 
 bool Svg::findPaint( const svg::Paint &paint, size_t &index ) const
@@ -1555,7 +1555,7 @@ void Svg::drawImage( const svg::Image &image )
 	GLuint fillRule = mStacks.fillRule.back() == svg::FILL_RULE_EVEN_ODD ? 0x01 : 0xFF;
 
 	// Obtain image texture.
-	if( !mTextures.count( image.getUuid() ) ) {
+	if( !mTextures.count( GLuint( image.getUuid() ) ) ) {
 		auto svg = image.getSvg();
 		if( svg ) {
 			// Render embedded SVG to texture.
@@ -1573,16 +1573,16 @@ void Svg::drawImage( const svg::Image &image )
 
 			auto texture = canvas.getTexture();
 			if( texture )
-				mTextures.insert_or_assign( image.getUuid(), texture );
+				mTextures.insert_or_assign( GLuint( image.getUuid() ), texture );
 		}
 		else {
 			auto surface = image.getSurface();
 			if( surface )
-				mTextures.insert_or_assign( image.getUuid(), gl::Texture2d::create( *surface, gl::Texture2d::Format().loadTopDown( false ) ) );
+				mTextures.insert_or_assign( GLuint( image.getUuid() ), gl::Texture2d::create( *surface, gl::Texture2d::Format().loadTopDown( false ) ) );
 		}
 	}
 
-	const auto &texture = mTextures.at( image.getUuid() );
+	const auto &texture = mTextures.at( GLuint( image.getUuid() ) );
 
 	// Render image.
 	gl::ScopedTextureBind scpImage( texture, 2 );

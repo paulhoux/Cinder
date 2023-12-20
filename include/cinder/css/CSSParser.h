@@ -173,11 +173,11 @@ class Parser {
 	//!
 	void parseInAtBlock( std::string &css, std::string::size_type &i, ParseStatus &status, ParseStatus &from );
 	//!
-	void parseInSelector( std::string &css, std::string::size_type &i, ParseStatus &status, ParseStatus &from, bool &invalid_at, char &str_char, int str_size );
+	void parseInSelector( std::string &css, std::string::size_type &i, ParseStatus &status, ParseStatus &from, bool &invalid_at, char &str_char, std::string::size_type str_size );
 	//!
 	void parseInProperty( std::string &css, std::string::size_type &i, ParseStatus &status, ParseStatus &from, bool &invalid_at );
 	//!
-	void parseInValue( std::string &css, std::string::size_type &i, ParseStatus &status, ParseStatus &from, bool &invalid_at, char &str_char, bool &pn, int str_size );
+	void parseInValue( std::string &css, std::string::size_type &i, ParseStatus &status, ParseStatus &from, bool &invalid_at, char &str_char, bool &pn, std::string::size_type str_size );
 	//!
 	void parseInComment( std::string &css, std::string::size_type &i, ParseStatus &status, ParseStatus &from, std::string &cur_comment );
 	//!

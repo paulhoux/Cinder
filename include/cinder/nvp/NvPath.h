@@ -31,7 +31,7 @@ This code is intended for use with the Cinder C++ library: http://libcinder.org
 #include "cinder/svg/Svg.h"
 
 namespace cinder {
-	
+
 namespace nvp {
 
 // Forward declarations.

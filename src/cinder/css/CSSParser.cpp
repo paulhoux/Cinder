@@ -350,7 +350,7 @@ void Parser::parseInAtBlock( std::string &css, std::string::size_type &i, ParseS
 	}
 	else {
 		// Skip excess whitespace
-		int lastpos = mCurAt.length() - 1;
+		long long lastpos = mCurAt.length() - 1;
 		if( lastpos == -1 || !( ( isWhiteSpace( mCurAt[lastpos] ) || isToken( mCurAt, lastpos ) && mCurAt[lastpos] == ',' ) && isWhiteSpace( css[i] ) ) ) {
 			mCurAt += css[i];
 		}
@@ -358,7 +358,7 @@ void Parser::parseInAtBlock( std::string &css, std::string::size_type &i, ParseS
 }
 
 
-void Parser::parseInSelector( std::string &css, std::string::size_type &i, ParseStatus &status, ParseStatus &from, bool &invalid_at, char &str_char, int str_size )
+void Parser::parseInSelector( std::string &css, std::string::size_type &i, ParseStatus &status, ParseStatus &from, bool &invalid_at, char &str_char, std::string::size_type str_size )
 {
 	if( isToken( css, i ) ) {
 		// if(css_input[i] == '/' && CSSUtils::s_at(css_input,i+1) == '*' &&
@@ -385,7 +385,7 @@ void Parser::parseInSelector( std::string &css, std::string::size_type &i, Parse
 			if( invalid_at ) {
 				mCurSelector = "@";
 				std::string invalid_at_name;
-				for( int j = i + 1; j < str_size; ++j ) {
+				for( auto j = i + 1; j < str_size; ++j ) {
 					if( !isAlpha( css[j] ) ) {
 						return;
 					}
@@ -416,7 +416,7 @@ void Parser::parseInSelector( std::string &css, std::string::size_type &i, Parse
 		}
 		else if( css[i] == ',' ) {
 			mCurSelector = trim( mCurSelector ) + ",";
-			mSelSeparate.push_back( mCurSelector.length() );
+			mSelSeparate.push_back( int( mCurSelector.length() ) );
 		}
 		else if( css[i] == '\\' ) {
 			mCurSelector += unicode( css, i );
@@ -427,7 +427,7 @@ void Parser::parseInSelector( std::string &css, std::string::size_type &i, Parse
 		}
 	}
 	else {
-		int lastpos = mCurSelector.length() - 1;
+		long long lastpos = mCurSelector.length() - 1;
 		if( lastpos == -1 || !( ( isWhiteSpace( mCurSelector[lastpos] ) || isToken( mCurSelector, lastpos ) && mCurSelector[lastpos] == ',' ) && isWhiteSpace( css[i] ) ) ) {
 			mCurSelector += css[i];
 		}
@@ -488,7 +488,7 @@ void Parser::parseInProperty( std::string &css, std::string::size_type &i, Parse
 }
 
 
-void Parser::parseInValue( std::string &css, std::string::size_type &i, ParseStatus &status, ParseStatus &from, bool &invalid_at, char &str_char, bool &pn, int str_size )
+void Parser::parseInValue( std::string &css, std::string::size_type &i, ParseStatus &status, ParseStatus &from, bool &invalid_at, char &str_char, bool &pn, std::string::size_type str_size )
 {
 	pn = ( css[i] == '\n' || css[i] == '\r' ) && propertyIsNext( css, i + 1 ) || i == str_size - 1;
 	if( pn ) {
@@ -610,7 +610,7 @@ void Parser::parseInValue( std::string &css, std::string::size_type &i, ParseSta
 					mCurSubValueArray.emplace_back( ")" );
 				}
 			}
-			
+
 			// Always add token, even if invalid.
 			addToken( VALUE, buildValue( mCurSubValueArray ) );
 
