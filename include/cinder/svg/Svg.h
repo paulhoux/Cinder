@@ -360,6 +360,15 @@ class CI_API Renderer {
 			textPen.emplace_back( 0.0f, 0.0f );
 			textRotation.push_back( 0.0f );
 		}
+
+		//! Work-around for missing support of group opacity: this combines all opacities into a single value.
+		float calcGroupOpacity() const
+		{
+			float result = 1;
+			for( const auto opacity : groupOpacity )
+				result *= opacity;
+			return result;
+		}
 	};
 
   protected:
@@ -1149,7 +1158,7 @@ class CI_API Use : public Node {
 
 	void parse( const XmlTree &xml );
 
-	const Node *mReferenced;
+	const Node *mReferenced = nullptr;
 };
 
 //!

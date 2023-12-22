@@ -396,20 +396,13 @@ class CI_API Svg : public svg::Renderer {
 	explicit Svg( const DataSourceRef &src );
 	explicit Svg( const svg::DocRef &svg );
 
-	//!
-	float getWidth() const { return mBounds.getWidth(); }
-	//!
-	float getHeight() const { return mBounds.getHeight(); }
-	//!
-	vec2 getSize() const { return mBounds.getSize(); }
-	//!
+	float        getWidth() const { return mBounds.getWidth(); }
+	float        getHeight() const { return mBounds.getHeight(); }
+	vec2         getSize() const { return mBounds.getSize(); }
 	const Rectf &getBounds() const { return mBounds; }
 
+	//! Clears rendering cache.
 	void clear() override;
-
-	bool isDrawable() const { return !mCommands.empty(); }
-
-	void draw();
 
   private:
 	// svg::Renderer callbacks.
@@ -428,7 +421,7 @@ class CI_API Svg : public svg::Renderer {
 	void drawCircle( const svg::Circle & ) override;
 	void drawEllipse( const svg::Ellipse & ) override;
 	void drawImage( const svg::Image & ) override;
-	void drawTextSpan( const svg::TextSpan & ) override;
+	void drawTextSpan( const svg::TextSpan & ) override { /* currently not implemented */ }
 	void pushMatrix( const mat3 & ) override;
 	void popMatrix() override;
 	void pushFill( const svg::Paint & ) override;
@@ -462,14 +455,14 @@ class CI_API Svg : public svg::Renderer {
 	bool shouldRender() const { return !( mStacks.fill.back().isNone() && mStacks.stroke.back().isNone() ); }
 	//! Generates a draw call for visible paths.
 	void render( const Path &path );
-	//!
+	//! Fills the path with the specified \a paint and \a opacity.
 	void fill( GLuint pathId, const svg::Paint &paint, float opacity );
-	//!
+	//! Strokes the path with the specified \a paint and \a opacity.
 	void stroke( GLuint pathId, const svg::Paint &paint, float opacity );
-	//!
-	void fillText( GLuint baseId, GLsizei count, const glm::mat3x2 *transforms, const uint32_t *indices, const svg::Paint &paint, float opacity );
-	//!
-	void strokeText( GLuint baseId, GLsizei count, const glm::mat3x2 *transforms, const uint32_t *indices, const svg::Paint &paint, float opacity );
+	//! Strokes the instances with the specified \a paint and \a opacity.
+	void fillInstanced( GLuint baseId, GLsizei count, const glm::mat3x2 *transforms, const uint32_t *indices, const svg::Paint &paint, float opacity );
+	//! Strokes the instances with the specified \a paint and \a opacity.
+	void strokeInstanced( GLuint baseId, GLsizei count, const glm::mat3x2 *transforms, const uint32_t *indices, const svg::Paint &paint, float opacity );
 
 	//! Returns whether the path with the specified \a uuid exists and returns a pointer to the path if it exists.
 	const Path *findPath( size_t uuid ) const;
@@ -478,9 +471,9 @@ class CI_API Svg : public svg::Renderer {
 	//! Caches a path using the specified \a uuid and \a shape. Returns a pointer to the new path.
 	const Path *insertPath( size_t uuid, const Shape2d &shape, bool isClipPath = false );
 
-	//!
+	//! Returns whether the paint is cached and set \a index to the position of the paint in the cache.
 	bool findPaint( const svg::Paint &paint, size_t &index ) const;
-	//!
+	//! Stores the paint in the cache and returns the index to the position of the paint in the cache.
 	size_t insertPaint( const svg::Paint &paint );
 
 	//!  Creates or activates a linear gradient. Optionally prepares the correct shader as well.
@@ -490,14 +483,8 @@ class CI_API Svg : public svg::Renderer {
 	//! Creates or activates a gradient. Optionally prepares the correct shader as well.
 	Shader::Type preparePaint( const svg::Paint &paint, float opacity = 1, bool prepareShader = false );
 
-	enum Cmd : uint32_t { PUSH_CLIP, POP_CLIP, PREPARE_PAINT, FILL_PATH, STROKE_PATH };
-
-	void addCommand( Cmd cmd, GLuint pathId, const glm::mat3x2 &transform );
-	void addPushClipCommand( GLuint pathId, const glm::mat3x2 &transform, GLuint clipMask, GLuint fillRule );
-	void addPopClipCommand( GLuint pathId, const glm::mat3x2 &transform, GLuint clipMask );
-	void addPreparePaintCommand( const svg::Paint &paint, float opacity );
-	void addFillCommand( GLuint pathId, const glm::mat3x2 &transform, GLuint clipMask, GLuint fillRule );
-	void addStrokeCommand( GLuint pathId, const glm::mat3x2 &transform, GLuint clipMask );
+	//! Returns the stencil mask based on the current fill rule.
+	GLuint getStencilMask() const { return mStacks.fillRule.back() == svg::FILL_RULE_EVEN_ODD ? 0x01 : 0xFF; }
 
 	svg::DocRef                                  mDoc;
 	gl::Context                                 *mCtx = nullptr;
@@ -507,7 +494,6 @@ class CI_API Svg : public svg::Renderer {
 	std::unordered_map<GLuint, gl::Texture2dRef> mTextures;
 	std::unordered_map<GLuint, Path>             mPaths;
 	std::vector<svg::Paint>                      mPaints;
-	std::vector<uint32_t>                        mCommands;
 };
 
 //! Stores font faces and shaders so they can be easily reused by other parts of your code.

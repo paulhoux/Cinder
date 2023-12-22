@@ -2476,7 +2476,7 @@ Group::~Group()
 void Group::parse( const XmlTree &xml )
 {
 	if( !approxEqual( getOpacity(), 1.0f ) )
-		CI_LOG_W( "Group '" << getId() << "' opacity of " << getOpacity() << " is currently not supported." );
+		CI_LOG_W( "Group '" << getId() << "' opacity of " << getOpacity() << " is currently not supported. A work-around is provided, but results may vary." );
 
 	for( XmlTree::ConstIter treeIt = xml.begin(); treeIt != xml.end(); ++treeIt ) {
 		Node *node = create( this, *treeIt );

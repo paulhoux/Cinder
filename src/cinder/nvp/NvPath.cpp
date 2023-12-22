@@ -692,7 +692,7 @@ void Path::setPath( const std::vector<GLubyte> &commands, const std::vector<GLfl
 Face::Face( const Font &font )
 	: mFont( font )
 {
-	mNumGlyphs = (GLsizei)mFont.getNumGlyphs();
+	mNumGlyphs = GLsizei( mFont.getNumGlyphs() );
 	mBaseId = gl::genPathsNV( mNumGlyphs );
 
 	createPaths();
@@ -1034,54 +1034,6 @@ Shader::Type Svg::preparePaint( const svg::Paint &paint, float opacity, bool pre
 	return Shader::Type::SOLID_COLOR;
 }
 
-void Svg::addCommand( Cmd cmd, GLuint pathId, const glm::mat3x2 &transform )
-{
-	mCommands.push_back( cmd );
-	mCommands.push_back( pathId );
-
-	size_t index = mCommands.size();
-	mCommands.resize( mCommands.size() + sizeof( transform ) / sizeof( uint32_t ) );
-	memcpy( mCommands.data() + index, glm::value_ptr( transform ), sizeof( transform ) );
-}
-
-void Svg::addPushClipCommand( GLuint pathId, const glm::mat3x2 &transform, GLuint clipMask, GLuint fillRule )
-{
-	addCommand( PUSH_CLIP, pathId, transform );
-	mCommands.push_back( clipMask );
-	mCommands.push_back( fillRule );
-}
-
-void Svg::addPopClipCommand( GLuint pathId, const glm::mat3x2 &transform, GLuint clipMask )
-{
-	addCommand( POP_CLIP, pathId, transform );
-	mCommands.push_back( clipMask );
-}
-
-void Svg::addPreparePaintCommand( const svg::Paint &paint, float opacity )
-{
-	mCommands.push_back( PREPARE_PAINT );
-
-	uint32_t paintId = uint32_t( insertPaint( paint ) );
-	mCommands.push_back( paintId );
-
-	size_t index = mCommands.size();
-	mCommands.resize( mCommands.size() + sizeof( opacity ) / sizeof( uint32_t ) );
-	memcpy( mCommands.data() + index, &opacity, sizeof( opacity ) );
-}
-
-void Svg::addFillCommand( GLuint pathId, const glm::mat3x2 &transform, GLuint clipMask, GLuint fillRule )
-{
-	addCommand( FILL_PATH, pathId, transform );
-	mCommands.push_back( clipMask );
-	mCommands.push_back( fillRule );
-}
-
-void Svg::addStrokeCommand( GLuint pathId, const glm::mat3x2 &transform, GLuint clipMask )
-{
-	addCommand( STROKE_PATH, pathId, transform );
-	mCommands.push_back( clipMask );
-}
-
 const Path *Svg::findPath( size_t uuid ) const
 {
 	if( mPaths.count( GLuint( uuid ) ) )
@@ -1160,9 +1112,6 @@ void Svg::start()
 {
 	assert( nullptr == mCtx );
 
-	// Clear commands.
-	mCommands.clear();
-
 	// Clear stacks.
 	mStacks.defaults();
 
@@ -1222,135 +1171,6 @@ void Svg::clear()
 	mTextures.clear();
 	mPaths.clear();
 	mPaints.clear();
-	mCommands.clear();
-}
-
-void Svg::draw()
-{
-	if( mCommands.empty() )
-		return;
-
-	start();
-
-	ShaderRef shader;
-
-	size_t index = 0;
-	while( index < mCommands.size() ) {
-		const auto cmd = Cmd( mCommands.at( index++ ) );
-
-		if( cmd == PREPARE_PAINT ) {
-			const auto  paintId = mCommands.at( index++ );
-			const float opacity = *reinterpret_cast<float *>( mCommands.data() + index );
-			index += sizeof( float ) / sizeof( uint32_t );
-
-			if( shader )
-				shader->unbind();
-
-			const auto &paint = mPaints.at( paintId );
-			shader = Cache::loadShader( preparePaint( paint, opacity, true ) );
-			shader->bind();
-
-			ColorA solidColor = paint.getColor();
-			solidColor.a *= opacity;
-			shader->setColor( solidColor );
-		}
-		else {
-			const auto        pathId = mCommands.at( index++ );
-			const glm::mat3x2 transform = *reinterpret_cast<glm::mat3x2 *>( mCommands.data() + index );
-			index += sizeof( glm::mat3x2 ) / sizeof( uint32_t );
-
-			const auto clipMask = mCommands.at( index++ );
-			GLuint     coverMask = clipMask - 1;
-
-			gl::matrixLoadfEXT( GL_MODELVIEW, value_ptr( gl::getModelView() ) );
-			gl::matrixMult3x2fNV( GL_MODELVIEW, value_ptr( transform ) );
-
-			switch( cmd ) {
-			case Cmd::PUSH_CLIP: {
-				// Render shape to stencil buffer to use it as a clip-path.
-				gl::ScopedColorMask   scpColorMask( GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE ); // Don't write to color buffer.
-				gl::ScopedStencilMask scpStencilMask( coverMask | clipMask );                 // Don't write to previous clip bits.
-
-				gl::stencilOp( GL_KEEP, GL_KEEP, GL_REPLACE );
-				gl::stencilFunc( GL_NOTEQUAL, GLint( clipMask ), coverMask );
-
-				const auto fillRule = mCommands.at( index++ );
-				gl::stencilFillPathNV( pathId, GL_COUNT_UP_NV, coverMask & fillRule ); // Write path to LSB portion (step 1).
-
-				gl::coverFillPathNV( pathId, GL_BOUNDING_BOX_NV ); // Convert LSB portion to clip bit (step 3).
-			} break;
-			case Cmd::POP_CLIP: {
-				// Render shape to stencil buffer to use it as a clip-path.
-				gl::ScopedColorMask   scpColorMask( GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE ); // Don't write to color buffer.
-				gl::ScopedStencilMask scpStencilMask( coverMask | clipMask );                 // Don't write to previous clip bits.
-
-				gl::stencilOp( GL_KEEP, GL_KEEP, GL_ZERO );
-				gl::stencilFunc( GL_ALWAYS, GLint( clipMask ), coverMask );
-
-				gl::coverFillPathNV( pathId, GL_BOUNDING_BOX_NV ); // Clear stencil buffer bits (step 7).
-			} break;
-			case Cmd::FILL_PATH: {
-				const auto fillRule = mCommands.at( index++ );
-
-				if( clipMask ) {
-					// Render clipped path.
-					gl::ScopedStencilMask scpStencilMask( coverMask | clipMask ); // Don't write to previous clip bits.
-
-					GLuint mask = coverMask << 1 | 0x01;
-					gl::stencilFunc( GL_LESS, GLint( ~mask & 0xFF ), 0xFF ); // (step 5).
-					gl::stencilOp( GL_KEEP, GL_KEEP, GL_KEEP );
-
-					gl::stencilThenCoverFillPathNV( pathId, GL_COUNT_UP_NV, fillRule & coverMask, GL_BOUNDING_BOX_NV ); // (step 5).
-
-					// Remove path from stencil buffer (step 6).
-					gl::ScopedColorMask scpColorMask( GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE ); // Don't write to color buffer.
-
-					gl::stencilOp( GL_KEEP, GL_KEEP, GL_ZERO );
-					gl::stencilFunc( GL_ALWAYS, GLint( clipMask ), coverMask );
-
-					gl::coverFillPathNV( pathId, GL_BOUNDING_BOX_NV );
-				}
-				else {
-					gl::stencilFunc( GL_NOTEQUAL, 0, fillRule );
-					gl::stencilOp( GL_KEEP, GL_KEEP, GL_ZERO );
-
-					gl::stencilThenCoverFillPathNV( pathId, GL_COUNT_UP_NV, fillRule, GL_BOUNDING_BOX_NV );
-				}
-			} break;
-			case STROKE_PATH: {
-				if( clipMask ) {
-					// Render clipped path.
-					gl::ScopedStencilMask scpStencilMask( coverMask | clipMask ); // Don't write to previous clip bits.
-
-					GLuint mask = coverMask << 1 | 0x01;
-					gl::stencilFunc( GL_LESS, GLint( ~mask & 0xFF ), 0xFF ); // (step 5).
-					gl::stencilOp( GL_KEEP, GL_KEEP, GL_KEEP );
-
-					gl::stencilThenCoverStrokePathNV( pathId, GL_COUNT_UP_NV, coverMask, GL_BOUNDING_BOX_NV ); // (step 5).
-
-					// Remove path from stencil buffer (step 6).
-					gl::ScopedColorMask scpColorMask( GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE ); // Don't write to color buffer.
-
-					gl::stencilOp( GL_KEEP, GL_KEEP, GL_ZERO );
-					gl::stencilFunc( GL_ALWAYS, GLint( clipMask ), coverMask );
-
-					gl::coverStrokePathNV( pathId, GL_BOUNDING_BOX_NV );
-				}
-				else {
-					gl::stencilFunc( GL_NOTEQUAL, 0, 0xFF );
-					gl::stencilOp( GL_KEEP, GL_KEEP, GL_ZERO );
-
-					gl::stencilThenCoverStrokePathNV( pathId, GL_COUNT_UP_NV, 0xFF, GL_BOUNDING_BOX_NV );
-				}
-			} break;
-			}
-		}
-	}
-
-	if( shader )
-		shader->unbind();
-
-	finish();
 }
 
 void Svg::pushGroup( const svg::Group &group, float opacity )
@@ -1392,7 +1212,7 @@ void Svg::pushClipPath( const svg::ClipPath &clippath )
 		GLuint pathId = path->getId();
 		GLuint clipMask = 0x80 >> mStacks.clipPath.size();
 		GLuint coverMask = clipMask - 1;
-		GLuint fillRule = mStacks.fillRule.back() == svg::FILL_RULE_EVEN_ODD ? 0x01 : 0xFF;
+		GLuint stencilMask = getStencilMask();
 
 		// Render shape to stencil buffer to use it as a clip-path.
 		gl::matrixLoadfEXT( GL_MODELVIEW, value_ptr( gl::getModelView() ) );
@@ -1404,12 +1224,9 @@ void Svg::pushClipPath( const svg::ClipPath &clippath )
 		gl::stencilOp( GL_KEEP, GL_KEEP, GL_REPLACE );
 		gl::stencilFunc( GL_NOTEQUAL, GLint( clipMask ), coverMask );
 
-		gl::stencilFillPathNV( pathId, GL_COUNT_UP_NV, coverMask & fillRule ); // Write path to LSB portion (step 1).
+		gl::stencilFillPathNV( pathId, GL_COUNT_UP_NV, coverMask & stencilMask ); // Write path to LSB portion (step 1).
 
 		gl::coverFillPathNV( pathId, GL_BOUNDING_BOX_NV ); // Convert LSB portion to clip bit (step 3).
-
-		// Store in command buffer.
-		addPushClipCommand( pathId, mStacks.matrix.back(), clipMask, fillRule );
 	}
 
 	//
@@ -1445,9 +1262,6 @@ void Svg::popClipPath()
 		gl::stencilFunc( GL_ALWAYS, GLint( clipMask ), coverMask );
 
 		gl::coverFillPathNV( pathId, GL_BOUNDING_BOX_NV ); // Clear stencil buffer bits (step 7).
-
-		// Store in command buffer.
-		addPopClipCommand( pathId, mStacks.matrix.back(), clipMask );
 	}
 
 	//
@@ -1552,7 +1366,6 @@ void Svg::drawImage( const svg::Image &image )
 
 	//
 	GLuint pathId = ptr->getId();
-	GLuint fillRule = mStacks.fillRule.back() == svg::FILL_RULE_EVEN_ODD ? 0x01 : 0xFF;
 
 	// Obtain image texture.
 	if( !mTextures.count( GLuint( image.getUuid() ) ) ) {
@@ -1606,7 +1419,8 @@ void Svg::drawImage( const svg::Image &image )
 		gl::stencilFunc( GL_LESS, GLint( ~mask & 0xFF ), 0xFF ); // (step 5).
 		gl::stencilOp( GL_KEEP, GL_KEEP, GL_KEEP );
 
-		gl::stencilThenCoverFillPathNV( pathId, GL_COUNT_UP_NV, fillRule & coverMask, GL_BOUNDING_BOX_NV ); // (step 5).
+		GLuint stencilMask = getStencilMask();
+		gl::stencilThenCoverFillPathNV( pathId, GL_COUNT_UP_NV, stencilMask & coverMask, GL_BOUNDING_BOX_NV ); // (step 5).
 
 		// Remove shape from stencil buffer (step 6).
 		gl::ScopedColorMask scpColorMask( GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE ); // Don't write to color buffer.
@@ -1617,92 +1431,12 @@ void Svg::drawImage( const svg::Image &image )
 		gl::coverFillPathNV( pathId, GL_BOUNDING_BOX_NV );
 	}
 	else {
-		gl::stencilFunc( GL_NOTEQUAL, 0, fillRule );
+		GLuint stencilMask = getStencilMask();
+		gl::stencilFunc( GL_NOTEQUAL, 0, stencilMask );
 		gl::stencilOp( GL_KEEP, GL_KEEP, GL_ZERO );
 
-		gl::stencilThenCoverFillPathNV( pathId, GL_COUNT_UP_NV, fillRule, GL_BOUNDING_BOX_NV );
+		gl::stencilThenCoverFillPathNV( pathId, GL_COUNT_UP_NV, stencilMask, GL_BOUNDING_BOX_NV );
 	}
-}
-
-void Svg::drawTextSpan( const svg::TextSpan &textSpan )
-{
-	// assert( gl::context() == mCtx );
-
-	// const auto font = textSpan.getFont();
-	// if( font ) {
-	//	// Construct text.
-	//	text::AttrString text;
-	//	text << font << textSpan.getString();
-
-	//	text::Frame                layout( text );
-	//	text::Typesetter::Iterator iter = layout.getIterator();
-
-	//	// Calculate origin.
-	//	vec2 offset{ 0, -font->getAscender() };
-	//	measureString( text, &offset.x );
-
-	//	switch( textSpan.getTextAnchor() ) {
-	//	case svg::TEXT_ANCHOR_START:
-	//		offset.x *= 0.0f;
-	//		break;
-	//	case svg::TEXT_ANCHOR_MIDDLE:
-	//		offset.x *= -0.5f;
-	//		break;
-	//	case svg::TEXT_ANCHOR_END:
-	//		offset.x *= -1.0f;
-	//		break;
-	//	}
-
-	//	offset += mStacks.textPen.back();
-
-	//	// Render text as instanced paths.
-	//	std::vector<glm::mat3x2> transforms;
-
-	//	vec2 lineDrawOffset;
-
-	//	const text::Run *runPtr;
-	//	while( layout.nextRun( iter, &runPtr, &lineDrawOffset ) ) {
-	//		if( runPtr->isPlaceholder() )
-	//			continue;
-
-	//		// Cache the font face.
-	//		auto face = Cache::loadFace( runPtr->getFont()->getFace() );
-
-	//		// Create transforms.
-	//		transforms.clear();
-	//		transforms.reserve( runPtr->getNumGlyphs() );
-
-	//		const auto origin = offset + lineDrawOffset + runPtr->getDrawOffset();
-	//		const auto scale = runPtr->getFont()->getSize() / Face::DEFAULT_SIZE;
-	//		const auto positions = runPtr->getGlyphPositions();
-	//		const auto orientations = runPtr->getGlyphOrientations();
-	//		const auto indices = runPtr->getGlyphIndices();
-
-	//		for( size_t i = 0; i < runPtr->getNumGlyphs(); ++i ) {
-	//			const auto position = origin + positions[i];
-	//			const auto normal = orientations ? scale * orientations[i] : vec2( 0, -scale );
-	//			transforms.emplace_back( -normal.y, normal.x, normal.x, normal.y, position.x, position.y );
-
-	//			if( !mStacks.stroke.back().isNone() ) {
-	//				GLuint pathId = face->getBaseId() + indices[i];
-	//				//  gl::pathDashArrayNV( pathId, static_cast<GLsizei>( pattern.size() ), pattern.data() );
-	//				//  gl::pathParameterfNV( pathId, GL_PATH_DASH_OFFSET_NV, mStacks.dashOffset.back() );
-	//				//  gl::pathParameteriNV( pathId, GL_PATH_DASH_CAPS_NV, GLint( mStacks.lineCap.back() ) );
-	//				//  gl::pathParameteriNV( pathId, GL_PATH_INITIAL_DASH_CAP_NV, GLint( mStacks.lineCap.back() ) );
-	//				//  gl::pathParameteriNV( pathId, GL_PATH_TERMINAL_DASH_CAP_NV, GLint( mStacks.lineCap.back() ) );
-	//				gl::pathParameteriNV( pathId, GL_PATH_END_CAPS_NV, GLint( toCapsStyle( mStacks.lineCap.back() ) ) );
-	//				gl::pathParameteriNV( pathId, GL_PATH_JOIN_STYLE_NV, GLint( toJoinStyle( mStacks.lineJoin.back() ) ) );
-	//				gl::pathParameterfNV( pathId, GL_PATH_STROKE_WIDTH_NV, GLfloat( mStacks.strokeWidth.back() * Face::DEFAULT_SIZE / runPtr->getFont()->getSize() ) );
-	//				gl::pathParameterfNV( pathId, GL_PATH_MITER_LIMIT_NV, GLfloat( mStacks.miterLimit.back() ) );
-	//			}
-	//		}
-
-	//		if( !mStacks.fill.back().isNone() )
-	//			fillText( face->getBaseId(), transforms.size(), transforms.data(), indices, mStacks.fill.back(), mStacks.fillOpacity.back() * mStacks.groupOpacity.back() );
-	//		if( !mStacks.stroke.back().isNone() )
-	//			strokeText( face->getBaseId(), transforms.size(), transforms.data(), indices, mStacks.stroke.back(), mStacks.strokeOpacity.back() * mStacks.groupOpacity.back() );
-	//	}
-	//}
 }
 
 void Svg::pushMatrix( const mat3 &m )
@@ -1861,20 +1595,20 @@ void Svg::render( const Path &path )
 		// even though the stroke-width makes it look like they should have a bounding box with non-zero width and height.
 		if( mStacks.fill.back().fallback() && approxZero( path.getFillBounds().calcArea() ) ) {
 			if( !mStacks.fill.back().fallback()->isNone() )
-				fill( path.getId(), *mStacks.fill.back().fallback(), mStacks.fillOpacity.back() * mStacks.groupOpacity.back() );
+				fill( path.getId(), *mStacks.fill.back().fallback(), mStacks.fillOpacity.back() * mStacks.calcGroupOpacity() );
 		}
 		else
-			fill( path.getId(), mStacks.fill.back(), mStacks.fillOpacity.back() * mStacks.groupOpacity.back() );
+			fill( path.getId(), mStacks.fill.back(), mStacks.fillOpacity.back() * mStacks.calcGroupOpacity() );
 	}
 	if( !mStacks.stroke.back().isNone() ) {
 		// Vertical and horizontal lines don't have a bounding box, since they are one-dimensional,
 		// even though the stroke-width makes it look like they should have a bounding box with non-zero width and height.
 		if( mStacks.stroke.back().fallback() && approxZero( path.getFillBounds().calcArea() ) ) {
 			if( !mStacks.stroke.back().fallback()->isNone() )
-				stroke( path.getId(), *mStacks.stroke.back().fallback(), mStacks.strokeOpacity.back() * mStacks.groupOpacity.back() );
+				stroke( path.getId(), *mStacks.stroke.back().fallback(), mStacks.strokeOpacity.back() * mStacks.calcGroupOpacity() );
 		}
 		else
-			stroke( path.getId(), mStacks.stroke.back(), mStacks.strokeOpacity.back() * mStacks.groupOpacity.back() );
+			stroke( path.getId(), mStacks.stroke.back(), mStacks.strokeOpacity.back() * mStacks.calcGroupOpacity() );
 	}
 }
 
@@ -1882,8 +1616,6 @@ void Svg::fill( GLuint pathId, const svg::Paint &paint, float opacity )
 {
 	gl::matrixLoadfEXT( GL_MODELVIEW, value_ptr( gl::getModelView() ) );
 	gl::matrixMult3x3fNV( GL_MODELVIEW, value_ptr( mStacks.matrix.back() ) );
-
-	GLuint fillRule = mStacks.fillRule.back() == svg::FILL_RULE_EVEN_ODD ? 0x01 : 0xFF;
 
 	//
 	ScopedShader scpShader( preparePaint( paint, opacity, true ) );
@@ -1904,7 +1636,8 @@ void Svg::fill( GLuint pathId, const svg::Paint &paint, float opacity )
 		gl::stencilFunc( GL_LESS, GLint( ~mask & 0xFF ), 0xFF ); // (step 5).
 		gl::stencilOp( GL_KEEP, GL_KEEP, GL_KEEP );
 
-		gl::stencilThenCoverFillPathNV( pathId, GL_COUNT_UP_NV, fillRule & coverMask, GL_BOUNDING_BOX_NV ); // (step 5).
+		GLuint stencilMask = getStencilMask();
+		gl::stencilThenCoverFillPathNV( pathId, GL_COUNT_UP_NV, stencilMask & coverMask, GL_BOUNDING_BOX_NV ); // (step 5).
 
 		// Remove path from stencil buffer (step 6).
 		gl::ScopedColorMask scpColorMask( GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE ); // Don't write to color buffer.
@@ -1913,20 +1646,13 @@ void Svg::fill( GLuint pathId, const svg::Paint &paint, float opacity )
 		gl::stencilFunc( GL_ALWAYS, GLint( clipMask ), coverMask );
 
 		gl::coverFillPathNV( pathId, GL_BOUNDING_BOX_NV );
-
-		//
-		addPreparePaintCommand( paint, opacity );
-		addFillCommand( pathId, mStacks.matrix.back(), clipMask, fillRule );
 	}
 	else {
-		gl::stencilFunc( GL_NOTEQUAL, 0, fillRule );
+		GLuint stencilMask = getStencilMask();
+		gl::stencilFunc( GL_NOTEQUAL, 0, stencilMask );
 		gl::stencilOp( GL_KEEP, GL_KEEP, GL_ZERO );
 
-		gl::stencilThenCoverFillPathNV( pathId, GL_COUNT_UP_NV, fillRule, GL_BOUNDING_BOX_NV );
-
-		//
-		addPreparePaintCommand( paint, opacity );
-		addFillCommand( pathId, mStacks.matrix.back(), 0x00, fillRule );
+		gl::stencilThenCoverFillPathNV( pathId, GL_COUNT_UP_NV, stencilMask, GL_BOUNDING_BOX_NV );
 	}
 }
 
@@ -1962,30 +1688,19 @@ void Svg::stroke( GLuint pathId, const svg::Paint &paint, float opacity )
 		gl::stencilFunc( GL_ALWAYS, GLint( clipMask ), coverMask );
 
 		gl::coverStrokePathNV( pathId, GL_BOUNDING_BOX_NV );
-
-		//
-		addPreparePaintCommand( paint, opacity );
-		addStrokeCommand( pathId, mStacks.matrix.back(), clipMask );
 	}
 	else {
 		gl::stencilFunc( GL_NOTEQUAL, 0, 0xFF );
 		gl::stencilOp( GL_KEEP, GL_KEEP, GL_ZERO );
 
 		gl::stencilThenCoverStrokePathNV( pathId, GL_COUNT_UP_NV, 0xFF, GL_BOUNDING_BOX_NV );
-
-		//
-		addPreparePaintCommand( paint, opacity );
-		addStrokeCommand( pathId, mStacks.matrix.back(), 0x00 );
 	}
 }
 
-void Svg::fillText( GLuint baseId, GLsizei count, const glm::mat3x2 *transforms, const uint32_t *indices, const svg::Paint &paint, float opacity )
+void Svg::fillInstanced( GLuint baseId, GLsizei count, const glm::mat3x2 *transforms, const uint32_t *indices, const svg::Paint &paint, float opacity )
 {
 	gl::matrixLoadfEXT( GL_MODELVIEW, value_ptr( gl::getModelView() ) );
 	gl::matrixMult3x3fNV( GL_MODELVIEW, value_ptr( mStacks.matrix.back() ) );
-
-	//
-	GLuint fillRule = mStacks.fillRule.back() == svg::FILL_RULE_EVEN_ODD ? 0x01 : 0xFF;
 
 	//
 	ScopedShader scpShader( preparePaint( paint, opacity, true ) );
@@ -2007,7 +1722,9 @@ void Svg::fillText( GLuint baseId, GLsizei count, const glm::mat3x2 *transforms,
 		gl::stencilOp( GL_KEEP, GL_KEEP, GL_KEEP );
 
 		// (step 5).
-		gl::stencilThenCoverFillPathInstancedNV( count, GL_UNSIGNED_INT, indices, baseId, GL_PATH_FILL_MODE_NV, fillRule & coverMask, GL_BOUNDING_BOX_OF_BOUNDING_BOXES_NV, GL_AFFINE_2D_NV, reinterpret_cast<const GLfloat *>( transforms ) );
+		GLuint stencilMask = getStencilMask();
+		gl::stencilThenCoverFillPathInstancedNV(
+			count, GL_UNSIGNED_INT, indices, baseId, GL_PATH_FILL_MODE_NV, stencilMask & coverMask, GL_BOUNDING_BOX_OF_BOUNDING_BOXES_NV, GL_AFFINE_2D_NV, reinterpret_cast<const GLfloat *>( transforms ) );
 
 		// Remove text from stencil buffer (step 6).
 		gl::ScopedColorMask scpColorMask( GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE ); // Don't write to color buffer.
@@ -2015,20 +1732,36 @@ void Svg::fillText( GLuint baseId, GLsizei count, const glm::mat3x2 *transforms,
 		gl::stencilOp( GL_KEEP, GL_KEEP, GL_ZERO );
 		gl::stencilFunc( GL_ALWAYS, GLint( clipMask ), coverMask );
 
-		gl::stencilThenCoverFillPathInstancedNV( count, GL_UNSIGNED_INT, indices, baseId, GL_PATH_FILL_MODE_NV, fillRule & coverMask, GL_BOUNDING_BOX_OF_BOUNDING_BOXES_NV, GL_AFFINE_2D_NV, reinterpret_cast<const GLfloat *>( transforms ) );
+		gl::stencilThenCoverFillPathInstancedNV(
+			count, GL_UNSIGNED_INT, indices, baseId, GL_PATH_FILL_MODE_NV, stencilMask & coverMask, GL_BOUNDING_BOX_OF_BOUNDING_BOXES_NV, GL_AFFINE_2D_NV, reinterpret_cast<const GLfloat *>( transforms ) );
 	}
 	else {
-		gl::stencilFunc( GL_NOTEQUAL, 0, fillRule );
+		GLuint stencilMask = getStencilMask();
+		gl::stencilFunc( GL_NOTEQUAL, 0, stencilMask );
 		gl::stencilOp( GL_KEEP, GL_KEEP, GL_ZERO );
 
-		gl::stencilThenCoverFillPathInstancedNV( count, GL_UNSIGNED_INT, indices, baseId, GL_PATH_FILL_MODE_NV, fillRule, GL_BOUNDING_BOX_OF_BOUNDING_BOXES_NV, GL_AFFINE_2D_NV, reinterpret_cast<const GLfloat *>( transforms ) );
+		gl::stencilThenCoverFillPathInstancedNV( count, GL_UNSIGNED_INT, indices, baseId, GL_PATH_FILL_MODE_NV, stencilMask, GL_BOUNDING_BOX_OF_BOUNDING_BOXES_NV, GL_AFFINE_2D_NV, reinterpret_cast<const GLfloat *>( transforms ) );
 	}
 }
 
-void Svg::strokeText( GLuint baseId, GLsizei count, const glm::mat3x2 *transforms, const uint32_t *indices, const svg::Paint &paint, float opacity )
+void Svg::strokeInstanced( GLuint baseId, GLsizei count, const glm::mat3x2 *transforms, const uint32_t *indices, const svg::Paint &paint, float opacity )
 {
 	gl::matrixLoadfEXT( GL_MODELVIEW, value_ptr( gl::getModelView() ) );
 	gl::matrixMult3x3fNV( GL_MODELVIEW, value_ptr( mStacks.matrix.back() ) );
+
+	// Set stroke parameters for each glyph.
+	if( !paint.isNone() ) {
+		float scale = transforms[0][0][0]; // Assume uniform scaling and single font size per call.
+
+		for( GLsizei i = 0; i < count; ++i ) {
+			GLuint pathId = baseId + indices[i];
+			gl::pathParameteriNV( pathId, GL_PATH_END_CAPS_NV, GLint( toCapsStyle( mStacks.lineCap.back() ) ) );
+			gl::pathParameteriNV( pathId, GL_PATH_JOIN_STYLE_NV, GLint( toJoinStyle( mStacks.lineJoin.back() ) ) );
+			gl::pathParameterfNV( pathId, GL_PATH_STROKE_WIDTH_NV, GLfloat( mStacks.strokeWidth.back() / scale ) );
+			gl::pathParameterfNV( pathId, GL_PATH_MITER_LIMIT_NV, GLfloat( mStacks.miterLimit.back() ) );
+			// TODO: add support for dashing?
+		}
+	}
 
 	//
 	ScopedShader scpShader( preparePaint( paint, opacity, true ) );
