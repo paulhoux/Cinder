@@ -2097,25 +2097,6 @@ ScopedShader::~ScopedShader()
 		mShader->unbind();
 }
 
-// FaceRef Cache::loadFace( const text::Face *face )
-//{
-//	Cache &self = get();
-//
-//	const auto &name = face->getFamilyName();
-//
-//	if( self.mFaces.count( name ) && static_cast<bool>( self.mFaces.at( name ) ) ) {
-//		// CI_LOG_V( "Using cached face for " << name << " (" << std::this_thread::get_id() << ")" );
-//		return self.mFaces.at( name );
-//	}
-//
-//	CI_LOG_V( "Loading face for " << name << " (" << std::this_thread::get_id() << ")" );
-//
-//	auto cached = Face::create( face );
-//	self.mFaces.insert_or_assign( name, cached );
-//
-//	return cached;
-// }
-
 ShaderRef Cache::loadShader( Shader::Type type )
 {
 	Cache &self = get();
@@ -2133,17 +2114,6 @@ ShaderRef Cache::loadShader( Shader::Type type )
 
 void Cache::clean()
 {
-	// auto &fonts = get().mFaces;
-	// for( auto itr = fonts.begin(); itr != fonts.end(); ) {
-	//	const auto &item = *itr;
-	//	if( item.second.use_count() < 2 ) {
-	//		CI_LOG_V( "Removing face " << item.first << " (" << std::this_thread::get_id() << ")" );
-	//		itr = fonts.erase( itr );
-	//	}
-	//	else
-	//		++itr;
-	// }
-
 	auto &shaders = get().mShaders;
 	for( auto itr = shaders.begin(); itr != shaders.end(); ) {
 		const auto &item = *itr;
@@ -2158,8 +2128,6 @@ void Cache::clean()
 
 void Cache::clear()
 {
-	// CI_LOG_V( "Removing all faces (" << std::this_thread::get_id() << ")" );
-	// get().mFaces.clear();
 	CI_LOG_V( "Removing all shaders (" << std::this_thread::get_id() << ")" );
 	get().mShaders.clear();
 }

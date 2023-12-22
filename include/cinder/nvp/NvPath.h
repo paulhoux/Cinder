@@ -507,9 +507,7 @@ class Cache {
 		thread_local static Cache instance;
 		return instance;
 	}
-
-	// static FaceRef loadFace( const text::Face *face );
-
+	
 	static ShaderRef loadShader( Shader::Type type );
 
 	static void clean();
