@@ -214,6 +214,22 @@ Rectf Path::getStrokeBounds() const
 	return bounds;
 }
 
+float Path::getClientLength() const
+{
+	float clientLength = 0;
+
+	if( mPathId > 0 )
+		gl::getPathParameterfvNV( mPathId, GL_PATH_CLIENT_LENGTH_NV, &clientLength );
+
+	return clientLength;
+}
+
+void Path::setClientLength( float length ) const
+{
+	if( mPathId > 0 )
+		gl::pathParameterfNV( mPathId, GL_PATH_CLIENT_LENGTH_NV, glm::max( 0.0f, length ) );
+}
+
 int Path::getNumSegments() const
 {
 	int numSegments = 0;

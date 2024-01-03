@@ -198,6 +198,11 @@ CI_API class Path {
 	[[nodiscard]] Rectf getFillBounds() const;
 	//! Returns the path's bounding box, calculated from the actual shape and adjusted for stroke width.
 	[[nodiscard]] Rectf getStrokeBounds() const;
+	
+	//! Returns the path's client length. Dash patterns use the client length to scale the dash pattern. Returns zero if not set.
+	[[nodiscard]] float getClientLength() const;
+	//! Sets the path's client length. Dash patterns use the client length to scale the dash pattern. Use zero to disable.
+	void setClientLength( float length ) const;
 
 	//! Obtains the path's commands and coords.
 	void getPath( std::vector<GLubyte> &commands, std::vector<GLfloat> &coords ) const;
@@ -207,7 +212,7 @@ CI_API class Path {
 	void setPath( const std::string &svg );
 
 	//! Returns the number of segments defined for this path.
-	int getNumSegments() const;
+	[[nodiscard]] int getNumSegments() const;
 
 	//! Resets the dash pattern.
 	void resetDashPattern() const;
@@ -285,9 +290,9 @@ CI_API class Path {
 
 	//! Returns the result of this path's transformation as a new path.
 	[[nodiscard]] Path transformed( const glm::mat3x2 &transform ) const;
-	//! Returns the result of this path's transformation as a new path.
+	//! Returns the result of this path's affine transformation as a new path.
 	[[nodiscard]] Path transformed( const glm::mat3x3 &transform ) const { return transformed( toMat3x2( transform ) ); }
-	//! Returns the result of this path's transformation as a new path.
+	//! Returns the result of this path's affine transformation as a new path.
 	[[nodiscard]] Path transformed( const glm::mat4x4 &transform ) const { return transformed( toMat3x2( transform ) ); }
 
 	//! Reverses the order of the points and segments, effectively changing the winding. NOT THOROUGHLY TESTED, USE WITH CARE!
