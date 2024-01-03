@@ -250,6 +250,12 @@
     <Filter Include="Header Files\gl\nv">
       <UniqueIdentifier>{7ff32b0d-8190-49b2-ab18-187db6196a2b}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Header Files\nvpath">
+      <UniqueIdentifier>{b04ce12b-dc98-41db-9df2-faede9cd043d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\nvpath">
+      <UniqueIdentifier>{531e7a6c-7d22-4178-919d-e631a3b76f38}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\src\cinder\Area.cpp">
@@ -1082,6 +1088,9 @@
     </ClCompile>
     <ClCompile Include="..\..\src\cinder\MediaTime.cpp">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\cinder\nvpath\NvPath.cpp">
+      <Filter>Source Files\nvpath</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -2275,6 +2284,9 @@
     </ClInclude>
     <ClInclude Include="..\..\include\cinder\MediaTime.h">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\cinder\nvpath\NvPath.h">
+      <Filter>Header Files\nvpath</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
