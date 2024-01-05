@@ -35,7 +35,6 @@ namespace nvpath {
 // Forward declarations.
 class Cache;
 class Canvas;
-class ClipRect;
 class Path;
 class Shader;
 
@@ -51,28 +50,38 @@ CI_API enum class JoinStyle { ROUND = GL_ROUND_NV, BEVEL = GL_BEVEL_NV, MITER_RE
 CI_API enum class PathStyle { MOVETO_RESETS = GL_MOVE_TO_RESETS_NV, MOVETO_CONTINUES = GL_MOVE_TO_CONTINUES_NV, DEFAULT = GL_MOVE_TO_RESETS_NV };
 
 //! Defines the coordinate system used by gradients and images.
-enum class CoordinateSpace { OBJECT_BOUNDING_BOX = GL_PATH_OBJECT_BOUNDING_BOX_NV, USER_SPACE_ON_USE = GL_OBJECT_LINEAR_NV, DEFAULT = GL_PATH_OBJECT_BOUNDING_BOX_NV };
+CI_API enum class CoordinateSpace { OBJECT_BOUNDING_BOX = GL_PATH_OBJECT_BOUNDING_BOX_NV, USER_SPACE_ON_USE = GL_OBJECT_LINEAR_NV, DEFAULT = GL_PATH_OBJECT_BOUNDING_BOX_NV };
 //! Defines the spread method used by gradient and images.
-enum class SpreadMethod { PAD = GL_CLAMP_TO_EDGE, REFLECT = GL_MIRRORED_REPEAT, REPEAT = GL_REPEAT, DEFAULT = PAD };
+CI_API enum class SpreadMethod { PAD = GL_CLAMP_TO_EDGE, REFLECT = GL_MIRRORED_REPEAT, REPEAT = GL_REPEAT, DEFAULT = PAD };
 
 //!
-CI_API static CapsStyle toCapsStyle( ci::svg::LineCap lineCap );
+CI_API enum class PathFormat { SVG = GL_PATH_FORMAT_SVG_NV, PS = GL_PATH_FORMAT_PS_NV };
+
 //!
-CI_API static JoinStyle toJoinStyle( ci::svg::LineJoin lineJoin );
+CI_API static CapsStyle toCapsStyle( svg::LineCap lineCap );
+//!
+CI_API static JoinStyle toJoinStyle( svg::LineJoin lineJoin );
 //!
 CI_API static CoordinateSpace toGradientUnits( std::string style );
 //!
 CI_API static SpreadMethod toSpreadMethod( std::string style );
 
-//!
+//! Converts an affine 3x3 matrix to a 3x2 matrix.
 CI_API inline glm::mat3x2 toMat3x2( const glm::mat3x3 &m )
 {
 	return glm::mat3x2{ m[0][0], m[0][1], m[1][0], m[1][1], m[2][0], m[2][1] };
 }
-//!
+//! Converts an affine 4x4 matrix to a 3x2 matrix. Z-components are ignored.
 CI_API inline glm::mat3x2 toMat3x2( const glm::mat4x4 &m )
 {
 	return glm::mat3x2{ m[0][0], m[0][1], m[1][0], m[1][1], m[3][0], m[3][1] };
+}
+
+//! Returns whether NV Path Rendering is available on this system.
+CI_API inline bool hasNvPathRendering()
+{
+	assert( ci::gl::context() ); // We must have an active OpenGL context first!
+	return bool( GLAD_GL_NV_path_rendering );
 }
 
 //! Shader for solid colors or gradients to be applied to paths.
@@ -103,7 +112,7 @@ class CI_API Shader {
 	void uniform( const std::string &name, const glm::mat3x2 &value ) const;
 	void uniform( const std::string &name, const mat4 &value ) const;
 
-	void setColor( const ci::ColorA &color ) const;
+	void setColor( const ColorA &color ) const;
 
   protected:
 	GLuint mProgram{ 0 };
@@ -183,8 +192,10 @@ CI_API class Path {
 	explicit Path( const Shape2d &shape );
 	//! Construct a path from a PolyLine2. Note the correct winding order: points should be defined in counter clockwise order.
 	explicit Path( const PolyLine2 &polyLine );
-	//! Construct a path from an \a svg string.
-	explicit Path( const std::string &svg );
+	//! Construct a path from a \a path string. Accepts SVG or PostScript \a format.
+	explicit Path( const std::string &path, PathFormat format = PathFormat::SVG );
+	//! Construct a path from a vector of \a commands and 2D \a points.
+	explicit Path( const std::vector<GLubyte> &commands, const std::vector<vec2> &points );
 
 	//! Creates a shallow clone of this path. Use with care.
 	[[nodiscard]] PathRef clone() const { return std::make_shared<Path>( *this ); }
@@ -198,7 +209,7 @@ CI_API class Path {
 	[[nodiscard]] Rectf getFillBounds() const;
 	//! Returns the path's bounding box, calculated from the actual shape and adjusted for stroke width.
 	[[nodiscard]] Rectf getStrokeBounds() const;
-	
+
 	//! Returns the path's client length. Dash patterns use the client length to scale the dash pattern. Returns zero if not set.
 	[[nodiscard]] float getClientLength() const;
 	//! Sets the path's client length. Dash patterns use the client length to scale the dash pattern. Use zero to disable.
@@ -286,16 +297,20 @@ CI_API class Path {
 	Path &operator+=( const Path &other );
 
 	//! Transforms the coordinates of our path.
-	void transform( const glm::mat3x2 &transform ) const;
+	void transform( const glm::mat3x2 &m ) const;
+	//! Transforms the coordinates of our path. Assumes matrix \a m is affine.
+	void transform( const glm::mat3x3 &m ) const { transform( toMat3x2( m ) ); }
+	//! Transforms the coordinates of our path. Assumes matrix \a m is affine.
+	void transform( const glm::mat4x4 &m ) const { transform( toMat3x2( m ) ); }
 
 	//! Returns the result of this path's transformation as a new path.
-	[[nodiscard]] Path transformed( const glm::mat3x2 &transform ) const;
-	//! Returns the result of this path's affine transformation as a new path.
-	[[nodiscard]] Path transformed( const glm::mat3x3 &transform ) const { return transformed( toMat3x2( transform ) ); }
-	//! Returns the result of this path's affine transformation as a new path.
-	[[nodiscard]] Path transformed( const glm::mat4x4 &transform ) const { return transformed( toMat3x2( transform ) ); }
+	[[nodiscard]] Path transformed( const glm::mat3x2 &m ) const;
+	//! Returns the result of this path's transformation as a new path. Assumes matrix \a m is affine.
+	[[nodiscard]] Path transformed( const glm::mat3x3 &m ) const { return transformed( toMat3x2( m ) ); }
+	//! Returns the result of this path's transformation as a new path. Assumes matrix \a m is affine.
+	[[nodiscard]] Path transformed( const glm::mat4x4 &m ) const { return transformed( toMat3x2( m ) ); }
 
-	//! Reverses the order of the points and segments, effectively changing the winding. NOT THOROUGHLY TESTED, USE WITH CARE!
+	//! Reverses the order of the points and segments, effectively changing the winding.
 	void reverse() const;
 
   protected:
@@ -304,7 +319,7 @@ CI_API class Path {
 	GLuint mPathId{ 0 };
 };
 
-//! Stores font faces and shaders so they can be easily reused by other parts of your code.
+//! Stores shaders so they can be easily reused by other parts of your code.
 class Cache {
 	std::unordered_map<Shader::Type, ShaderRef> mShaders;
 
@@ -395,13 +410,6 @@ class ScopedCanvas {
 	ScopedCanvas &operator=( const ScopedCanvas & ) = delete;
 	ScopedCanvas &operator=( ScopedCanvas && ) = delete;
 };
-
-//! Returns whether NV Path Rendering is available on this system.
-CI_API inline bool hasNvPathRendering()
-{
-	assert( ci::gl::context() ); // We must have an active OpenGL context first!
-	return bool( GLAD_GL_NV_path_rendering );
-}
 
 } // namespace nvpath
 } // namespace cinder

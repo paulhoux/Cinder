@@ -133,6 +133,8 @@ Path::Path( const Path2d &path )
 
 	mPathId = gl::genPathsNV( 1 );
 	gl::pathCommandsNV( mPathId, static_cast<GLsizei>( commands.size() ), commands.data(), static_cast<GLsizei>( points.size() * 2 /* each vec2 contains 2 floats */ ), GL_FLOAT, points.data() );
+	if( GLenum err = gl::getError(); err != GL_NO_ERROR )
+		CI_LOG_E( gl::getErrorString( err ) );
 }
 
 Path::Path( const Shape2d &shape )
@@ -156,6 +158,8 @@ Path::Path( const Shape2d &shape )
 
 	mPathId = gl::genPathsNV( 1 );
 	gl::pathCommandsNV( mPathId, static_cast<GLsizei>( commands.size() ), commands.data(), static_cast<GLsizei>( coords.size() * 2 /* each vec2 contains 2 floats */ ), GL_FLOAT, coords.data() );
+	if( GLenum err = gl::getError(); err != GL_NO_ERROR )
+		CI_LOG_E( gl::getErrorString( err ) );
 }
 
 Path::Path( const PolyLine2 &polyLine )
@@ -176,12 +180,24 @@ Path::Path( const PolyLine2 &polyLine )
 
 	mPathId = gl::genPathsNV( 1 );
 	gl::pathCommandsNV( mPathId, static_cast<GLsizei>( commands.size() ), commands.data(), static_cast<GLsizei>( points.size() * 2 /* each vec2 contains 2 floats */ ), GL_FLOAT, points.data() );
+	if( GLenum err = gl::getError(); err != GL_NO_ERROR )
+		CI_LOG_E( gl::getErrorString( err ) );
 }
 
-Path::Path( const std::string &svg )
+Path::Path( const std::string &path, PathFormat format )
 {
 	mPathId = gl::genPathsNV( 1 );
-	gl::pathStringNV( mPathId, GL_PATH_FORMAT_SVG_NV, GLsizei( svg.length() ), svg.c_str() );
+	gl::pathStringNV( mPathId, GLenum( format ), GLsizei( path.length() ), path.c_str() );
+	if( GLenum err = gl::getError(); err != GL_NO_ERROR )
+		CI_LOG_E( gl::getErrorString( err ) );
+}
+
+Path::Path( const std::vector<GLubyte> &commands, const std::vector<vec2> &points )
+{
+	mPathId = gl::genPathsNV( 1 );
+	gl::pathCommandsNV( mPathId, static_cast<GLsizei>( commands.size() ), commands.data(), static_cast<GLsizei>( points.size() * 2 /* each vec2 contains 2 floats */ ), GL_FLOAT, points.data() );
+	if( GLenum err = gl::getError(); err != GL_NO_ERROR )
+		CI_LOG_E( gl::getErrorString( err ) );
 }
 
 float Path::getLength() const
@@ -560,16 +576,16 @@ Path &Path::operator+=( const Path &other )
 	return *this;
 }
 
-void Path::transform( const glm::mat3x2 &transform ) const
+void Path::transform( const glm::mat3x2 &m ) const
 {
 	if( mPathId > 0 )
-		gl::transformPathNV( mPathId, mPathId, GL_AFFINE_2D_NV, reinterpret_cast<const GLfloat *>( &transform ) );
+		gl::transformPathNV( mPathId, mPathId, GL_AFFINE_2D_NV, reinterpret_cast<const GLfloat *>( &m ) );
 }
 
-Path Path::transformed( const glm::mat3x2 &transform ) const
+Path Path::transformed( const glm::mat3x2 &m ) const
 {
 	Path path( *this );
-	path.transform( transform );
+	path.transform( m );
 	return path;
 }
 
