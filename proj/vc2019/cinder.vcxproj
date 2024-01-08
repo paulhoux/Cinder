@@ -1144,6 +1144,7 @@
     <ClInclude Include="..\..\include\cinder\TimelineItem.h" />
     <ClInclude Include="..\..\include\cinder\Triangulate.h" />
     <ClInclude Include="..\..\include\cinder\Tween.h" />
+    <ClInclude Include="..\..\include\cinder\Uid.h" />
     <ClInclude Include="..\..\include\cinder\Unicode.h" />
     <ClInclude Include="..\..\include\cinder\UrlImplWinInet.h" />
     <ClInclude Include="..\..\include\freetype\config\ftconfig.h" />
